@@ -39,7 +39,7 @@ public sealed partial class NativeMedia : INativeMedia
     private DesktopCapture? desktop;
     private LocalVideoTrack? desktopTrack;
     private string? microphoneSid, desktopSid, loopbackSid;
-    private WasapiOut? output;
+    private NativeAudioOutput? output;
     private MixingSampleProvider? mixer;
     private string? session, microphoneDevice, speakerDevice;
     private volatile bool closing;
@@ -211,6 +211,18 @@ public sealed partial class NativeMedia : INativeMedia
         await StartScreenShareAsync(choice.Value.Source, choice.Value.Audio);
     }
 
+    private async Task StopFailedDesktopAsync(DesktopCapture failed, Exception error)
+    {
+        await gate.WaitAsync();
+        try
+        {
+            if (!ReferenceEquals(desktop, failed)) return;
+            await StopDesktopAsync(); await ReportAsync();
+            SetStatus($"画面共有: {SafeError(error)}");
+        }
+        finally { gate.Release(); }
+    }
+
     /// <summary>Also used by automated native media smoke checks without opening a chooser.</summary>
     public async Task StartScreenShareAsync(ScreenSource source, bool systemAudio = false)
     {
@@ -221,7 +233,8 @@ public sealed partial class NativeMedia : INativeMedia
             await StopDesktopAsync();
             desktop = new DesktopCapture(source);
             desktop.Frame += frame => PushVideo(client.State.SelfId, "screen", frame);
-            desktop.Failed += ex => SetStatus($"画面共有: {SafeError(ex)}");
+            var sharing = desktop;
+            desktop.Failed += ex => _ = StopFailedDesktopAsync(sharing, ex);
             desktopTrack = LocalVideoTrack.Create("screen", desktop.Source);
             desktopSid = (await room.LocalParticipant.PublishTrackAsync(desktopTrack, new TrackPublishOptions
             {
@@ -298,10 +311,7 @@ public sealed partial class NativeMedia : INativeMedia
             if (mixer is null)
             {
                 mixer = new MixingSampleProvider(WaveFormat.CreateIeeeFloatWaveFormat(48000, 2)) { ReadFully = true };
-                using var enumerator = new MMDeviceEnumerator();
-                var device = speakerDevice is null ? enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia) : enumerator.GetDevice(speakerDevice);
-                output = new WasapiOut(device, AudioClientShareMode.Shared, true, 60);
-                output.Init(mixer); output.Play();
+                output = new NativeAudioOutput(mixer.ToWaveProvider(), speakerDevice);
             }
             mixer.AddMixerInput(input);
         });
@@ -461,6 +471,7 @@ public sealed partial class NativeMedia : INativeMedia
 
     public async Task ShowAudioSettingsAsync(Window? owner = null)
     {
+        if (OperatingSystem.IsLinux()) { await ShowLinuxAudioSettingsAsync(owner); return; }
         owner ??= (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
         if (owner is null) return;
         await Dispatcher.UIThread.InvokeAsync(async () =>
@@ -511,8 +522,7 @@ public sealed partial class NativeMedia : INativeMedia
                 output?.Stop(); output?.Dispose(); output = null;
                 if (mixer is not null)
                 {
-                    var device = speakerDevice is null ? enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia) : enumerator.GetDevice(speakerDevice);
-                    output = new WasapiOut(device, AudioClientShareMode.Shared, true, 60); output.Init(mixer); output.Play();
+                    output = new NativeAudioOutput(mixer.ToWaveProvider(), speakerDevice);
                 }
                 if (microphoneWanted && Connected) await StartMicrophoneAsync();
                 await ReportAsync();

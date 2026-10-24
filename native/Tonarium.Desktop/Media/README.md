@@ -1,6 +1,6 @@
-# Windows ネイティブメディア
+# ネイティブメディア
 
-`NativeMedia` は LiveKit Rust FFI (`Livekit.Rtc.Dotnet`) に接続し、WASAPI で音声入出力、GDI で画面/ウィンドウ共有を処理します。WebView は使用しません。2D/Unity の切替では同じインスタンスを維持してください。
+`NativeMedia` は LiveKit Rust FFI (`Livekit.Rtc.Dotnet`) に接続し、WASAPI で音声入出力、GDI で画面/ウィンドウ共有を処理します。LinuxではPulseAudio/PipeWireで音声入出力、xdg-desktop-portalとGStreamerで画面共有を処理します。Linuxの依存関係は [Linux版](../../../docs/native-linux.md) を参照してください。通話処理にWebViewは使用しません。2D/Unity の切替では同じインスタンスを維持してください。
 
 - `SetMicrophoneAsync` はマイクの希望状態を保存します。セッションを移動してもミュートは維持します。
 - `SetScreenShareAsync(true)` は共有対象と PC 音声の選択ダイアログを表示します。

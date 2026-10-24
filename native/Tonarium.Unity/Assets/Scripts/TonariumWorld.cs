@@ -81,6 +81,7 @@ namespace Tonarium.UnityClient
             if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TONARIUM_INPUT_DIAGNOSTICS"))) gameObject.AddComponent<InputDiagnostics>();
             foreach (string arg in Environment.GetCommandLineArgs())
             {
+                if (arg == "--tonarium-hud-probe") gameObject.AddComponent<HudInputProbe>();
                 if (arg == "--tonarium-smoke") gameObject.AddComponent<SmokeCheck>();
                 if (arg == "--tonarium-embedded") embedded = true;
                 if (arg == "--tonarium-avatar-parity") gameObject.AddComponent<AvatarParityProbe>();
@@ -96,6 +97,7 @@ namespace Tonarium.UnityClient
         {
             string type = (string)m["t"];
             if (type == "notice") { notice = (string)m["text"] ?? ""; return; }
+            if (type == "nativeChatClosed") { chatOpen = false; Unlock(); return; }
             if (type == "nativeItems") { SetNativeOpenItems(m["ids"] as JArray); return; }
             if(type=="pointerWindow")
             {
@@ -325,14 +327,15 @@ namespace Tonarium.UnityClient
         {
             PointerDelta = Vector2.zero;
             ValidateChessSelection();
-            if (Input.GetKeyDown(KeyCode.Escape)) { EndCanvasStroke(); EndNoteEditing(); ClearChessSelection(); menu = false; Unlock(); }
+            if (!string.IsNullOrEmpty(Input.compositionString)) lastCompositionFrame = Time.frameCount;
+            if (Input.GetKeyDown(KeyCode.Escape)) { chatOpen = false; EndCanvasStroke(); EndNoteEditing(); ClearChessSelection(); menu = false; Unlock(); }
             if (Input.GetKeyDown(KeyCode.F2)) ReturnTo2D();
-            if (Input.GetKeyDown(KeyCode.Return) && !menu && selected == null && chessPromotionTo < 0)
+            if (Input.GetKeyDown(KeyCode.Return) && !chatOpen && !menu && selected == null && chessPromotionTo < 0)
             {
                 if (embedded) { Unlock(); bridge.Send(new {t="focusChat"}); }
-                else { chatOpen = !chatOpen; if (chatOpen) Unlock(); else SendChat(); }
+                else { chatOpen = true; chatOpenedFrame = Time.frameCount; Unlock(); }
             }
-            if(selected!=null&&Input.GetMouseButtonDown(0))
+            if(selected!=null&&items.TryGetValue(selected,out var selectedItem)&&(string)selectedItem["kind"]=="note"&&Input.GetMouseButtonDown(0))
             {
                 var point=new Vector2(Input.mousePosition.x/uiScale,(Screen.height-Input.mousePosition.y)/uiScale);
                 float width=Mathf.Min(480,HudWidth-32);
@@ -341,17 +344,7 @@ namespace Tonarium.UnityClient
             bool controls = !menu && !chatOpen && selected == null && chessPromotionTo < 0;
             if (embedded && controls && Input.GetKeyDown(KeyCode.Tab)) bridge.Send(new { t = "toggleSidePanels" });
             if (embedded && controls && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && Input.GetKeyDown(KeyCode.V)) bridge.Send(new { t = "pasteMedia" });
-            bool justLocked = controls && Input.GetMouseButtonDown(0) && Cursor.lockState != CursorLockMode.Locked;
-            if (justLocked)
-            {
-                Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false;
-                if(embedded && relativePointer==null && pointerWindow!=IntPtr.Zero && !WindowsRelativePointer.TryCreate(out relativePointer,pointerWindow))pointerInitializationError=WindowsRelativePointer.LastCreateError;
-                if(relativePointer!=null&&!relativePointer.SetLocked(true))
-                {
-                    pointerInitializationError=relativePointer.LastError??"Relative pointer registration did not activate";
-                }
-                if(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TONARIUM_INPUT_DIAGNOSTICS")))Debug.Log("TONARIUM_POINTER "+(RelativePointerActive?"relative":"legacy")+" "+PointerError);
-            }
+            bool justLocked = Time.frameCount <= pointerLockedFrame + 1;
             if (controls && Cursor.lockState == CursorLockMode.Locked)
             {
                 Vector2 delta;
@@ -535,6 +528,7 @@ namespace Tonarium.UnityClient
                 return;
             }
             if (kind == "note") BeginNoteEditing(target.Id);
+            else if (kind == "image") BeginImageViewing(target.Id);
             else OpenNativeItem(target.Id);
         }
         void ToggleCarry()
@@ -581,6 +575,19 @@ namespace Tonarium.UnityClient
             Room(new { t = "itemAction", id = held, action = new { a = "drop", x = p.x, z = -p.z, ry = -yaw * Mathf.Deg2Rad, pitch = -pitch * Mathf.Deg2Rad } }); held = null;
         }
         void Room(object value) => bridge.Send(new { t = "room", message = value });
+        int pointerLockedFrame = -10;
+        void LockPointer()
+        {
+            pointerLockedFrame = Time.frameCount;
+            Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false;
+            if(embedded && relativePointer==null && pointerWindow!=IntPtr.Zero && !WindowsRelativePointer.TryCreate(out relativePointer,pointerWindow))pointerInitializationError=WindowsRelativePointer.LastCreateError;
+            if(relativePointer!=null&&!relativePointer.SetLocked(true))
+            {
+                pointerInitializationError=relativePointer.LastError??"Relative pointer registration did not activate";
+            }
+            if(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TONARIUM_INPUT_DIAGNOSTICS")))Debug.Log("TONARIUM_POINTER "+(RelativePointerActive?"relative":"legacy")+" "+PointerError);
+        }
+
         void Unlock() { EndCanvasStroke();FinishCarry();relativePointer?.SetLocked(false);Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }
         void OnApplicationFocus(bool focused){if(!focused)Unlock();}
         void SendChat() { if (!string.IsNullOrWhiteSpace(draft)) Room(new { t = "chat", text = draft, scope = "all" }); draft = ""; }

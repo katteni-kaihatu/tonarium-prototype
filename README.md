@@ -17,6 +17,10 @@
 
 詳しい仕組みと使い方は [docs/](docs/) にある。
 
+## Linux ネイティブ版
+
+Linux x86_64版のビルド・インストール・AUR用PKGBUILDは [Linux ネイティブ版](docs/native-linux.md) を参照。2DはAvalonia、3DはUnity Linuxプレイヤーを使用する。
+
 ## Windows ネイティブ版
 
 `native/` に Avalonia の 2D クライアントと Unity の 3D クライアントがある。同じサーバーとセッションに接続する。2DはWeb版と共通の画像・アイコン・フォントを使用し、お絵描きアバターもネイティブでアニメーション表示する。起動は `powershell -ExecutionPolicy Bypass -File native/run-desktop.ps1`。初回は .NET 10 SDK が必要。3D のビルド、配布、確認状況は [Windows ネイティブ版](docs/native-windows.md) を参照。

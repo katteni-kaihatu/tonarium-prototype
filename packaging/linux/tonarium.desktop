@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Tonarium
+Comment=Shared social spaces in 2D and 3D
+Comment[ja]=2Dと3Dでつながるソーシャル空間
+Exec=tonarium
+Icon=tonarium
+Terminal=false
+Categories=Network;Chat;
+StartupWMClass=Tonarium

@@ -188,8 +188,11 @@ namespace Tonarium.UnityClient
         {
             using (var request = UnityWebRequestTexture.GetTexture(MediaUrl(url)))
             {
-                yield return request.SendWebRequest(); if (request.result != UnityWebRequest.Result.Success || panel == null) yield break;
-                var texture = DownloadHandlerTexture.GetContent(request); texture.anisoLevel = 4; panel.GetComponent<Renderer>().material.mainTexture = texture; panel.GetComponentInParent<ItemResources>()?.Textures.Add(texture);
+                yield return request.SendWebRequest();
+                if (panel == null) yield break;
+                var surface = panel.GetComponent<ItemPanelSurface>();
+                if (request.result != UnityWebRequest.Result.Success) { if (surface != null) surface.ImageLoadFailed = true; yield break; }
+                var texture = DownloadHandlerTexture.GetContent(request); if (surface != null) surface.Texture = texture; texture.anisoLevel = 4; panel.GetComponent<Renderer>().material.mainTexture = texture; panel.GetComponentInParent<ItemResources>()?.Textures.Add(texture);
             }
         }
 

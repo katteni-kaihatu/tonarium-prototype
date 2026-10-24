@@ -25,9 +25,14 @@ internal static class Program
         var server = args.ElementAtOrDefault(0) ?? "http://localhost:3015";
         output = Path.GetFullPath(args.ElementAtOrDefault(1) ?? Path.Combine(AppContext.BaseDirectory, "ui-results"));
         Directory.CreateDirectory(output);
+        File.Delete(Path.Combine(output, "result.json"));
         File.Delete(Path.Combine(output, "failure-state.png"));
         var builder = AppBuilder.Configure<Tonarium.Desktop.App>();
-        if (args.Contains("--native-lifecycle")) builder.UsePlatformDetect();
+        if (args.Contains("--linux-ime") || args.Contains("--linux-form-ime") || args.Contains("--linux-3d-ime")) System.Diagnostics.Trace.Listeners.Add(new System.Diagnostics.ConsoleTraceListener());
+        if (args.Contains("--linux-ime") || args.Contains("--linux-form-ime") || args.Contains("--linux-3d-ime")) builder = args.Contains("--ime-baseline")
+            ? builder.UsePlatformDetect()
+            : Tonarium.Desktop.Program.BuildAvaloniaApp();
+        else if (args.Contains("--linux-voice") || args.Contains("--native-lifecycle") || args.Contains("--linux-platform") || args.Contains("--linux-online")) builder.UsePlatformDetect();
         else builder.UseSkia().UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false });
         builder.SetupWithoutStarting();
         SynchronizationContext.SetSynchronizationContext(new AvaloniaSynchronizationContext());
@@ -37,7 +42,13 @@ internal static class Program
         {
             try
             {
-                if (args.Contains("--3d-lifecycle")) await ThreeDLifecycleProbe.Run(output, Pass, args.Contains("--native-lifecycle"));
+                if (args.Contains("--linux-3d-ime")) await LinuxThreeDImeProbe.Run(output, Pass);
+                else if (args.Contains("--linux-form-ime")) await LinuxFormImeProbe.Run(output, Pass);
+                else if (args.Contains("--linux-ime")) await LinuxImeProbe.Run(output, Pass);
+                else if (args.Contains("--linux-voice")) await LinuxVoiceProbe.Run(server, output, Pass);
+                else if (args.Contains("--linux-online")) await LinuxOnlineProbe.Run(server, output, Pass);
+                else if (args.Contains("--linux-platform")) await LinuxPlatformProbe.Run(output, Pass);
+                else if (args.Contains("--3d-lifecycle")) await ThreeDLifecycleProbe.Run(output, Pass, args.Contains("--native-lifecycle"));
                 else if (args.Contains("--audio-transmit")) await AudioTransmitProbe.Run(output, Pass);
                 else if (args.Contains("--side-panels")) await SidePanelProbe.Run(output, Pass);
                 else if (args.Contains("--chat-scroll")) await ChatScrollProbe.Run(output, Pass);
@@ -57,7 +68,15 @@ internal static class Program
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new
         {
             passed = failure is null, checks = Checks, layouts = Layouts, error = failure?.ToString(),
-            limitations = args.Contains("--native-lifecycle")
+            limitations = args.Contains("--linux-ime") || args.Contains("--linux-form-ime") || args.Contains("--linux-3d-ime")
+                ? new[] { "Real X11/XWayland IME conversion; no server connection. IBus-only desktop is not exercised." }
+                : args.Contains("--linux-voice")
+                ? new[] { "Real Linux recorder/player and isolated local group channel; synthetic tone through a temporary null sink only." }
+                : args.Contains("--linux-online")
+                ? new[] { "Synthetic audio and camera frames only; no physical microphone or desktop captured.", "Dedicated temporary session only; the lounge is never joined." }
+                : args.Contains("--linux-platform")
+                ? new[] { "WebKit uses a local test page; external YouTube playback is a separate check.", "Audio uses a temporary null sink; no physical microphone or speaker is used." }
+                : args.Contains("--native-lifecycle")
                 ? new[] { "Real Windows windows and Unity processes; physical keyboard scan codes, OS logoff and unrelated GPU faults are not tested." }
                 : new[] { "Headless native control input and Skia rendering; no physical IME or OS window-manager verification.", "LiveKit devices and Unity rendering are checked by separate integration checks." }
         }, new JsonSerializerOptions { WriteIndented = true }));

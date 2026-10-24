@@ -55,6 +55,12 @@ namespace Tonarium.UnityClient
                             if (actions.Length != 3 || (string)actions[0]["a"] != "noteLock" || (bool?)actions[0]["lock"] != true || (string)actions[1]["text"] != "編集した付箋" || (bool?)actions[2]["lock"] != false)
                                 throw new InvalidOperationException("Note lock/edit/unlock emission failed.");
                             checks.Add("付箋のロック・変更・解除を順に送信");
+                            var imageItem = item("image"); imageItem["url"] = "file:///nonexistent-tonarium-probe.png"; apply(imageItem);
+                            call("BeginImageViewing", new object[] { (string)imageItem["id"] });
+                            if ((string)typeof(TonariumWorld).GetField("selected", flags).GetValue(world) != (string)imageItem["id"] || sent().Any(m => (string)m["t"] == "openItem"))
+                                throw new InvalidOperationException("Note/image unexpectedly delegated to native UI.");
+                            call("EndNoteEditing", new object[0]);
+                            checks.Add("付箋と画像は別窓を開かずUnity内で操作");
 
                             string self = (string)typeof(TonariumWorld).GetField("selfId", flags).GetValue(world);
                             var dice = item("dice");

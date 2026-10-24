@@ -60,3 +60,21 @@ dotnet run --project native/Tonarium.UiSmoke -c Release -- unused native/artifac
 ```
 
 This is a happy-path integration smoke, not a failure-case unit suite. Headless input does not validate physical Windows IME composition, foreground window switching, GPU surfaces, microphone devices or Unity rendering; those require the separate runtime smoke. Its CPU sample includes the test harness and Skia software rendering, so it is evidence about this run, not a hardware-independent performance guarantee.
+
+## Linux
+
+`--linux-platform` は画像変換、実X11上のWebKitGTK埋め込みと時計同期、専用の仮想PulseAudioデバイスを使う音声入出力を検証する。`--linux-online` は指定サーバーに専用セッションを新規作成し、2クライアント同期・Unity起動終了・LiveKitの合成音声と仮想カメラ映像を検証した後、セッションを削除する。既存のラウンジには参加しない。[手順](../../docs/native-linux.md)。
+
+`--3d-lifecycle` は同期送信失敗後もUnityブリッジが次のコマンドを処理できることを検証する。`--linux-online` は専用テスト部屋で6秒のUI停止中の24メッセージ受信、およびUnity起動中の同期切断・復旧3回も検証する。
+
+## Linux IME
+
+`--linux-ime` は実際のX11/XWaylandウィンドウでIMEの未確定文字列と「日本語」の確定を確認する。サーバーには接続しない。ArchのFcitx5/Mozc環境では、`python3 native/verification/linux/ime-check.py native/artifacts/ime-native dotnet native/Tonarium.UiSmoke/bin/Release/net10.0/Tonarium.UiSmoke.dll unused native/artifacts/ime-native --linux-ime` で専用ウィンドウへキーを送れる。xdotoolとfcitx5-remoteが必要で、テスト中はウィンドウをアクティブにする。入力エンジンはテスト終了時に戻す。
+
+`--ime-baseline` を追加すると修正前の起動設定を使う。IME関連の環境変数が未指定の環境では、ローマ字のままになり検証に失敗する。IBusのサービス選択は検証するが、IBusのみの実デスクトップは未検証。
+
+`--linux-3d-ime` は `TONARIUM_UNITY_PLAYER` で指定した実UnityプレイヤーをローカルTCPブリッジに接続する。`python3 native/verification/linux/hud-check.py OUTPUT dotnet native/Tonarium.UiSmoke/bin/Release/net10.0/Tonarium.UiSmoke.dll unused OUTPUT --linux-3d-ime` で、☰・ワールド名・ワールド切替・2D復帰、空間クリックによる視点操作、日本語変換、確定Enterでは未送信、次のEnterで1回だけ送信、再入力と空Enterを検証する。製品と同じIME起動設定を使い、専用入力窓への迂回は失敗扱いにする。クリックは対象Unity窓へX11イベントを送る。IMEには実デスクトップのFcitx5/Mozcとフォーカスが必要。外部サーバーは使わない。
+
+長文IMEの回帰確認は `TONARIUM_IME_ROMAJI=wagahaihanekodearu.namaehamadanai.` と `TONARIUM_IME_EXPECTED='吾輩は猫である。名前はまだ無い。'` を同じコマンドへ渡す。変換候補はMozcの辞書・学習状態に依存する。`TONARIUM_IME_ITEMS=1` も指定すると付箋への同じ文章の保存と画像ビューアーの拡大・終了、別窓が開かないことを確認する。事前にOUTPUT内へ `test-image.png` を置く。未確定文字はIME側で表示するため、Unityの `compositionString` が空でも正常。診断用の `hud-command.json` は `--tonarium-hud-probe` を指定したテスト起動時のみ読み取る。
+
+`--linux-form-ime` は実際のセッション作成ダイアログを開き、最初のセッション名欄へTab移動なしで日本語を入力する。`ime-check.py` から起動する。`--linux-voice` はローカル検証サーバー上にグループを作り、実際の録音・再生ウィンドウで開始、停止、WebMアップロード、会話への添付、一時停止、再開、再再生、録音キャンセル、開始失敗を確認する。仮想PulseAudioデバイスの合成音を使用し、実マイク・実スピーカーは使わない。

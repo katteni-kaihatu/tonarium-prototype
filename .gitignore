@@ -17,4 +17,13 @@ native/**/*.log
 # PNPM
 pnpm-lock.yaml
 pnpm-workspace.yaml
+
+# Linux packaging
+packaging/aur/**/src/
+packaging/aur/**/pkg/
+packaging/aur/**/*.tar.gz
+packaging/aur/**/*.pkg.tar.*
+**/__pycache__/
+
 data-isolated
+

@@ -20,7 +20,12 @@ internal static class Program
         }
         catch (Exception e) { Log(e.ToString()); throw; }
     }
-    public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<App>().UsePlatformDetect().LogToTrace();
+    public static AppBuilder BuildAvaloniaApp()
+    {
+        Linux.LinuxInputMethod.Configure();
+        return AppBuilder.Configure<App>().UsePlatformDetect()
+            .With(new X11PlatformOptions { EnableIme = true }).LogToTrace();
+    }
     public static string? Argument(string name)
     {
         var i = Array.IndexOf(Arguments, name);

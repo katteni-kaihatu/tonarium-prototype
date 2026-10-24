@@ -49,3 +49,36 @@ jobs:
           path: native/artifacts/ci-*
           if-no-files-found: ignore
           retention-days: 14
+
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install desktop test dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb libfontconfig1 libice6 libsm6 libxrandr2
+      - run: dotnet build native/Tonarium.UiSmoke -c Release
+      - name: Verify layouts and scrolling
+        run: |
+          dotnet run --project native/Tonarium.UiSmoke -c Release --no-build -- unused native/artifacts/ci-linux-panels --side-panels
+          dotnet run --project native/Tonarium.UiSmoke -c Release --no-build -- unused native/artifacts/ci-linux-chat --chat-scroll
+      - name: Verify Linux publish and X11 startup
+        run: |
+          dotnet publish native/Tonarium.Desktop -c Release -r linux-x64 --self-contained true -o native/artifacts/ci-linux-publish
+          timeout 30s xvfb-run -a native/artifacts/ci-linux-publish/Tonarium --demo --data-dir /tmp/tonarium-ci --screenshot native/artifacts/ci-linux-demo
+          test -s native/artifacts/ci-linux-demo/home.png
+          test -s native/artifacts/ci-linux-demo/room.png
+      - run: python3 -m py_compile native/Tonarium.Desktop/Linux/*.py
+      - name: Upload Linux UI evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-ui-checks
+          path: |
+            native/artifacts/ci-linux-panels
+            native/artifacts/ci-linux-chat
+            native/artifacts/ci-linux-demo
+          retention-days: 14

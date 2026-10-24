@@ -9,13 +9,14 @@ namespace Tonarium.Desktop.Media;
 /// <summary>WASAPI samples are resampled once to LiveKit's 48 kHz PCM input.</summary>
 internal sealed class NativeAudioCapture : IAsyncDisposable
 {
-    private readonly WasapiCapture capture;
-    private readonly BufferedWaveProvider buffer;
-    private readonly ISampleProvider samples;
+    private readonly WasapiCapture? capture;
+    private readonly LinuxAudioCapture? linux;
+    private readonly BufferedWaveProvider buffer = null!;
+    private readonly ISampleProvider samples = null!;
     private readonly CancellationTokenSource lifetime = new();
     private readonly Channel<AudioFrame> frames = Channel.CreateBounded<AudioFrame>(new BoundedChannelOptions(8)
     { SingleReader = true, SingleWriter = true, FullMode = BoundedChannelFullMode.DropOldest });
-    private readonly Task pump;
+    private readonly Task pump = Task.CompletedTask;
     private readonly int channels;
     public AudioSource Source { get; }
     public event Action<Exception>? Failed;
@@ -23,6 +24,14 @@ internal sealed class NativeAudioCapture : IAsyncDisposable
 
     public NativeAudioCapture(bool loopback, string? deviceId = null)
     {
+        if (OperatingSystem.IsLinux())
+        {
+            linux = new LinuxAudioCapture(loopback, deviceId);
+            Source = linux.Source;
+            linux.Failed += error => Failed?.Invoke(error);
+            linux.LevelAvailable += (rms, peak) => LevelAvailable?.Invoke(rms, peak);
+            return;
+        }
         using var devices = new MMDeviceEnumerator();
         var device = deviceId is null
             ? devices.GetDefaultAudioEndpoint(loopback ? DataFlow.Render : DataFlow.Capture, Role.Multimedia)
@@ -52,7 +61,7 @@ internal sealed class NativeAudioCapture : IAsyncDisposable
         });
     }
 
-    public void Start() => capture.StartRecording();
+    public void Start() { if (linux is not null) linux.Start(); else capture!.StartRecording(); }
 
     private void OnData(object? sender, WaveInEventArgs e)
     {
@@ -81,8 +90,9 @@ internal sealed class NativeAudioCapture : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (linux is not null) { await linux.DisposeAsync(); lifetime.Dispose(); return; }
         lifetime.Cancel();
-        capture.DataAvailable -= OnData;
+        capture!.DataAvailable -= OnData;
         capture.StopRecording();
         capture.Dispose();
         frames.Writer.TryComplete();

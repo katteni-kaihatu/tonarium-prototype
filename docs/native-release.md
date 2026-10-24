@@ -6,7 +6,7 @@ Windowsクライアントは手元でUnityと.NETをビルドし、完成したZ
 
 ## 1. 手元でビルドする
 
-Unity 2022.3.22f1とWindows Build Support、.NET 10、Node.jsが必要。先にソース変更をコミットし、そのコミットからビルドする。
+Unity 6000.6.7f1とWindows Build Support、.NET 10、Node.jsが必要。先にソース変更をコミットし、そのコミットからビルドする。
 
 ```powershell
 ./native/build-unity.ps1 -Version 0.0.1

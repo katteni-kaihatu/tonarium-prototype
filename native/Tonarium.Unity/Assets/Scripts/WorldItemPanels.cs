@@ -252,7 +252,7 @@ namespace Tonarium.UnityClient
         public int PixelWidth, PixelHeight;
         public Texture2D Texture;
         public ItemRaster CanvasRaster;
-        public bool CanvasDirty;
+        public bool CanvasDirty, ImageLoadFailed;
         // 同じフレームに届いた差分は、まとめて一度だけGPUへ反映する。
         void LateUpdate()
         {

@@ -80,7 +80,8 @@ public sealed class ItemWindow : Window
         PropertyChanged += (_, e) => { if (e.Property == ClientSizeProperty && note is not null) note.Height = Math.Max(140, ClientSize.Height - 84); };
         context.Client.MessageReceived += MarkCanvasDirty;
         context.Client.State.Changed += Refresh;
-        Closed += (_, _) => { context.Client.MessageReceived -= MarkCanvasDirty; context.Client.State.Changed -= Refresh; tick.Stop(); noteTimer?.Stop(); if (note is not null) { FlushNote(); Send(new { a = "noteLock", @lock = false }); } video?.Dispose(); youtube?.Dispose(); };
+        Closing += (_, _) => { video?.Dispose(); youtube?.Dispose(); };
+        Closed += (_, _) => { context.Client.MessageReceived -= MarkCanvasDirty; context.Client.State.Changed -= Refresh; tick.Stop(); noteTimer?.Stop(); if (note is not null) { FlushNote(); Send(new { a = "noteLock", @lock = false }); } };
         Refresh();
     }
 
@@ -264,12 +265,9 @@ public sealed class ItemWindow : Window
             using var bitmap = new RenderTargetBitmap(new PixelSize(1240, 900), new Vector(192, 192));
             bitmap.Render(canvas);
             using var png = new MemoryStream(); bitmap.Save(png); png.Position = 0;
-            using var decoded = System.Drawing.Image.FromStream(png);
-            using var encoded = new MemoryStream();
-            var codec = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == System.Drawing.Imaging.ImageFormat.Jpeg.Guid);
-            using var parameters = new System.Drawing.Imaging.EncoderParameters(1);
-            parameters.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 85L);
-            decoded.Save(encoded, codec, parameters);
+            using var decoded = SkiaSharp.SKBitmap.Decode(png);
+            using var image = SkiaSharp.SKImage.FromBitmap(decoded);
+            using var encoded = image.Encode(SkiaSharp.SKEncodedImageFormat.Jpeg, 85);
             _ = context.Client.SendRoomAsync(new { t = "chat", text = "🎨 キャンバスを保存しました", image = "data:image/jpeg;base64," + Convert.ToBase64String(encoded.ToArray()), scope = "all" });
             status.Text = "ログに保存しました";
         }

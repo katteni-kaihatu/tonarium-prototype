@@ -1,6 +1,6 @@
 # Windows ネイティブクライアント
 
-Avalonia 12 / .NET 10 の2Dクライアントと、Unity 2022.3のWindows Player。ホーム・チャット・アイテム・プロフィールはネイティブUIで、Unityは3Dを開いたときだけ別プロセスで起動する。WindowsではUnityをウィンドウ全体の背景へ埋め込み、左右の一覧・顔・チャット・下のドックをネイティブの透明レイヤーで重ねる。
+Avalonia 12 / .NET 10 の2Dクライアントと、Unity 6.6のWindows Player。ホーム・チャット・アイテム・プロフィールはネイティブUIで、Unityは3Dを開いたときだけ別プロセスで起動する。WindowsではUnityをウィンドウ全体の背景へ埋め込み、左右の一覧・顔・チャット・下のドックをネイティブの透明レイヤーで重ねる。
 
 既存のNodeサーバー、kokosync、LiveKitを使用する。ブラウザ版と同じセッションに参加でき、2D/3D切り替えでユーザーID・同期接続・通話接続は変わらない。2Dに戻るとUnityプロセスを終了する。
 
@@ -20,7 +20,7 @@ powershell -ExecutionPolicy Bypass -File native/build-unity.ps1
 powershell -ExecutionPolicy Bypass -File native/publish-desktop.ps1
 ```
 
-Unity EditorとWindows Build Supportが必要。ビルドは導入済みの2022.3を優先し、`native/build/unity/Tonarium3D.exe` を生成する。ビルドがなければ3Dボタンからもビルドを試みる。`TONARIUM_UNITY_EDITOR` / `TONARIUM_UNITY_PLAYER` で実行ファイルを指定できる。
+Unity EditorとWindows Build Supportが必要。ビルドはProjectVersion.txtで指定されたEditorを使い、`native/build/unity/Tonarium3D.exe` を生成する。ビルドがなければ3Dボタンからもビルドを試みる。`TONARIUM_UNITY_EDITOR` / `TONARIUM_UNITY_PLAYER` で実行ファイルを指定できる。
 
 配布用フォルダーは `native/artifacts/Tonarium-win-x64/`。全体をコピーして `Tonarium.exe` を起動する。.NETランタイムとUnityを含むため配布先にSDKは不要。接続先のTonariumサーバーは別途必要。YouTubeを開く場合だけWebView2 Runtimeを使用する。Unityビルド済みならpublishに `-SkipUnity` を指定できる。独立した3Dウィンドウで比較する場合はアプリに `--separate-3d` を付ける。
 

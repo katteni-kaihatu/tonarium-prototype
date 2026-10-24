@@ -11,7 +11,8 @@ foreach ($file in @('Tonarium.exe', 'Tonarium.dll', 'Unity/Tonarium3D.exe', 'Uni
     if (-not (Test-Path -LiteralPath (Join-Path $inputRoot $file) -PathType Leaf)) { throw "Incomplete Windows client: $file is missing" }
 }
 if (-not $Commit) { $Commit = (& git -C $PSScriptRoot rev-parse HEAD); if ($LASTEXITCODE -ne 0) { throw 'Cannot determine source commit' } }
-@{ version = $Version; commit = $Commit; runtime = 'win-x64'; unity = '2022.3.22f1'; builtAt = [DateTime]::UtcNow.ToString('o') } |
+$unityVersion = ((Get-Content (Join-Path $PSScriptRoot 'Tonarium.Unity/ProjectSettings/ProjectVersion.txt') | Select-String '^m_EditorVersion:').ToString() -split ':', 2)[1].Trim()
+@{ version = $Version; commit = $Commit; runtime = 'win-x64'; unity = $unityVersion; builtAt = [DateTime]::UtcNow.ToString('o') } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $inputRoot 'release.json') -Encoding utf8
 @'
 Tonarium for Windows

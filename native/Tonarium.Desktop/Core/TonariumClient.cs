@@ -234,8 +234,10 @@ public sealed class TonariumClient : IAsyncDisposable
                 Scheme = State.ServerUrl.StartsWith("https:", StringComparison.Ordinal) ? "wss" : "ws",
                 Path = "/sync/ws", Query = "token=" + Uri.EscapeDataString(Text(config, "token"))
             };
-            var connection = await KokoSync.Client.ConnectWebSocketAsync(endpoint.Uri, ct,
-                headers: new Dictionary<string, string> { ["Origin"] = State.ServerUrl });
+            // SDKの受信ループもUIのSynchronizationContextを引き継がないようにする。
+            var origin = State.ServerUrl;
+            var connection = await Task.Run(() => KokoSync.Client.ConnectWebSocketAsync(endpoint.Uri, ct,
+                headers: new Dictionary<string, string> { ["Origin"] = origin }));
             var adopted = false;
             lock (roomGate)
             {
@@ -251,7 +253,7 @@ public sealed class TonariumClient : IAsyncDisposable
             lock (roomGate)
             {
                 if (generation != roomGeneration) return;
-                roomLoop = RunRoomAsync(connection, config, generation, ct);
+                roomLoop = Task.Run(() => RunRoomAsync(connection, config, generation, ct));
             }
             await SendRoomAsync(new JsonObject { ["t"] = "sync" }, generation);
         }
@@ -285,6 +287,7 @@ public sealed class TonariumClient : IAsyncDisposable
         catch (Exception ex) { failure = ex; }
         finally
         {
+            if (generation == roomGeneration) roomReady = false;
             stop.Cancel();
             // The running session owns disposal. Close immediately on a budget/receive failure,
             // before waiting for UI error reporting or the retry delay.
@@ -293,11 +296,14 @@ public sealed class TonariumClient : IAsyncDisposable
             try { await Task.WhenAll(receiver, consumer); }
             catch (OperationCanceledException) { }
             catch (Exception ex) { failure ??= ex; }
-            await inbox.DrainAsync();
+            try { await inbox.DrainAsync(); }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { failure ??= ex; }
             lastEventQueueDiagnostics = connection.EventQueueDiagnostics;
             lastDispatchDiagnostics = inbox.Diagnostics;
         }
         if (generation != roomGeneration || parentToken.IsCancellationRequested) return;
+        Program.Log($"Room synchronization interrupted: {failure?.GetType().Name}; queue={lastEventQueueDiagnostics}");
         await UiAsync(() =>
         {
             if (generation != roomGeneration || parentToken.IsCancellationRequested) return;
@@ -505,8 +511,8 @@ public sealed class TonariumClient : IAsyncDisposable
         {
             Task<RoomPacket>[] tasks;
             lock (gate) tasks = outstanding.Select(e => e.Packet).ToArray();
-            await Task.WhenAll(tasks);
-            lock (gate) { queued.Clear(); outstanding.Clear(); latest.Clear(); bytes = 0; }
+            try { await Task.WhenAll(tasks); }
+            finally { lock (gate) { queued.Clear(); outstanding.Clear(); latest.Clear(); bytes = 0; } }
         }
     }
 

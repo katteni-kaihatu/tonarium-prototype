@@ -16,6 +16,7 @@ internal sealed class DesktopCapture : IAsyncDisposable
     private readonly ScreenSource target;
     private readonly CancellationTokenSource lifetime = new();
     private Task? loop;
+    private System.Diagnostics.Process? linux;
     public VideoSource Source { get; }
     public int Width { get; }
     public int Height { get; }
@@ -32,7 +33,34 @@ internal sealed class DesktopCapture : IAsyncDisposable
         Source = new VideoSource(Width, Height);
     }
 
-    public void Start() => loop = Task.Run(async () =>
+    public void Start()
+    {
+        if (OperatingSystem.IsLinux()) { StartLinux(); return; }
+        StartWindows();
+    }
+
+    private void StartLinux()
+    {
+        linux = LinuxAudio.Start(Environment.GetEnvironmentVariable("TONARIUM_PYTHON") ?? "/usr/bin/python3", [Path.Combine(AppContext.BaseDirectory, "Linux", "screencast.py")]);
+        CaptureMethod = "PipeWire portal";
+        loop = Task.Run(async () =>
+        {
+            try
+            {
+                while (!lifetime.IsCancellationRequested)
+                {
+                    var pixels = new byte[Width * Height * 4];
+                    await linux.StandardOutput.BaseStream.ReadExactlyAsync(pixels, lifetime.Token);
+                    var frame = new VideoFrame(Width, Height, VideoBufferType.Bgra, pixels);
+                    Source.CaptureFrame(frame); Frame?.Invoke(frame);
+                }
+            }
+            catch (Exception ex) when (lifetime.IsCancellationRequested && ex is OperationCanceledException or IOException or ObjectDisposedException) { }
+            catch (Exception ex) { Failed?.Invoke(new IOException("画面共有が終了しました。デスクトップの共有設定とPipeWireを確認してください。", ex)); }
+        });
+    }
+
+    private void StartWindows() => loop = Task.Run(async () =>
     {
         var desktop = GetDC(0);
         var dc = CreateCompatibleDC(desktop);
@@ -108,13 +136,16 @@ internal sealed class DesktopCapture : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         lifetime.Cancel();
+        LinuxAudio.Stop(linux);
         if (loop is not null) await loop.ConfigureAwait(false);
+        if (linux is not null) { await linux.WaitForExitAsync(); linux.Dispose(); }
         Source.Dispose();
         lifetime.Dispose();
     }
 
     public static IReadOnlyList<ScreenSource> EnumerateSources()
     {
+        if (OperatingSystem.IsLinux()) return [new ScreenSource("画面・ウィンドウを選択（デスクトップの共有ダイアログ）", 0, 0, 0, 1280, 720)];
         var list = new List<ScreenSource>();
         var i = 0;
         EnumDisplayMonitors(0, 0, (nint monitor, nint dc, ref Rect rect, nint data) =>

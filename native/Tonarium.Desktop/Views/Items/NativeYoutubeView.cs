@@ -17,6 +17,7 @@ internal sealed class NativeYoutubeView : NativeControlHost, IDisposable
     private readonly string videoId;
     private readonly Action<object> send;
     private readonly Action<string> report;
+    private LinuxYoutube? linux;
     private CoreWebView2Controller? controller;
     private CoreWebView2Environment? environment;
     private IntPtr window;
@@ -38,6 +39,18 @@ internal sealed class NativeYoutubeView : NativeControlHost, IDisposable
 
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
     {
+        if (OperatingSystem.IsLinux())
+        {
+            var host = base.CreateNativeControlCore(parent);
+            try
+            {
+                linux = new LinuxYoutube(host.Handle, videoId, PlayerHtml, HandleMessage, report);
+                linux.Clock(pendingClock);
+                ResizeController();
+            }
+            catch (Exception ex) { report("YouTubeプレーヤーを開けませんでした: " + ex.Message); }
+            return host;
+        }
         window = CreateWindowEx(0, "STATIC", "", 0x40000000u | 0x10000000u | 0x04000000u, 0, 0, 1, 1, parent.Handle, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
         if (window == IntPtr.Zero) throw new InvalidOperationException("YouTube表示用のウィンドウを作成できませんでした。");
         _ = InitializeAsync(window);
@@ -86,13 +99,17 @@ internal sealed class NativeYoutubeView : NativeControlHost, IDisposable
         if (!e.Source.StartsWith("https://tonarium.local/", StringComparison.OrdinalIgnoreCase)) return;
         try
         {
-            var message = JsonNode.Parse(e.WebMessageAsJson);
-            var action = ItemWindow.Str(message, "a");
-            if (action == "ready") { report("再生・一時停止・シークは全員に反映されます"); return; }
-            if (action == "error") { report("この動画は埋め込みで再生できません。YouTubeで開いてください。（" + ItemWindow.Num(message, "code") + "）"); return; }
-            if (action is "mediaPlay" or "mediaPause" or "mediaSeek") send(new { a = action, pos = Math.Max(0, ItemWindow.Num(message, "pos")) });
+            if (JsonNode.Parse(e.WebMessageAsJson) is JsonObject message) HandleMessage(message);
         }
         catch (JsonException) { }
+    }
+
+    private void HandleMessage(JsonObject message)
+    {
+        var action = ItemWindow.Str(message, "a");
+        if (action == "ready") { report("再生・一時停止・シークは全員に反映されます"); return; }
+        if (action == "error") { report("この動画は埋め込みで再生できません。YouTubeで開いてください。（" + ItemWindow.Num(message, "code") + "）"); return; }
+        if (action is "mediaPlay" or "mediaPause" or "mediaSeek") send(new { a = action, pos = Math.Max(0, ItemWindow.Num(message, "pos")) });
     }
 
     public async void UpdateClock(JsonObject? clock, long offset)
@@ -100,6 +117,12 @@ internal sealed class NativeYoutubeView : NativeControlHost, IDisposable
         if (clock is null || disposed) return;
         var playing = ItemWindow.Bool(clock, "playing"); var basePosition = ItemWindow.Num(clock, "base"); var at = ItemWindow.Num(clock, "at");
         pendingClock = JsonSerializer.Serialize(new { playing, position = ItemWindow.ClockPosition(clock, offset), revision = new { playing, basePosition, at } });
+        if (linux is not null)
+        {
+            if (DateTime.UtcNow - lastUpdate < TimeSpan.FromMilliseconds(500) && playing == lastPlaying && basePosition == lastBase && at == lastAt) return;
+            lastUpdate = DateTime.UtcNow; lastPlaying = playing; lastBase = basePosition; lastAt = at;
+            linux.Clock(pendingClock); return;
+        }
         if (controller is null || updating || DateTime.UtcNow - lastUpdate < TimeSpan.FromMilliseconds(500) && playing == lastPlaying && basePosition == lastBase && at == lastAt) return;
         updating = true; lastUpdate = DateTime.UtcNow; lastPlaying = playing; lastBase = basePosition; lastAt = at;
         try
@@ -119,14 +142,16 @@ internal sealed class NativeYoutubeView : NativeControlHost, IDisposable
 
     private void ResizeController()
     {
+        if (linux is not null) { var scale = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1; linux.Resize(Math.Max(1, (int)(Bounds.Width * scale)), Math.Max(1, (int)(Bounds.Height * scale))); return; }
         if (controller is null || window == IntPtr.Zero || disposed) return;
         if (GetClientRect(window, out var r)) controller.Bounds = new System.Drawing.Rectangle(0, 0, Math.Max(1, r.Right), Math.Max(1, r.Bottom));
     }
 
-    protected override void DestroyNativeControlCore(IPlatformHandle control) { Dispose(); }
+    protected override void DestroyNativeControlCore(IPlatformHandle control) { Dispose(); if (OperatingSystem.IsLinux()) base.DestroyNativeControlCore(control); }
     public void Dispose()
     {
         if (disposed) return; disposed = true;
+        linux?.Dispose(); linux = null;
         if (controller is not null) { controller.CoreWebView2.WebMessageReceived -= OnMessage; controller.Close(); controller = null; }
         if (window != IntPtr.Zero) { DestroyWindow(window); window = IntPtr.Zero; }
         environment = null;

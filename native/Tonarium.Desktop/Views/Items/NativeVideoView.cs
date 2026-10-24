@@ -13,6 +13,8 @@ namespace Tonarium.Desktop.Views;
 
 internal sealed class NativeVideoView : StackPanel, IDisposable
 {
+    private VideoView? surface;
+    private bool disposed;
     private LibVLC? vlc;
     private MediaPlayer? player;
     private LibVLCSharp.Shared.Media? media;
@@ -39,7 +41,7 @@ internal sealed class NativeVideoView : StackPanel, IDisposable
         {
             LibVLCSharp.Shared.Core.Initialize();
             vlc = new LibVLC("--no-video-title-show", "--quiet"); player = new MediaPlayer(vlc) { Volume = 50 }; media = new LibVLCSharp.Shared.Media(vlc, new Uri(url)); player.Media = media;
-            var surface = new VideoView { MediaPlayer = player, Height = 315, HorizontalAlignment = HorizontalAlignment.Stretch };
+            surface = new VideoView { MediaPlayer = player, Height = 315, HorizontalAlignment = HorizontalAlignment.Stretch };
             Children.Add(surface);
             // Start only after the native video HWND exists, otherwise VLC can open its own window.
             player.Playing += (_, _) => Dispatcher.UIThread.Post(() => { if (pendingClock is null) player?.SetPause(true); else ApplyClock(pendingClock, pendingOffset, true); });
@@ -84,5 +86,14 @@ internal sealed class NativeVideoView : StackPanel, IDisposable
         if (!dragging) seek.Value = Math.Clamp(position, 0, seek.Maximum);
         time.Text = TimeSpan.FromSeconds(position).ToString(@"hh\:mm\:ss");
     }
-    public void Dispose() { player?.Stop(); player?.Dispose(); media?.Dispose(); vlc?.Dispose(); player = null; }
+    public void Dispose()
+    {
+        if (disposed) return;
+        disposed = true;
+        player?.Stop();
+        if (surface is not null) surface.MediaPlayer = null;
+        player?.Dispose(); player = null;
+        media?.Dispose(); media = null;
+        vlc?.Dispose(); vlc = null;
+    }
 }

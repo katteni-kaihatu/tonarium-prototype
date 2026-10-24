@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-<PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><ApplicationManifest>../Tonarium.Desktop/app.manifest</ApplicationManifest></PropertyGroup>
+<PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><ApplicationManifest Condition="$([MSBuild]::IsOSPlatform('Windows'))">../Tonarium.Desktop/app.manifest</ApplicationManifest></PropertyGroup>
 <ItemGroup><ProjectReference Include="../Tonarium.Desktop/Tonarium.Desktop.csproj"/><PackageReference Include="Avalonia.Headless" Version="12.0.0"/><PackageReference Include="Avalonia.Skia" Version="12.0.0"/></ItemGroup>
 <ItemGroup><None Update="Fixtures/red-blue-4s.mp4" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 <Target Name="UseOnlyWebViewCore" BeforeTargets="ResolveAssemblyReferences"><ItemGroup><Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf' Or '%(Reference.Filename)' == 'Microsoft.Web.WebView2.WinForms'" /></ItemGroup></Target>

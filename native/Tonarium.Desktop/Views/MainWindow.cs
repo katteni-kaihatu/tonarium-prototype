@@ -32,6 +32,8 @@ public sealed partial class MainWindow : Window
     private readonly TextBlock sessionSummary = Ui.Text("", 13, Ui.Ink);
     private UnitySurface? unitySurface;
     private ThreeDOverlayWindow? threeDOverlay;
+    private ThreeDChatWindow? threeDChat;
+    private string threeDChatDraft = "";
     private string? previousSession;
     private bool signedIn, closing, refreshQueued, switching;
     private bool allowClose;
@@ -79,7 +81,7 @@ public sealed partial class MainWindow : Window
             unitySurface?.SetInputLocked(locked, threeD.UsesRelativePointer);
         };
         threeD.HomeRequested += () => ShowHome("toggle");
-        threeD.ChatRequested += () => { room?.FocusChat(); threeDOverlay?.Activate(); };
+        threeD.ChatRequested += OpenThreeDChat;
         threeD.SidePanelsToggleRequested += ToggleSidePanels;
         threeD.MediaPasteRequested += () => RunMediaInput(() => room?.PasteMediaAsync() ?? Task.CompletedTask);
         threeD.MediaFilesDropped += paths => RunMediaInput(() => room?.DropMediaPathsAsync(paths) ?? Task.CompletedTask);
@@ -193,6 +195,7 @@ public sealed partial class MainWindow : Window
         room ??= new RoomView(context);
         if (previousSession != client.State.SessionId)
         {
+            threeDChat?.Close(); threeDChatDraft = "";
             foreach (var item in itemWindows.Values.ToArray()) item.Close();
             itemWindows.Clear();
             CloseHome();
@@ -218,7 +221,7 @@ public sealed partial class MainWindow : Window
     {
         var type = J.Text(message, "t");
         if (type == "attention" && J.Text(message, "from") != client.State.SelfId) Notify("近くの人がアイテムに注目しています");
-        if (type == "poke" && J.Text(message, "to") == client.State.SelfId) { Notify("つんつんされました"); System.Media.SystemSounds.Asterisk.Play(); }
+        if (type == "poke" && J.Text(message, "to") == client.State.SelfId) { Notify("つんつんされました"); NativeSounds.Play("bell"); }
         if (type == "hit" && J.Text(message, "to") == client.State.SelfId) Notify("ピコピコ！");
         if (type == "sound") NativeSounds.Play(J.Text(message, "id"));
     }
@@ -311,10 +314,30 @@ public sealed partial class MainWindow : Window
 
     private void RestoreNativeRoot()
     {
+        threeDChat?.Close();
         context.Owner = this;
         threeDOverlay?.CloseAndDetach(); threeDOverlay = null;
         Content = null; room?.SetExternalScene(false); room?.SetThreeDSurface(null);
         unitySurface = null; Content = root;
+    }
+
+    private void OpenThreeDChat()
+    {
+        if (!OperatingSystem.IsLinux()) { room?.FocusChat(); threeDOverlay?.Activate(); return; }
+        if (!threeD.IsRunning || client.State.SessionId is not { } session) return;
+        if (threeDChat is not null) { threeDChat.Activate(); return; }
+        var window = new ThreeDChatWindow(threeDChatDraft, text =>
+        {
+            if (client.State.SessionId != session) throw new InvalidOperationException("セッションが変わりました");
+            return client.SendRoomAsync(new { t = "chat", text, scope = "all" });
+        });
+        threeDChat = window;
+        window.Closed += (_, _) =>
+        {
+            threeDChatDraft = window.Draft; threeDChat = null;
+            _ = threeD.CloseNativeChatAsync();
+        };
+        window.Show(); window.Activate();
     }
 
     private void ShowHome(string page)
@@ -454,6 +477,7 @@ public sealed partial class MainWindow : Window
 
     private async Task CaptureNative(string path)
     {
+        if (!OperatingSystem.IsWindows()) { Capture(path); return; }
         await Task.Delay(350);
         var handle = TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
         if (handle == IntPtr.Zero) throw new InvalidOperationException("Native window handle is unavailable.");

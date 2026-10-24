@@ -94,6 +94,34 @@ internal static class ThreeDLifecycleProbe
             pass("Session disconnect returns local mode and releases the active host");
         }
 
+        await using (var client = new TonariumClient(persistSettings: false))
+        await using (var host = new ThreeDHost(client))
+        {
+            client.State.SessionId = "test-room"; client.State.Mode = "3d";
+            await InstallClosedRoom(client);
+            var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start();
+            using var lifetime = new CancellationTokenSource();
+            Set(host, "listener", listener); Set(host, "lifetime", lifetime); Set(host, "sessionId", "test-room");
+            var receive = (Task)Call(host, "ReceiveAsync", lifetime.Token)!;
+            Set(host, "receiveTask", receive);
+            using var unity = new TcpClient(); await unity.ConnectAsync((IPEndPoint)listener.LocalEndpoint);
+            using var writer = new StreamWriter(unity.GetStream()) { AutoFlush = true };
+            using var reader = new StreamReader(unity.GetStream());
+            await writer.WriteLineAsync("{\"t\":\"room\",\"message\":{\"t\":\"viewing\",\"keys\":[]}}");
+            var notice = await reader.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            Require(notice?.Contains("notice") == true, "failed send did not report a notice");
+            bool inputReceived = false;
+            host.InputStateChanged += locked => inputReceived = locked;
+            await writer.WriteLineAsync("{\"t\":\"inputState\",\"locked\":true}");
+            await Until(() => inputReceived);
+            Require(!receive.IsCompleted && client.State.Mode == "3d", "room failure terminated the Unity bridge");
+            await writer.WriteLineAsync("{\"t\":\"return2d\"}");
+            await Until(() => client.State.Mode == "2d");
+            await host.StopAsync();
+            Set(client, "room", null); Set(client, "roomReady", false);
+            pass("Failed room send preserves the Unity bridge, processes the next command and allows explicit return to 2D");
+        }
+
         var previousPlayer = Environment.GetEnvironmentVariable("TONARIUM_UNITY_PLAYER");
         var invalidPlayer = Path.Combine(output, "invalid-player.exe");
         await File.WriteAllTextAsync(invalidPlayer, "not an executable");

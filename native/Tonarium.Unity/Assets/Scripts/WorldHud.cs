@@ -12,6 +12,9 @@ namespace Tonarium.UnityClient
         readonly Dictionary<string, GUIStyle> hudPanels = new Dictionary<string, GUIStyle>();
         float uiScale = 1, noteSentAt;
         string noteSent = "";
+        float imageZoom = 1;
+        Vector2 imageScroll;
+        int lastCompositionFrame = -10, chatOpenedFrame = -10;
         float HudWidth => Screen.width / uiScale;
         float HudHeight => Screen.height / uiScale;
 
@@ -33,7 +36,7 @@ namespace Tonarium.UnityClient
             {
                 if(GUI.Button(new Rect(20,20,44,44),"☰",buttonStyle)){menu=!menu;Unlock();}
                 var logo=Resources.Load<Texture2D>("Web/Brand/mark");
-                HudPanel(new Rect(76,20,180,44),"#fffdf9");
+                if(GUI.Button(new Rect(76,20,180,44),"",buttonStyle)){menu=!menu;Unlock();}
                 if(logo!=null)GUI.DrawTexture(new Rect(83,26,30,30),logo,ScaleMode.ScaleToFit);
                 GUI.Label(new Rect(121,25,126,32),WorldName(world),bodyStyle);
                 if(GUI.Button(new Rect(HudWidth-128,20,108,36),"2D に戻る",buttonStyle))ReturnTo2D();
@@ -71,12 +74,24 @@ namespace Tonarium.UnityClient
             }
             if(chatOpen&&!embedded)
             {
+                var key = Event.current;
+                // IMGUIがEnterを消費する前に処理し、IME確定と開いた直後のEnterは送信しない。
+                if (key.type == EventType.KeyDown && (key.keyCode == KeyCode.Return || key.keyCode == KeyCode.KeypadEnter))
+                {
+                    if (Time.frameCount > chatOpenedFrame && Time.frameCount > lastCompositionFrame + 1 && string.IsNullOrEmpty(Input.compositionString))
+                    { SendChat(); chatOpen = false; }
+                    key.Use();
+                }
                 GUI.SetNextControlName("chat");draft=GUI.TextField(new Rect(20,HudHeight-88,HudWidth-120,38),draft);
                 GUI.FocusControl("chat");if(GUI.Button(new Rect(HudWidth-90,HudHeight-88,70,38),"送信",buttonStyle)){SendChat();chatOpen=false;}
             }
             if(menu&&!embedded)MenuGUI();
             if(selected!=null&&items.TryGetValue(selected,out var item))ItemGUI(item);
             if(chessPromotionTo>=0)ChessPromotionGUI();
+            // UIが消費しなかったクリックだけを視点操作へ渡す。
+            if (Event.current.type == EventType.MouseDown && Event.current.button == 0
+                && !menu && !chatOpen && selected == null && chessPromotionTo < 0 && Cursor.lockState != CursorLockMode.Locked)
+            { LockPointer(); Event.current.Use(); }
         }
 
         void ChessPromotionGUI()
@@ -125,6 +140,7 @@ namespace Tonarium.UnityClient
 
         void ItemGUI(JObject item)
         {
+            if ((string)item["kind"] == "image") { ImageGUI(item); return; }
             if((string)item["kind"]!="note")
             {
                 if(embedded)bridge.Send(new{t="openItem",id=selected});
@@ -132,8 +148,10 @@ namespace Tonarium.UnityClient
             }
             float width=Mathf.Min(480,HudWidth-32),height=186;
             var rect=new Rect((HudWidth-width)/2,HudHeight-height-110,width,height);HudPanel(rect,"#fffdf9");
-            GUI.skin.textArea.normal.background=HudTexture((string)item["color"]??"#fde68a");
-            string next=GUI.TextArea(new Rect(rect.x+12,rect.y+12,width-24,72),noteDraft,300);
+            var noteStyle = new GUIStyle(GUI.skin.textArea);
+            foreach (var state in new[] { noteStyle.normal, noteStyle.hover, noteStyle.active, noteStyle.focused })
+            { state.background = HudTexture((string)item["color"] ?? "#fde68a"); state.textColor = ColorValue("#1c1917"); }
+            string next=GUI.TextArea(new Rect(rect.x+12,rect.y+12,width-24,72),noteDraft,300,noteStyle);
             if(next!=noteDraft){noteDraft=next;noteSentAt=Time.unscaledTime;}
             if(noteDraft!=noteSent&&Time.unscaledTime-noteSentAt>.08f)CommitNote();
             float x=rect.x+12;
@@ -143,6 +161,38 @@ namespace Tonarium.UnityClient
             if(GUI.Button(new Rect(x+4,rect.y+94,118,30),"こちらに向ける",buttonStyle)){var p=itemObjects[selected].transform.position;Room(new{t="itemMove",id=selected,x=p.x,z=-p.z,ry=-yaw*Mathf.Deg2Rad});}
             if(GUI.Button(new Rect(rect.x+width-76,rect.y+94,64,30),"閉じる",buttonStyle))EndNoteEditing();
             GUI.Label(new Rect(rect.x+12,rect.y+140,width-24,30),"空間をクリックすると操作に戻ります",new GUIStyle(bodyStyle){fontSize=12,normal={textColor=ColorValue("#5e5c64")}});
+        }
+
+        void BeginImageViewing(string id)
+        {
+            if (!items.TryGetValue(id, out var item) || (string)item["kind"] != "image") return;
+            EndNoteEditing(); selected = id; imageZoom = 1; imageScroll = Vector2.zero; Unlock();
+        }
+
+        void ImageGUI(JObject item)
+        {
+            var rect = new Rect(24, 80, Mathf.Max(200, HudWidth - 48), Mathf.Max(160, HudHeight - 104));
+            HudPanel(rect, "#26262eF2");
+            GUI.Label(new Rect(rect.x + 12, rect.y + 8, 180, 30), "画像", labelStyle);
+            if (GUI.Button(new Rect(rect.x + rect.width - 260, rect.y + 8, 48, 30), "−", buttonStyle)) imageZoom = Mathf.Max(1, imageZoom / 1.5f);
+            if (GUI.Button(new Rect(rect.x + rect.width - 204, rect.y + 8, 48, 30), "＋", buttonStyle)) imageZoom = Mathf.Min(8, imageZoom * 1.5f);
+            if (GUI.Button(new Rect(rect.x + rect.width - 148, rect.y + 8, 64, 30), "全体", buttonStyle)) { imageZoom = 1; imageScroll = Vector2.zero; }
+            if (GUI.Button(new Rect(rect.x + rect.width - 76, rect.y + 8, 64, 30), "閉じる", buttonStyle)) { EndNoteEditing(); return; }
+            if (!itemObjects.TryGetValue((string)item["id"], out var root)) return;
+            var surface = root.GetComponentInChildren<ItemPanelSurface>();
+            var texture = surface != null ? surface.Texture : null;
+            var viewport = new Rect(rect.x + 12, rect.y + 48, rect.width - 24, rect.height - 60);
+            if (texture == null)
+            {
+                GUI.Label(viewport, surface != null && surface.ImageLoadFailed ? "画像を読み込めませんでした" : "画像を読み込み中…", labelStyle);
+                return;
+            }
+            float fit = Mathf.Min((viewport.width - 18) / texture.width, (viewport.height - 18) / texture.height);
+            var size = new Vector2(texture.width, texture.height) * fit * imageZoom;
+            var content = new Rect(0, 0, Mathf.Max(viewport.width - 18, size.x), Mathf.Max(viewport.height - 18, size.y));
+            imageScroll = GUI.BeginScrollView(viewport, imageScroll, content);
+            GUI.DrawTexture(new Rect((content.width - size.x) / 2, (content.height - size.y) / 2, size.x, size.y), texture, ScaleMode.ScaleToFit);
+            GUI.EndScrollView();
         }
 
         void CommitNote()

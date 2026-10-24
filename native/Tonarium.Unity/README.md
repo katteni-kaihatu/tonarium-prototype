@@ -1,14 +1,16 @@
 # Tonarium Unity client
 
-Unity 2022.3.22f1 の Windows x64 プレイヤー。2D クライアントのセッションを引き継ぐ描画プロセスとして動作します。別のユーザーとしてサーバーには接続しません。
+Unity 6.6（6000.6.7f1）の Windows / Linux x64 プレイヤー。2D クライアントのセッションを引き継ぐ描画プロセスとして動作します。別のユーザーとしてサーバーには接続しません。
 
 ## ビルド
 
 ```powershell
-& 'C:/Program Files/Unity/Hub/Editor/2022.3.22f1/Editor/Unity.exe' -batchmode -nographics -quit -projectPath "$PWD/native/Tonarium.Unity" -executeMethod Tonarium.UnityClient.Editor.WindowsBuild.Build -logFile "$PWD/native/Tonarium.Unity/build.log"
+& 'C:/Program Files/Unity/Hub/Editor/6000.6.7f1/Editor/Unity.exe' -batchmode -nographics -quit -projectPath "$PWD/native/Tonarium.Unity" -executeMethod Tonarium.UnityClient.Editor.WindowsBuild.Build -logFile "$PWD/native/Tonarium.Unity/build.log"
 ```
 
 出力先は `native/build/unity/Tonarium3D.exe`。シーンはビルド時に生成され、ワールドやアイテムは共有セッションの状態をもとに構築されます。`TONARIUM_UNITY_EDITOR` と `TONARIUM_UNITY_PLAYER` でエディター／ビルド済みプレイヤーのパスを指定できます。
+
+Linuxは `native/build-unity-linux.sh` でビルドし、`native/build/unity-linux/Tonarium3D.x86_64` を生成します。詳しくは [Linux手順](../../docs/native-linux.md) を参照してください。
 
 ## 操作
 
@@ -21,11 +23,12 @@ Unity 2022.3.22f1 の Windows x64 プレイヤー。2D クライアントのセ�
 | 運ぶ／置く | 右クリック |
 | ハンマー・カメラを手放す | Q |
 | 持っているカメラで撮影してチャットに送る | C |
-| チャット | Enter |
-| ワールド切替・アイテム追加メニュー | Esc |
+| チャットを開く／確定済みの文を送る | Enter（IME変換中は確定のみ） |
+| ワールド切替・アイテム追加メニュー | 左上の☰またはワールド名 |
+| カーソルを出す／入力欄を閉じる | Esc |
 | 2D に戻る | F2 または右上ボタン |
 
-ホール・カフェ・板わたりの家具配置、当たり判定、ジャンプ値、アイテムのメッセージ形式は `shared/` と既存 Web 版の定義に対応しています。チェス、付箋、サイコロ、2048、共同キャンバス、画像、同期動画の表示・基本操作に対応します。各アイテムから「2D のパネルで開く」で既存セッションの詳しい操作パネルを開けます。YouTube はこのパネルを利用します。
+ホール・カフェ・板わたりの家具配置、当たり判定、ジャンプ値、アイテムのメッセージ形式は `shared/` と既存 Web 版の定義に対応しています。チェス、付箋、サイコロ、2048、共同キャンバス、画像、同期動画の表示・基本操作に対応します。付箋はUnity内で編集・保存します。画像はUnity内のビューアーで全体表示・拡大・スクロールでき、閉じるボタンまたはEscで戻れます。YouTubeとサイコロ設定などはDesktop側の操作パネルを利用します。
 
 ## プロセス間通信
 

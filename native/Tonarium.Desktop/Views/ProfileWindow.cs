@@ -11,7 +11,6 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Tonarium.Desktop.Core;
-using Drawing = System.Drawing;
 
 namespace Tonarium.Desktop.Views;
 
@@ -253,42 +252,7 @@ public sealed class ProfileWindow : Window
         if (files.Count == 0) return;
         await using var source = await files[0].OpenReadAsync();
         using var input = new MemoryStream(); await source.CopyToAsync(input); input.Position = 0;
-        using var original = Drawing.Image.FromStream(input);
-        if (original.PropertyIdList.Contains(0x0112) && original.GetPropertyItem(0x0112)?.Value is { Length: >= 2 } orientation)
-        {
-            var rotation = BitConverter.ToUInt16(orientation, 0) switch
-            {
-                2 => Drawing.RotateFlipType.RotateNoneFlipX, 3 => Drawing.RotateFlipType.Rotate180FlipNone,
-                4 => Drawing.RotateFlipType.Rotate180FlipX, 5 => Drawing.RotateFlipType.Rotate90FlipX,
-                6 => Drawing.RotateFlipType.Rotate90FlipNone, 7 => Drawing.RotateFlipType.Rotate270FlipX,
-                8 => Drawing.RotateFlipType.Rotate270FlipNone, _ => Drawing.RotateFlipType.RotateNoneFlipNone
-            };
-            original.RotateFlip(rotation);
-        }
-        using var output = new Drawing.Bitmap(avatar ? 2048 : 128, avatar ? 1024 : 128, Drawing.Imaging.PixelFormat.Format32bppArgb);
-        using (var graphics = Drawing.Graphics.FromImage(output))
-        {
-            graphics.InterpolationMode = Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-            graphics.CompositingQuality = Drawing.Drawing2D.CompositingQuality.HighQuality;
-            graphics.PixelOffsetMode = Drawing.Drawing2D.PixelOffsetMode.HighQuality;
-            if (avatar) graphics.DrawImage(original, new Drawing.Rectangle(0, 0, 2048, 1024));
-            else
-            {
-                graphics.Clear(Drawing.Color.White);
-                var size = Math.Min(original.Width, original.Height);
-                graphics.DrawImage(original, new Drawing.Rectangle(0, 0, 128, 128), new Drawing.Rectangle((original.Width - size) / 2, (original.Height - size) / 2, size, size), Drawing.GraphicsUnit.Pixel);
-            }
-        }
-        using var encoded = new MemoryStream();
-        if (avatar) output.Save(encoded, Drawing.Imaging.ImageFormat.Png);
-        else
-        {
-            var codec = Drawing.Imaging.ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == Drawing.Imaging.ImageFormat.Jpeg.Guid);
-            using var parameters = new Drawing.Imaging.EncoderParameters(1);
-            parameters.Param[0] = new Drawing.Imaging.EncoderParameter(Drawing.Imaging.Encoder.Quality, 85L);
-            output.Save(encoded, codec, parameters);
-        }
-        using var content = new ByteArrayContent(encoded.ToArray()); content.Headers.ContentType = new MediaTypeHeaderValue(avatar ? "image/png" : "image/jpeg");
+        using var content = new ByteArrayContent(ProfileImage.Encode(input.ToArray(), avatar)); content.Headers.ContentType = new MediaTypeHeaderValue(avatar ? "image/png" : "image/jpeg");
         using var result = await http.PostAsync(Endpoint(avatar ? "/avatar" : "/icon"), content); result.EnsureSuccessStatusCode();
         await ProfileUpdatedAsync(); await LoadImageAsync(avatar); feedback.Text = avatar ? "アバター画像を保存しました" : "アイコンを保存しました";
     }

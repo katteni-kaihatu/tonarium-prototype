@@ -14,13 +14,14 @@ using Tonarium.Desktop.Core;
 
 namespace Tonarium.Desktop.Views;
 
-/// <summary>Windows-native voice messages, encoded as AAC/MP4 by the OS media stack.</summary>
-internal static class HomeVoiceMessage
+/// <summary>OSごとの録音・再生経路を使う音声メッセージ。</summary>
+internal static partial class HomeVoiceMessage
 {
     private static readonly HttpClient Http = new();
 
     public static void ShowRecorder(NativeContext context,string conversation)
     {
+        if (OperatingSystem.IsLinux()) { ShowLinuxRecorder(context, conversation); return; }
         var folder=Path.Combine(Path.GetTempPath(),"Tonarium","voice");Directory.CreateDirectory(folder);
         var stem=Path.Combine(folder,Guid.NewGuid().ToString("N"));var wavePath=stem+".wav";var encodedPath=stem+".m4a";
         var window=MakeWindow("音声メッセージ");var status=Ui.Text("録音を始めるとマイクを使います。最長 60 秒。",13);
@@ -68,6 +69,7 @@ internal static class HomeVoiceMessage
 
     public static void Play(NativeContext context,string url)
     {
+        if (OperatingSystem.IsLinux()) { PlayLinux(context, url); return; }
         var window=MakeWindow("音声メッセージ");var status=Ui.Text("音声を読み込んでいます…",14);var absolute=new Uri(new Uri(context.State.ServerUrl.TrimEnd('/')+"/"),url).ToString();
         WaveOutEvent? player=null;MediaFoundationReader? reader=null;string? local=null;var closed=false;
         var toggle=Ui.Button("一時停止",()=>{if(player==null||reader==null)return;if(player.PlaybackState==PlaybackState.Playing)player.Pause();else{if(reader.Position>=reader.Length)reader.Position=0;player.Play();}});toggle.IsEnabled=false;
