@@ -1,9 +1,10 @@
 import { ARENA, START_BUTTON } from './game.ts';
 import { CITY_HALF, CITY_SOLIDS } from './city.ts';
 import { SURVIVOR_TITLE } from './survivor.ts';
+import { ANTIMATTER_SOLIDS } from './antimatterLayout.ts';
 
 /** ワールド＝ 3D 空間の種類。セッションはどれか 1 つを読み込み、途中で切り替えられる */
-export type WorldKind = 'room' | 'cafe' | 'game' | 'survivors' | 'city' | 'garden' | 'starlounge';
+export type WorldKind = 'room' | 'cafe' | 'game' | 'survivors' | 'city' | 'garden' | 'starlounge' | 'antimatter';
 
 /** 床の上の通り抜けられない物。r があれば円、なければ w×d の箱（x, z が中心）。
  * y0〜y1 があればその高さの間だけ効く（マンションの階ごとの壁など）。無ければどの高さでも効く */
@@ -116,6 +117,11 @@ export const WORLDS: Record<WorldKind, WorldInfo> = {
     desc: '10 階建てのマンションと、駅が 3 つある高架の環状線が走る広い街',
     solids: CITY_SOLIDS,
     extent: { minX: -CITY_HALF, maxX: CITY_HALF, minZ: -CITY_HALF, maxZ: CITY_HALF },
+  },
+  antimatter: {
+    name: 'AD 研究所',
+    desc: '反物質次元の研究所。塔・コア・展示ウィングがある。進行はプレイヤーごとで、ワールド切替でも消えない',
+    solids: ANTIMATTER_SOLIDS,
   },
 };
 

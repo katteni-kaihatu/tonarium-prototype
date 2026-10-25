@@ -54,7 +54,7 @@ test('empty user sessions expire; joins, fixed sessions and manual deletion keep
   });
   await until(() => ready);
   async function peer(id: string) {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
     t.after(() => ws.terminate());
     let sessions: SessionDef[] = [], events: EventDef[] = [], info: Record<string, unknown> = {};
     let snapshot = false;

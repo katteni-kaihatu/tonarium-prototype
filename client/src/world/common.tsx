@@ -1,12 +1,17 @@
+import { sourceText as uiSource } from '../i18n/core.ts';
+import { useTranslatedText } from '../TranslatedText.tsx';
+import { t as tr, localized } from '../i18n/index.ts';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ChatMessage } from '../../../shared/protocol.ts';
-import { ITEM_INFO, type Item } from '../../../shared/items.ts';
+import { ITEM_INFO } from '../i18n/static.ts';
+import { type Item } from '../../../shared/items.ts';
 import { NEAR_RANGE, VOICE_RANGE } from '../../../shared/places.ts';
 import { bandOf, type Band, type ListedPlayer } from '../nearby.ts';
 import { useStore, set, colorOf, heldHammer } from '../store.ts';
 import { iconUrl } from '../icon.ts';
 import { useNearby, useNearbyItems } from '../spatial.ts';
+import { popoverPosition } from './popoverPosition.ts';
 
 /** アイコンがあれば画像、無ければ頭文字 */
 export function Face({ id, name, size = 32, ring }: { id: string; name: string; size?: number; ring?: string }) {
@@ -29,15 +34,15 @@ export function ItemMark({ item, size = 32, by }: { item: Item; size?: number; b
   );
 }
 
-export const Badge3D = () => <span className="b3d" title="3D モードで参加中">3D</span>;
+export const Badge3D = () => <span className="b3d" title={tr("ui552")}>3D</span>;
 
 export function Viewers({ keyName, dark = false }: { keyName: string; dark?: boolean }) {
   const viewers = useStore((s) => s.participants).filter((u) => u.viewing.includes(keyName));
   if (!viewers.length) return null;
   const shown = viewers.slice(0, 3);
   return (
-    <span className={`viewers ${dark ? 'dark' : ''}`} title={`閲覧中：${viewers.map((v) => v.name).join('、')}`} aria-label={`閲覧中 ${viewers.length}人`}>
-      <span className="vlabel">閲覧中</span>
+    <span className={`viewers ${dark ? 'dark' : ''}`} title={tr("ui553", viewers.map((v) => v.name).join('、'))} aria-label={tr("ui554", viewers.length)}>
+      <span className="vlabel">{tr("ui555")}</span>
       {shown.map((v) => <Face key={v.id} id={v.id} name={v.name} size={22} />)}
       {viewers.length > 3 && <span className="vmore">+{viewers.length - 3}</span>}
     </span>
@@ -46,11 +51,11 @@ export function Viewers({ keyName, dark = false }: { keyName: string; dark?: boo
 
 export type { Band };
 export { bandOf };
-export const BANDS: { band: Band; label: string; range: string; dot: string }[] = [
-  { band: 'near', label: 'すぐそば', range: `〜${NEAR_RANGE}m`, dot: '#2E9A64' },
-  { band: 'mid', label: '声が届く', range: `〜${VOICE_RANGE}m`, dot: '#D9A02B' },
-  { band: 'far', label: 'とおく', range: `${VOICE_RANGE}m〜`, dot: '#9A98A2' },
-];
+export const BANDS: { band: Band; label: string; range: string; dot: string }[] = localized([
+  { band: 'near', label: uiSource('ui556'), range: `〜${NEAR_RANGE}m`, dot: '#2E9A64' },
+  { band: 'mid', label: uiSource('ui557'), range: `〜${VOICE_RANGE}m`, dot: '#D9A02B' },
+  { band: 'far', label: uiSource('ui558'), range: `${VOICE_RANGE}m〜`, dot: '#9A98A2' },
+]);
 
 export type PlayerEntry = ListedPlayer;
 
@@ -77,7 +82,7 @@ export function windowKeyOf(item: Item, camFeeds: Record<string, number>) {
 }
 
 export const itemLabel = (item: Item) =>
-  item.kind === 'note' ? (item.text.split('\n')[0].slice(0, 16) || '付箋（空）')
+  item.kind === 'note' ? (item.text.split('\n')[0].slice(0, 16) || tr("ui559"))
     : item.kind === 'youtube' && item.title ? item.title.slice(0, 24)
     : ITEM_INFO[item.kind].name;
 
@@ -90,12 +95,13 @@ export function useLastSaid(id: string) {
   const [, tick] = useState(0);
   const last = [...chat].reverse().find((m) => m.from === id && m.text);
   const fresh = last && Date.now() - last.at < BUBBLE_MS;
+  const translated = useTranslatedText(fresh ? last.text : '');
   useEffect(() => {
     if (!fresh || !last) return;
     const t = setTimeout(() => tick((n) => n + 1), BUBBLE_MS - (Date.now() - last.at) + 50);
     return () => clearTimeout(t);
   }, [fresh, last]);
-  return fresh ? last.text : null;
+  return fresh ? translated?.text ?? last.text : null;
 }
 
 export function ChatImage({ src }: { src?: string }) {
@@ -109,7 +115,7 @@ export function Lightbox() {
   return (
     <div className="lightbox" onClick={() => set({ lightbox: null })}>
       <img src={src} alt="" />
-      <a className="dl" href={src} download="tonarium.jpg" onClick={(e) => e.stopPropagation()}>保存</a>
+      <a className="dl" href={src} download="tonarium.jpg" onClick={(e) => e.stopPropagation()}>{tr("ui560")}</a>
     </div>
   );
 }
@@ -145,31 +151,43 @@ export function Popover({ anchor, onClose, children, side = 'right', className =
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
-    // 開閉ボタン（data-popanchor）は自分で切り替えるので、ここでは閉じない
-    const down = (e: MouseEvent) => {
+    // 自分の開閉ボタンだけはクリックで切り替え、別のメニューを開いたら閉じる
+    const down = (e: PointerEvent) => {
       const t = e.target as Element;
-      if (!ref.current?.contains(t) && !t.closest?.('[data-popanchor]')) close.current();
+      const button = t.closest?.('[data-popanchor]')?.getBoundingClientRect();
+      const ownAnchor = button && button.left === anchor.left && button.top === anchor.top;
+      if (!ref.current?.contains(t) && !ownAnchor) close.current();
     };
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') close.current(); };
     // 開いたクリック自体で閉じないよう、次のイベントから見る
-    const t = setTimeout(() => { window.addEventListener('mousedown', down); window.addEventListener('keydown', key); });
-    return () => { clearTimeout(t); window.removeEventListener('mousedown', down); window.removeEventListener('keydown', key); };
-  }, []);
-  // 実際の大きさが分かってから画面内に収める
-  const [shift, setShift] = useState({ x: 0, y: 0 });
-  useLayoutEffect(() => {
-    const r = ref.current?.getBoundingClientRect();
-    if (!r) return;
-    setShift({
-      x: Math.min(0, window.innerWidth - 12 - r.right) + Math.max(0, 12 - r.left),
-      y: Math.min(0, window.innerHeight - 12 - r.bottom) + Math.max(0, 12 - r.top),
-    });
+    const t = setTimeout(() => { window.addEventListener('pointerdown', down); window.addEventListener('keydown', key); });
+    return () => { clearTimeout(t); window.removeEventListener('pointerdown', down); window.removeEventListener('keydown', key); };
   }, [anchor]);
-  const style: React.CSSProperties = side === 'right'
-    ? { left: anchor.right + 10 + shift.x, top: anchor.top - 8 + shift.y }
-    : side === 'up'
-      ? { left: anchor.left + anchor.width / 2 + shift.x, bottom: window.innerHeight - anchor.top + 10 - shift.y, transform: 'translateX(-50%)' }
-      : { left: anchor.left + shift.x, top: anchor.bottom + 8 + shift.y };
+  // 実際の大きさが分かってから画面内に収める
+  const [style, setStyle] = useState<React.CSSProperties>({ visibility: 'hidden' });
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const place = () => {
+      const viewport = window.visualViewport;
+      const bounds = { left: viewport?.offsetLeft ?? 0, top: viewport?.offsetTop ?? 0, width: viewport?.width ?? window.innerWidth, height: viewport?.height ?? window.innerHeight };
+      el.style.maxWidth = `${Math.max(0, bounds.width - 24)}px`;
+      el.style.maxHeight = `${Math.max(0, bounds.height - 24)}px`;
+      setStyle(popoverPosition(anchor, el.getBoundingClientRect(), bounds, side));
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(el);
+    window.addEventListener('resize', place);
+    window.visualViewport?.addEventListener('resize', place);
+    window.visualViewport?.addEventListener('scroll', place);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', place);
+      window.visualViewport?.removeEventListener('resize', place);
+      window.visualViewport?.removeEventListener('scroll', place);
+    };
+  }, [anchor, side]);
   // パネルの backdrop-filter が fixed の基準になって切れてしまうので body に出す
   return createPortal(<div ref={ref} className={`popover ${className}`} style={style}>{children}</div>, document.body);
 }

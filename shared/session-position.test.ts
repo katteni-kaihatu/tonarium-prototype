@@ -3,6 +3,29 @@ import assert from 'node:assert/strict';
 import type { KokosyncClient, Frame } from '../vendor/kokosync/index.js';
 import { base64, importKey, open, seal, type SyncConfig, type PositionPeer } from './session-wire.ts';
 import { POSITION_DIRECT_PEERS, POSITION_TOPIC, SessionPositions } from './session-position.ts';
+import { clampAvatar } from './places.ts';
+
+test('walking start and stationary stop reach multiple peers through position sync', async () => {
+  const source = config('walker', 0), sender = fixture(source);
+  const peers = [config('observer-a', 1), config('observer-b', 2)];
+  const receivers = peers.map(fixture);
+  await sender.positions.update(peers.map((p) => member(p)));
+  sender.present(peers.map((p) => p.peer));
+  for (const receiver of receivers) await receiver.positions.update([member(source)]);
+  for (const walking of [true, false]) {
+    sender.sent.length = 0;
+    await sender.positions.send({ x: 1, z: 2, ry: 0, walking });
+    for (let i = 0; i < peers.length; i++) {
+      const packet = sender.sent.find((f) => f.to?.includes(peers[i].peer))!;
+      await receivers[i].positions.receive({ ...packet, peer: source.peer });
+      const applied = receivers[i].applied.at(-1) as { state: any };
+      assert.equal(clampAvatar('room', applied.state).walking, walking);
+    }
+    const serverPacket = sender.sent.find((f) => f.to?.includes(source.server))!;
+    const decoded = await open(await importKey(source.positionKey!), source.token, 'position', serverPacket.value);
+    assert.equal(clampAvatar('room', decoded.value.s).walking, walking);
+  }
+});
 
 const secret = () => base64(crypto.getRandomValues(new Uint8Array(32)));
 const config = (peer: string, slot: number): SyncConfig => ({ sid: 'room', room: 'wire-room', server: 'server', peer,
@@ -62,6 +85,8 @@ test('reject mismatched sequence and non-position payloads without applying them
   const base = { type: 'latest', key: `${POSITION_TOPIC}:0`, peer: other.peer, seq: 3n };
   await f.positions.receive({ ...base, value: await seal(key, other.token, 'position', 2, { t: 'avatar', s: { x: 1, z: 1, ry: 0 } }) });
   await f.positions.receive({ ...base, value: await seal(key, other.token, 'position', 3, { t: 'chat', text: 'injected' }) });
+  assert.equal(f.applied.length, 0);
+  await f.positions.receive({ ...base, value: await seal(key, other.token, 'position', 3, { t: 'avatar', s: { x: 1, z: 1, ry: 0, walking: 'true' } }) });
   assert.equal(f.applied.length, 0);
   f.positions.close();
   await f.positions.receive({ ...base, value: await seal(key, other.token, 'position', 3, { t: 'avatar', s: { x: 1, z: 1, ry: 0 } }) });

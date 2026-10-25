@@ -13,7 +13,7 @@ stub('../world/sounds.ts', { playPoke() {}, playSynth() {} });
 stub('../emotes.ts', { receiveEmote() {} });
 stub('../world/survivorAudio.ts', { playSurvivorSound() {} });
 stub('./session.ts', { startSessionSync() {}, stopSessionSync() {}, roomSend() {}, configureSessionSync() {}, syncError() {}, resetSessionSync() {} });
-globalThis.document = { querySelector: () => null };
+globalThis.document = { documentElement: { lang: '' }, title: '', querySelector: () => null };
 globalThis.WebSocket = class {
   static OPEN = 1;
   readyState = 1;

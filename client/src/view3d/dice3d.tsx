@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n/index.ts';
 import { DiceStand } from './diceModel.tsx';
 import { useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -114,15 +115,15 @@ export function Dice3D({ item }: { item: Item & { kind: 'dice' } }) {
     if (d !== done.current) { done.current = d; rerender((n) => n + 1); }
   });
   const label = !roll
-    ? 'サイコロ'
+    ? tr("ui446")
     : !done.current
-      ? `${nameOf(roll.by)} が ${diceLabel(roll.sides, roll.count)} を振っています…`
+      ? tr("ui482", nameOf(roll.by), diceLabel(roll.sides, roll.count))
       : results
-        ? `${nameOf(roll.by)}：${diceLabel(roll.sides, roll.count)} = ${results.reduce((a, b) => a + b, 0)}${roll.secret ? '（シークレット）' : ''}`
-        : `${nameOf(roll.by)} がシークレットで ${diceLabel(roll.sides, roll.count)} を振りました`;
+        ? `${nameOf(roll.by)}：${diceLabel(roll.sides, roll.count)} = ${results.reduce((a, b) => a + b, 0)}${roll.secret ? tr("ui483") : ''}`
+        : tr("ui484", nameOf(roll.by), diceLabel(roll.sides, roll.count));
   const data: Interactable = {
     ...removable(item),
-    hint: `クリック: ${diceLabel(settings.sides, settings.count)}${settings.secret ? 'をシークレットで' : 'を'}振る（種類と個数はウィンドウで）`,
+    hint: tr("ui485", diceLabel(settings.sides, settings.count), settings.secret ? tr("ui486") : tr("ui487")),
     use: () => rollDice(item.id),
   };
   return (

@@ -1,12 +1,14 @@
+import { sourceText as uiSource } from '../i18n/core.ts';
+import { localized } from '../i18n/core.ts';
 import type { ItemKind } from '../../../shared/items.ts';
 
-export const ITEM_USAGE: Partial<Record<ItemKind, string>> = {
-  note: 'セッションで「目の前に出す」を選び、付箋を押して文字や色を編集します。3D では空間の板に表示されます。',
-  hammer: 'セッションで「目の前に出す」を選び、ハンマーを拾って使います。相手を叩くと、その人の前に移動できます。',
-  chess: 'セッションに出した盤面の駒と移動先を順に選びます。手番の駒は誰でも動かせます。「新しい対局」で最初から遊べます。',
-  chessAi: 'セッションに出して、白の駒と移動先を選びます。黒の駒は AI が動かします。みんなで白の手を相談して遊べます。',
-  g2048: 'セッションに出し、2D のパネルで上下左右にタイルを動かします。同じ数のタイルを合わせて大きな数を目指します。',
-  canvas: 'セッションに出したキャンバスで、ペンの色と太さを選んで描きます。消しゴムや保存も使えます。',
-  camera: '3D のセッションに出して拾います。持っている間はクリックで撮影、L キーでライブ配信、Q キーで三脚に戻せます。三脚に置いたカメラは、照準を合わせて C キーで撮影できます。',
-  dice: 'セッションに出し、ウィンドウで種類・個数・シークレットを選んで振ります。3D では木の器を押しても振れます。結果はチャットに残ります。',
-};
+export const ITEM_USAGE: Partial<Record<ItemKind, string>> = localized({
+  note: uiSource('ui373'),
+  hammer: uiSource('ui374'),
+  chess: uiSource('ui375'),
+  chessAi: uiSource('ui376'),
+  g2048: uiSource('ui377'),
+  canvas: uiSource('ui378'),
+  camera: uiSource('ui379'),
+  dice: uiSource('ui380'),
+});

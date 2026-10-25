@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
-import { EMOTES, isEmoteId } from '../../shared/emotes.ts';
+import { EMOTES } from './i18n/static.ts';
+import { isEmoteId } from '../../shared/emotes.ts';
 import type { RoomServerMsg } from '../../shared/protocol.ts';
 import { get, set, serverNow, useStore } from './store.ts';
 import { volumeFrom } from './spatial.ts';

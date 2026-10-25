@@ -80,6 +80,7 @@ export function clampAvatar(world: WorldKind, s: AvatarState): AvatarState {
     ...(Number.isFinite(y) ? { y: Math.max(-30, Math.min(40, y)) } : {}),
     pitch: Math.max(-1.5, Math.min(1.5, Number(s.pitch) || 0)),
     jump: Math.max(0, Math.floor(Number(s.jump) || 0)),
+    ...(s.walking !== undefined ? { walking: s.walking === true && !s.ride } : {}),
     ...(world === 'city' && s.ride ? { ride: cleanRide(s.ride) } : {}),
   };
 }

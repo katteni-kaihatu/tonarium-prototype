@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n/index.ts';
 import { useEffect, useRef } from 'react';
 import type { Item } from '../../../shared/items.ts';
 import { useStore, get, type ItemUi } from '../store.ts';
@@ -20,10 +21,11 @@ export function drawPanel(canvas: HTMLCanvasElement, item: Item, ui: ItemUi) {
 }
 
 export function PanelCanvas({ item, interactive }: { item: Item; interactive: boolean }) {
+  const language = useLanguage();
   const ref = useRef<HTMLCanvasElement>(null);
   const ui = useStore((s) => s.itemUi[item.id] ?? NO_UI);
   const panel = PANELS[item.kind]!;
-  useEffect(() => { drawPanel(ref.current!, item, ui); }, [item, ui]);
+  useEffect(() => { drawPanel(ref.current!, item, ui); }, [item, ui, language]);
 
   const toPanel = (e: React.PointerEvent | React.MouseEvent) => {
     const r = e.currentTarget.getBoundingClientRect();

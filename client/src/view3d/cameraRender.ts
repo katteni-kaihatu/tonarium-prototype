@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n/index.ts';
 // 撮影・配信ともメインとは別の WebGLRenderer で同じシーンを描く
 import * as THREE from 'three';
 import type { Item } from '../../../shared/items.ts';
@@ -90,7 +91,7 @@ let photoRenderer: THREE.WebGLRenderer | null = null;
 export function takePhoto(item: Item & { kind: 'camera' }) {
   photoRenderer ??= makeRenderer(1280, 720);
   renderCamera(photoRenderer, item);
-  postImage('📷 撮影しました', photoRenderer.domElement.toDataURL('image/jpeg', 0.85));
+  postImage(tr("ui478"), photoRenderer.domElement.toDataURL('image/jpeg', 0.85));
   playShutter();
   set({ flashAt: performance.now() });
 }

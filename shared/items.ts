@@ -1,7 +1,8 @@
 import { newChess, chessBoard, playChess, type ChessState, type Promotion } from './chess.ts';
 import type { DiceRoll, DieSides } from './dice.ts';
+import { BIKE, releaseBike, vehicleInitial, type VehicleState } from './vehicle.ts';
 
-export type ItemKind = 'note' | 'hammer' | 'chess' | 'chessAi' | 'g2048' | 'canvas' | 'camera' | 'image' | 'video' | 'youtube' | 'dice';
+export type ItemKind = 'note' | 'hammer' | 'chess' | 'chessAi' | 'g2048' | 'canvas' | 'camera' | 'image' | 'video' | 'youtube' | 'dice' | 'antimatter' | 'bike';
 
 /**
  * みんなで同じ位置を再生するための時計。at（サーバー時刻 ms）の時点で base 秒目。
@@ -35,6 +36,7 @@ interface ItemBase {
 }
 
 export type Item =
+  | (ItemBase & VehicleState & { kind: 'bike'; rider: string | null; rideVersion: number })
   | (ItemBase & { kind: 'note'; text: string; color: string; editingBy: string | null })
   | (ItemBase & { kind: 'hammer'; holder: string | null })
   /** board[row * 8 + col]。row 0 が黒の 8 段目 */
@@ -47,17 +49,22 @@ export type Item =
   | (ItemBase & { kind: 'video'; url: string; w: number; h: number; clock: MediaClock })
   | (ItemBase & { kind: 'youtube'; videoId: string; title: string; clock: MediaClock })
   /** 結果をサーバーで検証・確定し、チャットにも残す。roll は最後に振った回 */
-  | (ItemBase & { kind: 'dice'; roll: DiceRoll | null });
+  | (ItemBase & { kind: 'dice'; roll: DiceRoll | null })
+  /** AD への入口だけ。進行・セーブは持たず、ad スライス側が担う */
+  | (ItemBase & { kind: 'antimatter' });
 
 export type ChessItem = Extract<Item, { kind: 'chess' | 'chessAi' }>;
 export const isChessItem = (item: Item): item is ChessItem => item.kind === 'chess' || item.kind === 'chessAi';
 
 export const isHandheld = (i: Item) => i.kind === 'hammer' || i.kind === 'camera';
-export const ONLY_3D: Partial<Record<ItemKind, boolean>> = { camera: true };
+export const ONLY_3D: Partial<Record<ItemKind, boolean>> = { camera: true, bike: true };
 
 export type Dir = 'up' | 'down' | 'left' | 'right';
 
 export type ItemAction =
+  | { a: 'bikeMount' }
+  | { a: 'bikeDismount' }
+  | { a: 'bikeDrive'; state: VehicleState; rideVersion: number }
   | { a: 'noteEdit'; text?: string; color?: string }
   | { a: 'noteLock'; lock: boolean }
   | { a: 'pick' }
@@ -95,6 +102,7 @@ export interface ItemInfo {
 }
 
 export const ITEM_INFO: Record<ItemKind, ItemInfo> = {
+  bike: { name: 'バイク', mark: '単車', tint: '#DBEAE7', ink: '#235E57', desc: '3D 専用の一人乗りバイク。照準を合わせ E またはクリックで乗車、E で降車。W/↑: アクセル、S/↓: ブレーキ、A/D・←/→: ハンドル。急旋回すると滑ります。', genre: 'のりもの', in2d: false, in3d: true },
   note: { illustration: '/items/note.png', name: '付箋', mark: '付', tint: '#FBF1C4', ink: '#7A5B0E', desc: '文字を書いて置いておける付箋。2D ではウィンドウで、3D では空間の板として読み書きできる。', genre: 'ツール', in2d: true, in3d: true },
   hammer: { illustration: '/items/hammer.png', name: 'ピコピコハンマー', mark: '槌', tint: '#FBE3D2', ink: '#A24A16', desc: '手に持って誰かを叩ける。叩くと相手の前に移動する。', genre: 'あそび', in2d: true, in3d: true },
   chess: { illustration: '/items/chess.png', name: 'チェス', mark: '♟', tint: '#E3E7F6', ink: '#2F4A9C', desc: '3D では立体のチェス盤、2D ではパネルの UI で遊べる。', genre: 'ゲーム', in2d: true, in3d: true },
@@ -106,6 +114,7 @@ export const ITEM_INFO: Record<ItemKind, ItemInfo> = {
   video: { name: '動画', mark: '動', tint: '#EFE4F6', ink: '#6A3A8C', desc: '貼り付けた動画。みんなで同じところを再生する。', genre: 'メディア', in2d: true, in3d: true, media: true },
   dice: { illustration: '/items/dice.png', name: 'サイコロ', mark: '賽', tint: '#F3E6D3', ink: '#7A4A22', desc: 'TRPG 用のサイコロ（d4〜d100、最大10個）。3D では木の器の中を転がり、結果はチャットに残る。シークレットで振ると結果は自分だけに見える。', genre: 'あそび', in2d: true, in3d: true },
   youtube: { name: 'YouTube', mark: 'YT', tint: '#FBE1DE', ink: '#B3261E', desc: 'YouTube の動画。みんなで同じところを再生する。', genre: 'メディア', in2d: true, in3d: true, media: true },
+  antimatter: { name: 'AD ポータル', mark: 'AD', tint: '#E9E2F5', ink: '#5B3A8C', desc: '反物質次元への入口。開くと自分の AD 研究所パネルが開く。進行・セーブはプレイヤーごとに残り、アイテムを片付けたりワールドを切り替えたりしても消えない。', genre: 'ゲーム', in2d: true, in3d: true },
 };
 
 const BACK = ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'];
@@ -183,6 +192,7 @@ export function createItem(
   const clock: MediaClock = { playing: false, base: 0, at: 0 };
   const size = (n: number) => Math.max(1, Math.min(10000, Math.round(Number(n) || 1)));
   switch (kind) {
+    case 'bike': return { ...b, ...vehicleInitial(b.x, b.z, b.ry), kind, rider: null, rideVersion: 0 };
     case 'image':
     case 'video': {
       if (!media || !('url' in media) || !MEDIA_URL_RE.test(media.url)) return null;
@@ -202,6 +212,7 @@ export function createItem(
     case 'canvas': return { ...b, kind, strokes: [] };
     case 'camera': return { ...b, kind, holder: null, pitch: 0, live: false, operator: null };
     case 'dice': return { ...b, kind, roll: null };
+    case 'antimatter': return { ...b, kind };
   }
 }
 
@@ -210,6 +221,25 @@ export function applyItemAction(item: Item, act: ItemAction, userId: string, rng
   // クライアント由来の非有限数がアイテムに保存されないようにする変換
   const fin = (v: number) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
   switch (item.kind) {
+    case 'bike': {
+      if (act.a === 'bikeMount' && item.rider === null) {
+        item.heading = item.ry;
+        item.rider = userId;
+        item.rideVersion++;
+        break;
+      }
+      if (item.rider !== userId) return false;
+      if (act.a === 'bikeDismount') { Object.assign(item, releaseBike(item)); break; }
+      if (act.a !== 'bikeDrive' || act.rideVersion !== item.rideVersion) return false;
+      const s = act.state;
+      if (!s || ![s.x, s.z, s.ry, s.speed, s.heading, s.roll, s.wheel, s.steer].every(Number.isFinite)) return false;
+      item.x = s.x; item.z = s.z; item.ry = fin(s.ry); item.heading = fin(s.heading);
+      item.speed = Math.max(0, Math.min(BIKE.maxSpeed, s.speed));
+      item.roll = Math.max(-BIKE.maxLean, Math.min(BIKE.maxLean, s.roll));
+      item.steer = Math.max(-BIKE.maxSteer, Math.min(BIKE.maxSteer, s.steer));
+      item.wheel = fin(s.wheel); item.slipping = !!s.slipping; item.remainder = 0;
+      break;
+    }
     case 'note':
       if (act.a === 'noteEdit') {
         if (act.text !== undefined) item.text = act.text.slice(0, 300);
@@ -319,6 +349,9 @@ export function applyItemAction(item: Item, act: ItemAction, userId: string, rng
     // 結果はサーバーが決める（server の rollDice）
     case 'dice':
       return false;
+    // 入口だけで操作を持たない
+    case 'antimatter':
+      return false;
   }
   item.updatedBy = userId;
   return true;
@@ -338,6 +371,7 @@ export function itemSummary(it: Item): string | null {
     case 'image': return '写真';
     case 'video': return '動画';
     case 'youtube': return it.title ? `YouTube「${it.title.slice(0, 20)}」` : 'YouTube';
+    case 'antimatter': return 'AD ポータル';
     default: return null;
   }
 }

@@ -4,6 +4,7 @@ import { ROOM_HALF } from '../../../shared/protocol.ts';
 import { DEFAULT_EYE_HEIGHT } from '../../../shared/avatar.ts';
 
 export interface Interactable {
+  bike?: string;
   use?: (hit: THREE.Intersection) => void;
   /** あれば use の代わりに使う */
   drag?: (phase: 'start' | 'move' | 'end', hit: THREE.Intersection | null) => void;

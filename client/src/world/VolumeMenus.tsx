@@ -1,13 +1,15 @@
+import { sourceText as uiSource } from '../i18n/core.ts';
+import { localized, t as tr } from '../i18n/index.ts';
 import { useStore } from '../store.ts';
 import { peerLevel, setMasterVolume, setPeerVolume, togglePeerMute, type VolumeKind } from '../volume.ts';
 import { Popover } from './common.tsx';
 import { Icon } from './Icon.tsx';
 
-const KINDS: { kind: VolumeKind; label: string }[] = [
-  { kind: 'voice', label: '人の声' },
-  { kind: 'fx', label: 'サウンドボード・効果音' },
-  { kind: 'media', label: '動画・画面共有' },
-];
+const KINDS: { kind: VolumeKind; label: string }[] = localized([
+  { kind: 'voice', label: uiSource('ui820') },
+  { kind: 'fx', label: uiSource('ui821') },
+  { kind: 'media', label: uiSource('ui822') },
+]);
 
 function Slider({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (v: number) => void }) {
   return (
@@ -23,7 +25,7 @@ export function MasterVolume({ anchor, onClose }: { anchor: DOMRect; onClose: ()
   const vol = useStore((s) => s.audioVol);
   return (
     <Popover anchor={anchor} side="up" onClose={onClose} className="volume">
-      <span className="menutitle">音量（自分だけ）</span>
+      <span className="menutitle">{tr("ui37")}</span>
       {KINDS.map((k) => <Slider key={k.kind} label={k.label} value={vol[k.kind]} max={1} onChange={(v) => setMasterVolume(k.kind, v)} />)}
     </Popover>
   );
@@ -35,13 +37,13 @@ export function PeerVolume({ name, anchor, onClose }: { name: string; anchor: DO
   const muted = useStore((s) => s.peerMuted.includes(name));
   return (
     <Popover anchor={anchor} onClose={onClose} className="volume">
-      <span className="menutitle">{name} の声の音量（自分だけ）</span>
-      <Slider label="音量" value={level} max={2} onChange={(v) => setPeerVolume(name, v)} />
+      <span className="menutitle">{name} {tr("ui823")}</span>
+      <Slider label={tr("ui824")} value={level} max={2} onChange={(v) => setPeerVolume(name, v)} />
       <div className="volbtns">
         <button className={`ib menuitem ${muted ? 'on' : ''}`} onClick={() => togglePeerMute(name)}>
-          <Icon name={muted ? 'volumeOff' : 'volume'} />{muted ? 'ミュートを解除' : 'ミュート'}
+          <Icon name={muted ? 'volumeOff' : 'volume'} />{muted ? tr("ui825") : tr("ui601")}
         </button>
-        <button className="ib menuitem" disabled={level === 1} onClick={() => setPeerVolume(name, 1)}>100% に戻す</button>
+        <button className="ib menuitem" disabled={level === 1} onClick={() => setPeerVolume(name, 1)}>{tr("ui826")}</button>
       </div>
     </Popover>
   );

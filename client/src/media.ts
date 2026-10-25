@@ -1,3 +1,4 @@
+import { msg } from './i18n/core.ts';
 import type { ChatMedia, ChatMessage } from '../../shared/protocol.ts';
 import type { ItemKind, MediaInit } from '../../shared/items.ts';
 import { get, showToast } from './store.ts';
@@ -37,19 +38,19 @@ async function sizeOf(file: Blob, video: boolean): Promise<{ w: number; h: numbe
 /** 大きすぎるものは送る前に断る。サーバーでも同じ上限を見る */
 export async function uploadMedia(file: Blob): Promise<ChatMedia | null> {
   const video = file.type.startsWith('video/');
-  if (!video && !file.type.startsWith('image/')) { showToast('画像か動画のファイルだけ共有できます'); return null; }
+  if (!video && !file.type.startsWith('image/')) { showToast(msg("ui28")); return null; }
   const max = video ? VIDEO_MAX : IMAGE_MAX;
-  if (file.size > max) { showToast(`${video ? '動画' : '画像'}は ${mb(max)} までです（${mb(file.size)}）`); return null; }
-  showToast(`${video ? '動画' : '画像'}をアップロードしています…`);
+  if (file.size > max) { showToast(msg("ui29", video ? msg("ui30") : msg("ui31"), mb(max), mb(file.size))); return null; }
+  showToast(msg("ui32", video ? msg("ui30") : msg("ui31")));
   try {
     const { w, h } = await sizeOf(file, video);
     const res = await fetch('/media', { method: 'POST', body: file });
     const j = await res.json() as { url?: string; error?: string };
-    if (!res.ok || !j.url) { showToast(j.error ?? 'アップロードできませんでした'); return null; }
-    showToast(`${video ? '動画' : '画像'}を共有しました`);
+    if (!res.ok || !j.url) { showToast(j.error ?? msg("ui33")); return null; }
+    showToast(msg("ui34", video ? msg("ui30") : msg("ui31")));
     return { kind: video ? 'video' : 'image', url: j.url, w, h };
   } catch {
-    showToast('アップロードできませんでした');
+    showToast(msg("ui33"));
     return null;
   }
 }

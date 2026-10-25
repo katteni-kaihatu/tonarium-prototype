@@ -1,7 +1,8 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { Group } from 'three';
-import { EMOTES, type ActiveEmote } from '../../../shared/emotes.ts';
+import { EMOTES } from '../i18n/static.ts';
+import { type ActiveEmote } from '../../../shared/emotes.ts';
 import { useEmote, useReducedMotion } from '../emotes.ts';
 import { Label } from './Label.tsx';
 

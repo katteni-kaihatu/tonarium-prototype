@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ROOM_HALF } from '../../../shared/protocol.ts';
-import { WORLDS, type WorldKind } from '../../../shared/worlds.ts';
+import { WORLDS } from '../i18n/static.ts';
+import { type WorldKind } from '../../../shared/worlds.ts';
 import { useStore, get, worldKindOf } from '../store.ts';
 import { placesOf } from '../spatial.ts';
 import { walkTo } from '../walk.ts';

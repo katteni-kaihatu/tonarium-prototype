@@ -1,3 +1,4 @@
+import { t as tr, msg, systemText, type UiMessage } from '../i18n/index.ts';
 import { useState } from 'react';
 import { useStore, set, colorOf } from '../store.ts';
 import { follow, friendRequest, goNear, poke, report, toggleBlock } from '../actions.ts';
@@ -18,7 +19,7 @@ export function ProfileCard() {
   const [requested, setRequested] = useState<string | null>(null);
   const [reporting, setReporting] = useState(false);
   const [reason, setReason] = useState('');
-  const [done, setDone] = useState('');
+  const [done, setDone] = useState<string | UiMessage>('');
   if (!id || !u) return null;
   const close = () => { set({ profileOf: null }); setReporting(false); setDone(''); };
   const self = me?.id === u.id;
@@ -27,33 +28,33 @@ export function ProfileCard() {
   const following = me?.follow === u.id;
   const isFriend = friends.includes(u.name);
   const isBlocked = blocked.includes(u.name);
-  const status = `${u.mode === '3d' ? '3D' : '2D'} で参加中${u.sharing ? ' · 画面共有中' : ''}${!u.micOn ? ' · ミュート' : ''}${isFriend ? ' · フレンド' : ''}`;
+  const status = tr("ui665", u.mode === '3d' ? '3D' : '2D', u.sharing ? tr("ui666") : '', !u.micOn ? tr("ui667") : '', isFriend ? tr("ui668") : '');
   const sendReport = async () => {
     const ok = await report(u.name, reason);
-    setDone(ok ? '通報を送りました。ありがとうございます' : '通報を送れませんでした');
+    setDone(ok ? msg("ui669") : msg("ui670"));
     setReporting(false);
     setReason('');
   };
 
   return (
     <div className="modalbg" onClick={close}>
-      <div role="dialog" aria-modal="true" aria-label={`${u.name} のプロフィール`} className="profilecard" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={tr("ui584", u.name)} className="profilecard" onClick={(e) => e.stopPropagation()}>
         <div className="pcbanner" style={{ background: colorOf(u.id) }} />
-        <button className="ib pcclose" onClick={close} aria-label="閉じる"><Icon name="close" /></button>
+        <button className="ib pcclose" onClick={close} aria-label={tr("ui73")}><Icon name="close" /></button>
         <div className="pcbody">
           <Face id={u.id} name={u.name} size={80} ring="0 0 0 4px #FFFDF9" />
           <div className="pcname">
             <h2>{u.name}</h2>
             <span className="sub">{status} · <ProfileDistance id={u.id} /></span>
           </div>
-          <p className="bio">{u.bio || '自己紹介はまだありません'}</p>
+          <p className="bio">{u.bio || tr("ui671")}</p>
           {!self && (
             <div className="pcacts">
-              <button className="primary" onClick={run(() => goNear(u.id))}><Icon name="near" />そばにいく</button>
-              <button onClick={run(() => follow(following ? null : u.id))} disabled={!canFollow} title={canFollow ? undefined : '2D から 3D の人についていけます'}>
-                <Icon name="follow" />{following ? 'やめる' : 'ついていく'}
+              <button className="primary" onClick={run(() => goNear(u.id))}><Icon name="near" />{tr("ui611")}</button>
+              <button onClick={run(() => follow(following ? null : u.id))} disabled={!canFollow} title={canFollow ? undefined : tr("ui672")}>
+                <Icon name="follow" />{following ? tr("ui109") : tr("ui613")}
               </button>
-              <button onClick={run(() => poke(u.id))}><Icon name="poke" />つんつん</button>
+              <button onClick={run(() => poke(u.id))}><Icon name="poke" />{tr("ui581")}</button>
             </div>
           )}
           {!self && (
@@ -61,21 +62,21 @@ export function ProfileCard() {
               <button
                 className="ib" disabled={isFriend || requested === u.id}
                 onClick={() => { friendRequest(u.id); setRequested(u.id); }}
-              >{isFriend ? 'フレンド' : requested === u.id ? '申請しました' : 'フレンド申請'}</button>
+              >{isFriend ? tr("ui153") : requested === u.id ? tr("ui673") : tr("ui674")}</button>
               <span className="spacer" />
-              <button className="ib" onClick={() => toggleBlock(u.name)}>{isBlocked ? 'ブロック解除' : 'ブロック'}</button>
-              <button className="ib danger" onClick={() => setReporting(!reporting)}>通報</button>
+              <button className="ib" onClick={() => toggleBlock(u.name)}>{isBlocked ? tr("ui675") : tr("ui676")}</button>
+              <button className="ib danger" onClick={() => setReporting(!reporting)}>{tr("ui677")}</button>
             </div>
           )}
-          {isBlocked && <div className="sub">ブロック中：この人の声・チャット・通知はあなたに届きません</div>}
+          {isBlocked && <div className="sub">{tr("ui678")}</div>}
           {reporting && (
             <div className="reportbox">
-              <label htmlFor="reportreason">通報の理由</label>
-              <textarea id="reportreason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="何があったかを書いてください" />
-              <button className="danger" onClick={() => void sendReport()}>通報を送る</button>
+              <label htmlFor="reportreason">{tr("ui679")}</label>
+              <textarea id="reportreason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={tr("ui680")} />
+              <button className="danger" onClick={() => void sendReport()}>{tr("ui681")}</button>
             </div>
           )}
-          {done && <div className="sub ok">{done}</div>}
+          {done && <div className="sub ok">{systemText(done)}</div>}
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { t as tr, getLanguage } from '../i18n/index.ts';
+import { Suspense, useMemo } from 'react';
 import * as THREE from 'three';
 import { ROOM_HALF } from '../../../shared/protocol.ts';
 import { CAFE, CAFE_TABLE_R, type WorldKind } from '../../../shared/worlds.ts';
@@ -9,6 +10,8 @@ import { GameWorld } from './game3d.tsx';
 import { CityWorld } from './city3d.tsx';
 import { SurvivorObjects } from './survivors3d.tsx';
 import { GardenWorld } from './garden3d.tsx';
+import { AntimatterWorld } from './antimatterWorld.tsx';
+import { AntimatterSky } from './AntimatterSky.tsx';
 
 const H = ROOM_HALF;
 const WALL_H = 4;
@@ -22,6 +25,7 @@ const PALETTES: Record<WorldKind, Palette> = {
   game: { floor: '#3b3f6b', wall: '#2a2d52', spawn: '#9cf0ff' },
   survivors: { floor: '#38243d', wall: '#4b2945', spawn: '#ef6b9b' },
   city: { floor: '#9db08a', wall: '#ece5d8', spawn: '#7fb3ff' },
+  antimatter: { floor: '#1b1d2e', wall: '#2c2f4a', spawn: '#7fd8ff' },
 };
 
 /** 床と壁。どのワールドも同じ形で、色だけ変える */
@@ -94,7 +98,7 @@ function MenuBoard() {
     ctx.font = '700 84px "Segoe UI", "Noto Sans JP", sans-serif';
     ctx.fillText('Café Tonarium', 512, 130);
     ctx.font = '500 48px "Segoe UI", "Noto Sans JP", sans-serif';
-    const menu = [['ブレンドコーヒー', '¥450'], ['カフェラテ', '¥520'], ['抹茶ラテ', '¥550'], ['チーズケーキ', '¥480']];
+    const menu = [[tr("ui548"), '¥450'], [tr("ui549"), '¥520'], [tr("ui550"), '¥550'], [tr("ui551"), '¥480']];
     menu.forEach(([n, p], i) => {
       ctx.textAlign = 'left';
       ctx.fillText(n, 120, 250 + i * 88);
@@ -103,7 +107,7 @@ function MenuBoard() {
     });
     t.needsUpdate = true;
     return t;
-  }, []);
+  }, [getLanguage()]);
   return (
     <mesh position={[-H + 0.12, 3.05, CAFE.shelf.z]} rotation-y={Math.PI / 2}>
       <planeGeometry args={[2.6, 1.62]} />
@@ -276,7 +280,9 @@ export function WorldMesh({ kind, map = false }: { kind: WorldKind; map?: boolea
   if (kind === 'survivors') return <><Hall /><SurvivorObjects /></>;
   if (kind === 'city') return <CityWorld map={map} />;
   if (kind === 'garden') return <><Shell pal={PALETTES.garden} /><GardenWorld map={map} /></>;
+  // AntimatterLab は床・壁・光源を自前で持つため Hall では包まない
+  if (kind === 'antimatter') return <><Suspense fallback={null}><AntimatterSky /></Suspense><AntimatterWorld /></>;
   return kind === 'cafe' ? <Cafe /> : <Hall />;
 }
 
-export const WORLD_BG: Record<WorldKind, string> = { room: '#2b2d31', cafe: '#1f1a17', game: '#7fb6e6', survivors: '#2b2d31', city: '#bcd6ec', garden: '#c8e3ed', starlounge: '#151c37' };
+export const WORLD_BG: Record<WorldKind, string> = { room: '#2b2d31', cafe: '#1f1a17', game: '#7fb6e6', survivors: '#2b2d31', city: '#bcd6ec', garden: '#c8e3ed', starlounge: '#151c37', antimatter: '#0b0d1a' };

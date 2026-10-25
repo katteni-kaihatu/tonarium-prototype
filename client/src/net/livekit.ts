@@ -1,3 +1,4 @@
+import { sourceText as uiSource } from '../i18n/core.ts';
 // 接続はここで1つだけ持ち、2D/3D の表示切替では切らない。セッションを移るときだけつなぎ直す。
 import {
   Room, RoomEvent, Track, LocalVideoTrack,
@@ -135,7 +136,7 @@ room
     const sid = get().session;
     if (!sid) return;
     send({ t: 'status', micOn: false, sharing: false });
-    set({ voice: 'unavailable', voiceError: '接続が切れました。つなぎ直しています' });
+    set({ voice: 'unavailable', voiceError: uiSource('ui448') });
     setTimeout(() => { if (gen === generation && get().session === sid) void connectVoice(sid); }, 3000);
   });
 
@@ -169,12 +170,12 @@ export async function leaveVoice() {
 async function explainConnectError(url: string, token: string) {
   try {
     const res = await fetch(`${url.replace(/^ws/, 'http').replace(/\/$/, '')}/rtc/validate?access_token=${encodeURIComponent(token)}`);
-    if (res.status === 429) return 'LiveKit の利用上限に達しています（接続時間など）';
-    if (res.status === 401) return 'LiveKit のキーが合っていません（LIVEKIT_API_KEY / SECRET を確認）';
+    if (res.status === 429) return uiSource('ui449');
+    if (res.status === 401) return uiSource('ui450');
     if (res.ok) return null;
-    return `LiveKit に接続できません（${res.status}）`;
+    return uiSource('ui451', res.status);
   } catch {
-    return `LiveKit サーバー（${url}）に届きません。起動しているか、URL を確認してください`;
+    return uiSource('ui452', url);
   }
 }
 
@@ -207,7 +208,7 @@ export async function connectVoice(sid: string) {
     try {
       await room.localParticipant.setMicrophoneEnabled(true);
     } catch (e) {
-      set({ micEnabled: false, voiceError: `マイクを開始できません: ${(e as Error).message}` });
+      set({ micEnabled: false, voiceError: uiSource('ui453', (e as Error).message) });
     }
   }
   syncParticipants();
@@ -220,7 +221,7 @@ export async function toggleMic() {
   try {
     await room.localParticipant.setMicrophoneEnabled(next);
   } catch (e) {
-    set({ voiceError: `マイク: ${(e as Error).message}` });
+    set({ voiceError: uiSource('ui454', (e as Error).message) });
   }
   syncParticipants();
 }
@@ -236,7 +237,7 @@ export async function toggleShare() {
       { videoEncoding: { maxBitrate: 3_000_000, maxFramerate: 30 } },
     );
   } catch (e) {
-    if ((e as Error).name !== 'NotAllowedError') set({ voiceError: `画面共有: ${(e as Error).message}` });
+    if ((e as Error).name !== 'NotAllowedError') set({ voiceError: uiSource('ui455', (e as Error).message) });
   }
   syncParticipants();
 }

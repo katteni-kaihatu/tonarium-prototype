@@ -1,3 +1,4 @@
+import { sourceText as uiSource } from '../i18n/core.ts';
 import { applyItemAction, type ItemAction, type ItemKind, type MediaInit } from '../../../shared/items.ts';
 import { ROOM_HALF, spawnSlot, type AvatarState } from '../../../shared/protocol.ts';
 import { approach } from '../../../shared/places.ts';
@@ -101,7 +102,7 @@ export function toggleLive(id: string) {
   const it = get().items[id];
   if (it?.kind !== 'camera') return;
   if (!it.live && get().voice !== 'connected') {
-    set({ voiceError: '通話に接続していないので配信できません' });
+    set({ voiceError: uiSource('ui340') });
     return;
   }
   itemAction(id, { a: 'camLive', on: !it.live });

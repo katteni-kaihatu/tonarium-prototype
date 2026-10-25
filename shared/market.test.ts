@@ -5,6 +5,19 @@ import { isWorldKind } from './worlds.ts';
 import { SOUNDS } from './sounds.ts';
 import { isEmoteId } from './emotes.ts';
 import { marketProductFromUrl, marketProductUrl } from './market-links.ts';
+import { createItem, ITEM_INFO } from './items.ts';
+
+test('bike uses the existing item product and purchase identity', () => {
+  const product = MARKET_PRODUCTS.find(p => p.id === 'bike');
+  assert.ok(product?.category === 'items' && product.kind === 'bike');
+  assert.equal(contentAvailable([], 'items', 'bike'), false);
+  assert.equal(contentAvailable(cleanPurchases(['bike']), 'items', 'bike'), true);
+  assert.equal(product.price, 150);
+  const item = createItem(product.kind, { id: 'b', x: 0, z: 0, ry: 0, createdBy: 'a' }, Math.random);
+  assert.equal(item?.kind, 'bike');
+  assert.equal(ITEM_INFO.bike.in2d, false);
+  assert.match(ITEM_INFO.bike.desc, /E.*W\/↑.*S\/↓.*A\/D/);
+});
 
 test('share links resolve a known product without carrying identity or session parameters', () => {
   const link = marketProductUrl('talk-card', 'https://tonarium.example/?as=alice&secret=no');

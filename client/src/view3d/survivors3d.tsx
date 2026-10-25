@@ -1,7 +1,9 @@
+import { t as tr } from '../i18n/index.ts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { SURVIVOR_JOIN, SURVIVOR_STYLES, survivorDistance, type SurvivorAttackEffect, type SurvivorEnemy, type SurvivorPlayer, type SurvivorProjectile } from '../../../shared/survivor.ts';
+import { SURVIVOR_STYLES } from '../i18n/static.ts';
+import { SURVIVOR_JOIN, survivorDistance, type SurvivorAttackEffect, type SurvivorEnemy, type SurvivorPlayer, type SurvivorProjectile } from '../../../shared/survivor.ts';
 import { useStore, get, colorOf, serverNow } from '../store.ts';
 import { Cyl } from './parts3d.tsx';
 import { Label } from './Label.tsx';
@@ -124,7 +126,7 @@ function JoinCircle() {
     return survivorDistance(p ?? { x: 0, z: 6.5 }, SURVIVOR_JOIN) <= SURVIVOR_JOIN.r;
   });
   const run = s.survivors[s.session ?? ''];
-  const label = run?.phase === 'running' || run?.phase === 'boss' ? '途中参加エリア' : `参加エリア · ${users.length}人`;
+  const label = run?.phase === 'running' || run?.phase === 'boss' ? tr("ui532") : tr("ui533", users.length);
   return (
     <group position={[SURVIVOR_JOIN.x, 0, SURVIVOR_JOIN.z]} userData={{ noRay: true }}>
       <mesh rotation-x={-Math.PI / 2} position-y={0.018}>
@@ -148,7 +150,7 @@ function StartAltar() {
         <icosahedronGeometry args={[0.28, 1]} />
         <meshStandardMaterial color="#ef6b9b" emissive="#b32e70" emissiveIntensity={1.2} roughness={0.3} />
       </mesh>
-      <Label text="夜の受付" position={[0, 1.5, 0]} height={0.22} bg="rgba(93,30,68,.96)" />
+      <Label text={tr("ui534")} position={[0, 1.5, 0]} height={0.22} bg="rgba(93,30,68,.96)" />
     </group>
   );
 }
@@ -381,7 +383,7 @@ export function SurvivorObjects() {
     <>
       <JoinCircle />
       <StartAltar />
-      <Label text="宵闇サバイバーズ" position={[0, 2.2, -8]} height={0.34} bg="rgba(48,24,52,.94)" />
+      <Label text={tr("ui535")} position={[0, 2.2, -8]} height={0.34} bg="rgba(48,24,52,.94)" />
       {Object.values(run?.players ?? {}).map((p, i) => <RunPlayer key={p.id} player={p} index={i} self={p.id === selfId} />)}
       {run?.enemies.map((e) => <Enemy key={e.id} enemy={e} paused={run.pausedAt != null} />)}
       {run?.enemies.filter((e) => e.kind === 'charger' && e.chargeTarget).map((e) => <ChargeTelegraph key={`${e.id}-charge`} enemy={e} pausedAt={run?.pausedAt ?? null} />)}

@@ -1,10 +1,11 @@
+import { t as tr, systemText } from '../i18n/index.ts';
 import type { ReactNode } from 'react';
 import type { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Item } from '../../../shared/items.ts';
 import type { ItemUi } from '../store.ts';
 import { chessView, chessLegalMoves, squareIndex } from '../../../shared/chess.ts';
-import { ITEM_INFO } from '../../../shared/items.ts';
+import { ITEM_INFO } from '../i18n/static.ts';
 import { Label } from './Label.tsx';
 const NOTE_Y = 1.5;
 /** 柄が +Y、頭が Z 方向 */
@@ -68,14 +69,14 @@ export function ChessModel({ item, ui, tableData, sqData, actions }: {
   const active = ui?.chessRevision === item.chess.revision;
   const sel = active ? ui?.sel : undefined;
   const view = chessView(item.chess);
-  const status = item.kind === 'chessAi' && view.turn === 'b' && !view.over ? 'AIが考えています…' : view.status;
+  const status = item.kind === 'chessAi' && view.turn === 'b' && !view.over ? tr("ui354") : systemText(view.status);
   const legal = sel === undefined ? [] : chessLegalMoves(item.chess, sel);
   const promoting = active && ui?.promotionTo !== undefined;
   return (
     <group>
       <Label text={status} position={[0, 1.5, 0]} height={0.17} />
-      <Label text={promoting ? '昇格する駒を選択 ↓' : active && ui?.chessMessage ? ui.chessMessage : item.kind === 'chessAi' ? '白：みんな / 黒：AI' : '手番の駒は誰でも操作できます'} position={[0, 1.28, 0]} height={0.09} />
-      {actions ?? <group position={[0, TABLE_Y, 1.12]}><mesh><boxGeometry args={[0.8, 0.08, 0.25]} /><meshStandardMaterial color="#476b8c" /></mesh><Label text="新しい対局" position={[0, 0.14, 0]} height={0.08} /></group>}
+      <Label text={promoting ? tr("ui508") : active && ui?.chessMessage ? systemText(ui.chessMessage) : item.kind === 'chessAi' ? tr("ui509") : tr("ui510")} position={[0, 1.28, 0]} height={0.09} />
+      {actions ?? <group position={[0, TABLE_Y, 1.12]}><mesh><boxGeometry args={[0.8, 0.08, 0.25]} /><meshStandardMaterial color="#476b8c" /></mesh><Label text={tr("ui353")} position={[0, 0.14, 0]} height={0.08} /></group>}
       {/* 持ち運び・片付けは机に照準を合わせる */}
       <group userData={tableData}>
         <mesh position-y={TABLE_Y - 0.03}>
@@ -155,7 +156,7 @@ export function PanelModel({ item, width: w, texture: tex, data }: { item: Item;
       </mesh>
       <Label
         position={[0, 1.6 + PANEL_H / 2 + 0.18, 0]} height={0.16}
-        text={`${ITEM_INFO[item.kind].name}${item.kind === 'g2048' ? ' ・ 互換モード' : ''}`}
+        text={`${ITEM_INFO[item.kind].name}${item.kind === 'g2048' ? tr("ui511") : ''}`}
         bg={item.kind === 'g2048' ? 'rgba(88,101,242,0.95)' : 'rgba(0,0,0,0.75)'}
       />
   </group>;

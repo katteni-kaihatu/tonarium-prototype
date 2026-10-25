@@ -78,6 +78,8 @@ test('CLI はタスク全体の Git 比較元と作業ツリーを比較し、�
     git('config', 'user.email', 'test@example.invalid');
     mkdirSync(join(cwd, 'shared'));
     const path = join(cwd, 'shared/changelog.ts');
+    mkdirSync(join(cwd, 'changelog'));
+    const fragment = join(cwd, 'changelog/2026-10-25-test-task.json');
     writeFileSync(path, base);
     git('add', '.');
     git('-c', 'core.hooksPath=', 'commit', '-m', 'base');
@@ -86,12 +88,19 @@ test('CLI はタスク全体の Git 比較元と作業ツリーを比較し、�
 
     const missing = run('--base', baseCommit);
     assert.equal(missing.status, 1);
-    assert.match(missing.stderr, /shared\/changelog\.ts/);
-    assert.match(missing.stderr, /先頭.*今回実際に行った変更.*追記/);
+    assert.match(missing.stderr, /changelog\/YYYY-MM-DD/);
+    assert.match(missing.stderr, /今回実際に行った変更/);
     assert.equal(run().status, 1);
     assert.equal(run('--base', 'missing-ref').status, 1);
 
     writeFileSync(path, source([added, old, older]));
+    assert.equal(run('--base', baseCommit).status, 1);
+    writeFileSync(path, base);
+    writeFileSync(fragment, JSON.stringify(added));
+    assert.equal(run('--base', baseCommit).status, 0);
+    writeFileSync(path, source([entry('置き換えられた履歴'), older]));
+    assert.equal(run('--base', baseCommit).status, 1);
+    writeFileSync(path, base);
     assert.equal(run('--base', baseCommit).status, 0);
     git('add', '.');
     assert.equal(run('--base', baseCommit).status, 0);
@@ -102,6 +111,26 @@ test('CLI はタスク全体の Git 比較元と作業ツリーを比較し、�
     assert.equal(run('--base', baseCommit).status, 0);
     assert.equal(run().status, 0);
     assert.equal(run('--base', 'HEAD^').status, 1);
+    const existingBase = git('rev-parse', 'HEAD');
+    const second = join(cwd, 'changelog/2026-10-25-second-task.json');
+    writeFileSync(second, JSON.stringify(entry('次の作業')));
+    assert.equal(run('--base', existingBase).status, 0);
+    writeFileSync(fragment, JSON.stringify(entry('改変')));
+    assert.equal(run('--base', existingBase).status, 1);
+    rmSync(fragment);
+    assert.equal(run('--base', existingBase).status, 1);
+    writeFileSync(fragment, JSON.stringify(added));
+    writeFileSync(second, JSON.stringify(added));
+    assert.equal(run('--base', existingBase).status, 1);
+    writeFileSync(second, '{ invalid JSON');
+    assert.equal(run('--base', existingBase).status, 1);
+    writeFileSync(second, JSON.stringify(old));
+    assert.equal(run('--base', existingBase).status, 1);
+    writeFileSync(second, JSON.stringify(entry('次の作業')));
+    writeFileSync(path, source([old]));
+    assert.equal(run('--base', existingBase).status, 1);
+    writeFileSync(path, base);
+    assert.equal(run('--base', existingBase).status, 0);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }

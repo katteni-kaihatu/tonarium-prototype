@@ -1,7 +1,10 @@
+import { t as tr } from '../i18n/index.ts';
 import { ItemDetail } from './ItemDetail.tsx';
 import { OriginBadge } from './OriginBadge.tsx';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { MARKET_CATEGORIES, MARKET_PRODUCTS, type MarketCategory, type MarketProduct } from '../../../shared/market.ts';
+import { MARKET_CATEGORIES } from '../i18n/static.ts';
+import { MARKET_PRODUCTS, type MarketCategory, type MarketProduct } from '../../../shared/market.ts';
+import { ITEM_INFO } from '../i18n/static.ts';
 import { Icon } from '../world/Icon.tsx';
 import { playSynth, unlockEmoteAudio } from '../world/sounds.ts';
 import { purchaseProduct, useOwnedContent } from './store.ts';
@@ -24,6 +27,9 @@ export function ProductArt({ product: p }: { product: MarketProduct }) {
       </> : p.category === 'sounds' ? <>
         <circle cx="180" cy="105" r="65" stroke="currentColor" opacity=".15" strokeWidth="20" />
         {Array.from({ length: 21 }, (_, i) => { const h = 14 + Math.abs(Math.sin(i * 1.7)) * (i > 4 && i < 17 ? 60 : 24); return <path key={i} d={`M${60+i*12} ${105-h/2}v${h}`} stroke="currentColor" strokeWidth="5" strokeLinecap="round" />; })}
+      </> : p.category === 'items' && p.kind === 'bike' ? <>
+        <circle cx="110" cy="145" r="37" stroke="currentColor" strokeWidth="12" /><circle cx="255" cy="145" r="37" stroke="currentColor" strokeWidth="12" />
+        <path d="m110 145 45-55h55l45 55m-100-55 30 55h-75m75 0 25-55-8-25h25m-85 20h40" stroke="currentColor" strokeWidth="9" strokeLinejoin="round" />
       </> : p.category === 'items' ? <>
         <rect x="119" y="34" width="140" height="145" rx="6" fill="currentColor" opacity=".14" transform="rotate(9 189 106)" />
         <rect x="105" y="30" width="140" height="145" rx="6" fill="#FFFDF9" transform="rotate(-7 175 102)" />
@@ -42,12 +48,12 @@ function PurchaseDialog({ product, onClose, onPurchased }: { product: MarketProd
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => { const el = dialog.current!; el.showModal(); return () => el.close(); }, []);
   return <dialog ref={dialog} className="market-confirm" aria-labelledby="purchase-title" onCancel={(e) => { e.preventDefault(); onClose(); }} onKeyDown={(e) => e.stopPropagation()} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-    <h2 id="purchase-title">このコンテンツを購入しますか？</h2>
-    <p><b>{product.name}</b><br /><span className="sub">制作：{product.creator}</span></p>
-    <div className="market-total"><span>購入価格</span><b>◉ {product.price.toLocaleString()} コイン</b></div>
-    <p>購入後は「{MARKET_CATEGORIES[product.category]}」に追加され、すぐに使えます。</p>
-    <p className="market-demo">モック購入です。支払いは発生せず、コイン残高も変わりません。</p>
-    <div className="market-actions"><button autoFocus onClick={onClose}>キャンセル</button><button className="primary" onClick={() => { if (purchaseProduct(product.id) !== 'invalid') onPurchased(); }}>購入を確定する</button></div>
+    <h2 id="purchase-title">{tr("ui394")}</h2>
+    <p><b>{product.name}</b><br /><span className="sub">{tr("ui371")}{product.creator}</span></p>
+    <div className="market-total"><span>{tr("ui395")}</span><b>◉ {product.price.toLocaleString()} {tr("ui396")}</b></div>
+    <p>{tr("ui397")}{MARKET_CATEGORIES[product.category]}{tr("ui398")}</p>
+    <p className="market-demo">{tr("ui399")}</p>
+    <div className="market-actions"><button autoFocus onClick={onClose}>{tr("ui338")}</button><button className="primary" onClick={() => { if (purchaseProduct(product.id) !== 'invalid') onPurchased(); }}>{tr("ui400")}</button></div>
   </dialog>;
 }
 
@@ -86,23 +92,23 @@ export function MarketPage({ q }: { q: string }) {
   useEffect(() => { if (!previewing) return; const timer = setTimeout(() => setPreviewing(false), 1600); return () => clearTimeout(timer); }, [previewing]);
   const products = MARKET_PRODUCTS.filter((p) => (category === 'all' || p.category === category) && (ownership === 'all' || owned.includes(p.id) === (ownership === 'owned')) && `${p.name} ${p.creator} ${p.description}`.toLowerCase().includes(q.trim().toLowerCase()));
   return <section className="market-page">
-    <div className="market-topline"><span className="market-wallet"><span aria-hidden="true">◉</span> 2,000 <small>コイン</small><span className="content-origin">体験用</span></span></div>
+    <div className="market-topline"><span className="market-wallet"><span aria-hidden="true">◉</span> 2,000 <small>{tr("ui396")}</small><span className="content-origin">{tr("ui401")}</span></span></div>
     {selected ? <>
       <ItemDetail name={selected.name} genre={MARKET_CATEGORIES[selected.category]} creator={selected.creator} description={selected.description}
         headingRef={heading} onBack={() => { openMarketProduct(null); setSuccess(false); setPreviewing(false); }}
-        visual={<>{selected.category !== 'sounds' ? <Suspense fallback={<div className="market-3d-stage market-3d-loading" role="status">3D プレビューを準備中…</div>}><Preview3D key={selected.id} product={selected} /></Suspense> : <ProductArt product={selected} />}{selected.category === 'sounds' && <div className="market-preview"><button disabled={previewing} onClick={() => { unlockEmoteAudio(); playSynth(selected.content, 1); setPreviewing(true); }}><Icon name="volume" />{previewing ? '試聴中…' : 'サウンドを試聴する'}</button><small>試聴は自分だけに聞こえます</small></div>}</>}
-        social={<><div className="market-social"><LikeButton key={selected.id} product={selected.id} /><div className="market-share-actions"><span className="market-share"><button onClick={() => void copyLink()}><Icon name="link" />共有リンクをコピー</button>{copyStatus === 'copied' && <span className="market-copy-toast" role="status">コピーしました</span>}</span>{session && <button disabled={!connected} title={connected ? '参加中のセッション全体に共有します' : 'セッションへの接続後に共有できます'} onClick={shareToSession}><Icon name="send" />現在のセッションに共有</button>}</div></div>
-          {copyStatus === 'manual' && <label className="market-copy-fallback">リンクを選択してコピーしてください<input readOnly aria-label="共有リンク" value={shareProductUrl(selected.id)} onFocus={(e) => e.currentTarget.select()} /></label>}</>}
-        tags={<><span>2D / 3D 対応</span><span>モック商品</span></>}
-        usage={<>{selected.category === 'worlds' ? 'ワールド一覧から、このワールドでセッションを作成できます。参加中なら、確認後に全員のワールドを切り替えられます。' : selected.category === 'items' ? 'アイテム一覧やセッション内の所持アイテムから「目の前に出す」を選びます。質問・挨拶入りの付箋として配置され、自由に編集できます。' : selected.category === 'sounds' ? 'セッション下部のサウンドボードに追加されます。ボタンを押すと近くにいる人にサウンドが聞こえます。' : 'セッション下部のエモートメニューに追加されます。ボタンを押すと、アイコンやアバターが動きます。'}</>}>
-        <div className="market-price">◉ {selected.price.toLocaleString()} <small>コイン</small></div>
-          {owned.includes(selected.id) ? <div className="market-success" role="status"><b><Icon name="check" />{success ? '購入しました！' : '購入済みです'}</b><p>「{MARKET_CATEGORIES[selected.category]}」に追加されています。</p><button className="primary" onClick={() => goHome(selected.category)}>{MARKET_CATEGORIES[selected.category]}を開く</button></div> : <><button className="primary market-buy" onClick={() => setConfirm(true)}>購入する</button><small>購入すると「{MARKET_CATEGORIES[selected.category]}」から使えます。</small></>}
+        visual={<>{selected.category !== 'sounds' ? <Suspense fallback={<div className="market-3d-stage market-3d-loading" role="status">{tr("ui382")}</div>}><Preview3D key={selected.id} product={selected} /></Suspense> : <ProductArt product={selected} />}{selected.category === 'sounds' && <div className="market-preview"><button disabled={previewing} onClick={() => { unlockEmoteAudio(); playSynth(selected.content, 1); setPreviewing(true); }}><Icon name="volume" />{previewing ? tr("ui402") : tr("ui403")}</button><small>{tr("ui404")}</small></div>}</>}
+        social={<><div className="market-social"><LikeButton key={selected.id} product={selected.id} /><div className="market-share-actions"><span className="market-share"><button onClick={() => void copyLink()}><Icon name="link" />{tr("ui405")}</button>{copyStatus === 'copied' && <span className="market-copy-toast" role="status">{tr("ui406")}</span>}</span>{session && <button disabled={!connected} title={connected ? tr("ui407") : tr("ui408")} onClick={shareToSession}><Icon name="send" />{tr("ui409")}</button>}</div></div>
+          {copyStatus === 'manual' && <label className="market-copy-fallback">{tr("ui410")}<input readOnly aria-label={tr("ui411")} value={shareProductUrl(selected.id)} onFocus={(e) => e.currentTarget.select()} /></label>}</>}
+        tags={<><span>{selected.category === 'items' && selected.kind && !ITEM_INFO[selected.kind].in2d ? tr('merge3dOnly') : tr("ui412")}</span><span>{tr("ui413")}</span></>}
+        usage={<>{selected.category === 'worlds' ? tr("ui414") : selected.category === 'items' && selected.kind ? ITEM_INFO[selected.kind].desc : selected.category === 'items' ? tr("ui313") : selected.category === 'sounds' ? tr("ui415") : tr("ui416")}</>}>
+        <div className="market-price">◉ {selected.price.toLocaleString()} <small>{tr("ui396")}</small></div>
+          {owned.includes(selected.id) ? <div className="market-success" role="status"><b><Icon name="check" />{success ? tr("ui417") : tr("ui418")}</b><p>「{MARKET_CATEGORIES[selected.category]}{tr("ui419")}</p><button className="primary" onClick={() => goHome(selected.category)}>{MARKET_CATEGORIES[selected.category]}{tr("ui420")}</button></div> : <><button className="primary market-buy" onClick={() => setConfirm(true)}>{tr("ui421")}</button><small>{tr("ui422")}{MARKET_CATEGORIES[selected.category]}{tr("ui423")}</small></>}
       </ItemDetail>
       {confirm && <PurchaseDialog product={selected} onClose={() => setConfirm(false)} onPurchased={() => { setConfirm(false); setSuccess(true); }} />}
     </> : <>
-      <div className="market-filters"><div className="market-tabs" aria-label="商品ジャンル">{(['all', ...Object.keys(MARKET_CATEGORIES)] as const).map((cat) => <button key={cat} aria-pressed={category === cat} className={category === cat ? 'on' : ''} onClick={() => setCategory(cat as MarketCategory | 'all')}>{cat === 'all' ? 'すべて' : MARKET_CATEGORIES[cat as MarketCategory]}</button>)}</div><label className="market-owned">購入状態<select value={ownership} onChange={(e) => setOwnership(e.target.value as typeof ownership)}><option value="all">すべて表示</option><option value="owned">購入済みのみ</option><option value="unowned">購入したものを非表示</option></select></label></div>
-      <div className="market-result" aria-live="polite"><b>{category === 'all' ? 'すべてのコンテンツ' : MARKET_CATEGORIES[category]}</b><span>{products.length} 件</span></div>
-      {products.length ? <div className="market-grid">{products.map((p) => <article className="market-card" key={p.id}><button className="market-card-open" onClick={(e) => { lastCard.current = e.currentTarget; openMarketProduct(p.id); }} aria-label={`${p.name}の詳細`}><ProductArt product={p} /><span className="market-card-copy"><span className="market-category">{MARKET_CATEGORIES[p.category]}</span><b>{p.name}</b><span className="market-creator">{p.creator}</span><strong>◉ {p.price.toLocaleString()} <small>コイン</small></strong></span></button><OriginBadge productId={owned.includes(p.id) ? p.id : undefined} /><div className="market-card-social"><LikeButton product={p.id} /></div></article>)}</div> : <div className="market-empty"><Icon name="search" size={30} /><h3>{ownership === 'owned' ? '該当する購入済みコンテンツはありません' : 'コンテンツが見つかりません'}</h3><p>検索語やジャンルを変えて探してみてください。</p><button onClick={() => { setCategory('all'); setOwnership('all'); }}>絞り込みを解除</button></div>}
+      <div className="market-filters"><div className="market-tabs" aria-label={tr("ui424")}>{(['all', ...Object.keys(MARKET_CATEGORIES)] as const).map((cat) => <button key={cat} aria-pressed={category === cat} className={category === cat ? 'on' : ''} onClick={() => setCategory(cat as MarketCategory | 'all')}>{cat === 'all' ? tr("ui281") : MARKET_CATEGORIES[cat as MarketCategory]}</button>)}</div><label className="market-owned">{tr("ui425")}<select value={ownership} onChange={(e) => setOwnership(e.target.value as typeof ownership)}><option value="all">{tr("ui426")}</option><option value="owned">{tr("ui427")}</option><option value="unowned">{tr("ui428")}</option></select></label></div>
+      <div className="market-result" aria-live="polite"><b>{category === 'all' ? tr("ui429") : MARKET_CATEGORIES[category]}</b><span>{products.length} {tr("ui196")}</span></div>
+      {products.length ? <div className="market-grid">{products.map((p) => <article className="market-card" key={p.id}><button className="market-card-open" onClick={(e) => { lastCard.current = e.currentTarget; openMarketProduct(p.id); }} aria-label={tr("ui430", p.name)}><ProductArt product={p} /><span className="market-card-copy"><span className="market-category">{MARKET_CATEGORIES[p.category]}</span><b>{p.name}</b><span className="market-creator">{p.creator}</span><strong>◉ {p.price.toLocaleString()} <small>{tr("ui396")}</small></strong></span></button><OriginBadge productId={owned.includes(p.id) ? p.id : undefined} /><div className="market-card-social"><LikeButton product={p.id} /></div></article>)}</div> : <div className="market-empty"><Icon name="search" size={30} /><h3>{ownership === 'owned' ? tr("ui431") : tr("ui432")}</h3><p>{tr("ui433")}</p><button onClick={() => { setCategory('all'); setOwnership('all'); }}>{tr("ui434")}</button></div>}
     </>}
   </section>;
 }

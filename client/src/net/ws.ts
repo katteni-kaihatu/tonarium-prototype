@@ -1,3 +1,4 @@
+import { sourceText as uiSource } from '../i18n/core.ts';
 import { COMPAT_VERSION, isRoomClientMsg, type ClientMsg, type ServerMsg, type SessionInfo, type SessionSnapshot } from '../../../shared/protocol.ts';
 import type { SurvivorState } from '../../../shared/survivor.ts';
 import { applyAvatars } from '../sessionView.ts';
@@ -25,17 +26,17 @@ type SessionReply = Extract<ServerMsg, { t: 'sessionCreated' | 'sessionResult' }
 const sessionRequests = new Map<string, { resolve: (reply: SessionReply) => void; reject: (error: Error) => void }>();
 
 export function requestSession(msg: Extract<ClientMsg, { t: 'sessionCreate' | 'join' | 'leave' }>): Promise<SessionReply> {
-  if (g.__tonariumWs?.readyState !== WebSocket.OPEN) return Promise.reject(new Error('サーバーに接続されていません'));
+  if (g.__tonariumWs?.readyState !== WebSocket.OPEN) return Promise.reject(new Error(uiSource('ui468')));
   const requestId = crypto.randomUUID();
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => finish(new Error('セッション操作がタイムアウトしました')), 15_000);
+    const timer = setTimeout(() => finish(new Error(uiSource('ui469'))), 15_000);
     const finish = (error?: Error, reply?: SessionReply) => {
       clearTimeout(timer);
       sessionRequests.delete(requestId);
       if (error) reject(error); else resolve(reply!);
     };
     sessionRequests.set(requestId, { resolve: (reply) => finish(undefined, reply), reject: (error) => finish(error) });
-    try { send({ ...msg, requestId }); } catch { finish(new Error('セッション操作を送信できませんでした')); }
+    try { send({ ...msg, requestId }); } catch { finish(new Error(uiSource('ui470'))); }
   });
 }
 
@@ -58,12 +59,12 @@ export function connectWs() {
   };
   ws.onmessage = (e) => onMessage(JSON.parse(e.data) as ServerMsg);
   ws.onclose = (event) => {
-    for (const request of sessionRequests.values()) request.reject(new Error('サーバーとの接続が切れました'));
+    for (const request of sessionRequests.values()) request.reject(new Error(uiSource('ui471')));
     console.warn('[home-ws] closed', { code: event.code, reason: event.reason, wasClean: event.wasClean,
       connectedSeconds: openedAt ? Math.round((performance.now() - openedAt) / 1000) : 0 });
     stopSessionSync(true);
     set({ wsConnected: false });
-    if (get().session) set({ sync: 'unavailable', syncError: 'ホームとの接続を待っています' });
+    if (get().session) set({ sync: 'unavailable', syncError: uiSource('ui472') });
     // 互換性バージョン違いで断たれた場合はつなぎ直しても結果が同じなので、再接続しない
     if (!get().incompatible) setTimeout(connectWs, Math.min(5000, 500 * 2 ** retry++));
   };

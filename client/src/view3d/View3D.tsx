@@ -1,9 +1,10 @@
+import { t as tr } from '../i18n/index.ts';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { jumpHeight, spawnSlot, type Participant } from '../../../shared/protocol.ts';
 import { NOTE_COLORS } from '../../../shared/items.ts';
-import { useStore, get, colorOf, nameOf, heldHammer, heldCamera, worldKindOf, serverNow } from '../store.ts';
+import { useStore, get, colorOf, nameOf, heldCamera, worldKindOf, serverNow } from '../store.ts';
 import { carPose, fromCarLocal } from '../../../shared/city.ts';
 import { selectNote } from '../actions.ts';
 import { pitchOf, placesOf } from '../spatial.ts';
@@ -13,6 +14,7 @@ import { bump, recentlyHit } from '../items/effects.ts';
 import { carrying, type Interactable } from './interact.ts';
 import { DEFAULT_EYE_HEIGHT } from '../../../shared/avatar.ts';
 import { EyeHeightContext, useEyeHeight } from './eyeHeight.ts';
+import { PlayerCamera } from './playerCamera.ts';
 import { Player } from './Player.tsx';
 import { AttentionGlow, HammerModel, Item3D } from './items3d.tsx';
 import { Label } from './Label.tsx';
@@ -58,7 +60,7 @@ function Standee({ user }: { user: Participant }) {
     card.current?.scale.set(1 + 0.3 * b, 1 - 0.45 * b, 1 + 0.3 * b);
   });
   return (
-    <group ref={ref} position={[pos0.x, 0, pos0.z]} userData={{ hitTarget: user.id, carry: `user:${user.id}`, hint: `💻 ${user.name}（2Dで参加中）` } satisfies Interactable}>
+    <group ref={ref} position={[pos0.x, 0, pos0.z]} userData={{ hitTarget: user.id, carry: `user:${user.id}`, hint: tr("ui536", user.name) } satisfies Interactable}>
       <group ref={card}>
         <Suspense fallback={null}>
           <OekakiAvatar userId={user.id} name={user.name} version={user.avatar} speaking={speaking} onEyeHeight={setHeight} />
@@ -92,8 +94,8 @@ export function Entrance() {
   return <>{in2d.map((u) => <Standee key={u.id} user={u} />)}</>;
 }
 
-/** self は一人称では見えないので隠しておき、カメラで撮るときだけ表示する（renderCamera） */
-export function Avatar3D({ id, self = false }: { id: string; self?: boolean }) {
+/** 自分の体は三人称と外部カメラで表示する。 */
+export function Avatar3D({ id, self = false, rig }: { id: string; self?: boolean; rig?: PlayerCamera }) {
   const eye = useEyeHeight();
   const [height, setHeight] = useState(DEFAULT_EYE_HEIGHT);
   const onEyeHeight = useCallback((value: number) => {
@@ -121,9 +123,14 @@ export function Avatar3D({ id, self = false }: { id: string; self?: boolean }) {
     if (!g) return;
     const state = self ? get().selfAvatar : get().avatars[id];
     if (!state) return;
-    const k = Math.min(1, dt * 10);
     const r = state.ride;
-    if (r && !self) {
+    const bike = Object.values(get().items).find(i => i.kind === 'bike' && i.rider === id);
+    const k = bike ? 1 - Math.exp(-12 * dt) : Math.min(1, dt * 10);
+    if (bike) {
+      ride.current = null;
+      g.position.x += (bike.x - g.position.x) * k;
+      g.position.z += (bike.z - g.position.z) * k;
+    } else if (r && !self) {
       const L = ride.current;
       if (!L || L.car !== r.car) ride.current = { ...r };
       else {
@@ -142,13 +149,19 @@ export function Avatar3D({ id, self = false }: { id: string; self?: boolean }) {
     }
     const j = jump.current;
     if ((state.jump ?? 0) !== j.n) { j.n = state.jump ?? 0; j.at = performance.now(); }
-    if (state.y !== undefined) g.position.y += (state.y - g.position.y) * Math.min(1, dt * 15);
+    if (bike) g.position.y = 0;
+    else if (state.y !== undefined) g.position.y += (state.y - g.position.y) * Math.min(1, dt * 15);
     else g.position.y = jumpHeight(performance.now() - j.at);
-    const targetRy = ride.current && r ? carPose(serverNow(), r.car).ry + ride.current.ry : state.ry;
+    const targetRy = bike ? bike.ry : ride.current && r ? carPose(serverNow(), r.car).ry + ride.current.ry : state.ry;
     let d = targetRy - g.rotation.y;
     d = Math.atan2(Math.sin(d), Math.cos(d));
     g.rotation.y += ride.current ? d : d * k;
     const s = get();
+    if (self && rig) {
+      g.visible = rig.thirdPerson;
+      g.position.copy(rig.avatarPosition);
+      g.rotation.y = rig.yaw;
+    }
     const b = bump(s.hits[id]);
     body.current?.scale.set(1 + 0.3 * b, 1 - 0.45 * b, 1 + 0.3 * b);
     if (hand.current) hand.current.rotation.x = -0.4 - bump(s.swings[id], performance.now(), 350) * 1.6;
@@ -161,7 +174,13 @@ export function Avatar3D({ id, self = false }: { id: string; self?: boolean }) {
     >
       <group ref={body}>
         <Suspense fallback={null}>
-          <OekakiAvatar userId={id} name={name} version={avatarV} speaking={speaking} look={() => pitchOf(id)} onEyeHeight={onEyeHeight} />
+          <OekakiAvatar userId={id} name={name} version={avatarV} speaking={speaking} look={() => pitchOf(id)}
+            walking={() => {
+              const s = get();
+              const a = self ? s.selfAvatar : s.avatars[id];
+              return a?.walking === true && !a.ride && !(self && s.movementMode !== 'walk')
+                && !Object.values(s.items).some((i) => i.kind === 'bike' && i.rider === id);
+            }} onEyeHeight={onEyeHeight} />
         </Suspense>
       </group>
       {/* 板ポリのモデルは横から当てにくいので、照準用の当たり判定を別に置く */}
@@ -204,7 +223,7 @@ function NoteEditor() {
   return (
     <div className="noteeditor">
       <textarea
-        autoFocus value={note.text} placeholder="付箋の内容"
+        autoFocus value={note.text} placeholder={tr("ui537")}
         style={{ background: note.color }}
         onChange={(e) => editNote(note.id, { text: e.target.value })}
       />
@@ -212,11 +231,11 @@ function NoteEditor() {
         {NOTE_COLORS.map((c) => (
           <button key={c} className="swatch" style={{ background: c }} onClick={() => editNote(note.id, { color: c })} />
         ))}
-        <button className="small" onClick={faceMe}>こちらに向ける</button>
-        <button className="small" onClick={() => removeItem(note.id)}>片付ける</button>
-        <button className="small" onClick={() => selectNote(null)}>閉じる</button>
+        <button className="small" onClick={faceMe}>{tr("ui538")}</button>
+        <button className="small" onClick={() => removeItem(note.id)}>{tr("ui539")}</button>
+        <button className="small" onClick={() => selectNote(null)}>{tr("ui73")}</button>
       </div>
-      <small>空間をクリックすると操作に戻ります</small>
+      <small>{tr("ui540")}</small>
     </div>
   );
 }
@@ -242,7 +261,7 @@ function Viewfinder() {
       {cam && (
         <div className="viewfinder">
           <i className="tl" /><i className="tr" /><i className="bl" /><i className="br" />
-          {cam.live && <div className="rec">● LIVE 配信中</div>}
+          {cam.live && <div className="rec">{tr("ui541")}</div>}
         </div>
       )}
       {flashAt > 0 && <div key={flashAt} className="flash" />}
@@ -252,13 +271,7 @@ function Viewfinder() {
 
 function Crosshair() {
   const locked = useStore((s) => s.locked);
-  const survivorWorld = useStore((s) => worldKindOf(s) === 'survivors');
-  const survivorActive = useStore((s) => {
-    const phase = s.survivors[s.session ?? '']?.phase;
-    return worldKindOf(s) === 'survivors' && (phase === 'running' || phase === 'boss');
-  });
   const hint = useStore((s) => s.aimHint);
-  const holding = useStore((s) => !!heldHammer(s) || !!heldCamera(s));
   const hitMe = useStore((s) => s.hits[s.selfId]);
   const [, tick] = useState(0);
   useEffect(() => {
@@ -270,19 +283,13 @@ function Crosshair() {
     <>
       {locked && <div className={`crosshair ${hint ? 'on' : ''}`} />}
       {locked && hint && <div className="aimhint">{hint}</div>}
-      {recentlyHit(get().selfId) && <div className="hitme">ピコッ!</div>}
-      <div className="keyhelp">
-        {survivorWorld && survivorActive
-          ? <>WASD / 矢印: 移動 ・ Esc: カーソルを出す</>
-          : locked
-            ? <>WASD: 移動 ・ Space: ジャンプ ・ マウス: 視点 ・ クリック: 操作 ・ 右クリック: 運ぶ/置く ・ X: 片付ける{holding && ' ・ Q: 手に持った物を置く'} ・ Esc: カーソルを出す</>
-            : <>画面をクリックすると操作を始めます（マウスで視点・照準で操作）</>}
-      </div>
+      {recentlyHit(get().selfId) && <div className="hitme">{tr("ui542")}</div>}
     </>
   );
 }
 
 export function View3D() {
+  const rig = useRef(new PlayerCamera()).current;
   const eyeHeight = useRef({ current: DEFAULT_EYE_HEIGHT, target: DEFAULT_EYE_HEIGHT });
   const avatarIds = useStore((s) => s.avatarIds);
   const items = useStore((s) => s.items);
@@ -301,13 +308,13 @@ export function View3D() {
           <ShareDisplay />
           <Entrance />
           {avatarIds.map((id) => <Avatar3D key={id} id={id} />)}
-          <Avatar3D id={selfId} self />
+          <Avatar3D id={selfId} self rig={rig} />
           {Object.values(items).map((it) => <Item3D key={it.id} item={it} />)}
           {Object.values(items).map((it) => <AttentionGlow key={`attn-${it.id}`} item={it} />)}
           {Object.values(items).map((it) => (it.kind === 'camera' && it.live && it.operator === selfId
             ? <CameraStreamer key={`stream-${it.id}`} item={it} /> : null))}
           {viewLive && <ViewStreamer />}
-          <Player />
+          <Player rig={rig} />
         </Canvas>
       </EyeHeightContext.Provider>
       <Viewfinder />

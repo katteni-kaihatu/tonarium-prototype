@@ -1,3 +1,5 @@
+import { sourceText as uiSource } from './i18n/core.ts';
+import { msg } from './i18n/core.ts';
 import type { ChatMedia, ChatScope, ClientMsg, Mode, Rsvp, StatusKind, Visibility } from '../../shared/protocol.ts';
 import type { WorldKind } from '../../shared/worlds.ts';
 import { approach } from '../../shared/places.ts';
@@ -29,7 +31,7 @@ async function enterSession(sid: string, requireVoice = false) {
   recompute();
   startSessionSync();
   await connectVoice(sid);
-  if (requireVoice && get().voice !== 'connected') throw new Error('通話に接続できませんでした');
+  if (requireVoice && get().voice !== 'connected') throw new Error(uiSource('ui0'));
   // 外で 3D を選んでいたら、入った後に 3D へ
   if (get().joinMode === '3d' && !touchOnly) setTimeout(() => { if (get().session === sid) switchMode('3d'); }, 400);
 }
@@ -53,14 +55,14 @@ async function withSessionOperation(action: () => Promise<void>) {
   try {
     await action();
   } catch (error) {
-    let message = error instanceof Error ? error.message : 'セッションに参加できませんでした';
+    let message = error instanceof Error ? error.message : uiSource('ui1');
     try {
       if (get().session !== before.session) {
         await exitSession();
         if (before.session) await enterSession(before.session);
       }
     } catch {
-      message += '。元のセッションに再接続できませんでした';
+      message += uiSource('ui2');
     }
     if (get().session === before.session) {
       set({ mode: before.mode, hubOpen: before.hubOpen, homePage: before.homePage, selfAvatar: before.selfAvatar,
@@ -193,7 +195,7 @@ export function createSession(name: string, topic: string, world: WorldKind, vis
   resumeAudio();
   return withSessionOperation(async () => {
     const reply = await requestSession({ t: 'sessionCreate', name, topic, world, visibility, group });
-    if (reply.t !== 'sessionCreated') throw new Error('セッションを作成できませんでした');
+    if (reply.t !== 'sessionCreated') throw new Error(uiSource('ui3'));
     await enterSession(reply.sid, true);
   });
 }
@@ -211,7 +213,7 @@ export const setStatus = (status: StatusKind, text: string) => send({ t: 'setSta
 export const watchFriend = (name: string, on: boolean) => send({ t: 'watch', name, on });
 export function askJoin(to: string) {
   send({ t: 'askJoin', to });
-  showToast(`${nameOf(to)} に「行ってもいい？」と聞きました`);
+  showToast(msg("ui4", nameOf(to)));
 }
 export const answerPlan = (conv: string, id: string, answer: Rsvp | null) => send({ t: 'rsvp', conv, id, answer });
 
@@ -238,7 +240,7 @@ export function openGroup(id: string, channel?: string) {
 export const deleteEvent = (id: string) => send({ t: 'eventDelete', id });
 export function invite(kind: 'session' | 'group', id: string, to: string) {
   send({ t: 'invite', kind, id, to });
-  showToast(`${nameOf(to)} を誘いました`);
+  showToast(msg("ui5", nameOf(to)));
 }
 
 export function toggleBlock(name: string) {

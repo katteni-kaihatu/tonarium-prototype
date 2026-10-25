@@ -1,0 +1,84 @@
+export interface BigNum { mantissa: number; exponent: number }
+export interface DimensionState { amount: BigNum; bought: number; tier: number }
+export interface GameState {
+  version: number;
+  antimatter: BigNum;
+  dimensions: DimensionState[];
+  tickspeed: number;
+  tickspeedBought: number;
+  dimensionalBoosts: number;
+  galaxies: number;
+  sacrificeBoost: BigNum;
+  sacrificeTotalFirst: BigNum;
+  achievements: string[];
+  infinityPoints: BigNum;
+  infinities: number;
+  totalAntimatter: BigNum;
+  lastTick: number;
+  createdAt: number;
+}
+export interface OfflineResult {
+  elapsedMs: number;
+  simulatedMs: number;
+  antimatterBefore: BigNum;
+  antimatterAfter: BigNum;
+  antimatterGained: BigNum;
+}
+export interface SacrificeCandidate { candidate: BigNum; boost: BigNum }
+export const VERSION: number;
+export const OFFLINE_CAP_MS: number;
+export function bigNormalize(mantissa: number, exponent?: number): BigNum;
+export function toBig(value: unknown): BigNum;
+export function bigFromNumber(n: number): BigNum;
+export function bigFromLog10(log10: number): BigNum;
+export function bigZero(): BigNum;
+export function bigOne(): BigNum;
+export function bigClone(b: BigNum): BigNum;
+export function bigLog10(b: BigNum): number;
+export function bigCompare(a: BigNum, b: BigNum): number;
+export function bigGte(a: BigNum, b: BigNum): boolean;
+export function bigGt(a: BigNum, b: BigNum): boolean;
+export function bigLte(a: BigNum, b: BigNum): boolean;
+export function bigLt(a: BigNum, b: BigNum): boolean;
+export function bigEq(a: BigNum, b: BigNum): boolean;
+export function bigAdd(a: BigNum, b: BigNum): BigNum;
+export function bigSub(a: BigNum, b: BigNum): BigNum;
+export function bigMul(a: BigNum, b: BigNum): BigNum;
+export function bigDiv(a: BigNum, b: BigNum): BigNum;
+export function bigMulNumber(a: BigNum, scalar: number): BigNum;
+export function bigPow(a: BigNum, p: number): BigNum;
+export function bigToNumber(b: BigNum): number;
+export function formatNumber(value: BigNum | number, decimals?: number): string;
+export function createNewGame(now?: number): GameState;
+export function getDimensionCost(state: GameState, tier: number): BigNum;
+export function getDimensionCostForBulk(state: GameState, tier: number, count: number): BigNum;
+export function getTickspeedCost(state: GameState): BigNum;
+export function getTickspeedPerPurchase(state: GameState): number;
+export function getEffectiveTickspeed(state: GameState): number;
+export function getMaxUnlockedTier(state: GameState): number;
+export function getDimensionMultiplier(state: GameState, tier: number): number;
+export function getDimensionMultiplierBig(state: GameState, tier: number): BigNum;
+export function getDimensionProductionPerSecond(state: GameState, tier: number): BigNum;
+export function getAntimatterPerSecond(state: GameState): BigNum;
+export function getDimensionalBoostRequirement(state: GameState): { tier: number; amount: number };
+export function getGalaxyRequirement(state: GameState): { tier: number; amount: number };
+export function canDimensionalBoost(state: GameState): boolean;
+export function canAntimatterGalaxy(state: GameState): boolean;
+export function getInfinityGain(state: GameState): number;
+export function canInfinity(state: GameState): boolean;
+export function canSacrifice(state: GameState): boolean;
+export function getSacrificeCandidate(state: GameState): SacrificeCandidate;
+export function checkAchievements(state: GameState): string[];
+export function tick(state: GameState, dtMs: number): GameState;
+export function buyDimension(state: GameState, tier: number): boolean;
+export function buyMaxDimension(state: GameState, tier: number, maxIterations?: number): number;
+export function buyMax(state: GameState): void;
+export function buyTickspeed(state: GameState): boolean;
+export function buyMaxTickspeed(state: GameState, maxIterations?: number): number;
+export function dimensionalBoost(state: GameState): boolean;
+export function antimatterGalaxy(state: GameState): boolean;
+export function sacrifice(state: GameState): boolean;
+export function prestigeInfinity(state: GameState): boolean;
+export function offlineProgress(state: GameState, now?: number): OfflineResult;
+export function serialize(state: GameState): string;
+export function deserialize(input: string | Record<string, unknown>, now?: number): GameState;

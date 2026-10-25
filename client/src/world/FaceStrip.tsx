@@ -1,3 +1,4 @@
+import { t as tr, useLanguage } from '../i18n/index.ts';
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Participant } from '../../../shared/protocol.ts';
 import { useStore, get, set, save, heldHammer } from '../store.ts';
@@ -31,7 +32,7 @@ function PokeFx({ at, small = false }: { at: number; small?: boolean }) {
   return (
     <span key={at} className={`pokefx ${small ? 'small' : ''}`} aria-hidden="true">
       <span className="pokehand"><Icon name="poke" size={small ? 22 : 34} stroke={2.2} /></span>
-      {!small && <span className="poketext">つんつん</span>}
+      {!small && <span className="poketext">{tr("ui581")}</span>}
     </span>
   );
 }
@@ -44,6 +45,7 @@ function clickFace(id: string) {
 }
 
 const BigFace = memo(function BigFace({ u, d, self = false, width }: { u: Participant; d: number; self?: boolean; width?: number }) {
+  useLanguage();
   const poked = usePoked(u.id);
   const speaking = useStore((s) => !!s.speaking[u.id]);
   const sharer = useStore((s) => s.sharer);
@@ -61,13 +63,13 @@ const BigFace = memo(function BigFace({ u, d, self = false, width }: { u: Partic
       <AvatarView u={u} speaking={speaking} />
       <PortraitEmote id={u.id} />
       {poked && <PokeFx at={poked} />}
-      <button className="faceclick" onClick={() => clickFace(u.id)} aria-label={canHit ? `${u.name} を叩く` : `${u.name} を大きく表示`} />
-      <button className="faceprofile" onClick={() => pickProfile(u.id)} aria-label={`${u.name} のプロフィール`} title="プロフィール"><Icon name="more" size={14} /></button>
+      <button className="faceclick" onClick={() => clickFace(u.id)} aria-label={canHit ? tr("ui582", u.name) : tr("ui583", u.name)} />
+      <button className="faceprofile" onClick={() => pickProfile(u.id)} aria-label={tr("ui584", u.name)} title={tr("ui585")}><Icon name="more" size={14} /></button>
       <div className="facebadges">
         {u.mode === '3d' && <Badge3D />}
         {live && (
-          <button className="livebtn small" onClick={() => toggleFromList('share')} title={open ? 'ライブを閲覧中（クリックで閉じる）' : 'クリックでライブを見る'}>
-            <span className="lb"><Icon name="screen" size={11} stroke={2.4} />ライブ</span>
+          <button className="livebtn small" onClick={() => toggleFromList('share')} title={open ? tr("ui586") : tr("ui587")}>
+            <span className="lb"><Icon name="screen" size={11} stroke={2.4} />{tr("ui588")}</span>
             {open && <span className="lbon"><Icon name="eye" size={12} stroke={2.4} /></span>}
           </button>
         )}
@@ -78,18 +80,19 @@ const BigFace = memo(function BigFace({ u, d, self = false, width }: { u: Partic
         {speaking && <span className="spk"><Icon name="speaking" size={12} stroke={2.6} /></span>}
         {!u.micOn && <span className="spk off"><Icon name="micOff" size={12} /></span>}
         <b>{u.name}</b>
-        <span className="d">{self ? 'あなた' : formatDistance(d)}</span>
+        <span className="d">{self ? tr("ui84") : formatDistance(d)}</span>
       </div>
     </div>
   );
 });
 
 const MidFace = memo(function MidFace({ p }: { p: PlayerEntry }) {
+  useLanguage();
   const poked = usePoked(p.user.id);
   return (
     <button
       className={`midface ${poked ? 'poked' : ''}`} data-uid={p.user.id} onClick={() => clickFace(p.user.id)}
-      title={`${p.user.name} · ${formatDistance(p.d)}`} aria-label={`${p.user.name} を大きく表示`}
+      title={`${p.user.name} · ${formatDistance(p.d)}`} aria-label={tr("ui583", p.user.name)}
     >
       <AvatarView u={p.user} speaking={false} small />
       <PortraitEmote id={p.user.id} small />
@@ -123,7 +126,7 @@ function FaceGrid({ list }: { list: { user: Participant; d: number; self?: boole
   }, []);
   const tile = gridTile(list.length, size.w, size.h);
   return (
-    <div ref={ref} className="facegrid" aria-label="声が届く人">
+    <div ref={ref} className="facegrid" aria-label={tr("ui589")}>
       <div className="facegridin">
         {list.map((x) => <BigFace key={x.user.id} u={x.user} d={x.d} self={x.self} width={tile} />)}
       </div>
@@ -144,9 +147,9 @@ export function FaceStrip() {
   if (folded) {
     return (
       <div className="facestrip">
-        <button className="facepill" onClick={() => fold(false)} aria-label="顔の表示を開く">
+        <button className="facepill" onClick={() => fold(false)} aria-label={tr("ui590")}>
           <span className="stack">{near.slice(0, 4).map((p) => <Face key={p.user.id} id={p.user.id} name={p.user.name} size={24} ring="0 0 0 2px #FFFDF9" />)}</span>
-          <b>すぐそば {near.length}</b><span className="sub">· 声が届く {mid.length}</span>
+          <b>{tr("ui556")}{near.length}</b><span className="sub">{tr("ui591")}{mid.length}</span>
           <Icon name="down" size={14} stroke={2.4} />
         </button>
       </div>
@@ -156,19 +159,19 @@ export function FaceStrip() {
   const rest = mid.slice(MID_MAX);
   return (
     <div className="facestrip">
-      <div className="faces" aria-label="すぐそばの人">
+      <div className="faces" aria-label={tr("ui592")}>
         <BigFace u={me} d={0} self />
         {near.slice(0, NEAR_MAX).map((p) => <BigFace key={p.user.id} u={p.user} d={p.d} />)}
         {mid.length > 0 && (
           <div className="midfaces">
             {mid.slice(0, MID_MAX).map((p) => <MidFace key={p.user.id} p={p} />)}
             {rest.length > 0 && (
-              <span className="midmore" title={rest.map((r) => r.user.name).join('、')} aria-label={`ほか ${rest.length} 人`}>+{rest.length}</span>
+              <span className="midmore" title={rest.map((r) => r.user.name).join('、')} aria-label={tr("ui593", rest.length)}>+{rest.length}</span>
             )}
           </div>
         )}
       </div>
-      <button className="facefold" onClick={() => fold(true)} aria-label="顔の表示を上にたたむ"><Icon name="up" size={14} stroke={2.4} /></button>
+      <button className="facefold" onClick={() => fold(true)} aria-label={tr("ui594")}><Icon name="up" size={14} stroke={2.4} /></button>
     </div>
   );
 }

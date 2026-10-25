@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n/index.ts';
 import { useEffect, useState } from 'react';
 import { useStore } from '../store.ts';
 
@@ -9,9 +10,9 @@ export function UpdateBanner() {
   if (!version || version === dismissed) return null;
   return (
     <div className="updatebar" role="status">
-      <span><b>新しいバージョンがあります</b>{inSession && <span className="sub">更新するとセッションから一度抜けます</span>}</span>
-      <button className="updatego" onClick={() => location.reload()}>更新する</button>
-      <button className="ib updatelater" onClick={() => setDismissed(version)}>あとで</button>
+      <span><b>{tr("ui682")}</b>{inSession && <span className="sub">{tr("ui683")}</span>}</span>
+      <button className="updatego" onClick={() => location.reload()}>{tr("ui684")}</button>
+      <button className="ib updatelater" onClick={() => setDismissed(version)}>{tr("ui685")}</button>
     </div>
   );
 }
@@ -22,9 +23,9 @@ export function CompatOverlay() {
     <div className="maintenance" role="alert">
       <div className="maintcard">
         <img src="/brand/mark.png" alt="" />
-        <h2>バージョンが変わりました</h2>
-        <p>アプリの互換性バージョンが変わったため、この画面のままでは通信できません。再読み込みして最新版に更新してください。</p>
-        <button className="updatego" onClick={() => location.reload()}>再読み込みする</button>
+        <h2>{tr("ui686")}</h2>
+        <p>{tr("ui687")}</p>
+        <button className="updatego" onClick={() => location.reload()}>{tr("ui688")}</button>
       </div>
     </div>
   );
@@ -57,9 +58,9 @@ export function MaintenanceOverlay() {
     <div className="maintenance" role="alert">
       <div className="maintcard">
         <img src="/brand/mark.png" alt="" />
-        <h2>メンテナンス中です</h2>
-        <p>アップデートなどの作業をしています。終わると自動でつながります。</p>
-        <span className="maintwait"><i className="spin" />接続を待っています…</span>
+        <h2>{tr("ui689")}</h2>
+        <p>{tr("ui690")}</p>
+        <span className="maintwait"><i className="spin" />{tr("ui691")}</span>
       </div>
     </div>
   );

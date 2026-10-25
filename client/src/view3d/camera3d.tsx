@@ -1,3 +1,4 @@
+import { t as tr, msg } from '../i18n/index.ts';
 import { CameraStand } from './cameraModel.tsx';
 export { CameraModel } from './cameraModel.tsx';
 import { useEffect, useMemo, useRef } from 'react';
@@ -72,7 +73,7 @@ export function Camera3D({ item }: { item: CameraItem }) {
   const data: Interactable = {
     carry: item.id,
     remove: () => removeItem(item.id),
-    hint: `クリック: 拾う ・ C: 撮影 ・ L: 配信${item.live ? 'を止める' : ''}`,
+    hint: tr("ui473", item.live ? tr("ui474") : ''),
     use: () => itemAction(item.id, { a: 'pick' }),
   };
   return (
@@ -98,7 +99,7 @@ export function CameraStreamer({ item }: { item: CameraItem }) {
     publishCamera(item.id, stream.getVideoTracks()[0])
       .then((s) => { if (cancelled) void s(); else stop = s; })
       .catch((e) => {
-        set({ voiceError: `カメラ配信: ${(e as Error).message}` });
+        set({ voiceError: msg("ui475", (e as Error).message) });
         itemAction(item.id, { a: 'camLive', on: false });
       });
     set((s) => ({ camFeeds: { ...s.camFeeds, [item.id]: performance.now() } }));
@@ -125,7 +126,7 @@ export function CameraStreamer({ item }: { item: CameraItem }) {
 }
 
 export function cameraHelp(item: CameraItem) {
-  return `📷 クリック: 撮影 ・ L: 配信${item.live ? 'を止める' : 'を始める'} ・ Q: 三脚に置く`;
+  return tr("ui476", item.live ? tr("ui474") : tr("ui477"));
 }
 
 export const operatorName = (item: CameraItem) => nameOf(item.operator);

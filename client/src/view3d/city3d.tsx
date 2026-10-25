@@ -1,10 +1,11 @@
+import { t as tr, localized, systemText } from '../i18n/index.ts';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
   BUILDINGS, CAR, CITY_HALF, CITY_SURFACES, FLOOR_H, LOOP, MANSION, MANSION_SOLIDS, MANSION_STOPS, PILLARS, PLATFORM_Y,
-  PLAZA, SHAFT, SHAFT_FRONT, SHAFT_RECT, STATIONS, STATION_PARTS, TRACK, carPose, elevatorDoorOpen, elevatorY, mansionPoint,
-  stairSteps, stopLabel, trackAt, trainState,
+  PLAZA, SHAFT, SHAFT_FRONT, SHAFT_RECT, STATIONS as RAW_STATIONS, STATION_PARTS, TRACK, carPose, elevatorDoorOpen, elevatorY, mansionPoint,
+  stairSteps, stopLabel as rawStopLabel, trackAt, trainState,
 } from '../../../shared/city.ts';
 import { elevatorOfSession, get, serverNow } from '../store.ts';
 import { send } from '../net/ws.ts';
@@ -242,7 +243,7 @@ function ElevatorHalls() {
               <boxGeometry args={[w, 2.4, 0.06]} />
               <meshStandardMaterial color="#9aa3ad" metalness={0.3} />
             </mesh>
-            <mesh position={[btn.x, y + 1.2, btn.z]} userData={{ use: () => send({ t: 'elevatorCall', floor: f }), hint: `クリック: エレベーターを呼ぶ（${stopLabel(f)}）` } satisfies Interactable}>
+            <mesh position={[btn.x, y + 1.2, btn.z]} userData={{ use: () => send({ t: 'elevatorCall', floor: f }), hint: tr("ui479", stopLabel(f)) } satisfies Interactable}>
               <boxGeometry args={[0.18, 0.26, 0.05]} />
               <meshStandardMaterial color="#f2c14e" emissive="#f2a13e" emissiveIntensity={0.3} />
             </mesh>
@@ -273,7 +274,7 @@ function ElevatorCar() {
         const row = Math.floor(f / 2);
         return (
           <group key={f} position={[w / 2 - 0.04, 0.9 + row * 0.2, -0.25 + col * 0.3]}>
-            <mesh userData={{ use: () => send({ t: 'elevatorCall', floor: f }), hint: `クリック: ${stopLabel(f)}へ` } satisfies Interactable}>
+            <mesh userData={{ use: () => send({ t: 'elevatorCall', floor: f }), hint: tr("ui480", stopLabel(f)) } satisfies Interactable}>
               <boxGeometry args={[0.04, 0.16, 0.24]} />
               <meshStandardMaterial color="#f4f1ea" />
             </mesh>
@@ -323,7 +324,7 @@ export function CityWorld({ map = false }: { map?: boolean }) {
         const f = STATION_PARTS[i].frame;
         return <Label key={st.name} position={[f.x + f.nx * 5.4, PLATFORM_Y + 2.4, f.z + f.nz * 5.4]} text={st.name} height={0.5} bg="rgba(40,90,60,0.92)" />;
       })}
-      <Label position={[MANSION.x - MANSION.hw - 0.6, 3.4, MANSION.z]} text="トナリウム・レジデンス" height={0.45} bg="rgba(60,50,40,0.9)" />
+      <Label position={[MANSION.x - MANSION.hw - 0.6, 3.4, MANSION.z]} text={tr("ui481")} height={0.45} bg="rgba(60,50,40,0.9)" />
       <ElevatorHalls />
       <ElevatorCar />
       <Car k={0} />
@@ -331,3 +332,6 @@ export function CityWorld({ map = false }: { map?: boolean }) {
     </>
   );
 }
+
+const STATIONS = localized(RAW_STATIONS);
+const stopLabel = (floor: number) => systemText(rawStopLabel(floor));

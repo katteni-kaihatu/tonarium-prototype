@@ -1,3 +1,4 @@
+import { t as tr, getLanguage } from '../i18n/index.ts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -25,7 +26,7 @@ function useJoiners() {
   useEffect(() => {
     const t = setInterval(() => tick((n) => n + 1), 500);
     return () => clearInterval(t);
-  }, []);
+  }, [getLanguage()]);
   const s = get();
   return s.participants.filter((u) => {
     if (u.mode !== '3d') return false;
@@ -83,7 +84,7 @@ function Tower() {
         <Box key={`${sx}${sz}`} p={[ARENA.x + sx * (ARENA.half + 0.3), (top + FALL_Y) / 2, ARENA.z + sz * (ARENA.half + 0.3)]} s={[0.4, top - FALL_Y, 0.4]} color="#d9dcff" />
       )))}
       {LAYER_Y.map((y, i) => (
-        <Label key={y} text={`${i + 1} 階`} position={[ARENA.x - ARENA.half - 0.3, y + 1.2, ARENA.z + ARENA.half + 0.3]} height={0.5} bg="rgba(40,44,90,.85)" />
+        <Label key={y} text={tr("ui488", i + 1)} position={[ARENA.x - ARENA.half - 0.3, y + 1.2, ARENA.z + ARENA.half + 0.3]} height={0.5} bg="rgba(40,44,90,.85)" />
       ))}
       {/* 奈落の底 */}
       <mesh rotation-x={-Math.PI / 2} position={[ARENA.x, FALL_Y, ARENA.z + 2]}>
@@ -108,10 +109,10 @@ function drawMonitor(canvas: HTMLCanvasElement, g: GameState, joiners: string[])
   ctx.font = font(800, 54);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText('板わたりサバイバル', 40, 50);
+  ctx.fillText(tr("ui489"), 40, 50);
   ctx.textAlign = 'right';
   ctx.font = font(700, 34);
-  const phase = g.phase === 'running' ? `プレイ中 · 残り ${g.players.filter((p) => p.out === null).length} 人` : g.phase === 'ended' ? '決着！' : '参加者募集中';
+  const phase = g.phase === 'running' ? tr("ui490", g.players.filter((p) => p.out === null).length) : g.phase === 'ended' ? tr("ui491") : tr("ui492");
   ctx.fillText(phase, W - 40, 50);
   ctx.textAlign = 'left';
   let y = 150;
@@ -120,28 +121,28 @@ function drawMonitor(canvas: HTMLCanvasElement, g: GameState, joiners: string[])
     ctx.fillStyle = '#ffd34d';
     ctx.font = font(900, 84);
     ctx.textAlign = 'center';
-    ctx.fillText(`🏆 ${w?.name ?? ''} の優勝！`, W / 2, y + 30);
+    ctx.fillText(tr("ui493", w?.name ?? ''), W / 2, y + 30);
     ctx.textAlign = 'left';
     y += 120;
   }
   if (g.phase === 'idle') {
     ctx.fillStyle = '#cfd3ff';
     ctx.font = font(700, 36);
-    ctx.fillText(`参加エリアに入って、横のボタンでスタート（${MIN_PLAYERS} 人から）`, 40, y);
+    ctx.fillText(tr("ui494", MIN_PLAYERS), 40, y);
     y += 60;
     ctx.fillStyle = '#fff';
-    ctx.fillText(`参加エリア：${joiners.length ? joiners.join('、') : 'まだ誰もいません'}`, 40, y);
+    ctx.fillText(tr("ui495", joiners.length ? joiners.join('、') : tr("ui496")), 40, y);
     y += 70;
     if (!g.winner) return;
     ctx.fillStyle = '#ffd34d';
-    ctx.fillText(`前回の優勝：${g.players.find((p) => p.id === g.winner)?.name ?? ''}`, 40, y);
+    ctx.fillText(tr("ui497", g.players.find((p) => p.id === g.winner)?.name ?? ''), 40, y);
     y += 56;
   }
   const list = g.phase === 'running' ? g.players : ranking(g);
   ctx.font = font(700, 34);
   list.forEach((p, i) => {
     if (y > canvas.height - 30) return;
-    const place = g.phase === 'running' ? (p.out === null ? '生存中' : '脱落') : `${i + 1} 位`;
+    const place = g.phase === 'running' ? (p.out === null ? tr("ui498") : tr("ui499")) : tr("ui500", i + 1);
     ctx.fillStyle = p.id === g.winner ? '#ffd34d' : p.out === null ? '#8ef0a8' : '#9aa0c8';
     ctx.fillText(`${place}`, 60, y);
     ctx.fillStyle = '#fff';
@@ -159,7 +160,7 @@ function MainMonitor() {
   useEffect(() => {
     drawMonitor(canvas, game, joiners);
     tex.needsUpdate = true;
-  }, [key]);
+  }, [key, getLanguage()]);
   return (
     <group position={[-H + 0.15, 2.4, -3]} rotation-y={Math.PI / 2} userData={{ noRay: true }}>
       <mesh position-z={-0.03}>
@@ -186,7 +187,7 @@ function JoinArea() {
         <ringGeometry args={[JOIN_AREA.r - 0.08, JOIN_AREA.r, 64]} />
         <meshBasicMaterial color="#ffd34d" />
       </mesh>
-      <Label text={`参加エリア（${n} 人）`} position={[0, 2.3, 0]} height={0.24} bg="rgba(120,90,0,.9)" />
+      <Label text={tr("ui501", n)} position={[0, 2.3, 0]} height={0.24} bg="rgba(120,90,0,.9)" />
     </group>
   );
 }
@@ -197,7 +198,7 @@ function StartButton() {
   const ready = game.phase === 'idle' && n >= MIN_PLAYERS;
   const data: Interactable = {
     use: () => send({ t: 'gameStart' }),
-    hint: game.phase !== 'idle' ? 'ゲーム中です' : ready ? 'クリック: ゲーム開始' : `参加エリアに ${MIN_PLAYERS} 人以上で開始できます`,
+    hint: game.phase !== 'idle' ? tr("ui502") : ready ? tr("ui503") : tr("ui504", MIN_PLAYERS),
   };
   return (
     <group position={[START_BUTTON.x, 0, START_BUTTON.z]} userData={data}>
@@ -206,7 +207,7 @@ function StartButton() {
         <cylinderGeometry args={[0.24, 0.26, 0.12, 24]} />
         <meshStandardMaterial color={ready ? '#ff3b5c' : '#7a7d99'} emissive={ready ? '#ff3b5c' : '#000'} emissiveIntensity={0.5} />
       </mesh>
-      <Label text={ready ? 'ゲーム開始' : game.phase === 'idle' ? `あと ${MIN_PLAYERS - n} 人` : 'ゲーム中'} position={[0, 1.55, 0]} height={0.2} bg={ready ? 'rgba(220,40,70,.95)' : 'rgba(40,44,90,.85)'} />
+      <Label text={ready ? tr("ui505") : game.phase === 'idle' ? tr("ui506", MIN_PLAYERS - n) : tr("ui507")} position={[0, 1.55, 0]} height={0.2} bg={ready ? 'rgba(220,40,70,.95)' : 'rgba(40,44,90,.85)'} />
     </group>
   );
 }

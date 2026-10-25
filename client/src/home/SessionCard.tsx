@@ -1,14 +1,16 @@
+import { t as tr } from '../i18n/index.ts';
 import { useStore } from '../store.ts';
 import type { SessionDef, SessionInfo } from '../../../shared/protocol.ts';
-import { VISIBILITY_INFO } from '../../../shared/protocol.ts';
-import { WORLDS, type WorldKind } from '../../../shared/worlds.ts';
+import { VISIBILITY_INFO } from '../i18n/static.ts';
+import { WORLDS } from '../i18n/static.ts';
+import { type WorldKind } from '../../../shared/worlds.ts';
 import { deleteSession, joinSession } from '../actions.ts';
 import { Face } from '../world/common.tsx';
 import { Icon } from '../world/Icon.tsx';
 import { Chip, ModeIcon, timeLabel, uniqueByName } from './common.tsx';
 import { GroupAvatar } from './GroupAvatar.tsx';
 
-const WORLD_TINT: Record<WorldKind, string> = { room: '#DCE6F3', cafe: '#F3E6C6', game: '#E7DDF2', survivors: '#F2D5E2', city: '#D7EAD3', garden: '#DDEBCF', starlounge: '#DBE1F4' };
+const WORLD_TINT: Record<WorldKind, string> = { room: '#DCE6F3', cafe: '#F3E6C6', game: '#E7DDF2', survivors: '#F2D5E2', city: '#D7EAD3', garden: '#DDEBCF', starlounge: '#DBE1F4', antimatter: '#D9D6F5' };
 const WORLD_PLACEHOLDER = Object.fromEntries(Object.entries(WORLD_TINT).map(([kind, tint]) => [kind,
   `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180"><rect width="320" height="180" fill="${tint}"/><circle cx="240" cy="45" r="24" fill="white" opacity=".5"/><path d="M0 150 90 65 160 130 220 85 320 160V180H0Z" fill="white" opacity=".4"/></svg>`)}`,
 ]));
@@ -36,26 +38,26 @@ export function SessionCard({ s, showDelete }: { s: SessionDef; showDelete?: boo
   const current = useStore((st) => st.session);
   return (
     <article className="scard">
-      <img className="scthumbnail" src={thumbnail || WORLD_PLACEHOLDER[world]} alt={`${WORLDS[world].name}のセッションの様子`} />
+      <img className="scthumbnail" src={thumbnail || WORLD_PLACEHOLDER[world]} alt={tr("ui317", WORLDS[world].name)} />
       <div className="schead" style={{ background: WORLD_TINT[world] }}>
-        <span className="pill dark">{here.length} 人</span>
-        {sharing && <span className="livechip"><Icon name="screen" size={11} />画面共有</span>}
+        <span className="pill dark">{here.length} {tr("ui125")}</span>
+        {sharing && <span className="livechip"><Icon name="screen" size={11} />{tr("ui318")}</span>}
         <span className="spacer" />
         <span className="scworld"><Icon name="globe" size={13} />{WORLDS[world].name}</span>
         {current === s.id
-          ? <span className="hhere"><i />参加中</span>
-          : <button className="primary scjoin" onClick={() => joinSession(s.id)}>{current ? '移動する' : '参加する'}</button>}
+          ? <span className="hhere"><i />{tr("ui192")}</span>
+          : <button className="primary scjoin" onClick={() => joinSession(s.id)}>{current ? tr("ui193") : tr("ui194")}</button>}
       </div>
       <div className="scbody">
         <div className="sctitle">
           <h3 title={s.topic}>{s.name}</h3>
           <Chip kind={vis}>{(vis === 'group' || vis === 'groupPlus') && group ? <GroupAvatar group={group} size="chip" /> : <Icon name={VIS_ICON[vis]} size={11} />}{(vis === 'group' || vis === 'groupPlus') && group ? `${group.name}${vis === 'groupPlus' ? '＋' : ''}` : VISIBILITY_INFO[vis].name}</Chip>
         </div>
-        <span className="sub">{s.topic || `ワールド：${WORLDS[world].name}`}</span>
-        {invitedByOwner && <span className="scinvited">{s.owner} から招待されています</span>}
+        <span className="sub">{s.topic || tr("ui319", WORLDS[world].name)}</span>
+        {invitedByOwner && <span className="scinvited">{s.owner} {tr("ui320")}</span>}
         <div className="scpeople">
           <b className={friendsHere.length ? 'acc' : ''}>
-            {friendsHere.length ? `フレンド ${friendsHere.length} 人` : here.length ? `${here.length} 人がいます` : 'だれもいません'}
+            {friendsHere.length ? tr("ui186", friendsHere.length) : here.length ? tr("ui321", here.length) : tr("ui322")}
           </b>
           {shown.length > 0 && (
             <div className="scfaces">
@@ -66,7 +68,7 @@ export function SessionCard({ s, showDelete }: { s: SessionDef; showDelete?: boo
                   <ModeIcon mode={u.mode} sharing={u.sharing} />
                 </span>
               ))}
-              {here.length > shown.length && <span className="scmore">ほか {here.length - shown.length} 人</span>}
+              {here.length > shown.length && <span className="scmore">{tr("ui295")}{here.length - shown.length} {tr("ui125")}</span>}
             </div>
           )}
         </div>
@@ -77,9 +79,8 @@ export function SessionCard({ s, showDelete }: { s: SessionDef; showDelete?: boo
           </div>
         )}
         {showDelete && s.owner === selfName && (
-          <button className="ib scdel" disabled={here.length > 0} title={here.length ? 'だれかがいる間は消せません' : 'このセッションを消す'} onClick={() => deleteSession(s.id)}>
-            <Icon name="trash" size={13} />消す
-          </button>
+          <button className="ib scdel" disabled={here.length > 0} title={here.length ? tr("ui323") : tr("ui324")} onClick={() => deleteSession(s.id)}>
+            <Icon name="trash" size={13} />{tr("ui182")}</button>
         )}
       </div>
     </article>

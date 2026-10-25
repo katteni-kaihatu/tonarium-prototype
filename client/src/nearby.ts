@@ -1,3 +1,4 @@
+import { t as tr } from './i18n/core.ts';
 import type { Item } from '../../shared/items.ts';
 import { NEAR_RANGE, VOICE_RANGE, placeDistance, type Place } from '../../shared/places.ts';
 import type { Participant } from '../../shared/protocol.ts';
@@ -12,7 +13,7 @@ export function displayMeters(d: number) {
   return d < 10 ? Number(d.toFixed(1)) : Math.round(d);
 }
 
-export const formatDistance = (d: number) => (d === 0 ? '自分' : !Number.isFinite(d) ? '—' : d < 10 ? `${d.toFixed(1)}m` : `${Math.round(d)}m`);
+export const formatDistance = (d: number) => (d === 0 ? tr("ui41") : !Number.isFinite(d) ? '—' : d < 10 ? `${d.toFixed(1)}m` : `${Math.round(d)}m`);
 
 export interface ListedPlayer { user: Participant; d: number; band: Band; child: boolean }
 export interface ListedItem { item: Item; d: number; band: Band; heldBy: string | null }

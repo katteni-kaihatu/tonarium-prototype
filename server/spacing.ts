@@ -3,7 +3,7 @@ import type { Item } from '../shared/items.ts';
 
 /** 体の半径（m）。2D の人は他の人やアイテムに押されて、重ならない位置へ少しずつずれる */
 export const PERSON = 0.35;
-const ITEM_R: Partial<Record<Item['kind'], number>> = { chess: 0.9, chessAi: 0.9, g2048: 0.7, canvas: 0.9, image: 0.7, video: 0.7, youtube: 0.8, note: 0.6, dice: 0.5 };
+const ITEM_R: Partial<Record<Item['kind'], number>> = { bike: 0.9, chess: 0.9, chessAi: 0.9, g2048: 0.7, canvas: 0.9, image: 0.7, video: 0.7, youtube: 0.8, note: 0.6, dice: 0.5, antimatter: 0.7 };
 const itemRadius = (it: Item) => ITEM_R[it.kind] ?? 0.4;
 
 interface Body { x: number; z: number; r: number; id?: string }

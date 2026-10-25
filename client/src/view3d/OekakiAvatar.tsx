@@ -48,7 +48,7 @@ function baseAnimation(p: AvatarParams) {
 
 /** モデルは +Z 向きなので、こちらの「前 = -Z」に合わせて回してある */
 /** look は顔の上下の向き（ラジアン、上向きが正）を返す */
-export function OekakiAvatar({ name, version, speaking, look, userId, previewEmote, onEyeHeight }: { name: string; version: string | null; speaking: boolean; look?: () => number; userId?: string; previewEmote?: ActiveEmote | null; onEyeHeight?: (height: number) => void }) {
+export function OekakiAvatar({ name, version, speaking, look, walking, userId, previewEmote, onEyeHeight }: { name: string; version: string | null; speaking: boolean; look?: () => number; walking?: () => boolean; userId?: string; previewEmote?: ActiveEmote | null; onEyeHeight?: (height: number) => void }) {
   const { scene, animations } = useGLTF(MODEL);
   const clone = useMemo(() => scene.clone(), [scene]);
   const { nodes } = useGraph(clone);
@@ -57,6 +57,8 @@ export function OekakiAvatar({ name, version, speaking, look, userId, previewEmo
   const [paramsReady, setParamsReady] = useState(false);
   const notified = useRef(false);
   const mixer = useMemo(() => new THREE.AnimationMixer(clone), [clone]);
+  const walkActions = useMemo(() => animations.filter((clip) => clip.name === 'Transform:LeftFoot' || clip.name === 'Transform:RightFoot')
+    .map((clip) => mixer.clipAction(clip)), [animations, mixer]);
   const face = useRef<THREE.Texture | null>(null);
   const blink = useRef(0);
   const motion = useRef<THREE.Group>(null);
@@ -100,9 +102,9 @@ export function OekakiAvatar({ name, version, speaking, look, userId, previewEmo
 
   useEffect(() => {
     const actions = animations.map((clip) => mixer.clipAction(clip));
-    actions.forEach((a) => a.play());
+    actions.filter((a) => !walkActions.includes(a)).forEach((a) => a.play());
     return () => actions.forEach((a) => a.stop());
-  }, [animations, mixer]);
+  }, [animations, mixer, walkActions]);
 
   useEffect(() => {
     const action = mixer.clipAction(baseAnimation(params));
@@ -117,6 +119,11 @@ export function OekakiAvatar({ name, version, speaking, look, userId, previewEmo
   const faceBase = useMemo(() => [nodes.Head_Front, nodes.Head_Back].filter(Boolean).map((o) => ({ o, q: o.quaternion.clone() })), [nodes]);
   useFrame((_, dt) => {
     for (const h of hands) if (h) { h.o.quaternion.copy(h.q); h.o.position.copy(h.p); }
+    const moving = walking?.() === true;
+    for (const action of walkActions) {
+      if (moving && !action.isRunning()) action.reset().play();
+      else if (!moving && action.isRunning()) action.stop();
+    }
     mixer.update(dt);
     if (!notified.current && texture && paramsReady) {
       notified.current = true;

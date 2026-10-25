@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n/index.ts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -87,7 +88,7 @@ export function ShareDisplay() {
   if (grounded) {
     const w = 1.6;
     const h = w / aspect;
-    const data: Interactable = { carry: `display:${user.id}`, hint: `${nameOf(user.id)} の配信ディスプレイ` };
+    const data: Interactable = { carry: `display:${user.id}`, hint: tr("ui530", nameOf(user.id)) };
     return (
       <group ref={ref} position={[grounded.x, 0, grounded.z]} rotation-y={grounded.ry} userData={data}>
         <mesh position-y={STAND_H / 2 - 0.2}>
@@ -100,7 +101,7 @@ export function ShareDisplay() {
         </mesh>
         <group position-y={STAND_H - 0.2 + h / 2 - 0.4}>
           <VideoPanel w={w} h={h} tex={tex} />
-          <Label position={[0, h / 2 + 0.16, 0]} height={0.16} text={`● ${nameOf(user.id)} の配信`} bg="rgba(217,72,59,0.95)" />
+          <Label position={[0, h / 2 + 0.16, 0]} height={0.16} text={tr("ui531", nameOf(user.id))} bg="rgba(217,72,59,0.95)" />
         </group>
       </group>
     );
@@ -111,7 +112,7 @@ export function ShareDisplay() {
     <group ref={ref} userData={{ noRay: true }}>
       <group position-y={0.15 + h / 2}>
         <VideoPanel w={w} h={h} tex={tex} />
-        <Label position={[0, h / 2 + 0.11, 0]} height={0.11} text={`● ${nameOf(user.id)} の配信`} bg="rgba(217,72,59,0.95)" />
+        <Label position={[0, h / 2 + 0.11, 0]} height={0.11} text={tr("ui531", nameOf(user.id))} bg="rgba(217,72,59,0.95)" />
       </group>
     </group>
   );

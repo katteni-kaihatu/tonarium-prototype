@@ -1,8 +1,10 @@
+import { t as tr } from '../i18n/index.ts';
 import { contentAvailable, productFor } from '../../../shared/market.ts';
 import { useOwnedContent } from '../market/store.ts';
 import { OriginBadge } from '../market/OriginBadge.tsx';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { EMOTES, type EmoteId } from '../../../shared/emotes.ts';
+import { EMOTES } from '../i18n/static.ts';
+import { type EmoteId } from '../../../shared/emotes.ts';
 import { useEmote } from '../emotes.ts';
 import { get, useStore } from '../store.ts';
 import { send } from '../net/ws.ts';
@@ -56,15 +58,15 @@ function EmotePicker({ anchor, onClose }: { anchor: DOMRect; onClose: () => void
   };
   return (
     <Popover anchor={anchor} side="up" onClose={onClose} className="emote-picker">
-      <div role="dialog" aria-label="エモートを選ぶ" onKeyDown={(e) => { if (e.key !== 'Escape') e.stopPropagation(); }}>
-        <div className="emote-heading"><span><b>きもちを、動きに。</b><span className="sub">エモート</span></span><button className="ib" onClick={onClose} aria-label="エモートを閉じる"><Icon name="close" size={16} /></button></div>
+      <div role="dialog" aria-label={tr("ui574")} onKeyDown={(e) => { if (e.key !== 'Escape') e.stopPropagation(); }}>
+        <div className="emote-heading"><span><b>{tr("ui575")}</b><span className="sub">{tr("ui225")}</span></span><button className="ib" onClick={onClose} aria-label={tr("ui576")}><Icon name="close" size={16} /></button></div>
         <div className="emote-grid">
           {(Object.keys(EMOTES) as EmoteId[]).filter((id) => contentAvailable(owned, 'emotes', id)).map((id, i) => <div key={id} className="market-entry"><button
             ref={i === 0 ? first : undefined} className={`emote-option ${active?.id === id ? 'playing' : ''}`}
             style={emoteStyle(id)} disabled={!connected || !!active || pending} onClick={() => choose(id)}
           ><span className="emote-option-mark" aria-hidden="true">{EMOTES[id].mark}</span><b>{EMOTES[id].name}</b><span className="sub">{EMOTES[id].caption}</span></button><OriginBadge productId={productFor('emotes', id)?.id} onOpen={onClose} /></div>)}
         </div>
-        <p className="emote-hint" role="status">{!connected ? 'セッションへの接続を待っています…' : active ? `${EMOTES[active.id].name} を再生中…` : pending ? 'エモートを送っています…' : '動きはみんなに、効果音は近くの人に。'}</p>
+        <p className="emote-hint" role="status">{!connected ? tr("ui577") : active ? tr("ui578", EMOTES[active.id].name) : pending ? tr("ui579") : tr("ui580")}</p>
       </div>
     </Popover>
   );
@@ -76,7 +78,7 @@ export function EmoteDockButton() {
   const active = useStore((s) => s.emotes[s.selfId]);
   const close = () => { setAnchor(null); button.current?.focus(); };
   return <>
-    <button ref={button} className={`dk ${anchor || active ? 'active' : ''}`} aria-label="エモート" title="エモート" aria-haspopup="dialog" aria-expanded={!!anchor} data-popanchor
+    <button ref={button} className={`dk ${anchor || active ? 'active' : ''}`} aria-label={tr("ui225")} title={tr("ui225")} aria-haspopup="dialog" aria-expanded={!!anchor} data-popanchor
       onClick={(e) => { unlockEmoteAudio(); setAnchor(anchor ? null : e.currentTarget.getBoundingClientRect()); }}><Icon name="emote" size={23} /></button>
     {anchor && <EmotePicker anchor={anchor} onClose={close} />}
   </>;

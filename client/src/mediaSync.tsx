@@ -1,3 +1,4 @@
+import { t as tr } from './i18n/index.ts';
 import { useEffect, useRef, useState } from 'react';
 import { clockTime, type Item } from '../../shared/items.ts';
 import { useStore, get, set, serverNow } from './store.ts';
@@ -38,10 +39,10 @@ function VolumeControl({ id }: { id: string }) {
   };
   return (
     <span className="mvol">
-      <button className="ib mbtn" onClick={mute} aria-label={vol > 0 ? 'ミュート（自分だけ）' : 'ミュート解除'} title="音量（自分だけ）">
+      <button className="ib mbtn" onClick={mute} aria-label={vol > 0 ? tr("ui35") : tr("ui36")} title={tr("ui37")}>
         <Icon name={vol > 0 ? 'volume' : 'volumeOff'} size={16} />
       </button>
-      <input type="range" min={0} max={1} step={0.05} value={vol} aria-label="音量（自分だけ）" onChange={(e) => setUserVolume(id, Number(e.target.value))} />
+      <input type="range" min={0} max={1} step={0.05} value={vol} aria-label={tr("ui37")} onChange={(e) => setUserVolume(id, Number(e.target.value))} />
     </span>
   );
 }
@@ -141,12 +142,12 @@ export function MediaControls({ item, duration }: { item: ClockItem; duration: (
   };
   return (
     <div className="mediactl" onPointerDown={(e) => e.stopPropagation()}>
-      <button className="ib mbtn" onClick={toggle} aria-label={playing ? '一時停止（みんな）' : '再生（みんな）'}>
+      <button className="ib mbtn" onClick={toggle} aria-label={playing ? tr("ui38") : tr("ui39")}>
         <Icon name={playing ? 'pause' : 'play'} size={16} />
       </button>
       <input
         type="range" min={0} max={Number.isFinite(dur) && dur > 0 ? dur : 1} step={0.1} value={Math.min(shown, Number.isFinite(dur) ? dur : shown)}
-        aria-label="再生位置" onChange={(e) => setSeeking(Number(e.target.value))} onPointerUp={commit} onKeyUp={commit}
+        aria-label={tr("ui40")} onChange={(e) => setSeeking(Number(e.target.value))} onPointerUp={commit} onKeyUp={commit}
       />
       <span className="mtime">{fmt(shown)} / {fmt(dur)}</span>
       <VolumeControl id={item.id} />

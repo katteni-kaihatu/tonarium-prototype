@@ -1,3 +1,5 @@
+import { sourceText as uiSource } from '../i18n/core.ts';
+import { msg as uiMsg } from '../i18n/core.ts';
 import { KokosyncClient, type Value } from '../../../vendor/kokosync/index.js';
 import type { AvatarState, RoomClientMsg, ServerMsg } from '../../../shared/protocol.ts';
 import { importKey, MAX_PACKET, open, pack, PACKET_TOPIC, receiveBlob, seal, sealBytes, sendPacket, type Envelope, type SyncConfig } from '../../../shared/session-wire.ts';
@@ -34,7 +36,7 @@ const positions = new Map<string, number>();
 const initialPositions = new Map<string, AvatarState>();
 
 export function stopSessionSync(warn = false) {
-  if (warn && (queuedBytes > 0 || pending.length > 0)) showToast('通信が途切れました。直前の操作が反映されたか確認してください');
+  if (warn && (queuedBytes > 0 || pending.length > 0)) showToast(uiMsg("ui456"));
   generation++;
   clearTimeout(retryTimer); clearTimeout(deadline); clearInterval(statsTimer); clearInterval(peerStatsTimer);
   const old = client;
@@ -55,7 +57,7 @@ export function startSessionSync() {
   set({ sync: 'connecting' });
   send({ t: 'prepareSync', requestId, peerPositions: true, peerDelivery: true });
   const gen = generation;
-  deadline = setTimeout(() => { if (gen === generation) failed('同期の接続がタイムアウトしました'); }, 60_000);
+  deadline = setTimeout(() => { if (gen === generation) failed(uiSource('ui457')); }, 60_000);
 }
 
 function failed(message: string) {
@@ -63,11 +65,11 @@ function failed(message: string) {
   stopSessionSync();
   if (!get().session || !get().wsConnected) return;
   set({ sync: 'unavailable', syncError: message });
-  if (hadPending) showToast('通信が途切れました。直前の操作が反映されたか確認してください');
+  if (hadPending) showToast(uiMsg("ui456"));
   retryTimer = setTimeout(startSessionSync, Math.min(8000, 500 * 2 ** Math.min(retry++, 4)));
 }
 export function syncError(id: string, message: string) { if (id === requestId) failed(message); }
-export function resetSessionSync(sid: string) { if (sid === get().session) failed('同期サーバーに再接続しています'); }
+export function resetSessionSync(sid: string) { if (sid === get().session) failed(uiSource('ui458')); }
 
 export async function configureSessionSync(id: string, next: SyncConfig) {
   if (id !== requestId || next.sid !== get().session) return;
@@ -154,7 +156,7 @@ export async function configureSessionSync(id: string, next: SyncConfig) {
       else {
         const size = pack(raw).length;
         if (incomingCount >= 256 || incomingBytes + size > MAX_PACKET * 2) {
-          if (gen === generation) failed('同期データの受信待ちが増えたため再同期しています');
+          if (gen === generation) failed(uiSource('ui459'));
           return;
         }
         incomingBytes += size; incomingCount++;
@@ -163,19 +165,19 @@ export async function configureSessionSync(id: string, next: SyncConfig) {
         finally { if (gen === generation) { incomingBytes -= size; incomingCount--; } }
       }
     };
-    connection.on('message', (f) => { if (f.topic === PACKET_TOPIC) return receive(f.value, f.peer).catch(() => { if (gen === generation) failed('同期データを読み直しています'); }); });
+    connection.on('message', (f) => { if (f.topic === PACKET_TOPIC) return receive(f.value, f.peer).catch(() => { if (gen === generation) failed(uiSource('ui460')); }); });
     connection.on('latest', (f) => {
       if (f.key?.startsWith(POSITION_TOPIC)) return peerTransport?.receive(f).catch(() => {});
       if (f.key?.startsWith(`${PACKET_TOPIC}:${next.slot}:`)) return receive(f.value, f.peer, true).catch(() => {});
     });
     connection.on('route', () => updateRoutes());
     connection.on('peer_message', (f) => events?.receive(f));
-    connection.on('blob_open', (f) => receiveBlob(connection, f, (peer) => peer === next.server, receive).catch(() => { if (gen === generation) failed('大きな同期データの受信に失敗しました'); }));
-    connection.on('close', () => { if (gen === generation) failed('同期の接続が切れました'); });
+    connection.on('blob_open', (f) => receiveBlob(connection, f, (peer) => peer === next.server, receive).catch(() => { if (gen === generation) failed(uiSource('ui461')); }));
+    connection.on('close', () => { if (gen === generation) failed(uiSource('ui462')); });
     connection.on('error', (error) => {
       // 退出通知より先に相手が中継から消えた場合、この位置更新だけを捨てる。
       if (!error.id && error.code === 'InvalidMessage' && error.message === 'duplicate or unknown recipient') return;
-      if (gen === generation) failed('同期の通信に失敗しました');
+      if (gen === generation) failed(uiSource('ui463'));
     });
     roomSend({ t: 'sync' });
     statsTimer = setInterval(() => {
@@ -183,7 +185,7 @@ export async function configureSessionSync(id: string, next: SyncConfig) {
       void Promise.all([
         connection.ping().then(() => { if (gen === generation) set({ syncRtt: Math.round(performance.now() - start) }); }),
         connection.stats().then((stats) => { if (gen === generation) { set({ syncStats: stats }); updateRoutes(true); } }),
-      ]).catch(() => { if (gen === generation) failed('同期サーバーから応答がありません'); });
+      ]).catch(() => { if (gen === generation) failed(uiSource('ui464')); });
     }, 5000);
     let previousRoutes = new Map((peerTransport?.routes() ?? []).map((r) => [`${r.peer}:${r.publisherEpoch}`, r]));
     let previousTime = performance.now();
@@ -228,9 +230,9 @@ export function roomSend(msg: RoomClientMsg) {
   if (!get().session) return;
   if (!ready && msg.t !== 'sync') {
     if (['avatar', 'mode', 'status', 'viewing', 'emote'].includes(msg.t)) return;
-    if (!requestId) { showToast('接続が完了してから、もう一度操作してください'); return; }
+    if (!requestId) { showToast(uiMsg("ui465")); return; }
     if (pending.length < 128 && pack(pending).length + pack(msg).length < 2 * 1024 * 1024) pending.push(msg);
-    else showToast('接続が完了してから、もう一度操作してください');
+    else showToast(uiMsg("ui465"));
     return;
   }
   const c = client, cfg = config, k = key, gen = generation;
@@ -245,7 +247,7 @@ export function roomSend(msg: RoomClientMsg) {
   }
   const bytes = pack(msg);
   if (bytes.length > MAX_PACKET - 1024 || queuedBytes + bytes.length > MAX_PACKET * 2) {
-    showToast('同期データが大きすぎます。操作を分けてください'); return;
+    showToast(uiMsg("ui466")); return;
   }
   queuedBytes += bytes.length;
   outgoing = outgoing.then(async () => {
@@ -256,7 +258,7 @@ export function roomSend(msg: RoomClientMsg) {
     if (gen !== generation) return;
     const value = event ? pack({ t: 'peerOperation', event }) : bytes;
     await sendPacket(c, cfg.server, await sealBytes(k, cfg.token, 'client', ++sendSeq, value));
-  }).catch(() => { if (gen === generation) failed('操作の送信に失敗しました'); })
+  }).catch(() => { if (gen === generation) failed(uiSource('ui467')); })
     .finally(() => { if (gen === generation) queuedBytes -= bytes.length; });
 }
 

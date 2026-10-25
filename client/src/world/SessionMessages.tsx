@@ -1,3 +1,4 @@
+import { t as tr, msg } from '../i18n/index.ts';
 import { useState } from 'react';
 import { showToast, unreadOf, useStore } from '../store.ts';
 import { channelKey, dmKey } from '../../../shared/protocol.ts';
@@ -33,7 +34,7 @@ function ShareItem({ conv, onDone }: { conv: string; onDone: () => void }) {
   const list = Object.values(items).filter((it) => it.kind !== 'hammer' && it.kind !== 'camera');
   return (
     <div className="mpick">
-      {list.length === 0 && <span className="sub">このセッションに共有できるアイテムがありません</span>}
+      {list.length === 0 && <span className="sub">{tr("ui692")}</span>}
       {list.map((it) => (
         <button key={it.id} className="ib hpick" onClick={() => { if (sid) sendMessage(conv, { text: '', item: { session: sid, id: it.id } }); onDone(); }}>{itemLabel(it)}</button>
       ))}
@@ -48,21 +49,21 @@ function ConvView({ conv, title, onBack }: { conv: string; title: string; onBack
   const callHere = () => {
     if (!sid) return;
     sendMessage(conv, { text: '', invite: sid });
-    showToast(`${sessionName ?? 'このセッション'}への誘いを送りました`);
+    showToast(msg("ui693", sessionName ?? msg("ui694")));
   };
   return (
     <>
       <div className="phead">
-        <button className="ib" aria-label="会話の一覧に戻る" onClick={onBack}><Icon name="left" size={15} /></button>
+        <button className="ib" aria-label={tr("ui695")} onClick={onBack}><Icon name="left" size={15} /></button>
         <h2 className="ellipsis">{title}</h2>
         <span className="spacer" />
-        <button className="ib small" title="いまいるセッションへの誘いを送る" onClick={callHere}>ここに呼ぶ</button>
+        <button className="ib small" title={tr("ui696")} onClick={callHere}>{tr("ui697")}</button>
       </div>
-      <Thread key={conv} conv={conv} empty="まだメッセージはありません" />
+      <Thread key={conv} conv={conv} empty={tr("ui698")} />
       {picking && <ShareItem conv={conv} onDone={() => setPicking(false)} />}
       <Composer
-        conv={conv} placeholder="返信" allowPlan={conv.startsWith('ch:')}
-        extra={<button type="button" className={`ib square ${picking ? 'on' : ''}`} aria-label="アイテムを共有" aria-pressed={picking} onClick={() => setPicking(!picking)}><Icon name="box" size={17} /></button>}
+        conv={conv} placeholder={tr("ui699")} allowPlan={conv.startsWith('ch:')}
+        extra={<button type="button" className={`ib square ${picking ? 'on' : ''}`} aria-label={tr("ui700")} aria-pressed={picking} onClick={() => setPicking(!picking)}><Icon name="box" size={17} /></button>}
       />
     </>
   );
@@ -79,12 +80,12 @@ export function SessionMessages({ open, onOpen }: { open: string | null; onOpen:
   if (cur) return <ConvView conv={cur.key} title={cur.title} onBack={() => onOpen(null)} />;
   return (
     <div className="convlist">
-      <p className="sub wrap convhint">セッションの外のやりとり。セッションの中の会話は「ログ」に残る</p>
-      {convs.length === 0 && <p className="empty">フレンドかグループができると、ここでやりとりできます</p>}
+      <p className="sub wrap convhint">{tr("ui701")}</p>
+      {convs.length === 0 && <p className="empty">{tr("ui702")}</p>}
       {convs.map((c) => {
         const n = unreadOf(s, c.key);
         const last = s.inbox[c.key]?.at(-1);
-        const preview = last ? (last.recap ? 'セッションのまとめ' : last.voice ? '声のメッセージ' : last.plan ? `日程の相談：${last.text}` : last.invite ? 'セッションへの誘い' : last.item ? last.item.summary : last.text) : '';
+        const preview = last ? (last.recap ? tr("ui234") : last.voice ? tr("ui703") : last.plan ? tr("ui704", last.text) : last.invite ? tr("ui705") : last.item ? last.item.summary : last.text) : '';
         return (
           <button key={c.key} className={`ib convrow ${n ? 'unread' : ''}`} onClick={() => onOpen(c.key)}>
             {c.mark}

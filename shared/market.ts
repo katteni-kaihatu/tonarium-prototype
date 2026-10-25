@@ -1,14 +1,16 @@
 import type { WorldKind } from './worlds.ts';
 import type { SoundId } from './sounds.ts';
 import type { EmoteId } from './emotes.ts';
+import type { ItemKind } from './items.ts';
 
 export const MARKET_CATEGORIES = { worlds: 'ワールド', items: 'アイテム', sounds: 'サウンドボード', emotes: 'エモート' } as const;
 export type MarketCategory = keyof typeof MARKET_CATEGORIES;
-type Content = { category: 'worlds'; content: WorldKind } | { category: 'items'; content: string; text: string } | { category: 'sounds'; content: SoundId } | { category: 'emotes'; content: EmoteId };
+type Content = { category: 'worlds'; content: WorldKind } | { category: 'items'; content: string; text: string; kind?: ItemKind } | { category: 'sounds'; content: SoundId } | { category: 'emotes'; content: EmoteId };
 export type MarketProduct = Content & { id: string; name: string; creator: string; price: number; mark: string; color: string; ink: string; description: string };
 
 /** Fictional creators and locally bundled content for the marketplace UX prototype. */
 export const MARKET_PRODUCTS: MarketProduct[] = [
+  { id: 'bike', category: 'items', content: 'bike', kind: 'bike', text: 'E: 乗降 / W: アクセル / S: ブレーキ / A・D: ハンドル', name: 'バイク', creator: 'Tonarium', price: 150, mark: '単車', color: '#DBEAE7', ink: '#235E57', description: '街や庭を走れる一人乗りバイク。3D 専用。アクセルとブレーキ、ハンドルで運転し、急旋回では車体が傾いて滑ります。' },
   { id: 'star-lounge', category: 'worlds', content: 'starlounge', name: '星あかりのラウンジ', creator: 'hoshi studio', price: 800, mark: '☾', color: '#DBE1F4', ink: '#354879', description: '星の灯りに包まれる、夜の小さな集会所。青い床と光る星を眺めながら、いつもの仲間とゆっくり話そう。' },
   { id: 'talk-card', category: 'items', content: 'talk-card', text: 'おしゃべりカード\n最近、ちょっとうれしかったことは？\n次の人への質問も書いてみよう。', name: 'おしゃべりカード', creator: 'mugi', price: 150, mark: '☏', color: '#F8E5B7', ink: '#705620', description: '初めましての会話に、小さなきっかけを。質問入りの付箋を置いて、みんなで書き換えながら使えるカード。' },
   { id: 'welcome-note', category: 'items', content: 'welcome-note', text: 'ようこそ！\nここではのんびりお話ししています。\n初めての方も、気軽にどうぞ。', name: 'ようこそのメッセージ', creator: 'mugi', price: 100, mark: '✎', color: '#E2EDDA', ink: '#43663C', description: '部屋に来た人を迎える、編集できるメッセージ付箋。挨拶や今日の予定を自由に書き込めます。' },

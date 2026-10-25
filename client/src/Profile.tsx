@@ -1,3 +1,5 @@
+import { msg, systemText, t as tr, type UiMessage } from './i18n/index.ts';
+import { LanguageSelect } from './i18n/LanguageSelect.tsx';
 import { useEffect, useState } from 'react';
 import { iconUrl, pickIcon } from './icon.ts';
 import { avatarTextureUrl, uploadAvatarImage, uploadAvatarManifest } from './avatar.ts';
@@ -14,7 +16,7 @@ export function ProfileDialog({ name, onClose }: { name: string; onClose: () => 
   const n = name.trim();
   const [icon, setIcon] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState<string | UiMessage>('');
   const [bio, setBio] = useState('');
   const loadScale = useStore((s) => s.loadScale);
   const lightweight = useStore((s) => s.lightweight);
@@ -32,75 +34,74 @@ export function ProfileDialog({ name, onClose }: { name: string; onClose: () => 
   const saveBio = async () => {
     const r = await fetch(`/profile?name=${encodeURIComponent(n)}`, { method: 'POST', body: JSON.stringify({ bio }) });
     if (r.ok) send({ t: 'profileUpdated' });
-    setMessage(r.ok ? '自己紹介を保存しました' : '自己紹介を保存できませんでした');
+    setMessage(r.ok ? msg("ui42") : msg("ui43"));
   };
-  const run = async (f: () => Promise<string | null>, ok: (v: string) => void, label: string) => {
+  const run = async (f: () => Promise<string | null>, ok: (v: string) => void, label: UiMessage) => {
     const v = await f();
-    if (v) { ok(v); setMessage(`${label}を保存しました`); } else setMessage(`${label}を保存できませんでした`);
+    if (v) { ok(v); setMessage(msg("ui44", label)); } else setMessage(msg("ui45", label));
   };
 
   return (
     <div className="modalbg" onClick={onClose}>
       <div className="modal profile" onClick={(e) => e.stopPropagation()}>
-        <h2>{n} のプロフィール</h2>
-        <div className="sub">名前ごとにサーバーへ保存され、同じ名前で入ると使われます</div>
+        <h2>{tr('ui584', n)}</h2>
+        <section><LanguageSelect /></section>
+        <div className="sub">{tr("ui47")}</div>
         <section>
-          <h3>自己紹介</h3>
-          <textarea className="biofield" value={bio} maxLength={300} onChange={(e) => setBio(e.target.value)} placeholder="プロフィールに表示されます" aria-label="自己紹介" />
-          <div className="row end"><button onClick={() => void saveBio()}>自己紹介を保存</button></div>
+          <h3>{tr("ui48")}</h3>
+          <textarea className="biofield" value={bio} maxLength={300} onChange={(e) => setBio(e.target.value)} placeholder={tr("ui49")} aria-label={tr("ui48")} />
+          <div className="row end"><button onClick={() => void saveBio()}>{tr("ui50")}</button></div>
         </section>
         <section>
-          <h3>アイコン（2D）</h3>
+          <h3>{tr("ui51")}</h3>
           <div className="row">
             {icon ? <img className="av big" src={icon} alt="" /> : <div className="av big noicon">{n.slice(0, 1)}</div>}
-            <button onClick={() => void run(() => pickIcon(n), (v) => setIcon(iconUrl(n, v)), 'アイコン')}>画像を選ぶ</button>
+            <button onClick={() => void run(() => pickIcon(n), (v) => setIcon(iconUrl(n, v)), msg("ui52"))}>{tr("ui53")}</button>
           </div>
         </section>
         <section>
-          <h3>3D アバター（お絵描きアバター）</h3>
+          <h3>{tr("ui54")}</h3>
           <img className="avatartex" src={avatarTextureUrl(n, avatar)} alt="" />
-          {!avatar && <div className="sub">未設定の間は、名前から決まるサンプルが使われます</div>}
+          {!avatar && <div className="sub">{tr("ui55")}</div>}
           <div className="row wrap">
-            <button className="primary" onClick={() => void run(() => uploadAvatarImage(n), setAvatar, 'アバター画像')}>画像を選ぶ</button>
-            <button onClick={() => void run(() => uploadAvatarManifest(n), setAvatar, '調整値')}>manifest.json を選ぶ（任意）</button>
-            <a className="btnlink" href="/oekaki/template.png" download="oekaki-template.png">テンプレートをダウンロード</a>
-            <a className="btnlink" href={OEKAKI_SITE} target="_blank" rel="noreferrer">oekaki-avatar で描く ↗</a>
+            <button className="primary" onClick={() => void run(() => uploadAvatarImage(n), setAvatar, msg("ui56"))}>{tr("ui53")}</button>
+            <button onClick={() => void run(() => uploadAvatarManifest(n), setAvatar, msg("ui57"))}>{tr("ui58")}</button>
+            <a className="btnlink" href="/oekaki/template.png" download="oekaki-template.png">{tr("ui59")}</a>
+            <a className="btnlink" href={OEKAKI_SITE} target="_blank" rel="noreferrer">{tr("ui60")}</a>
           </div>
-          <div className="sub">テンプレート（2048×1024）に描いた画像を 1 枚アップロードします。oekaki-avatar で書き出した zip の texture.png と manifest.json も使えます</div>
+          <div className="sub">{tr("ui61")}</div>
         </section>
         <section>
-          <h3>2D / 3D 切り替えの読み込み時間</h3>
-          <div className="seg" role="radiogroup" aria-label="読み込み時間の倍率">
+          <h3>{tr("ui62")}</h3>
+          <div className="seg" role="radiogroup" aria-label={tr("ui63")}>
             {LOAD_SCALES.map((k) => (
               <button key={k} role="radio" aria-checked={loadScale === k} className={loadScale === k ? 'on' : 'ib'} onClick={() => setLoadScale(k)}>
-                {k === 0 ? 'なし' : `×${k}`}
+                {k === 0 ? tr("ui64") : `×${k}`}
               </button>
             ))}
           </div>
-          <div className="sub">標準（×1）で 1〜2 秒。この端末にだけ保存されます</div>
+          <div className="sub">{tr("ui65")}</div>
           <label className="checkrow">
             <input type="checkbox" checked={lightweight} onChange={(e) => setLightweight(e.target.checked)} />
-            軽量設定（3D のワールドのポイントライトを読み込まない）
-          </label>
+            {tr("ui66")}</label>
         </section>
         <section>
-          <h3>2D のマップ</h3>
-          <div className="seg" role="radiogroup" aria-label="2D のマップ">
+          <h3>{tr("ui67")}</h3>
+          <div className="seg" role="radiogroup" aria-label={tr("ui67")}>
             {(['none', '2d', '3d'] as const).map((k) => (
               <button key={k} role="radio" aria-checked={mapMode === k} className={mapMode === k ? 'on' : 'ib'} onClick={() => setMapMode(k)}>
-                {k === 'none' ? 'なし' : k === '2d' ? '2D マップ' : '3D マップ'}
+                {k === 'none' ? tr("ui64") : k === '2d' ? tr("ui68") : tr("ui69")}
               </button>
             ))}
           </div>
-          <div className="sub">2D で参加しているときの背景に出します。クリックした場所へ移動、ホイールで拡大縮小、ホイールを押しながらドラッグで動かす、スペースで元に戻す。3D マップは右ドラッグで角度を変えられます。この端末にだけ保存されます</div>
+          <div className="sub">{tr("ui70")}</div>
           <label className="checkrow">
             <input type="checkbox" checked={voiceHeat} onChange={(e) => setVoiceHeat(e.target.checked)} />
-            声の湯気（会話のあった場所の熱をマップに残す）
-          </label>
-          <div className="sub">話した場所が温かく光り、会話が終わっても数分でゆっくり冷めていきます。会話の内容は残りません</div>
+            {tr("ui71")}</label>
+          <div className="sub">{tr("ui72")}</div>
         </section>
-        {message && <div className="msgline">{message}</div>}
-        <div className="row end"><button onClick={onClose}>閉じる</button></div>
+        {message && <div className="msgline" role="status">{systemText(message)}</div>}
+        <div className="row end"><button onClick={onClose}>{tr("ui73")}</button></div>
       </div>
     </div>
   );

@@ -55,6 +55,7 @@ public sealed class HomeView : UserControl
     DateTime? _pickedDay;
     bool _monthView;
     bool _welcomeHidden;
+    bool _includeChangelogMaintenance;
     string _widget = "events";
     string _search = "";
     const string Ink = "#26262E", Muted = "#5E5C64", Paper = "#FFFDF9", Purple = "#5B47A8", Line = "#DCD5C8", Accent = "#2F5FC4", AccentBg = "#EEF3FC", Sand = "#F3EEE4";
@@ -213,13 +214,18 @@ public sealed class HomeView : UserControl
     Control ChangelogPage()
     {
         var root = Col(12);
-        foreach (var entry in ChangelogCatalog.Entries.Where(e => T(e,"title").Contains(_search,StringComparison.OrdinalIgnoreCase) || A(e,"items").Any(i => (i?.GetValue<string>() ?? "").Contains(_search,StringComparison.OrdinalIgnoreCase))))
+        var includeMaintenance = new CheckBox { Content = "開発・保守を含める", IsChecked = _includeChangelogMaintenance };
+        includeMaintenance.IsCheckedChanged += (_, _) => { _includeChangelogMaintenance = includeMaintenance.IsChecked == true; RenderPage(); };
+        root.Children.Add(includeMaintenance);
+        var entries = ChangelogCatalog.Entries.Where(e => (_includeChangelogMaintenance || T(e,"tag") != "開発・保守") &&
+            (T(e,"title").Contains(_search,StringComparison.OrdinalIgnoreCase) || A(e,"items").Any(i => (i?.GetValue<string>() ?? "").Contains(_search,StringComparison.OrdinalIgnoreCase)))).ToArray();
+        foreach (var entry in entries)
         {
             var body = Col(12,Text(T(entry,"date"),12,Muted),Row(Heading(T(entry,"title"),17),Text(T(entry,"tag"),12,Muted)));
             foreach (var item in A(entry,"items")) body.Children.Add(Text("• " + item?.GetValue<string>(),14));
             root.Children.Add(Card(body));
         }
-        if (root.Children.Count == 0) root.Children.Add(Empty("該当する変更履歴はありません"));
+        if (entries.Length == 0) root.Children.Add(Empty("該当する変更履歴はありません"));
         return root;
     }
 

@@ -1,8 +1,10 @@
+import { t as tr } from '../i18n/index.ts';
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { ITEM_INFO } from '../../../shared/items.ts';
+import { ITEM_INFO } from '../i18n/static.ts';
 import { ROOM_HALF, SPAWN } from '../../../shared/protocol.ts';
 import { NEAR_RANGE, VOICE_RANGE } from '../../../shared/places.ts';
-import { WORLDS, type WorldKind } from '../../../shared/worlds.ts';
+import { WORLDS } from '../i18n/static.ts';
+import { type WorldKind } from '../../../shared/worlds.ts';
 import { useStore, get, worldKindOf, serverNow } from '../store.ts';
 import { CAR, LOOP, STATION_PARTS, carPose, trackAt } from '../../../shared/city.ts';
 import { placesOf } from '../spatial.ts';
@@ -110,7 +112,7 @@ function Map2D({ kind }: { kind: WorldKind }) {
         return (
           <span key={u.id} className={`mperson ${u.id === selfId ? 'self' : smooth ? 'smooth' : ''} ${p.small ? 'small' : ''}`} style={toScreen(p.x, p.z)}>
             <Face id={u.id} name={u.name} size={p.small ? 22 : 30} />
-            <span className="mname">{u.id === selfId ? 'あなた' : u.name}</span>
+            <span className="mname">{u.id === selfId ? tr("ui84") : u.name}</span>
           </span>
         );
       })}

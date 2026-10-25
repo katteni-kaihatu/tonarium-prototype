@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n/index.ts';
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
@@ -86,7 +87,7 @@ function PersonPins({ els }: { els: React.RefObject<Map<string, HTMLElement>> })
     <>
       {participants.map((u) => (
         <span key={u.id} className={`mpin ${u.id === selfId ? 'self' : ''}`} ref={(el) => { if (el) els.current.set(u.id, el); else els.current.delete(u.id); }}>
-          <Face id={u.id} name={u.name} size={26} /><span className="mname">{u.id === selfId ? 'あなた' : u.name}</span>
+          <Face id={u.id} name={u.name} size={26} /><span className="mname">{u.id === selfId ? tr("ui84") : u.name}</span>
         </span>
       ))}
     </>

@@ -1,3 +1,5 @@
+import { sourceText as uiSource } from '../i18n/core.ts';
+import { localized, t as tr, systemText, msg } from '../i18n/core.ts';
 import { drawCanvasPanel, drawStrokes, PEN_COLORS, AREA, SIZE_BTNS, ERASER, SAVE, CLEAR, colorRect } from './canvasDrawing.ts';
 import { chessView, chessLegalMoves, squareIndex, type Promotion } from '../../../shared/chess.ts';
 // 3D の互換モードでも同じ描画・クリック処理を使うため、DOM ではなく Canvas に描く
@@ -39,9 +41,9 @@ const SQ = 56;
 const BX = 16;
 const BY = 108;
 const CHESS_RESET: Rect = [350, 10, 114, 34];
-export const PROMOTIONS: [Promotion, string][] = [['q', 'クイーン'], ['r', 'ルーク'], ['b', 'ビショップ'], ['n', 'ナイト']];
+export const PROMOTIONS: [Promotion, string][] = localized([['q', uiSource('ui346')], ['r', uiSource('ui347')], ['b', uiSource('ui348')], ['n', uiSource('ui349')]]);
 
-export const chessPanel: Panel = {
+export const chessPanel: Panel = localized({
   w: 480,
   h: 688,
   draw(ctx, item, ui) {
@@ -56,15 +58,15 @@ export const chessPanel: Panel = {
     ctx.font = `700 22px ${FONT}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(item.kind === 'chessAi' ? '♟ チェスAI' : '♟ チェス', 16, 28);
-    button(ctx, CHESS_RESET, ui.resetConfirm ? '本当に初期化？' : '新しい対局', '#4e5058', 15);
+    ctx.fillText(item.kind === 'chessAi' ? tr('ui350') : tr('ui351'), 16, 28);
+    button(ctx, CHESS_RESET, ui.resetConfirm ? tr('ui352') : tr('ui353'), '#4e5058', 15);
     ctx.fillStyle = view.check || view.over ? '#ffd27c' : '#f2f3f5';
     ctx.font = `700 20px ${FONT}`;
     ctx.textAlign = 'left';
-    ctx.fillText(item.kind === 'chessAi' && view.turn === 'b' && !view.over ? 'AIが考えています…' : view.status, 16, 65);
+    ctx.fillText(item.kind === 'chessAi' && view.turn === 'b' && !view.over ? tr('ui354') : systemText(view.status), 16, 65);
     ctx.font = `13px ${FONT}`;
     ctx.fillStyle = '#b5bac1';
-    ctx.fillText(item.kind === 'chessAi' ? '白：みんなで操作 / 黒：AI（自動で応手）' : '参加登録なし · 手番の色の駒を誰でも動かせます', 16, 90);
+    ctx.fillText(item.kind === 'chessAi' ? tr('ui355') : tr('ui356'), 16, 90);
     for (let i = 0; i < 64; i++) {
       const r = Math.floor(i / 8);
       const c = i % 8;
@@ -103,7 +105,7 @@ export const chessPanel: Panel = {
     ctx.font = `14px ${FONT}`;
     ctx.fillStyle = '#dce0e5';
     const promoting = active && ui.promotionTo !== undefined;
-    ctx.fillText(promoting ? '昇格する駒を選んでください' : active && ui.chessMessage ? ui.chessMessage : view.over ? '対局終了。「新しい対局」で最初から遊べます。' : '駒を選択 → 印のあるマスへ移動', 16, 578);
+    ctx.fillText(promoting ? tr('ui357') : active && ui.chessMessage ? systemText(ui.chessMessage) : view.over ? tr('ui358') : tr('ui359'), 16, 578);
     if (promoting) {
       PROMOTIONS.forEach(([, label], i) => button(ctx, [16 + i * 113, 596, 107, 32], label, '#476b8c', 14));
     } else {
@@ -112,12 +114,12 @@ export const chessPanel: Panel = {
         pairs.push(`${n / 2 + 1}. ${item.chess.moves[n]} ${item.chess.moves[n + 1] ?? ''}`);
       }
       ctx.fillStyle = '#b5bac1';
-      ctx.fillText(pairs.slice(0, 2).join('    ') || '棋譜はここに表示されます', 16, 609);
+      ctx.fillText(pairs.slice(0, 2).join('    ') || tr('ui360'), 16, 609);
       ctx.fillText(pairs.slice(2).join('    '), 16, 634);
     }
     ctx.font = `12px ${FONT}`;
     ctx.fillStyle = '#9ba1aa';
-    ctx.fillText('キャスリング・アンパッサン・昇格に対応 / 引き分けは自動判定', 16, 668);
+    ctx.fillText(tr('ui361'), 16, 668);
   },
   click(x, y, item, ui) {
     if (!isChessItem(item)) return;
@@ -131,7 +133,7 @@ export const chessPanel: Panel = {
     if (c < 0 || c > 7 || r < 0 || r > 7) return;
     chessSelect(item, ui, r * 8 + c);
   },
-};
+});
 
 export function chessReset(item: Item, ui: Ui) {
   if (!ui.resetConfirm) { setItemUi(item.id, { ...ui, resetConfirm: true }); return; }
@@ -157,12 +159,12 @@ export function chessSelect(item: Item, ui: Ui, i: number) {
     return;
   }
   if (sel === undefined) {
-    setItemUi(item.id, { ...nextUi, chessMessage: `${view.turn === 'w' ? '白' : '黒'}の駒を選んでください` });
+    setItemUi(item.id, { ...nextUi, chessMessage: msg('ui362', msg(view.turn === 'w' ? 'ui363' : 'ui364')) });
     return;
   }
   const moves = chessLegalMoves(item.chess, sel).filter(m => squareIndex(m.to) === i);
   if (!moves.length) {
-    setItemUi(item.id, { ...nextUi, sel, chessMessage: 'そこには動かせません。印のあるマスを選んでください。' });
+    setItemUi(item.id, { ...nextUi, sel, chessMessage: msg('ui365') });
     return;
   }
   if (moves.some(m => m.promotion)) {
@@ -190,7 +192,7 @@ const ARROWS: [Dir, string, Rect][] = [
   ['right', '→', [326, 500, 92, 72]],
 ];
 
-export const panel2048: Panel = {
+export const panel2048: Panel = localized({
   w: 440,
   h: 590,
   draw(ctx, item) {
@@ -204,8 +206,8 @@ export const panel2048: Panel = {
     ctx.fillText('2048', 20, 36);
     ctx.font = `600 18px ${FONT}`;
     ctx.fillStyle = '#b5bac1';
-    ctx.fillText(`スコア ${item.score}`, 110, 38);
-    button(ctx, G_RESET, 'リセット');
+    ctx.fillText(tr('ui366', item.score), 110, 38);
+    button(ctx, G_RESET, tr('ui367'));
     ctx.fillStyle = '#1e1f22';
     ctx.beginPath();
     ctx.roundRect(GX - GAP, GY - GAP, BOARD, BOARD, 8);
@@ -231,7 +233,7 @@ export const panel2048: Panel = {
       ctx.fillStyle = '#fff';
       ctx.font = `800 36px ${FONT}`;
       ctx.textAlign = 'center';
-      ctx.fillText('ゲームオーバー', GX - GAP + BOARD / 2, GY - GAP + BOARD / 2);
+      ctx.fillText(tr('ui368'), GX - GAP + BOARD / 2, GY - GAP + BOARD / 2);
     }
   },
   click(x, y, item) {
@@ -245,7 +247,7 @@ export const panel2048: Panel = {
     itemAction(item.id, { a: 'slide', dir });
     return true;
   },
-};
+});
 let active: null | { itemId: string; strokeId: string; buf: number[]; lastX: number; lastY: number; lastSend: number } = null;
 
 function flush() {
@@ -308,7 +310,7 @@ function saveCanvas(item: Item) {
   const ctx = cv.getContext('2d')!;
   ctx.scale(2, 2);
   drawStrokes(ctx, item, 0, 0);
-  postImage('🎨 キャンバスを保存しました', cv.toDataURL('image/jpeg', 0.85));
+  postImage(tr("ui369"), cv.toDataURL('image/jpeg', 0.85));
 }
 
 export const PANELS: Partial<Record<Item['kind'], Panel>> = { chess: chessPanel, chessAi: chessPanel, g2048: panel2048, canvas: canvasPanel };

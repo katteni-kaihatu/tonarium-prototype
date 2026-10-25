@@ -1,10 +1,12 @@
+import { sourceText as uiSource } from '../i18n/core.ts';
+import { localized, t as tr } from '../i18n/core.ts';
 import { CANVAS_H, CANVAS_W, type Item } from '../../../shared/items.ts';
 import type { ItemUi } from '../store.ts';
 type Rect = [number, number, number, number];
 const FONT = '"Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif';
 export const PEN_COLORS = ['#111111', '#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7'];
 export const AREA: Rect = [10, 58, CANVAS_W, CANVAS_H];
-export const SIZE_BTNS: [number, string, Rect][] = [[3, '細', [272, 12, 44, 34]], [10, '太', [320, 12, 44, 34]]];
+export const SIZE_BTNS: [number, string, Rect][] = localized([[3, uiSource('ui341'), [272, 12, 44, 34]], [10, uiSource('ui342'), [320, 12, 44, 34]]]);
 export const ERASER: Rect = [370, 12, 92, 34];
 export const SAVE: Rect = [468, 12, 70, 34];
 export const CLEAR: Rect = [544, 12, 84, 34];
@@ -44,9 +46,9 @@ export function drawCanvasPanel(ctx: CanvasRenderingContext2D, item: Item, ui: I
     }
   });
   for (const [v, label, r] of SIZE_BTNS) button(ctx, r, label, size === v ? '#5865f2' : '#4e5058');
-  button(ctx, ERASER, '🧽 消しゴム', erase ? '#5865f2' : '#4e5058', 15);
-  button(ctx, SAVE, '💾 保存', '#248046', 15);
-  button(ctx, CLEAR, '全部消す', '#da373c', 15);
+  button(ctx, ERASER, tr("ui343"), erase ? '#5865f2' : '#4e5058', 15);
+  button(ctx, SAVE, tr("ui344"), '#248046', 15);
+  button(ctx, CLEAR, tr("ui345"), '#da373c', 15);
   drawStrokes(ctx, item, AREA[0], AREA[1]);
 }
 

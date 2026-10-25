@@ -1,5 +1,6 @@
 import { scheduleChessAiReply } from './chess-ai.ts';
 import 'dotenv/config';
+import { configuredTranslationModel, createTranslationHandler, createTranslator } from './translation.ts';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,9 +20,10 @@ import { WORLDS, WORLD_COUNTDOWN_MS, isWorldKind, pushOut, type WorldKind } from
 import { ITEM_INFO, MEDIA_URL_RE, ONLY_3D, applyItemAction, createItem, isDeltaAction, isHandheld, itemSummary, type Item } from '../shared/items.ts';
 import { sanitizeParams } from '../shared/avatar.ts';
 import { VOICE_RANGE, clampAvatar, computePlaces, placeDistance } from '../shared/places.ts';
-import { clampCity } from '../shared/city.ts';
+import { CITY_HALF, clampCity } from '../shared/city.ts';
 import { callElevator, elevatorOf, resetElevator } from './city.ts';
 import { MarketLikes } from './market.ts';
+import { BIKE, clampBike, releaseBike } from '../shared/vehicle.ts';
 import { SOUNDS } from '../shared/sounds.ts';
 import { EMOTES, isEmoteId } from '../shared/emotes.ts';
 import { DICE_MAX, ROLL_MS, isDieSides, type DiceRoll } from '../shared/dice.ts';
@@ -55,6 +57,8 @@ const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
 const PEOPLE_FILE = path.join(DATA_DIR, 'people.json');
 const ITEMS_FILE = path.join(DATA_DIR, 'items.json');
 const SURVIVORS_FILE = path.join(DATA_DIR, 'survivors.json');
+const AD_SAVES_FILE = path.join(DATA_DIR, 'ad-saves.json');
+const AD_LEADERBOARD_FILE = path.join(DATA_DIR, 'ad-leaderboard.json');
 /** 2 人以上がこの時間以上いたセッションだけ、グループのチャンネルにまとめを残す */
 const RECAP_MIN_MS = Number(process.env.RECAP_MIN_MINUTES ?? 10) * 60_000;
 function readJson<T>(file: string, fallback: T): T {
@@ -78,6 +82,18 @@ const marketLikes = new MarketLikes(readJson<unknown>(MARKET_LIKES_FILE, {}));
 const saveMarketLikes = later(() => fs.writeFileSync(MARKET_LIKES_FILE, JSON.stringify(marketLikes.serialize())));
 const survivorProfiles = nullRecord(readJson<Record<string, SurvivorProfile>>(SURVIVORS_FILE, {}));
 const saveSurvivorProfiles = later(() => fs.writeFileSync(SURVIVORS_FILE, JSON.stringify(survivorProfiles)));
+/** AD のセーブとランキングは Tonarium サーバー内で完結する（Workers は使わない） */
+interface AdLeaderboardEntry { playerId: string; name: string; antimatterLog10: number; infinities: number; playTimeSec: number }
+const adSaves = nullRecord(readJson<Record<string, { save: unknown; updatedAt: string }>>(AD_SAVES_FILE, {}));
+const adLeaderboard = readJson<AdLeaderboardEntry[]>(AD_LEADERBOARD_FILE, []);
+/** AD の保存は 30 秒に 1 回程度のため、survivors のデバウンス書きとは別に tmp＋リネームで同期書きする（再起動後も残る） */
+function writeJsonAtomic(file: string, value: unknown): void {
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(value));
+  fs.renameSync(tmp, file);
+}
+const saveAdSaves = () => writeJsonAtomic(AD_SAVES_FILE, adSaves);
+const saveAdLeaderboard = () => writeJsonAtomic(AD_LEADERBOARD_FILE, adLeaderboard);
 function survivorCount(value: unknown, max: number) {
   return typeof value === 'number' && Number.isFinite(value)
     ? Math.min(max, Math.max(0, Math.floor(value)))
@@ -227,6 +243,7 @@ const thumbnails = new SessionThumbnails(
 const savedItems = nullRecord(readJson<Record<string, Item[]>>(ITEMS_FILE, {}));
 /** 持っている人や編集中の人は再起動でいなくなるので外す */
 function settle(it: Item) {
+  if (it.kind === 'bike') Object.assign(it, releaseBike(it));
   const x = it as Item & { holder?: string | null; editingBy?: string | null; live?: boolean; operator?: string | null };
   if ('holder' in x) x.holder = null;
   if ('editingBy' in x) x.editingBy = null;
@@ -456,6 +473,13 @@ function releaseCameras(sid: string, u: User, at?: AvatarState) {
     if (changed) sendItem(sid, it);
   }
 }
+function releaseBikes(sid: string, id: string) {
+  for (const it of items.get(sid)!.values()) {
+    if (it.kind !== 'bike' || it.rider !== id) continue;
+    Object.assign(it, releaseBike(it));
+    sendItem(sid, it);
+  }
+}
 /** 部屋の中だけの項目を落として、ホームにも配る形にする */
 const publicUser = ({ micOn, follow, pos, viewing, viewLive, display, ...u }: Participant): User => u;
 const presenceOf = ({ micOn, follow, pos, viewing, viewLive, display }: Participant): Presence => ({ micOn, follow, pos, viewing, viewLive, display });
@@ -568,6 +592,7 @@ function switchWorld(sid: string, world: WorldKind, clear: boolean, byName: stri
   worldOf.set(sid, world);
   resetGame(sid, gameDeps);
   const sessItems = items.get(sid)!;
+  for (const u of inSession(sid)) releaseBikes(sid, u.id);
   if (clear) {
     for (const id of [...sessItems.keys()]) { sessItems.delete(id); sendItemRemove(sid, id); }
   } else {
@@ -626,6 +651,7 @@ function leaveSession(u: Participant) {
     }
   }
   releaseCameras(sid, u, av);
+  releaseBikes(sid, u.id);
   dropFollowersOf(u);
   u.follow = null;
   u.pos = null;
@@ -961,14 +987,14 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
     }
     case 'itemRemove': {
       const it = sessItems.get(msg.id);
-      if (!it || !sessItems.delete(msg.id)) return;
+      if (!it || (it.kind === 'bike' && it.rider) || !sessItems.delete(msg.id)) return;
       sendItemRemove(sid, msg.id);
       event(sid, `${me.name} が ${ITEM_INFO[it.kind].name} をしまいました`);
       return;
     }
     case 'itemMove': {
       const it = sessItems.get(msg.id);
-      if (!it || (it.kind === 'hammer' && it.holder)) return;
+      if (!it || (it.kind === 'hammer' && it.holder) || (it.kind === 'bike' && it.rider)) return;
       const p = placeIn(sid, msg.x, msg.z, itemRadius(it) * 0.6);
       const ry = finNum(msg.ry);
       // 位置が変わっていなければ送らない
@@ -980,6 +1006,25 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
     case 'itemAction': {
       const it = sessItems.get(msg.id);
       if (!it) return;
+      if (it.kind === 'bike') {
+        if (msg.action.a === 'bikeMount') {
+          const av = avatars.get(sid)!.get(me.id);
+          if (me.mode !== '3d' || !av || Math.hypot(av.x - it.x, av.z - it.z) > 3 || Math.abs(av.y ?? 0) > 0.3
+            || [...sessItems.values()].some(h => h.kind === 'bike' && h.rider === me.id)) return;
+        }
+        if (msg.action.a === 'bikeDrive') {
+          if (it.rider !== me.id) return;
+          const state = msg.action.state;
+          if (!state || !Number.isFinite(state.x) || !Number.isFinite(state.z)) return;
+          const half = worldOf.get(sid) === 'city' ? CITY_HALF : ROOM_HALF;
+          const p = placeIn(sid, clampBike(state.x, half), clampBike(state.z, half), BIKE.radius);
+          p.x = clampBike(p.x, half); p.z = clampBike(p.z, half);
+          if (Math.hypot(p.x - state.x, p.z - state.z) > 1e-5) {
+            state.speed = 0; state.roll = 0; state.slipping = false;
+          }
+          Object.assign(state, p);
+        }
+      }
       if (msg.action.a === 'pick' && [...sessItems.values()].some((h) => isHandheld(h) && 'holder' in h && h.holder === me.id)) return;
       if (it.kind === 'camera' && (msg.action.a === 'pick' || (msg.action.a === 'camLive' && msg.action.on)) && me.mode !== '3d') return;
       if (it.kind === 'camera' && msg.action.a === 'camLive' && msg.action.on)
@@ -1022,6 +1067,7 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
         me.display = null;
         dropFollowersOf(me);
         releaseCameras(sid, me, av);
+        releaseBikes(sid, me.id);
         if (avatars.get(sid)!.delete(me.id)) roomSend(sid, { t: 'avatarRemove', sid, id: me.id });
       }
       broadcastUsers(); sendPresence(sid);
@@ -1375,15 +1421,18 @@ function onClose(ws: WebSocket, id: string | null) {
 }
 
 const MIME: Record<string, string> = {
+  '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg',
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2',
   '.webmanifest': 'application/manifest+json', '.webp': 'image/webp',
 };
 
+const handleTranslation = createTranslationHandler(createTranslator(configuredTranslationModel(process.env, DEV)));
 const server = http.createServer(async (req, res) => {
   // 絶対形式の壊れたリクエストターゲット（例: http://[::1）でも new URL が例外になるため、ここで 400 にする
   let url: URL;
   try { url = new URL(req.url ?? '/', 'http://x'); } catch { res.statusCode = 400; res.end('bad path'); return; }
+  if (url.pathname === '/api/translate') { await handleTranslation(req, res); return; }
   if (url.pathname === '/sync/offer') { await handleSyncOffer(req, res); return; }
   if (url.pathname.startsWith('/group-image/')) {
     const g = home.groups.find((x) => x.id === url.pathname.slice('/group-image/'.length));
@@ -1492,6 +1541,61 @@ const server = http.createServer(async (req, res) => {
     } catch { res.statusCode = 400; }
     res.end();
     return;
+  }
+  // AD の保存・ランキング。Tonarium にアカウント認証は無く、URL の playerId をキーとしてそのまま受け入れる。
+  // Workers 版にあった他人セーブの 403 保護はここでは成立しない（docs/3d.md 参照）。
+  const adSaveMatch = /^\/api\/save\/([^/]+)$/.exec(url.pathname);
+  if (adSaveMatch) {
+    let playerId: string;
+    try { playerId = decodeURIComponent(adSaveMatch[1]).slice(0, 128); } catch { res.statusCode = 400; res.end('bad path'); return; }
+    res.setHeader('Content-Type', 'application/json');
+    if (req.method === 'GET') {
+      const rec = playerId ? adSaves[playerId] : undefined;
+      if (!rec) { res.statusCode = 404; res.end(JSON.stringify({ error: 'not found' })); return; }
+      res.end(JSON.stringify({ save: rec.save }));
+      return;
+    }
+    if (req.method === 'POST') {
+      const body = await readBody(req, 1_000_000);
+      if (!body || !playerId) { res.statusCode = 413; res.end(); return; }
+      let parsed: { save?: unknown; updatedAt?: unknown } | null = null;
+      try { parsed = JSON.parse(body.toString('utf-8')) as { save?: unknown; updatedAt?: unknown }; } catch { res.statusCode = 400; res.end(); return; }
+      if (!parsed || typeof parsed.save !== 'object' || parsed.save === null || Array.isArray(parsed.save)) { res.statusCode = 400; res.end(); return; }
+      adSaves[playerId] = { save: parsed.save, updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : new Date().toISOString() };
+      try { saveAdSaves(); } catch { res.statusCode = 500; res.end(); return; }
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    res.statusCode = 405; res.end(); return;
+  }
+  if (url.pathname === '/api/leaderboard') {
+    res.setHeader('Content-Type', 'application/json');
+    if (req.method === 'GET') {
+      res.end(JSON.stringify({ entries: adLeaderboard }));
+      return;
+    }
+    if (req.method === 'POST') {
+      const body = await readBody(req, 20_000);
+      if (!body) { res.statusCode = 413; res.end(); return; }
+      let e: Partial<AdLeaderboardEntry> | null = null;
+      try { e = JSON.parse(body.toString('utf-8')) as Partial<AdLeaderboardEntry>; } catch { res.statusCode = 400; res.end(); return; }
+      const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, v) : null);
+      const antimatterLog10 = num(e?.antimatterLog10);
+      const infinities = num(e?.infinities);
+      const playTimeSec = num(e?.playTimeSec);
+      const playerId = typeof e?.playerId === 'string' ? e.playerId.slice(0, 128) : '';
+      const name = typeof e?.name === 'string' ? e.name.slice(0, 24) : '';
+      if (!playerId || antimatterLog10 === null || infinities === null || playTimeSec === null) { res.statusCode = 400; res.end(); return; }
+      const entry: AdLeaderboardEntry = { playerId, name, antimatterLog10, infinities, playTimeSec };
+      const at = adLeaderboard.findIndex((x) => x.playerId === playerId);
+      if (at >= 0) adLeaderboard[at] = entry; else adLeaderboard.push(entry);
+      adLeaderboard.sort((a, b) => b.antimatterLog10 - a.antimatterLog10 || b.infinities - a.infinities);
+      adLeaderboard.length = Math.min(adLeaderboard.length, 50);
+      try { saveAdLeaderboard(); } catch { res.statusCode = 500; res.end(); return; }
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    res.statusCode = 405; res.end(); return;
   }
   if (url.pathname === '/healthz') {
     res.setHeader('Content-Type', 'text/plain');

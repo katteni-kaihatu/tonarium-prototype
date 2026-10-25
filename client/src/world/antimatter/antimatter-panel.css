@@ -1,0 +1,47 @@
+.ad-lab-panel {
+  position: relative;
+  container-type: inline-size;
+  background-image: radial-gradient(ellipse at 0 0, #352563 0, transparent 55%), radial-gradient(ellipse at 100% 60%, #103943 0, transparent 65%) !important;
+  scrollbar-color: #a190f9 #181a36;
+}
+.ad-feedback-burst { position: absolute; width: 104px; height: 104px; margin: -52px 0 0 -52px; overflow: hidden; pointer-events: none; z-index: 2; contain: strict; }
+.ad-feedback-burst > i { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: currentColor; box-shadow: 0 0 5px currentColor; animation: ad-purchase-spark .65s ease-out forwards; }
+@keyframes ad-purchase-spark {
+  from { opacity: 1; transform: translate(0, 0) scale(1.2); }
+  to { opacity: 0; transform: translate(var(--ad-spark-x), var(--ad-spark-y)) scale(.3); }
+}
+/* The window body clips overflow; this panel owns the bounded scroll area. */
+.ad-lab-panel > * { flex-shrink: 0; min-width: 0; }
+.ad-lab-panel:focus-visible { outline: 2px solid #7fffe3; outline-offset: -3px; }
+.ad-lab-panel button { transition: border-color .15s, background-color .15s, box-shadow .15s; }
+.ad-lab-panel button:not(:disabled):hover { border-color: #7fffe3 !important; box-shadow: 0 0 12px #79ffe333; }
+.ad-lab-panel button:focus-visible { outline: 2px solid #fff188; outline-offset: 2px; }
+.ad-lab-panel button:disabled { opacity: .45; cursor: not-allowed !important; }
+.ad-resource-label { color: #a9fff0; font-size: 10px; font-weight: 900; letter-spacing: .12em; }
+.ad-resource-value { color: #fff; text-shadow: 0 0 20px #7fffe366; overflow-wrap: anywhere; }
+.ad-dimensions { display: flex; flex-direction: column; gap: 9px; }
+.ad-dimension-card { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px; border: 1px solid #b7a0ff38; border-radius: 14px; background: linear-gradient(110deg, #56458235, #10182d99); }
+.ad-dimension-card.is-locked { grid-template-columns: 64px minmax(0, 1fr); background: #14162b88; border-style: dashed; }
+.ad-dimension-card.is-affordable { border-color: #7fffe35c; }
+.ad-dimension-details { min-width: 0; overflow-wrap: anywhere; }
+.ad-dimension-title { font-weight: 800; }
+.ad-dimension-buy { display: flex; flex-direction: column; gap: 6px; }
+.ad-dimension-buy button:first-child { background: linear-gradient(115deg, #455cb777, #308c7c55) !important; }
+.ad-dimension-progress { height: 4px; margin-top: 8px; background: #ffffff15; border-radius: 4px; overflow: hidden; }
+.ad-dimension-progress > span { display: block; height: 100%; background: linear-gradient(90deg, #b6a2ff, #7fffe3); }
+.ad-dimension-reactor { display: block; width: 100%; color: var(--ad-tier-color); }
+.ad-reactor-halo { fill: currentColor; fill-opacity: .05; stroke: currentColor; stroke-opacity: .2; }
+.ad-reactor-orbit { transform-origin: 50px 50px; animation: ad-reactor-turn var(--ad-orbit-duration) linear infinite; }
+.ad-reactor-inner { animation-direction: reverse; animation-duration: calc(var(--ad-orbit-duration) * 1.4); }
+.ad-dimension-reactor.is-producing { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--ad-tier-color) 40%, transparent)); }
+.ad-dimension-reactor.is-locked { opacity: .4; }
+.ad-dimension-reactor.is-locked .ad-reactor-orbit { animation-play-state: paused; }
+@keyframes ad-reactor-turn { to { transform: rotate(360deg); } }
+@container (max-width: 460px) {
+  .ad-dimension-card { grid-template-columns: 60px minmax(0, 1fr); gap: 8px; padding: 10px; }
+  .ad-dimension-buy { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ad-feedback-burst { display: none; }
+  .ad-lab-panel *, .ad-lab-panel *::before, .ad-lab-panel *::after { animation: none !important; transition: none !important; }
+}

@@ -1,15 +1,19 @@
+import { t as tr, getLanguage } from '../i18n/index.ts';
 import { Component, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CanvasTexture, SRGBColorSpace } from 'three';
 import type { MarketProduct } from '../../../shared/market.ts';
-import { EMOTES, type ActiveEmote } from '../../../shared/emotes.ts';
+import { EMOTES } from '../i18n/static.ts';
+import { type ActiveEmote } from '../../../shared/emotes.ts';
 import { OekakiAvatar } from '../view3d/OekakiAvatar.tsx';
 import { useStore } from '../store.ts';
 import { Icon } from '../world/Icon.tsx';
 import { WorldMesh, WORLD_BG } from '../view3d/worlds3d.tsx';
-import { createItem, ITEM_INFO, type Item, type ItemKind } from '../../../shared/items.ts';
+import { BikeModel } from '../view3d/BikeModel.tsx';
+import { ITEM_INFO } from '../i18n/static.ts';
+import { createItem, type Item, type ItemKind } from '../../../shared/items.ts';
 import { ChessModel, HammerModel, NoteModel, PanelModel } from '../view3d/itemModels.tsx';
 import { CameraStand } from '../view3d/cameraModel.tsx';
 import { DiceStand } from '../view3d/diceModel.tsx';
@@ -20,7 +24,7 @@ import { drawCanvasPanel } from '../items/canvasDrawing.ts';
 class PreviewBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
-  render() { return this.state.failed ? <p className="market-3d-error">3D プレビューを読み込めませんでした。ページを再読み込みしてください。</p> : this.props.children; }
+  render() { return this.state.failed ? <p className="market-3d-error">{tr("ui437")}</p> : this.props.children; }
 }
 
 /** Same dimensions and stand as the in-world note, without session interactions. */
@@ -66,34 +70,34 @@ function ProductPreview({ product }: { product: MarketProduct }) {
   const item = product.category === 'items';
   const world = product.category === 'worlds';
   return <div className="market-3d-preview">
-    <div className="market-3d-stage" role="img" aria-label={`${product.name}の3Dプレビュー`}>
+    <div className="market-3d-stage" role="img" aria-label={tr("ui438", product.name)}>
       <PreviewBoundary>
-        <Canvas camera={{ position: world ? [24, 26, 24] : item ? [2.4, 2, 3.7] : [0, 1.05, -4.6], fov: world ? 45 : 35 }} dpr={[1, 1.5]} fallback={<p>このブラウザでは3D表示を利用できません。</p>}>
+        <Canvas camera={{ position: world ? [24, 26, 24] : item ? [2.4, 2, 3.7] : [0, 1.05, -4.6], fov: world ? 45 : 35 }} dpr={[1, 1.5]} fallback={<p>{tr("ui439")}</p>}>
           <color attach="background" args={[product.category === 'worlds' ? WORLD_BG[product.content] : product.color]} />
           {!world && <><ambientLight intensity={1.8} /><directionalLight position={[3, 5, 4]} intensity={2} /></>}
           <Suspense fallback={null}>
-            {product.category === 'worlds' ? <WorldMesh kind={product.content} /> : product.category === 'items' ? <NotePreview text={product.text} /> : <OekakiAvatar name={name} version={avatar} speaking={false} previewEmote={emote} />}
+            {product.category === 'worlds' ? <WorldMesh kind={product.content} /> : product.category === 'items' ? product.kind === 'bike' ? <BikeModel /> : <NotePreview text={product.text} /> : <OekakiAvatar name={name} version={avatar} speaking={false} previewEmote={emote} />}
           </Suspense>
           {!world && <mesh rotation-x={-Math.PI / 2} position-y={-.03}><circleGeometry args={[1.45, 48]} /><meshStandardMaterial color="#fffdf9" /></mesh>}
           <OrbitControls ref={controls} target={[0, world ? 0 : item ? 1.1 : .85, 0]} enablePan={false} minDistance={world ? 10 : 2.5} maxDistance={world ? 60 : 7} maxPolarAngle={world ? Math.PI / 2.6 : Math.PI / 2} />
         </Canvas>
       </PreviewBoundary>
-      <span className="market-3d-label">3D プレビュー</span>
+      <span className="market-3d-label">{tr("ui440")}</span>
     </div>
     <div className="market-preview-controls">
-      {product.category === 'emotes' && <button className="primary" disabled={!!emote} onClick={() => setEmote({ id: product.content, at: Date.now(), started: performance.now() })}><Icon name="play" />{emote ? 'プレビュー中…' : '動きを見る'}</button>}
-      <button onClick={() => controls.current?.reset()}><Icon name="eye" />視点を戻す</button>
+      {product.category === 'emotes' && <button className="primary" disabled={!!emote} onClick={() => setEmote({ id: product.content, at: Date.now(), started: performance.now() })}><Icon name="play" />{emote ? tr("ui441") : tr("ui442")}</button>}
+      <button onClick={() => controls.current?.reset()}><Icon name="eye" />{tr("ui443")}</button>
     </div>
-    <p className="sub wrap" role="status">{emote ? EMOTES[emote.id].caption : 'ドラッグで回転・スクロールで拡大。プレビューは自分だけに表示されます。'}</p>
+    <p className="sub wrap" role="status">{emote ? EMOTES[emote.id].caption : tr("ui444")}</p>
   </div>;
 }
 
 function InitialNote({ item }: { item: Item & { kind: 'note' } }) {
   const { canvas, tex } = useMemo(() => makeCanvasTexture(512, 384), []);
   useEffect(() => {
-    drawText(canvas, [{ text: '（空の付箋）', color: '#78716c', size: 64 }], { bg: item.color });
+    drawText(canvas, [{ text: tr("ui445"), color: '#78716c', size: 64 }], { bg: item.color });
     tex.needsUpdate = true;
-  }, [canvas, tex, item.color]);
+  }, [canvas, tex, item.color, getLanguage()]);
   useEffect(() => () => tex.dispose(), [tex]);
   return <NoteModel color={item.color} texture={tex} />;
 }
@@ -105,20 +109,21 @@ function InitialCanvas({ item }: { item: Item & { kind: 'canvas' } }) {
     ctx.setTransform(2, 0, 0, 2, 0, 0);
     drawCanvasPanel(ctx, item, {});
     tex.needsUpdate = true;
-  }, [canvas, tex, item]);
+  }, [canvas, tex, item, getLanguage()]);
   useEffect(() => () => tex.dispose(), [tex]);
   return <PanelModel item={item} width={1.8 * 640 / 520} texture={tex} />;
 }
 
 function InitialModel({ item }: { item: Item }) {
   switch (item.kind) {
+    case 'bike': return <BikeModel />;
     case 'note': return <InitialNote item={item} />;
     case 'hammer': return <HammerModel position={[0, 0.12, 0.3]} rotation-x={-Math.PI / 2} />;
     case 'chess':
     case 'chessAi': return <ChessModel item={item} />;
     case 'canvas': return <InitialCanvas item={item} />;
     case 'camera': return <CameraStand />;
-    case 'dice': return <><DiceStand /><Label text="サイコロ" position={[0, 1.25, 0]} height={0.1} /></>;
+    case 'dice': return <><DiceStand /><Label text={tr("ui446")} position={[0, 1.25, 0]} height={0.1} /></>;
     default: return null;
   }
 }
@@ -135,9 +140,9 @@ function StandardPreview({ kind }: { kind: ItemKind }) {
   const position: [number, number, number] = kind === 'hammer' ? [1.1, 1.1, 1.7] : [2.4, targetY + 1.6, kind === 'camera' ? -3.7 : 3.7];
   if (!item || !ITEM_INFO[kind].in3d) return <img className="item-illustration" src={ITEM_INFO[kind].illustration} alt={ITEM_INFO[kind].name} />;
   return <div className="market-3d-preview">
-    <div className="market-3d-stage" role="img" aria-label={`${ITEM_INFO[kind].name}の3Dプレビュー`}>
+    <div className="market-3d-stage" role="img" aria-label={tr("ui438", ITEM_INFO[kind].name)}>
       <PreviewBoundary>
-        <Canvas camera={{ position, fov: 35 }} dpr={[1, 1.5]} fallback={<p>このブラウザでは3D表示を利用できません。</p>}>
+        <Canvas camera={{ position, fov: 35 }} dpr={[1, 1.5]} fallback={<p>{tr("ui439")}</p>}>
           <color attach="background" args={[ITEM_INFO[kind].tint]} />
           <ambientLight intensity={1.8} /><directionalLight position={[3, 5, 4]} intensity={2} />
           <InitialModel item={item} />
@@ -145,10 +150,10 @@ function StandardPreview({ kind }: { kind: ItemKind }) {
           <OrbitControls ref={rememberView} target={[0, targetY, 0]} enablePan={false} minDistance={0.8} maxDistance={7} maxPolarAngle={Math.PI / 2} />
         </Canvas>
       </PreviewBoundary>
-      <span className="market-3d-label">3D プレビュー</span>
+      <span className="market-3d-label">{tr("ui440")}</span>
     </div>
-    <div className="market-preview-controls"><button onClick={() => controls.current?.reset()}><Icon name="eye" />視点を戻す</button></div>
-    <p className="sub wrap">ドラッグで回転・スクロールで拡大。新しく置いたときの姿です。</p>
+    <div className="market-preview-controls"><button onClick={() => controls.current?.reset()}><Icon name="eye" />{tr("ui443")}</button></div>
+    <p className="sub wrap">{tr("ui447")}</p>
   </div>;
 }
 
