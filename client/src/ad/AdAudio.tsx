@@ -6,7 +6,7 @@ import { getAntimatterPerSecond } from './engine.mjs';
 import { subscribeAdFeedback } from './feedback.ts';
 import { AdSoundPlayer } from './audio.ts';
 
-/** Audio follows the open item or the physical lab, without adding a screen HUD. */
+// 音は研究所ワールドに集約し、ポータルのパネルは音源にしない。
 export function AdAudio() {
   useEffect(() => {
     const player = new AdSoundPlayer();
@@ -14,7 +14,7 @@ export function AdAudio() {
 
     function sceneActive() {
       const s = get();
-      return s.joined && !!s.session && !s.hubOpen && !s.switching && !s.worldLoading && !document.hidden;
+      return worldKindOf(s) === 'antimatter' && s.joined && !!s.session && !s.hubOpen && !s.switching && !s.worldLoading && !document.hidden;
     }
 
     function panelVisible() {
@@ -22,8 +22,7 @@ export function AdAudio() {
       if (s.phoneTab !== 'screen' && phoneWidth.matches) return false;
       const windows = s.maxWin ? s.windows.filter((w) => w.key === s.maxWin)
         : s.winMode === 'simple' ? s.windows.slice(-1) : s.windows;
-      return windows.some(({ key }) => key === 'antimatter' || key === 'antimatter-space'
-        || (key.startsWith('item:') && s.items[key.slice(5)]?.kind === 'antimatter'));
+      return windows.some(({ key }) => key === 'antimatter' || key === 'antimatter-space');
     }
 
     function contextGain() {
@@ -49,7 +48,10 @@ export function AdAudio() {
     }
 
     const unsubscribeFeedback = subscribeAdFeedback((event) => {
-      if (sceneActive()) player.play(event);
+      const s = get();
+      const key = s.maxWin || s.windows.at(-1)?.key;
+      const portalFocused = key?.startsWith('item:') && s.items[key.slice(5)]?.kind === 'antimatter';
+      if (sceneActive() && !portalFocused) player.play(event);
     });
     const unsubscribeStore = useStore.subscribe(sync);
     window.addEventListener('pointerdown', player.unlock, true);
