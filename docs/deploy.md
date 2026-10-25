@@ -30,6 +30,7 @@ cloudflared 以外（ngrok など）を使う場合は、`.env` の `ALLOWED_HOS
    - `LIVEKIT_DOMAIN`: LiveKit 用のサブドメイン（`livekit.example.com`。`https://` は付けない）
    - `LIVEKIT_API_KEY`: 好きな文字列（例: `tonarium`）
    - `LIVEKIT_API_SECRET`: 32 文字以上のランダムな文字列（例: `openssl rand -base64 32` の結果）
+   - `LIVEKIT_RTC_TCP_PORT` / `LIVEKIT_RTC_UDP_PORT` / `LIVEKIT_TURN_UDP_PORT`: 任意。LiveKit がホストに公開し、クライアントへ案内するポート（既定は 7881 / 7882 / 3478）。同じサーバーに 2 つ以上のインスタンスを立てるときだけ、インスタンスごとに別の値（例: 17881 / 17882 / 13478）にして、手順 1 のファイアウォールもその番号を開ける。ドメイン（手順 5）もインスタンスごとに分けること
    - `KOKOSYNC_URL`: データ同期先（既定は `https://45.77.130.146`）
    - `KOKOSYNC_USERNAME` / `KOKOSYNC_PASSWORD`: 同梱のプロトタイプ用認証情報を上書きする場合に設定する。両方とも空なら既定の接続先に限り同梱の値を使う
 5. ドメインを設定する
@@ -44,7 +45,7 @@ cloudflared 以外（ngrok など）を使う場合は、`.env` の `ALLOWED_HOS
 メモ:
 - HTTP・ホーム用 WebSocket（`/ws`）・同期シグナリング（`/sync/offer`）・同期用 WebSocket（`/sync/ws`）・LiveKit トークン（`/token`）は同じポート。HTTPS は Coolify（Traefik）が付ける。`/sync/ws` も WebSocket Upgrade を許可する
 - アイコン・3D アバター・自己紹介・フレンド・通報は `tonarium-data` ボリューム（`/app/data`）に保存されるので再デプロイしても残る。作ったセッション・グループ・イベント、アイテム、DM とチャンネルのメッセージ、ステータスも同じボリュームに残る。セッション内のチャットはメモリ内だけなので、再デプロイ・再起動で消える。インスタンスは 1 つで動かすこと（複数にすると部屋が分かれる）
-- LiveKit の設定は `docker-compose.yml` の `LIVEKIT_CONFIG` にある。サーバーの外向きの IP は自動で調べる（`use_external_ip`）。社内ネットワークなど UDP が通らない人向けには TURN（UDP 3478）も動く
+- LiveKit の設定は `docker-compose.yml` の `LIVEKIT_CONFIG` にある。サーバーの外向きの IP は自動で調べる（`use_external_ip`）。社内ネットワークなど UDP が通らない人向けには TURN（既定 UDP 3478、`LIVEKIT_TURN_UDP_PORT` で変更可）も動く
 - Tonarium サーバーは `KOKOSYNC_URL` の HTTPS/WSS に外向き接続する。ブラウザの WebRTC は kokosync サーバーの公開 UDP ポートにも届く必要がある。UDP が通らなければ同一オリジンの WebSocket 経由に切り替わる
 - LiveKit Cloud に戻すときは、`livekit` サービスを消して `tonarium` の `LIVEKIT_URL` を Cloud の URL にする。データ同期には影響しない
 - セッション構成を本番だけ変えたいときは、`docker-compose.yml` のコメントにある `SESSIONS_FILE` とボリュームを使う

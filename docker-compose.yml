@@ -38,21 +38,23 @@ services:
         LIVEKIT_CONFIG=
         port: 7880
         rtc:
-          tcp_port: 7881
-          udp_port: 7882
+          tcp_port: ${LIVEKIT_RTC_TCP_PORT:-7881}
+          udp_port: ${LIVEKIT_RTC_UDP_PORT:-7882}
           use_external_ip: true
         turn:
           enabled: true
           domain: ${LIVEKIT_DOMAIN}
-          udp_port: 3478
+          udp_port: ${LIVEKIT_TURN_UDP_PORT:-3478}
         logging:
           level: info
     expose:
       - "7880"
+    # 公開ポートは LIVEKIT_CONFIG 側の案内ポートと必ず一致させること（クライアントは設定側の番号へ接続する）。
+    # 同じサーバーに複数インスタンスを立てるときは環境変数でインスタンスごとにずらす
     ports:
-      - "7881:7881/tcp"
-      - "7882:7882/udp"
-      - "3478:3478/udp"
+      - "${LIVEKIT_RTC_TCP_PORT:-7881}:${LIVEKIT_RTC_TCP_PORT:-7881}/tcp"
+      - "${LIVEKIT_RTC_UDP_PORT:-7882}:${LIVEKIT_RTC_UDP_PORT:-7882}/udp"
+      - "${LIVEKIT_TURN_UDP_PORT:-3478}:${LIVEKIT_TURN_UDP_PORT:-3478}/udp"
 
 volumes:
   tonarium-data:
