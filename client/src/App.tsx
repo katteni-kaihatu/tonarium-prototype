@@ -12,6 +12,7 @@ import { WorldScreen } from './world/WorldScreen.tsx';
 import { PeekMascot, type MascotHandle } from './world/Mascot.tsx';
 import { FEEDBACK_URL } from './feedback.ts';
 import { CompatOverlay, MaintenanceOverlay, UpdateBanner } from './world/ServerNotices.tsx';
+import { XRControls } from './xr/XRControls.tsx';
 
 function loadId() {
   try {
@@ -126,6 +127,7 @@ export function App() {
       <HammerCursor />
       <UpdateBanner />
       <MaintenanceOverlay />
+      <XRControls />
     </>
   );
 }

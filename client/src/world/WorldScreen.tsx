@@ -3,6 +3,7 @@ import { t as tr, systemText } from '../i18n/index.ts';
 import { contentAvailable, productFor } from '../../../shared/market.ts';
 import { MOVEMENT_MODES } from '../view3d/movement.ts';
 import { KeyHelp } from '../view3d/KeyHelp.tsx';
+import { XRLaunch, XRSettings } from '../xr/XRControls.tsx';
 import { useOwnedContent } from '../market/store.ts';
 import { OriginBadge } from '../market/OriginBadge.tsx';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
@@ -42,6 +43,7 @@ import { SurvivorPanel } from './SurvivorPanel.tsx';
 import { EmoteDockButton } from './Emotes.tsx';
 import { unlockEmoteAudio } from './sounds.ts';
 import { AdAudio } from '../ad/AdAudio.tsx';
+import { NewArrivals, PopupPauseSettings } from './NewArrivals.tsx';
 
 /** 名前はだれでも変えられ、全員に反映されてログに出る */
 function SessionRename({ current, onDone }: { current: string; onDone: () => void }) {
@@ -69,6 +71,8 @@ function WorldBadge() {
   const kind = useStore((s) => worldKindOf(s));
   const mode = useStore((s) => s.mode);
   const movementMode = useStore((s) => s.movementMode);
+  const doubleJump = useStore((s) => s.doubleJump);
+  const lean = useStore((s) => s.lean);
   const survivorWindowOpen = useStore((s) => s.windows.some((w) => w.key === 'survivors'));
   const antimatterWindowOpen = useStore((s) => s.windows.some((w) => w.key === 'antimatter'));
   const pending = useStore((s) => !!s.worldPending && s.worldPending.sid === s.session);
@@ -84,12 +88,16 @@ function WorldBadge() {
       {!wsConnected && <span className="reconn">{tr("ui854")}</span>}
       {kind === 'antimatter' && mode === '2d' && <button className="chipbtn" onClick={() => openWindow('antimatter')}>{antimatterWindowOpen ? tr('mergeAdLab') : tr('mergeOpenAd')}</button>}
       <span className="vline" />
+      <XRLaunch />
       <button
         className="ib" aria-label={tr("ui855")} title={tr("ui855")} data-popanchor
         onClick={(e) => setMenu(menu ? null : e.currentTarget.getBoundingClientRect())}
       ><Icon name="settings" size={18} /></button>
       {menu && (
         <Popover anchor={menu} side="down" onClose={() => setMenu(null)} className="settings">
+          <PopupPauseSettings />
+          <XRSettings />
+          <span className="menusep" />
           <span className="menutitle">{tr("ui856")}</span>
           <SessionRename current={world?.name ?? ''} onDone={() => setMenu(null)} />
           <span className="menusep" />
@@ -108,6 +116,14 @@ function WorldBadge() {
               ))}
             </div>
             <span className="sub wrap">{tr('mergeFlightHint')}</span>
+            <label className="switchrow">
+              <span>{tr('doubleJumpSetting')}</span>
+              <input type="checkbox" role="switch" checked={doubleJump} onChange={(e) => { set({ doubleJump: e.target.checked }); save('tonarium.doubleJump', e.target.checked); }} />
+            </label>
+            <label className="switchrow">
+              <span>{tr('leanSetting')}</span>
+              <input type="checkbox" role="switch" checked={lean} onChange={(e) => { set({ lean: e.target.checked }); save('tonarium.lean', e.target.checked); }} />
+            </label>
             <span className="menusep" />
           </>}
           <span className="menutitle">{tr('ui859')}</span>
@@ -509,6 +525,7 @@ export function WorldScreen() {
   }, []);
   useOpenRequestedLive();
   const phone = usePhone();
+  useEffect(() => { set({ phoneLayout: phone }); }, [phone]);
   const phoneTab = useStore((s) => s.phoneTab);
   // スマホでは左右のパネルはたたまず、ウィンドウはカンタン表示だけ（保存はしない）
   useEffect(() => {
@@ -569,6 +586,7 @@ export function WorldScreen() {
       <MediaSync />
       <AdAudio />
       <Toast />
+      <NewArrivals />
       {dragging && <DropHint />}
       <SwitchLoading />
       <WorldLoading />

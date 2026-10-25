@@ -64,6 +64,8 @@ test('missing or tampered peer copy recovers only from the authenticated server'
 });
 
 test('proposals limit P2P scope and hide secret dice results', () => {
+  assert.equal(proposeEvent({ t: 'itemAction', id: 'telephone', action: { a: 'telephoneSubmit', round: 1, step: 0,
+    answer: { kind: 'text', text: 'private answer' } } }, context), null);
   assert.equal(proposeEvent({ t: 'chat', scope: 'near', text: 'private' }, context), null);
   assert.equal(proposeEvent({ t: 'itemMove', id: 'x', x: 0, z: 0, ry: 0 }, context), null);
   const proposal = proposeEvent({ t: 'itemAction', id: 'dice', action: { a: 'diceRoll', sides: 6, count: 3, secret: true } },

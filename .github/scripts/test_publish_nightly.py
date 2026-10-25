@@ -18,8 +18,6 @@ SHA = 'a' * 40
 ENV = {'GITHUB_SHA': SHA, 'GH_REPO': 'example/tonarium', 'GITHUB_REF': 'refs/heads/main',
        'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '2'}
 NAMES = {
-    ('native', 'linux-x64'): ['Tonarium-nightly-linux-x64.tar.gz'],
-    ('native', 'win-x64'): ['Tonarium-nightly-win-x64.zip'],
     ('electron', 'linux-x64'): ['Tonarium-Electron-0.0.9-nightly.12.1-linux-x64.tar.gz',
                                 'Tonarium-Electron-0.0.9-nightly.12.1-linux-x86_64.AppImage'],
     ('electron', 'win-x64'): ['Tonarium-Electron-0.0.9-nightly.12.1-win-x64.zip', 'Tonarium-Electron-0.0.9-nightly.12.1-win-x64-setup.exe', 'Tonarium-Electron-0.0.9-nightly.12.1-win-x64-setup.exe.blockmap'],
@@ -85,7 +83,7 @@ class PublishTests(unittest.TestCase):
         self.environment.start()
         self.addCleanup(self.environment.stop)
 
-    def files(self, component='native', runtime='linux-x64'):
+    def files(self, component='electron', runtime='linux-x64'):
         hashes = {}
         for name in NAMES[component, runtime]:
             content = ('test archive ' + name).encode()
@@ -107,18 +105,18 @@ class PublishTests(unittest.TestCase):
             hashes[channel] = digest
         return hashes
 
-    def publish(self, fake, component='native', runtime='linux-x64'):
+    def publish(self, fake, component='electron', runtime='linux-x64'):
         with patch.object(publisher, 'gh', fake):
             publisher.publish(component, runtime, self.directory)
 
-    def test_existing_release_and_metadata_for_all_four_variants(self):
+    def test_existing_release_and_metadata_for_both_platforms(self):
         uploaded_names = set()
         for component, runtime in NAMES:
             with self.subTest(component=component, runtime=runtime):
                 hashes = self.files(component, runtime)
                 fake = FakeGitHub()
                 self.publish(fake, component, runtime)
-                self.assertEqual(len(fake.uploads()), 4 if component == 'electron' else 2)
+                self.assertEqual(len(fake.uploads()), 4)
                 self.assertFalse(any(args[:2] == ('release', 'create') for args in fake.calls))
                 name, record = fake.records[0]
                 if component == 'electron':
@@ -142,7 +140,7 @@ class PublishTests(unittest.TestCase):
         fake = FakeGitHub(exists=False)
         self.publish(fake)
         self.assertEqual(len(fake.records), 1)
-        self.assertEqual(sum(args[:2] == ('release', 'create') for args in fake.calls), 1)
+        self.assertEqual(sum(args[:2] == ('release', 'create') for args in fake.calls), 2)
 
     def test_electron_feed_uploaded_only_after_installers(self):
         self.files('electron', 'win-x64')
@@ -220,12 +218,6 @@ class PublishTests(unittest.TestCase):
             self.publish(fake)
         self.assertFalse(fake.uploads())
 
-    def test_native_never_touches_compatibility_release(self):
-        self.files()
-        fake = FakeGitHub()
-        self.publish(fake)
-        self.assertTrue(all(call[2] != 'nightly' for call in fake.calls if call[0] == 'release'))
-
     def test_compatibility_feed_has_absolute_urls_and_exact_checksums(self):
         import yaml
         for runtime in ['linux-x64', 'win-x64']:
@@ -274,8 +266,8 @@ class PublishTests(unittest.TestCase):
 
 
 class WorkflowTests(unittest.TestCase):
-    def test_electron_uses_native_runners_for_installers(self):
-        workflow = self.workflow('native-nightly.yml')
+    def test_electron_uses_platform_runners_for_installers(self):
+        workflow = self.workflow('electron-nightly.yml')
         electron = workflow['jobs']['electron']
         self.assertEqual(electron['runs-on'], '${{ matrix.os }}')
         runners = {entry['runtime']: entry['os'] for entry in electron['strategy']['matrix']['include']}
@@ -289,69 +281,18 @@ class WorkflowTests(unittest.TestCase):
             self.skipTest('Workflow checks require PyYAML')
         return yaml.load((ROOT / '.github/workflows' / name).read_text(), Loader=yaml.BaseLoader)
 
-    def test_native_checks_only_match_native_inputs(self):
-        from fnmatch import fnmatchcase
-        workflow = self.workflow('native-checks.yml')
-        for event in ['push', 'pull_request']:
-            paths = workflow['on'][event]['paths']
-            for filename in ['native/Tonarium.Desktop/App.cs', 'packaging/linux/PKGBUILD',
-                             'client/public/brand/favicon.png', 'client/public/oekaki/sample.png']:
-                self.assertTrue(any(fnmatchcase(filename, pattern) for pattern in paths), filename)
-            for filename in ['electron/main.cjs', 'client/src/App.tsx', 'docs/electron.md',
-                             '.github/scripts/publish-nightly.py']:
-                self.assertFalse(any(fnmatchcase(filename, pattern) for pattern in paths), filename)
-        self.assertNotIn('nightly-config', workflow['jobs'])
-        self.assertIn('nightly-config', self.workflow('nightly-checks.yml')['jobs'])
-
-    def test_gameci_outputs_can_be_packaged_for_both_platforms(self):
-        workflow = self.workflow('native-nightly.yml')
-        steps = workflow['jobs']['native']['steps']
-        prepare_index = next(i for i, step in enumerate(steps)
-                             if step.get('name') == 'Prepare Unity output for packaging')
-        self.assertIn('unity-builder@', steps[prepare_index - 1]['uses'])
-        self.assertEqual(steps[prepare_index + 1]['name'], 'Publish .NET client')
-        script = steps[prepare_index]['run']
-        self.assertIn('sudo chown -R "$(id -u):$(id -g)" native/build', script)
-        # Exercise the actual shell and packager with minimal GameCI-shaped fixtures.
-        # Ownership itself needs the root-run GameCI container; stub only sudo here.
-        for runtime, target, player, library in [
-            ('linux-x64', 'StandaloneLinux64', 'Tonarium3D', 'UnityPlayer.so'),
-            ('win-x64', 'StandaloneWindows64', 'Tonarium3D.exe', 'UnityPlayer.dll'),
-        ]:
-            with self.subTest(runtime=runtime), tempfile.TemporaryDirectory() as temp:
-                root = Path(temp)
-                unity = root / 'native/build/nightly-unity' / target
-                published = root / 'native/build/nightly' / runtime
-                unity.mkdir(parents=True)
-                published.mkdir(parents=True)
-                for name in [player, library, 'Tonarium3D_Data/globalgamemanagers']:
-                    path = unity / name
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text('fixture')
-                (unity / player).chmod(0o755)
-                for name in ['Tonarium.dll', 'Tonarium' if runtime == 'linux-x64' else 'Tonarium.exe']:
-                    (published / name).write_text('fixture')
-                subprocess.run(['bash', '-eu', '-c', 'sudo() { :; };\n' + script], cwd=root,
-                               env={**os.environ, 'RUNTIME': runtime, 'UNITY_TARGET': target}, check=True)
-                result = subprocess.run(['python3', str(ROOT / 'native/package-nightly.py'), runtime,
-                                         str(published), str(unity), str(root / 'artifacts')],
-                                        check=True, capture_output=True, text=True)
-                archive = Path(result.stdout.strip())
-                self.assertTrue(archive.is_file())
-                self.assertTrue(archive.with_name(archive.name + '.sha256').is_file())
-
-    def test_all_four_builds_are_independent_with_distinct_writer_locks(self):
+    def test_both_builds_are_independent_with_distinct_writer_locks(self):
         try:
             import yaml
         except ImportError:
             self.skipTest('Optional local workflow structure check requires PyYAML')
-        workflow = yaml.load((ROOT / '.github/workflows/native-nightly.yml').read_text(), Loader=yaml.BaseLoader)
+        workflow = yaml.load((ROOT / '.github/workflows/electron-nightly.yml').read_text(), Loader=yaml.BaseLoader)
         self.assertNotIn('concurrency', workflow)
         jobs = workflow['jobs']
-        self.assertTrue({'native', 'electron'} <= set(jobs))
+        self.assertEqual(set(jobs), {'electron'})
         combinations, locks, artifacts = set(), set(), set()
         for component, job in jobs.items():
-            if component not in {'native', 'electron'}:
+            if component not in {'electron'}:
                 continue
             self.assertNotIn('needs', job)
             self.assertEqual(job['strategy']['fail-fast'], 'false')
@@ -365,8 +306,8 @@ class WorkflowTests(unittest.TestCase):
                 locks.add(job['concurrency']['group'].replace('${{ matrix.runtime }}', runtime))
                 artifacts.add(artifact.replace('${{ matrix.runtime }}', runtime))
         self.assertEqual(combinations, set(NAMES))
-        self.assertEqual(len(locks), 4)
-        self.assertEqual(len(artifacts), 4)
+        self.assertEqual(len(locks), 2)
+        self.assertEqual(len(artifacts), 2)
 
 
 if __name__ == '__main__':

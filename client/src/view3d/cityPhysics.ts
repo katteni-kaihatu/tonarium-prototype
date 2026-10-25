@@ -28,12 +28,21 @@ export function cityGround(x: number, z: number, y: number, now: number, e: Elev
   return { y: best, car: null };
 }
 
-/** 時刻で変わる当たり判定：電車が止まっていない駅の線路側の柵と、かごが来ていない階のドア */
+/**
+ * 時刻で変わる当たり判定：電車が止まっていない駅の線路側の柵と、かごが来ていない階のドア。
+ * 結果は「開いている駅」と「閉まっている階の集合」だけで決まるので、その組が同じ間は
+ * 前回の配列をそのまま返す（毎フレーム呼ばれるため再構築を避ける。呼び出し側は読み取り専用）。
+ */
+let citySolidsCache: { open: number | null; closedDoors: number; out: Solid[] } | null = null;
 export function citySolids(now: number, e: ElevatorState): Solid[] {
   const open = trainState(now).station;
+  let closedDoors = 0;
+  for (let f = 0; f < MANSION_STOPS; f++) if (!elevatorDoorOpen(e, f, now)) closedDoors |= 1 << f;
+  if (citySolidsCache && citySolidsCache.open === open && citySolidsCache.closedDoors === closedDoors) return citySolidsCache.out;
   const out = [...CITY_SOLIDS];
   STATION_PARTS.forEach((p, i) => { if (i !== open) out.push(...p.gates); });
-  for (let f = 0; f < MANSION_STOPS; f++) if (!elevatorDoorOpen(e, f, now)) out.push(SHAFT_DOOR(f));
+  for (let f = 0; f < MANSION_STOPS; f++) if (closedDoors & (1 << f)) out.push(SHAFT_DOOR(f));
+  citySolidsCache = { open, closedDoors, out };
   return out;
 }
 

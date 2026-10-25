@@ -12,6 +12,7 @@ import { SurvivorObjects } from './survivors3d.tsx';
 import { GardenWorld } from './garden3d.tsx';
 import { AntimatterWorld } from './antimatterWorld.tsx';
 import { AntimatterSky } from './AntimatterSky.tsx';
+import { MirrorPanel } from './mirror3d.tsx';
 
 const H = ROOM_HALF;
 const WALL_H = 4;
@@ -241,6 +242,9 @@ function Cafe() {
       <hemisphereLight args={['#fff2dc', '#5a3826', 0.6]} />
       <directionalLight position={[4, 10, 6]} intensity={0.7} color="#ffe0b8" />
       <Shell pal={pal} floor={planks} />
+      <group position={[CAFE.mirror.x, CAFE.mirror.y, CAFE.mirror.z]}>
+        <MirrorPanel width={CAFE.mirror.w} height={CAFE.mirror.h} />
+      </group>
       {/* 腰壁 */}
       <Box p={[0, 0.55, -H + 0.13]} s={[2 * H, 1.1, 0.06]} color="#7a5038" />
       <Box p={[H - 0.13, 0.55, 0]} s={[0.06, 1.1, 2 * H]} color="#7a5038" />

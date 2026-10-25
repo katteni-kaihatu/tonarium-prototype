@@ -26,6 +26,7 @@ const chairsAround = (x: number, z: number, n: number, dist: number, start = 0):
 
 /** カフェの家具の配置。見た目（View3D）と当たり判定で共用する */
 export const CAFE = {
+  mirror: { x: 0, y: 1.8, z: -9.78, w: 7, h: 2.6 },
   counter: { x: -8.3, z: -1, w: 1.1, d: 8 },
   shelf: { x: -9.6, z: -1, w: 0.5, d: 8 },
   stools: [-4.2, -2.6, -1, 0.6, 2.2].map((z) => ({ x: -7.25, z, r: 0.22 })),

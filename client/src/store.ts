@@ -1,3 +1,4 @@
+import { initialArrivalState, type Arrival, type ArrivalKind } from './newArrival.ts';
 import { t } from './i18n/core.ts';
 import { create } from 'zustand';
 import type { UiMessage } from './i18n/index.ts';
@@ -145,6 +146,11 @@ interface State extends AdSlice {
   elevators: Record<string, ElevatorState>;
   /** 注目を集めているアイテム ID → 光らせる期限（performance.now） */
   attention: Record<string, number>;
+  popupPausedUntil: number;
+  arrivals: Partial<Record<ArrivalKind, Arrival>>;
+  phoneLayout: boolean;
+  rightView: 'log' | 'msg';
+  rightConversation: string | null;
   toast: { text: string | UiMessage; at: number } | null;
   /** 開く前に確認している外部 URL */
   openUrl: string | null;
@@ -163,6 +169,8 @@ interface State extends AdSlice {
   swings: Record<string, number>;
   hitFx: { key: number; from: string; to: string }[];
   movementMode: MovementMode;
+  doubleJump: boolean;
+  lean: boolean;
   locked: boolean;
   aimHint: string | null;
 
@@ -261,6 +269,10 @@ export const useStore = create<State>((set, get) => ({
   survivorProfile: newSurvivorProfile(),
   elevators: {},
   attention: {},
+  ...initialArrivalState(),
+  phoneLayout: false,
+  rightView: 'log',
+  rightConversation: null,
   toast: null,
   liveRequested: null,
   switching: null,
@@ -289,6 +301,8 @@ export const useStore = create<State>((set, get) => ({
   swings: {},
   hitFx: [],
   movementMode: 'walk',
+  doubleJump: load('tonarium.doubleJump', false),
+  lean: load('tonarium.lean', true),
   locked: false,
   aimHint: null,
   selfAvatar: spawnPoint(),

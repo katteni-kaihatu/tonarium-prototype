@@ -179,8 +179,10 @@ export function NoticeLog() {
   const selfId = useStore((s) => s.selfId);
   const chat = useVisibleChat();
   const [tab, setTab] = useState<'all' | 'chat'>('all');
-  const [view, setView] = useState<'log' | 'msg'>('log');
-  const [conv, setConv] = useState<string | null>(null);
+  const view = useStore((s) => s.rightView);
+  const setView = (rightView: 'log' | 'msg') => set({ rightView });
+  const conv = useStore((s) => s.rightConversation);
+  const setConv = (rightConversation: string | null) => set({ rightConversation });
   const msgUnread = useMessageUnread();
   const openMessage = (c: string) => { setConv(c); setView('msg'); };
   const listRef = useRef<HTMLDivElement>(null);

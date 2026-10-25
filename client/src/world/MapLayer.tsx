@@ -1,5 +1,5 @@
 import { t as tr } from '../i18n/index.ts';
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ITEM_INFO } from '../i18n/static.ts';
 import { ROOM_HALF, SPAWN } from '../../../shared/protocol.ts';
 import { NEAR_RANGE, VOICE_RANGE } from '../../../shared/places.ts';
@@ -18,6 +18,47 @@ const Map3D = lazy(() => import('./Map3D.tsx').then((m) => ({ default: m.Map3D }
 
 interface View2D { k: number; tx: number; ty: number }
 
+/**
+ * 床・スポーン・地物の静的な層。アバター受信では描き直さないよう、ビュー変換と
+ * ワールド種別だけを数値で受け取る memo 部品にする（変換が変われば当然描き直す）。
+ */
+export const MapBackdrop = memo(function MapBackdrop({ kind, tx, ty, k }: { kind: WorldKind; tx: number; ty: number; k: number }) {
+  const b = boundsOf(kind);
+  return (
+    <g transform={`translate(${tx} ${ty}) scale(${k})`}>
+      <rect className="mfloor" x={b.minX} y={b.minZ} width={b.maxX - b.minX} height={b.maxZ - b.minZ} rx={0.4} />
+      {WORLDS[kind].extent && <rect className="mfloor" x={-ROOM_HALF} y={-ROOM_HALF} width={ROOM_HALF * 2} height={ROOM_HALF * 2} rx={0.4} />}
+      <circle className="mspawn" cx={SPAWN.x} cy={SPAWN.z} r={SPAWN.r} />
+      {/* 地上の物だけ（マンションの上の階の壁や駅の柵は描かない） */}
+      {WORLDS[kind].solids.filter((s) => (s.y0 ?? 0) < 0.5).map((s, i) => ('r' in s
+        ? <circle key={i} className="msolid" cx={s.x} cy={s.z} r={s.r} />
+        : <rect key={i} className="msolid" x={s.x - s.w / 2} y={s.z - s.d / 2} width={s.w} height={s.d} rx={0.08} />))}
+    </g>
+  );
+});
+
+/** 置きアイテムの目印。自分の位置が変わったときだけ描き直す */
+export const MapItemMark = memo(function MapItemMark({ left, top, tint, ink, name, mark }: { left: number; top: number; tint: string; ink: string; name: string; mark: string }) {
+  return (
+    <span className="mitem" style={{ left, top, background: tint, color: ink }} title={name}>
+      {mark}
+    </span>
+  );
+});
+
+/**
+ * 人ひとり分の目印。位置などの props はすべて素の値で渡し、style オブジェクトは
+ * この中で作る。ほかの人のアバター更新では props が変わらないので描き直されない。
+ */
+export const MapPerson = memo(function MapPerson({ id, name, isSelf, smooth, small, left, top }: { id: string; name: string; isSelf: boolean; smooth: boolean; small: boolean; left: number; top: number }) {
+  return (
+    <span className={`mperson ${isSelf ? 'self' : smooth ? 'smooth' : ''} ${small ? 'small' : ''}`} style={{ left, top }}>
+      <Face id={id} name={name} size={small ? 22 : 30} />
+      <span className="mname">{isSelf ? tr("ui84") : name}</span>
+    </span>
+  );
+});
+
 function Map2D({ kind }: { kind: WorldKind }) {
   const box = useMapBox();
   const b = boundsOf(kind);
@@ -31,8 +72,9 @@ function Map2D({ kind }: { kind: WorldKind }) {
   useSpaceReset(() => setView(null));
   useEffect(() => setView(null), [kind]);
 
+  // 位置の更新でこの部品自体は描き直すが、重い層と動いていない人の行は memo 部品側で止まる
   useStore((s) => s.avatars);
-  useStore((s) => s.participants);
+  const participants = useStore((s) => s.participants);
   const heat = useHeatCells();
   const items = useStore((s) => s.items);
   const selfId = useStore((s) => s.selfId);
@@ -50,7 +92,7 @@ function Map2D({ kind }: { kind: WorldKind }) {
     if (e.button !== 0 && e.button !== 1) return;
     // ホイールを押したときの自動スクロールを出さない
     if (e.button === 1) e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* VR の合成入力は端末側で保持する */ }
     down.current = { x: e.clientX, y: e.clientY, button: e.button, v };
   };
   const onMove = (e: React.PointerEvent) => {
@@ -81,14 +123,8 @@ function Map2D({ kind }: { kind: WorldKind }) {
             <stop offset="100%" stopColor="#ff7a2f" stopOpacity="0" />
           </radialGradient>
         </defs>
+        <MapBackdrop kind={kind} tx={v.tx} ty={v.ty} k={v.k} />
         <g transform={`translate(${v.tx} ${v.ty}) scale(${v.k})`}>
-          <rect className="mfloor" x={b.minX} y={b.minZ} width={b.maxX - b.minX} height={b.maxZ - b.minZ} rx={0.4} />
-          {WORLDS[kind].extent && <rect className="mfloor" x={-ROOM_HALF} y={-ROOM_HALF} width={ROOM_HALF * 2} height={ROOM_HALF * 2} rx={0.4} />}
-          <circle className="mspawn" cx={SPAWN.x} cy={SPAWN.z} r={SPAWN.r} />
-          {/* 地上の物だけ（マンションの上の階の壁や駅の柵は描かない） */}
-          {WORLDS[kind].solids.filter((s) => (s.y0 ?? 0) < 0.5).map((s, i) => ('r' in s
-            ? <circle key={i} className="msolid" cx={s.x} cy={s.z} r={s.r} />
-            : <rect key={i} className="msolid" x={s.x - s.w / 2} y={s.z - s.d / 2} width={s.w} height={s.d} rx={0.08} />))}
           {/* 床と家具より上に出さないと、extent のあるワールドで内側の床に隠れる */}
           {heat.map((c) => {
             const ctr = cellCenter(c.cx, c.cz);
@@ -101,20 +137,15 @@ function Map2D({ kind }: { kind: WorldKind }) {
           {me && <circle className="mnear" cx={me.x} cy={me.z} r={NEAR_RANGE} />}
         </g>
       </svg>
-      {Object.values(items).filter((it) => !('holder' in it && it.holder)).map((it) => (
-        <span key={it.id} className="mitem" style={{ ...toScreen(it.x, it.z), background: ITEM_INFO[it.kind].tint, color: ITEM_INFO[it.kind].ink }} title={ITEM_INFO[it.kind].name}>
-          {ITEM_INFO[it.kind].mark}
-        </span>
-      ))}
-      {get().participants.map((u) => {
+      {Object.values(items).filter((it) => !('holder' in it && it.holder)).map((it) => {
+        const pos = toScreen(it.x, it.z);
+        return <MapItemMark key={it.id} left={pos.left} top={pos.top} tint={ITEM_INFO[it.kind].tint} ink={ITEM_INFO[it.kind].ink} name={ITEM_INFO[it.kind].name} mark={ITEM_INFO[it.kind].mark} />;
+      })}
+      {participants.map((u) => {
         const p = places.get(u.id);
         if (!p) return null;
-        return (
-          <span key={u.id} className={`mperson ${u.id === selfId ? 'self' : smooth ? 'smooth' : ''} ${p.small ? 'small' : ''}`} style={toScreen(p.x, p.z)}>
-            <Face id={u.id} name={u.name} size={p.small ? 22 : 30} />
-            <span className="mname">{u.id === selfId ? tr("ui84") : u.name}</span>
-          </span>
-        );
+        const pos = toScreen(p.x, p.z);
+        return <MapPerson key={u.id} id={u.id} name={u.name} isSelf={u.id === selfId} smooth={smooth} small={p.small} left={pos.left} top={pos.top} />;
       })}
     </div>
   );

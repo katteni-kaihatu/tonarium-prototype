@@ -211,15 +211,17 @@ export async function configureSessionSync(id: string, next: SyncConfig) {
       const delivery = connection.deliveryStats();
       const total = (route: 'direct' | 'relay', field: 'sentMessages' | 'receivedMessages') =>
         delivery.filter((r) => r.route === route && (r.kind === 'peer_message' || r.kind === 'peer_bulk')).reduce((sum, r) => sum + r[field], 0);
-      console.groupCollapsed(`[kokosync:peers] ${new Date().toISOString()} · ${routes.length} peers · core=${connection.transport} · data P2P ${total('direct', 'sentMessages')}/${total('direct', 'receivedMessages')} · relay ${total('relay', 'sentMessages')}/${total('relay', 'receivedMessages')}`);
-      console.table(rows);
-      console.table(delivery.map((r) => ({
-        name: users.find((u) => u.id === peerTransport?.routes().find((p) => p.peer === r.peer)?.user)?.name ?? (r.peer === next.server ? 'server' : r.peer),
-        peer: r.peer, route: r.route, kind: r.kind, rttMs: r.rttMs, sentBytes: r.sentBytes, receivedBytes: r.receivedBytes,
-        sentMessages: r.sentMessages, receivedMessages: r.receivedMessages, retries: r.retries,
-        queuedMessages: r.queuedMessages, queuedBytes: r.queuedBytes, unackedMessages: r.unackedMessages, reason: r.reason,
-      })));
-      console.groupEnd();
+      if (import.meta.env.DEV) {
+        console.groupCollapsed(`[kokosync:peers] ${new Date().toISOString()} · ${routes.length} peers · core=${connection.transport} · data P2P ${total('direct', 'sentMessages')}/${total('direct', 'receivedMessages')} · relay ${total('relay', 'sentMessages')}/${total('relay', 'receivedMessages')}`);
+        console.table(rows);
+        console.table(delivery.map((r) => ({
+          name: users.find((u) => u.id === peerTransport?.routes().find((p) => p.peer === r.peer)?.user)?.name ?? (r.peer === next.server ? 'server' : r.peer),
+          peer: r.peer, route: r.route, kind: r.kind, rttMs: r.rttMs, sentBytes: r.sentBytes, receivedBytes: r.receivedBytes,
+          sentMessages: r.sentMessages, receivedMessages: r.receivedMessages, retries: r.retries,
+          queuedMessages: r.queuedMessages, queuedBytes: r.queuedBytes, unackedMessages: r.unackedMessages, reason: r.reason,
+        })));
+        console.groupEnd();
+      }
       previousRoutes = new Map(routes.map((r) => [`${r.peer}:${r.publisherEpoch}`, r]));
       previousTime = now;
     }, 1000);

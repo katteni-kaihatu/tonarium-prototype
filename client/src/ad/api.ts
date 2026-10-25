@@ -1,6 +1,16 @@
 import type { AuthProvider } from './user.mjs';
 
+/** ランキング応答の1行。playerId はセーブのキーなのでサーバーは返さない (#210)。自分の行には self が付く */
 export interface LeaderboardEntry {
+  name: string;
+  antimatterLog10: number;
+  infinities: number;
+  playTimeSec: number;
+  self?: boolean;
+}
+
+/** スコア送信時の形。こちらは自分の playerId を含む */
+export interface LeaderboardSubmission {
   playerId: string;
   name: string;
   antimatterLog10: number;
@@ -66,7 +76,7 @@ export class AdApiClient {
     return Array.isArray(data.entries) ? (data.entries as LeaderboardEntry[]) : [];
   }
 
-  async submitScore(entry: LeaderboardEntry): Promise<void> {
+  async submitScore(entry: LeaderboardSubmission): Promise<void> {
     await this.request('/api/leaderboard', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

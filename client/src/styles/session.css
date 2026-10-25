@@ -1,0 +1,76 @@
+/* main のハブから移したもの：セッション中のメニューとシート、クライアントモード、ページのタブ、月のカレンダー */
+.hclient { margin-top: 10px; }
+.hseg { display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(38, 38, 46, .08); }
+.hseg button { flex: 1; min-width: 0; height: 32px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 700; gap: 4px; }
+.hseg button.on { background: #fff; color: var(--accent); box-shadow: 0 1px 3px rgba(40, 30, 10, .18); }
+.hleave { color: var(--danger); margin-bottom: 4px; }
+.hfeedback { display: flex; align-items: center; text-decoration: none; color: var(--muted2); white-space: nowrap; }
+.hfeedback svg:last-child { margin-left: auto; opacity: .6; }
+.hhere { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 10px; background: #E3F2E8; color: #2E6E4E; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.hhere i { width: 8px; height: 8px; border-radius: 50%; background: var(--speak); }
+.hcurrent { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--paper); border-radius: 16px; box-shadow: var(--shadow); flex-wrap: wrap; }
+.hcurrent .finfo { flex: none; }
+.hcurrent button { gap: 6px; }
+.htabs { display: flex; gap: 4px; }
+.htabs button { height: 34px; padding: 0 14px; border-radius: 10px; font-size: 13px; color: var(--muted2); gap: 6px; }
+.htabs button.on { background: var(--paper); color: var(--accent); font-weight: 700; box-shadow: var(--shadow); }
+.hsec h2 .htabs { margin-left: 8px; }
+.wcard.current { box-shadow: var(--shadow), inset 0 0 0 2px var(--speak); }
+.wface { position: relative; }
+.wface .hhere { position: absolute; left: 10px; top: 10px; height: 26px; padding: 0 9px; font-size: 11px; }
+.ispawn { align-self: flex-start; margin-top: 4px; gap: 4px; }
+
+.hcalwrap { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: var(--paper); border-radius: 18px; box-shadow: var(--shadow); }
+.hcalhead { display: flex; align-items: center; gap: 8px; }
+.hcalhead h3 { font-size: 16px; }
+.hcalhead button.square { width: 36px; height: 36px; }
+.hcal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.hcalwd { text-align: center; font-size: 11px; color: var(--muted); padding: 4px 0; }
+.hcalday { height: auto; min-height: 72px; padding: 6px; border: 1px solid var(--line2); border-radius: 10px; background: #fff; display: flex; flex-direction: column; align-items: stretch; gap: 3px; text-align: left; font-size: 12px; }
+.hcalday > span:first-child { font-weight: 700; }
+.hcalday.today { border-color: var(--accent); }
+.hcalday.today > span:first-child { color: var(--accent); }
+.hcalday.on { background: var(--accentbg); box-shadow: inset 0 0 0 2px var(--accent); }
+.hcalev { display: block; padding: 1px 6px; border-radius: 6px; background: var(--sand); font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hcalev.more { background: transparent; color: var(--muted); font-weight: 400; }
+
+/* セッション中：左上のメニューボタン。ホバーで左のメニューが出て、押すとホームをシートで重ねる */
+.smenu { position: fixed; left: 0; top: 0; z-index: 46; }
+.smenubtn { position: absolute; left: 20px; top: 20px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 14px; background: rgba(255, 253, 249, .92); color: var(--ink); box-shadow: 0 2px 10px rgba(60, 40, 10, .12); }
+.smenubtn.on { background: var(--paper); color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent), 0 2px 10px rgba(60, 40, 10, .12); }
+.smenubridge { position: absolute; left: 12px; top: 60px; width: 228px; height: 16px; }
+.smenunav { position: absolute; left: 12px; top: 72px; width: 228px; max-height: calc(100vh - 100px); transform: translateX(-12px); opacity: 0; pointer-events: none; transition: transform .16s ease-out, opacity .16s ease-out; }
+.smenunav.show { transform: none; opacity: 1; pointer-events: auto; }
+.smenunav .hside { position: static; max-height: calc(100vh - 100px); min-height: 0; }
+.world.locked .smenu { opacity: .4; pointer-events: none; }
+.hoverlay { position: fixed; inset: 0; z-index: 45; }
+.hoverlaybg { position: absolute; inset: 0; background: rgba(30, 28, 24, .42); backdrop-filter: blur(8px) saturate(.9); }
+.hnow { position: absolute; left: 76px; top: 20px; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: 14px; background: rgba(20, 20, 24, .45); color: #fff; font-size: 13px; pointer-events: none; }
+.hnow i { width: 8px; height: 8px; border-radius: 50%; background: #5BD394; }
+.hnow span { opacity: .8; }
+.hoverlayclose { position: absolute; right: 24px; top: 20px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 14px; background: rgba(20, 20, 24, .45); color: #fff; }
+.home.sheet { position: absolute; inset: 72px 24px 88px 12px; min-height: 0; grid-template-rows: minmax(0, 1fr); overflow: hidden; border-radius: 20px; box-shadow: 0 30px 80px rgba(0, 0, 0, .35); background-color: var(--ground); background-image: radial-gradient(var(--dots) 1px, transparent 1px); background-size: 22px 22px; }
+.home.sheet .hmain { min-height: 0; }
+.home.sheet .hhead { flex: none; }
+.home.sheet .hcontent { display: flex; flex-direction: column; gap: 22px; flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0 4px 4px; }
+.home.sheet .hcontent > * { flex-shrink: 0; }
+.home.sheet .hside, .home.sheet .hevents { position: static; min-height: 0; max-height: 100%; overscroll-behavior: contain; }
+.home.sheet .hside > *, .home.sheet .hevents > * { flex-shrink: 0; }
+.home.sheet .hchangelog-filter { position: sticky; top: 0; z-index: 1; background: var(--ground); padding: 8px 0; }
+@media (max-width: 720px), (hover: none) and (pointer: coarse) and (max-width: 1024px) and (max-height: 540px) {
+  .home.sheet { inset: 72px 8px 80px 8px; }
+}
+
+@media (max-width: 1100px) {
+  .home { grid-template-columns: 228px minmax(0, 1fr); }
+  .hevents { grid-column: 2; width: auto; position: static; max-height: none; }
+  .home.sheet:has(> .hevents) { grid-template-rows: minmax(0, 2fr) minmax(0, 1fr); }
+  .home.sheet > .hside { grid-row: 1 / -1; }
+}
+@media (max-width: 720px), (hover: none) and (pointer: coarse) and (max-width: 1024px) and (max-height: 540px) {
+  .home { grid-template-columns: 1fr; }
+  .hside { position: static; max-height: none; }
+  .hevents { grid-column: 1; }
+  .hhead { flex-wrap: wrap; }
+}
+

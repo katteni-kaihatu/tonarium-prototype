@@ -20,13 +20,21 @@ const WALL_H = 4;
 const LAYER_COLORS = ['#ff7a8a', '#ffb347', '#ffe066', '#7ee08a', '#6ec6ff'];
 const STEPPED = new THREE.Color('#ff3b30');
 
+const joinerTickListeners = new Set<() => void>();
+let joinerTimer: ReturnType<typeof setInterval> | undefined;
+function subscribeJoinerTick(listener: () => void) {
+  joinerTickListeners.add(listener);
+  joinerTimer ??= setInterval(() => joinerTickListeners.forEach((l) => l()), 500);
+  return () => {
+    joinerTickListeners.delete(listener);
+    if (joinerTickListeners.size === 0 && joinerTimer) { clearInterval(joinerTimer); joinerTimer = undefined; }
+  };
+}
+
 /** 参加エリアにいる 3D の人（自分を含む） */
 function useJoiners() {
   const [, tick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => tick((n) => n + 1), 500);
-    return () => clearInterval(t);
-  }, [getLanguage()]);
+  useEffect(() => subscribeJoinerTick(() => tick((n) => n + 1)), [getLanguage()]);
   const s = get();
   return s.participants.filter((u) => {
     if (u.mode !== '3d') return false;
@@ -39,32 +47,66 @@ function useJoiners() {
 function Tiles() {
   const ref = useRef<THREE.InstancedMesh>(null);
   const base = useMemo(() => Array.from({ length: TILE_COUNT }, (_, i) => new THREE.Color(LAYER_COLORS[tileCenter(i).layer])), []);
+  const centers = useMemo(() => Array.from({ length: TILE_COUNT }, (_, i) => tileCenter(i)), []);
   const m = useMemo(() => new THREE.Matrix4(), []);
   const c = useMemo(() => new THREE.Color(), []);
   const pos = useMemo(() => new THREE.Vector3(), []);
   const scl = useMemo(() => new THREE.Vector3(), []);
   const q = useMemo(() => new THREE.Quaternion(), []);
+  // 各タイルの書き込み済み状態。undefined=未書き込み、null=静止（未踏）を書き込み済み、数値=その消滅時刻を処理中
+  const written = useRef<(number | null | undefined)[]>(Array(TILE_COUNT).fill(undefined));
+  // 消滅時刻を過ぎて縮小済みのタイルは、行列が縮小したまま変わらない（中心位置は見た目に影響しない）
+  const goneWritten = useRef<boolean[]>(Array(TILE_COUNT).fill(false));
   useFrame(() => {
     const mesh = ref.current;
     if (!mesh) return;
     const g = gameOfSession();
     const now = serverNow();
+    let matrixDirty = false;
+    let colorDirty = false;
     for (let i = 0; i < TILE_COUNT; i++) {
-      const t = tileCenter(i);
       const at = g.tiles[i];
-      const left = at === undefined ? Infinity : at - now;
-      scl.setScalar(left <= 0 ? 0 : 1);
-      // 消える直前ほど大きく震える
+      if (at === undefined) {
+        // 未踏のタイルは静止画そのもの。初回と、踏まれた後に盤面が戻ったときだけ書く
+        if (written.current[i] === null) continue;
+        const t = centers[i];
+        pos.set(t.x, t.y - TILE_THICK / 2, t.z);
+        scl.setScalar(1);
+        m.compose(pos, q, scl);
+        mesh.setMatrixAt(i, m);
+        mesh.setColorAt(i, base[i]);
+        written.current[i] = null;
+        goneWritten.current[i] = false;
+        matrixDirty = colorDirty = true;
+        continue;
+      }
+      if (written.current[i] !== at) { written.current[i] = at; goneWritten.current[i] = false; }
+      if (goneWritten.current[i]) continue;
+      const left = at - now;
+      const t = centers[i];
+      if (left <= 0) {
+        pos.set(t.x, t.y - TILE_THICK / 2, t.z);
+        scl.setScalar(0);
+        m.compose(pos, q, scl);
+        mesh.setMatrixAt(i, m);
+        mesh.setColorAt(i, STEPPED);
+        goneWritten.current[i] = true;
+        matrixDirty = colorDirty = true;
+        continue;
+      }
+      // 消える直前ほど大きく震える。踏まれて消えるまでの間だけ毎フレーム書く
       const shake = left < TILE_BREAK_MS ? (1 - left / TILE_BREAK_MS) * 0.06 : 0;
       pos.set(t.x + (shake ? Math.sin(now / 17 + i) * shake : 0), t.y - TILE_THICK / 2, t.z + (shake ? Math.cos(now / 23 + i) * shake : 0));
+      scl.setScalar(1);
       m.compose(pos, q, scl);
       mesh.setMatrixAt(i, m);
       c.copy(base[i]);
-      if (left < Infinity) c.lerp(STEPPED, Math.min(1, 0.4 + (1 - left / TILE_BREAK_MS) * 0.6));
+      c.lerp(STEPPED, Math.min(1, 0.4 + (1 - left / TILE_BREAK_MS) * 0.6));
       mesh.setColorAt(i, c);
+      matrixDirty = colorDirty = true;
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    if (matrixDirty) mesh.instanceMatrix.needsUpdate = true;
+    if (colorDirty && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   });
   return (
     // 境界球は最初に一度だけ（全部の板が原点にある時点で）計算されるので、そのままだと塔を見ても画面外と判定されて消える

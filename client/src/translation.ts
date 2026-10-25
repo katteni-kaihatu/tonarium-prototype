@@ -25,7 +25,11 @@ export function createTranslationClient(request: typeof fetch = (...args) => fet
       if (!text.trim()) return Promise.resolve();
       const key = keyOf(text, targetLanguage);
       if (pending.has(key)) return pending.get(key)!;
-      if (cache.has(key)) return Promise.resolve();
+      // 失敗は最終結果として固定しない (#207)。混雑などで failed になった発言は、
+      // 次に load が呼ばれたとき（再マウント・言語の往復など）に再試行する。
+      // unavailable はサーバー側の未設定を表しセッション中は変わらないため、従来どおりキャッシュする。
+      const cached = cache.get(key);
+      if (cached && cached.status !== 'failed') return Promise.resolve();
       const update = (value: TranslationView) => {
         cache.set(key, value);
         if (cache.size > 500) {

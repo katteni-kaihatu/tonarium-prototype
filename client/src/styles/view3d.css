@@ -1,0 +1,52 @@
+/* 3D */
+.view3d canvas { touch-action: none; }
+.crosshair { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px #0008; pointer-events: none; }
+.crosshair.on { width: 14px; height: 14px; margin: -7px 0 0 -7px; background: transparent; box-shadow: 0 0 0 3px #fde047, 0 0 0 5px #0008; }
+.aimhint { position: absolute; left: 50%; top: calc(50% + 22px); transform: translateX(-50%); white-space: nowrap; background: rgba(20, 20, 24, .75); color: #fff; padding: 4px 10px; border-radius: 8px; font-size: 13px; pointer-events: none; }
+.view3d-hud { position: absolute; left: 50%; bottom: 102px; transform: translateX(-50%); width: min(960px, calc(100% - 32px)); max-height: calc(100% - 114px); display: flex; flex-direction: column; align-items: center; gap: 8px; overflow-y: auto; pointer-events: none; }
+.world.locked .front .view3d-hud { opacity: 1; }
+.view3d-hud .statuschips { position: static; transform: none; width: 100%; flex-flow: row wrap; justify-content: center; flex: none; }
+.view3d-hud .schip { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.view3d-hud .schip > span { min-width: 0; flex-wrap: wrap; }
+.view3d-hud .schip .chipbtn { flex: none; }
+.keyhelp { flex: none; max-width: 100%; white-space: normal; overflow-wrap: anywhere; background: rgba(20, 20, 24, .66); color: #fff; padding: 4px 12px; border-radius: 8px; font-size: 12px; pointer-events: none; }
+.world:not(.locked) .keyhelp { font-size: 15px; padding: 8px 16px; }
+@media (max-height: 480px) {
+  .view3d-hud { gap: 6px; }
+  .world:not(.locked) .keyhelp { font-size: 12px; padding: 4px 12px; }
+  .view3d-hud .statuschips { gap: 4px; }
+  .view3d-hud .schip { padding-top: 3px; padding-bottom: 3px; }
+}
+.hitme { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); font-size: 64px; font-weight: 900; color: #fde047; text-shadow: 0 3px 0 #000, 0 0 16px #f59e0b; pointer-events: none; animation: pico .7s forwards; }
+.noteeditor { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%); z-index: 4; background: var(--paper); border-radius: 14px; padding: 12px; box-shadow: var(--pop); display: flex; flex-direction: column; gap: 8px; width: min(480px, 90%); }
+.noteeditor textarea { height: 72px; resize: none; color: #1c1917; border: 0; }
+.noteeditor .row { flex-wrap: wrap; }
+.noteeditor small { color: var(--muted); }
+.viewfinder { position: absolute; inset: 8% 10%; pointer-events: none; }
+.viewfinder i { position: absolute; width: 40px; height: 40px; border: 3px solid #fffc; }
+.viewfinder .tl { left: 0; top: 0; border-right: 0; border-bottom: 0; }
+.viewfinder .tr { right: 0; top: 0; border-left: 0; border-bottom: 0; }
+.viewfinder .bl { left: 0; bottom: 0; border-right: 0; border-top: 0; }
+.viewfinder .br { right: 0; bottom: 0; border-left: 0; border-top: 0; }
+.viewfinder .rec { position: absolute; left: 12px; top: 12px; color: #fff; background: var(--live); padding: 2px 10px; border-radius: 4px; font-weight: 800; font-size: 13px; animation: recblink 1.2s infinite; }
+@keyframes recblink { 50% { opacity: .55; } }
+.flash { position: absolute; inset: 0; background: #fff; pointer-events: none; animation: flash .35s forwards; }
+@keyframes flash { from { opacity: .9; } to { opacity: 0; } }
+
+@media (max-width: 900px) {
+  .nearlist { width: calc(50% - 30px); }
+  .noticelog { width: calc(50% - 30px); top: 74px; }
+  .facestrip, .winregion { left: 16px; right: 16px; }
+  .facestrip { top: auto; bottom: 100px; }
+}
+
+/* 2D/3D 切り替えの疑似ローディング */
+.switchload { position: fixed; inset: 0; z-index: 48; display: flex; align-items: center; justify-content: center; animation: slfade .25s; }
+.switchload.to3d { background: radial-gradient(circle at 50% 45%, #3A3B44, #1E1F24); color: #fff; }
+.switchload.to2d { background-color: var(--ground); background-image: radial-gradient(var(--dots) 1px, transparent 1px); background-size: 22px 22px; color: var(--ink); }
+.slbox { display: flex; flex-direction: column; align-items: center; gap: 16px; font-family: "Zen Maru Gothic", sans-serif; font-size: 16px; }
+.slbar { width: 260px; height: 6px; border-radius: 3px; background: rgba(128, 128, 140, .3); overflow: hidden; }
+.slbar span { display: block; height: 100%; width: 100%; border-radius: 3px; background: var(--accent); transform-origin: left; animation: slprogress linear forwards; }
+@keyframes slprogress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes slfade { from { opacity: 0; } }
+

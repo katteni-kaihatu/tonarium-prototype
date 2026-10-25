@@ -1,3 +1,4 @@
+import { arrivalPatch, initialArrivalState } from './newArrival.ts';
 import { sourceText as uiSource } from './i18n/core.ts';
 import { msg } from './i18n/core.ts';
 import type { ChatMedia, ChatScope, ClientMsg, Mode, Rsvp, StatusKind, Visibility } from '../../shared/protocol.ts';
@@ -27,7 +28,7 @@ async function enterSession(sid: string, requireVoice = false) {
   selectNote(null);
   dropSession(get().session);
   // フレンド申請と招待はセッションをまたいで残す
-  set((s) => ({ session: sid, mode: '2d', hubOpen: false, selfAvatar: spawnPoint(), windows: [], maxWin: null, notices: s.notices.filter((n) => n.kind === 'friend' || n.kind === 'invite' || n.kind === 'online') }));
+  set((s) => ({ ...initialArrivalState(), session: sid, mode: '2d', hubOpen: false, selfAvatar: spawnPoint(), windows: [], maxWin: null, notices: s.notices.filter((n) => n.kind === 'friend' || n.kind === 'invite' || n.kind === 'online') }));
   recompute();
   startSessionSync();
   await connectVoice(sid);
@@ -40,7 +41,7 @@ async function exitSession() {
   if (!get().session) return;
   selectNote(null);
   dropSession(get().session);
-  set({ session: null, mode: '2d', hubOpen: false, windows: [], maxWin: null });
+  set({ ...initialArrivalState(), session: null, mode: '2d', hubOpen: false, windows: [], maxWin: null });
   recompute();
   stopSessionSync();
   // 通話の切断も終えてから次の部屋につなぐ。
@@ -268,5 +269,5 @@ export function markNoticesRead() {
 let noticeSeq = 0;
 export function pushNotice(kind: Notice['kind'], from: string, fromName = nameOf(from), key?: string) {
   if (get().blocked.includes(fromName)) return;
-  set((s) => ({ notices: [{ id: ++noticeSeq, kind, from, fromName, key, at: Date.now(), unread: true }, ...s.notices].slice(0, 30) }));
+  set((s) => ({ ...arrivalPatch('notice', s), notices: [{ id: ++noticeSeq, kind, from, fromName, key, at: Date.now(), unread: true }, ...s.notices].slice(0, 30) }));
 }

@@ -1,0 +1,100 @@
+/* スマホ幅：ホームのナビは下のバー、セッションは前面のパネルを下のタブで 1 つずつ全面に出す */
+.phonetabs, .hmorebtn { display: none; }
+@media (max-width: 720px), (hover: none) and (pointer: coarse) and (max-width: 1024px) and (max-height: 540px) {
+  .home, .home.sheet { padding: 12px 12px 84px; gap: 12px; }
+  .home.sheet { inset: 64px 0 0 0; border-radius: 20px 20px 0 0; }
+  .home.sheet:has(> .hevents) { grid-template-rows: minmax(0, 1fr); }
+  .home .hevents { display: none; }
+  .hhead h1 { font-size: 22px; }
+  .hsearch { order: 5; flex: 1 1 100%; }
+  .home .hside, .home.sheet .hside { position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 40; flex-direction: row; align-items: stretch; gap: 0; max-height: none; padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); border-radius: 0; overflow: visible; box-shadow: 0 -2px 12px rgba(60, 40, 10, .1); }
+  .hside:not(.open) > :not(.hnav):not(.hmorebtn) { display: none; }
+  .hside:not(.open) .hnav { display: flex; flex-direction: row; flex: 5; min-width: 0; margin: 0; gap: 0; }
+  .hside:not(.open) .hnav li { flex: 1; min-width: 0; }
+  .hside:not(.open) .hnav li:nth-child(n+6) { display: none; }
+  .hside:not(.open) .hnavbtn { position: relative; width: 100%; height: 52px; flex-direction: column; justify-content: center !important; gap: 2px; padding: 0; font-size: 10px; }
+  .hside:not(.open) .hnavbtn .hbadge { position: absolute; top: 2px; left: calc(50% + 6px); margin: 0; }
+  .hmorebtn { display: flex; flex: 1; min-width: 0; height: 52px; flex-direction: column; justify-content: center !important; gap: 2px; padding: 0; font-size: 10px; }
+  .home .hside.open, .home.sheet .hside.open { flex-direction: column; top: auto; max-height: 80vh; overflow-y: auto; padding: 16px 16px calc(8px + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0; gap: 6px; }
+  .hside.open .hmorebtn { flex-direction: row; justify-content: center !important; height: 40px; flex: none; font-size: 12px; }
+  .hmorebg { position: fixed; inset: 0; z-index: 39; background: rgba(30, 28, 24, .35); }
+
+  .world.phone .smenubtn { left: 10px; top: 10px; }
+  .world.phone .worldbadge { left: 62px; top: 10px; max-width: calc(100% - 72px); }
+  .world.phone .hnow { display: none; }
+  .world.phone .nearlist, .world.phone .noticelog { left: 8px; right: 8px; top: 64px; bottom: 130px; width: auto; }
+  .world.phone .nearlist .phead button[aria-label="パネルをたたむ"], .world.phone .noticelog button[aria-label="パネルをたたむ"] { display: none; }
+  .world.phone:not(.pt-list) .nearlist, .world.phone:not(.pt-log) .noticelog { display: none; }
+  .world.phone:not(.pt-screen) .facestrip, .world.phone:not(.pt-screen) .facegrid, .world.phone:not(.pt-screen) .winregion, .world.phone:not(.pt-screen) .statuschips { display: none; }
+  .world.phone .facestrip { left: 8px; right: 8px; top: 64px; bottom: auto; }
+  .world.phone .facegrid { left: 8px; right: 8px; top: 64px; bottom: 130px; }
+  .world.phone .winregion { left: 8px; right: 8px; top: 172px; bottom: 130px; }
+  .world.phone .dock { bottom: calc(68px + env(safe-area-inset-bottom)); padding: 6px; gap: 6px; border-radius: 18px; max-width: calc(100% - 16px); overflow-x: auto; }
+  .world.phone .dk { width: 44px; height: 44px; border-radius: 13px; }
+  .world.phone .dseg, .world.phone .dsep { display: none; }
+  .world.phone .dk { flex-shrink: 0; }
+  .world.phone .nearlist, .world.phone .noticelog, .world.phone .facegrid, .world.phone .winregion { bottom: calc(130px + env(safe-area-inset-bottom)); }
+  .world.phone .statuschips { bottom: calc(128px + env(safe-area-inset-bottom)); width: calc(100% - 16px); }
+  .world.phone .view3d-hud { bottom: calc(128px + env(safe-area-inset-bottom)); max-height: calc(100% - 140px - env(safe-area-inset-bottom)); width: calc(100% - 16px); }
+  .world.phone .view3d-hud .statuschips { width: 100%; }
+  .world.phone .phonetabs { position: absolute; left: 0; right: 0; bottom: 0; display: flex; padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); background: var(--paper); box-shadow: 0 -2px 12px rgba(60, 40, 10, .1); }
+  .phonetabs button { position: relative; flex: 1; height: 52px; flex-direction: column; gap: 2px; padding: 0; font-size: 11px; color: var(--muted2); }
+  .phonetabs button.on { color: var(--accent); font-weight: 700; }
+  .phonetabs .badge { position: absolute; top: 2px; left: calc(50% + 8px); }
+  .popover.picker { flex-direction: column; overflow-y: auto; }
+  .pickgrid { width: auto; }
+  .pickdetail { padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--line2); }
+  .pickdetail .thumb { display: none; }
+}
+
+@media (max-height: 540px) and (orientation: landscape) {
+  .world.phone { --phone-left: max(8px, env(safe-area-inset-left)); --phone-right: max(8px, env(safe-area-inset-right)); --phone-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .world.phone .smenubtn { left: var(--phone-left); top: 8px; }
+  .world.phone .worldbadge { left: calc(var(--phone-left) + 52px); top: 8px; max-width: calc(100% - var(--phone-left) - var(--phone-right) - 132px); }
+  .world.phone .wname { min-width: 0; }
+  .world.phone .phonetabs { left: auto; top: 8px; right: var(--phone-right); bottom: var(--phone-bottom); width: 72px; flex-direction: column; border-radius: 14px; padding: 4px; }
+  .world.phone .phonetabs button { min-height: 44px; }
+  .world.phone .dock { left: calc((100% - 80px - var(--phone-right)) / 2); bottom: var(--phone-bottom); }
+  .world.phone .nearlist, .world.phone .noticelog, .world.phone .facegrid { left: var(--phone-left); right: calc(88px + var(--phone-right)); top: 62px; bottom: calc(64px + var(--phone-bottom)); }
+  .world.phone .facegrid { overflow-y: auto; justify-content: safe center; align-items: safe center; pointer-events: auto !important; }
+  .world.phone .facestrip { left: var(--phone-left); right: auto; top: 62px; bottom: calc(120px + var(--phone-bottom)); width: 160px; overflow-y: auto; pointer-events: auto !important; }
+  .world.phone .faces { flex-wrap: wrap; flex-shrink: 0; }
+  .world.phone .facefold { flex-shrink: 0; }
+  .world.phone .winregion { left: calc(176px + var(--phone-left)); right: calc(88px + var(--phone-right)); top: 62px; bottom: calc(64px + var(--phone-bottom)); }
+  .world.phone .winstrip { height: 60px; }
+  .world.phone .winstrip .win.compact { height: 56px !important; width: 120px !important; }
+  .world.phone .front > .statuschips { left: var(--phone-left); bottom: calc(64px + var(--phone-bottom)); width: 160px; max-height: 50px; overflow-y: auto; transform: none; pointer-events: auto !important; }
+  .world.phone .view3d-hud { left: var(--phone-left); right: calc(88px + var(--phone-right)); bottom: calc(64px + var(--phone-bottom)); width: auto; max-height: calc(100% - 76px - var(--phone-bottom)); transform: none; }
+  .world.phone .schip { max-width: 100%; flex-shrink: 0; }
+  .world.phone .schip > span { flex-wrap: wrap; white-space: normal; }
+}
+
+.updatebar {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 110; display: flex; align-items: center; gap: 10px;
+  max-width: calc(100vw - 32px); padding: 8px 8px 8px 16px; border-radius: 14px; background: var(--ink); color: #fff; box-shadow: var(--pop); font-size: 13px;
+}
+.updatebar > span { display: flex; flex-direction: column; min-width: 0; }
+.updatebar .sub { font-size: 11px; color: #C9C7CF; }
+.updatego { height: 32px; padding: 0 14px; border: 0; border-radius: 9px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; flex: none; }
+.updatebar button.updatelater:hover:not(:disabled) { background: rgba(255, 255, 255, .12); }
+.updatelater { height: 32px; padding: 0 10px; border-radius: 9px; color: #E4E2E8; font-size: 12px; flex: none; }
+.maintenance { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(234, 229, 219, .92); backdrop-filter: blur(6px); }
+.maintcard { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 360px; padding: 28px 24px; border-radius: 20px; background: #fff; box-shadow: var(--pop); text-align: center; color: var(--ink); }
+.maintcard img { width: 56px; height: 56px; object-fit: contain; }
+.maintcard h2 { margin: 4px 0 0; font-size: 18px; }
+.maintcard p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.6; }
+.maintwait { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.translated-text, .translation-body { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
+.translation-original, .translation-meta { display: block; font-size: 0.78em; line-height: 1.5; opacity: 0.72; }
+.translation-original { margin-top: 4px; }
+.telephone-body { padding: 16px; max-height: min(72vh, 850px); overflow: auto; color: #29242b; background: #fff8fb; }
+.telephone-body p { margin: 8px 0; overflow-wrap: anywhere; }
+.telephone-body section { margin: 12px 0; }
+.telephone-body textarea { width: 100%; min-height: 90px; box-sizing: border-box; }
+.telephone-body small { display: block; margin-top: 8px; }
+.telephone-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+.telephone-controls button, .telephone-controls select { min-height: 32px; }
+.telephone-picture { display: block; width: 100%; aspect-ratio: 620 / 450; background: white; border: 1px solid #d8cbd1; touch-action: none; user-select: none; }
+.telephone-text { padding: 12px; white-space: pre-wrap; background: white; border: 1px solid #d8cbd1; }

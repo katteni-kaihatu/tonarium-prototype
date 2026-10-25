@@ -58,6 +58,35 @@ test('missing credentials, failures, malformed responses and lost HTTP connectio
   }
 });
 
+test('a failed translation is retried on the next load, while unavailable stays cached', async () => {
+  let calls = 0;
+  const client = createTranslationClient(async () => {
+    calls++;
+    if (calls === 1) return Response.json({ status: 'failed', text: '原文' });
+    return Response.json({ text: 'Hello', sourceLanguage: 'ja', status: 'translated' });
+  });
+  await client.load('原文', 'en');
+  assert.equal(client.get('原文', 'en')?.status, 'failed');
+  assert.equal(client.get('原文', 'en')?.text, '原文');
+  await client.load('原文', 'en');
+  assert.equal(calls, 2);
+  assert.equal(client.get('原文', 'en')?.status, 'translated');
+  assert.equal(client.get('原文', 'en')?.text, 'Hello');
+  // 成功結果は従来どおりキャッシュされ、再送しない
+  await client.load('原文', 'en');
+  assert.equal(calls, 2);
+
+  let unavailableCalls = 0;
+  const unavailable = createTranslationClient(async () => {
+    unavailableCalls++;
+    return Response.json({ status: 'unavailable', text: '原文' });
+  });
+  await unavailable.load('原文', 'en');
+  assert.equal(unavailable.get('原文', 'en')?.status, 'unavailable');
+  await unavailable.load('原文', 'en');
+  assert.equal(unavailableCalls, 1);
+});
+
 test('a long history is queued so it does not overflow server concurrency', async () => {
   const waiting: (() => void)[] = [];
   let active = 0, maximum = 0;

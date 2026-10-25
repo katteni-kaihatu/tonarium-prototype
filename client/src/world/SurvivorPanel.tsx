@@ -1,6 +1,6 @@
 import { sourceText as uiSource } from '../i18n/core.ts';
 import { t as tr } from '../i18n/index.ts';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../store.ts';
@@ -73,11 +73,42 @@ function gearTooltipText(id: string, level?: number) {
   ].filter(Boolean).join('\n');
 }
 
-function SurvivorCanvas({ state, player, participants, avatars, clock, serverOffset }: {
-  state?: SurvivorState; player?: SurvivorPlayer; participants: Participant[]; avatars: Record<string, AvatarState>; clock: number; serverOffset: number;
+// ミニマップの描画が時刻に依存するのは、ヒット演出 (敵 240ms / プレイヤー 300ms)、攻撃エフェクト (650ms)、
+// チャージャーの狙い脈動とダッシュ軌跡、wisp / shifter の回転だけ。それ以外は state が変わったときだけ描けば足りる。
+// ポーズ中と対戦外は従来どおり時刻で進めない (パネル側の時計も止まっている)。
+function survivorCanvasAnimating(state: SurvivorState | undefined, now: number): boolean {
+  if (!state || !isActive(state.phase) || state.pausedAt != null) return false;
+  for (const enemy of state.enemies) {
+    const hitAge = now - enemy.hitAt;
+    if (hitAge >= 0 && hitAge < 240) return true;
+    if (enemy.kind === 'wisp' || enemy.kind === 'shifter') return true;
+    if (enemy.kind === 'charger' && enemy.chargeTarget && enemy.chargeUntil > now) return true;
+    if (enemy.dashFrom && enemy.dashUntil > now) return true;
+  }
+  for (const other of Object.values(state.players)) {
+    const hitAge = now - other.hitAt;
+    if (hitAge >= 0 && hitAge < 300) return true;
+  }
+  return state.effects.some((effect) => {
+    const age = now - effect.at;
+    return age >= 0 && age <= 650;
+  });
+}
+
+function SurvivorCanvas({ state, player, participants, avatars, serverOffset }: {
+  state?: SurvivorState; player?: SurvivorPlayer; participants: Participant[]; avatars: Record<string, AvatarState>; serverOffset: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  // 時刻アニメーションが要る間だけ canvas 側で時計を持ち、再描画を canvas の責務にする
+  const [animTick, setAnimTick] = useState(0);
+  const animating = survivorCanvasAnimating(state, Date.now() + serverOffset);
   useEffect(() => {
+    if (!animating) return;
+    const timer = window.setInterval(() => setAnimTick((tick) => tick + 1), 100);
+    return () => window.clearInterval(timer);
+  }, [animating]);
+  useEffect(() => {
+    const clock = Date.now();
     const canvas = ref.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
@@ -260,7 +291,7 @@ function SurvivorCanvas({ state, player, participants, avatars, clock, serverOff
       }
       ctx.restore();
     }
-  }, [state?.enemies, state?.players, state?.projectiles, state?.effects, state?.phase, player?.x, player?.z, player?.id, participants, avatars, clock, serverOffset]);
+  }, [state?.enemies, state?.players, state?.projectiles, state?.effects, state?.phase, player?.x, player?.z, player?.id, participants, avatars, serverOffset, animTick]);
   return <canvas ref={ref} className="survivor-map" width={360} height={360} aria-label={tr("ui716")} />;
 }
 
@@ -285,30 +316,30 @@ export function SurvivorPanel({ overlay = false }: { overlay?: boolean }) {
   const elapsed = active ? Math.max(0, Math.min(clock + serverOffset, state!.pausedAt ?? Infinity) - state!.startedAt) : 0;
   const remaining = Math.max(0, SURVIVOR_DURATION_MS - elapsed);
   const xpRatio = me ? Math.min(1, me.xp / Math.max(1, me.nextXp)) : 0;
-  const inJoin = participants.filter((u) => {
+  const inJoin = useMemo(() => participants.filter((u) => {
     const p = u.mode === '3d' ? avatars[u.id] : u.pos;
     return survivorDistance(p ?? SPAWN, SURVIVOR_JOIN) <= SURVIVOR_JOIN.r;
-  });
+  }), [participants, avatars]);
   const canJoin = inJoin.some((u) => u.id === selfId);
   const choices = me?.choiceQueue[0] ?? [];
-  const queuedPlayers = Object.values(state?.players ?? {})
+  const queuedPlayers = useMemo(() => Object.values(state?.players ?? {})
     .filter((player) => player.alive && player.choiceQueue.length > 0)
-    .sort((a, b) => Number(b.id === selfId) - Number(a.id === selfId));
+    .sort((a, b) => Number(b.id === selfId) - Number(a.id === selfId)), [state?.players, selfId]);
   const pendingChoiceKey = queuedPlayers.map((player) => `${player.id}:${player.choiceQueue.map((choices) => choices.join('.')).join('/')}`).join(',');
   const needsOwnChoice = !!me?.alive && choices.length > 0;
   const choiceNow = clock + serverOffset;
   const runFinishedReward = phase === 'ended' && me ? survivorRunReward(me.level, me.gear.moonshard ?? 0) : 0;
-  const investedPoints = Object.values(profile.upgradeSpent).reduce((total, points) => total + points, 0);
-  const resultPlayers = Object.values(state?.players ?? {}).sort((a, b) => b.level - a.level || b.kills - a.kills);
+  const investedPoints = useMemo(() => Object.values(profile.upgradeSpent).reduce((total, points) => total + points, 0), [profile.upgradeSpent]);
+  const resultPlayers = useMemo(() => Object.values(state?.players ?? {}).sort((a, b) => b.level - a.level || b.kills - a.kills), [state?.players]);
   const resultDuration = phase === 'ended' && state ? Math.max(0, (state.endedAt ?? clock + serverOffset) - state.startedAt) : 0;
   const resultHighestLevel = resultPlayers.reduce((highest, player) => Math.max(highest, player.level), 0);
   const resultReward = me ? runFinishedReward : resultPlayers.reduce((total, player) => total + survivorRunReward(player.level, player.gear.moonshard ?? 0), 0);
-  const bosses = state?.enemies.filter((enemy) => enemy.kind === 'boss') ?? [];
+  const bosses = useMemo(() => state?.enemies.filter((enemy) => enemy.kind === 'boss') ?? [], [state?.enemies]);
   const bossHp = bosses.reduce((total, enemy) => total + enemy.hp, 0);
   const bossMaxHp = bosses.reduce((total, enemy) => total + enemy.maxHp, 0);
-  const acquiredSynergyGear = Object.entries(me?.gear ?? {}).filter(([id, level]) => level > 0 && SURVIVOR_GEAR[id]?.synergyGear);
-  const mythicFound = profile.discovered.some((id) => SURVIVOR_GEAR[id]?.rarity === 'mythic');
-  const synergyProgress = SYNERGY_RECIPES.filter((recipe) =>
+  const acquiredSynergyGear = useMemo(() => Object.entries(me?.gear ?? {}).filter(([id, level]) => level > 0 && SURVIVOR_GEAR[id]?.synergyGear), [me?.gear]);
+  const mythicFound = useMemo(() => profile.discovered.some((id) => SURVIVOR_GEAR[id]?.rarity === 'mythic'), [profile.discovered]);
+  const synergyProgress = useMemo(() => SYNERGY_RECIPES.filter((recipe) =>
     (recipe.evolvedFrom ?? []).some((id) => (me?.gear[id] ?? 0) > 0) || (me?.gear[recipe.id] ?? 0) > 0,
   ).map((recipe) => {
     const acquired = (me?.gear[recipe.id] ?? 0) > 0;
@@ -327,13 +358,18 @@ export function SurvivorPanel({ overlay = false }: { overlay?: boolean }) {
       recipe, sources, maximum, completed, remaining, acquired, slotFull, choiceIndex,
       revealed: acquired || mythicFound || profile.discovered.includes(recipe.id),
     };
-  });
+  }), [me?.gear, me?.synergyGearSlots, me?.choiceQueue, acquiredSynergyGear, mythicFound, profile.discovered]);
   const synergyGroups = [{ label: tr("ui717"), recipes: synergyProgress }];
 
+  // 時計が要るのは、経過時間を表示している最中（running/boss かつ非ポーズ）と、締切つきの選択中だけ。
+  // ロビー・ポーズ中・終了後は回さず、パネル全体の再レンダーとミニマップの再描画を止める
+  const needsClock = (active && !paused) || queuedPlayers.length > 0;
   useEffect(() => {
+    setClock(Date.now());
+    if (!needsClock) return;
     const timer = window.setInterval(() => setClock(Date.now()), 250);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [needsClock]);
   useEffect(() => {
     if (!me || !state) {
       previousHealth.current = null;
@@ -448,7 +484,7 @@ export function SurvivorPanel({ overlay = false }: { overlay?: boolean }) {
         {active && <strong className={`survivor-time ${phase === 'boss' ? 'boss' : ''}`}>{phase === 'boss' ? 'BOSS' : formatTime(remaining)}</strong>}
       </div>
       {paused && <div className="survivor-pause-banner"><span className="survivor-pause-mark">✦</span><span><b>{tr("ui748")}</b><small>{tr("ui749")}</small></span><span className="survivor-pause-mark">✦</span></div>}
-      {mode === '2d' && <SurvivorCanvas state={state} player={me} participants={participants} avatars={avatars} clock={clock} serverOffset={serverOffset} />}
+      {mode === '2d' && <SurvivorCanvas state={state} player={me} participants={participants} avatars={avatars} serverOffset={serverOffset} />}
       {phase === 'boss' && bossMaxHp > 0 && <div className="survivor-boss-health"><span>{tr("ui750")}{bosses.length} · {Math.ceil(bossHp).toLocaleString()} / {bossMaxHp.toLocaleString()}</span><div><i style={{ width: `${Math.max(0, bossHp / bossMaxHp * 100)}%` }} /></div></div>}
       <div className="survivor-legend"><span>{tr("ui751")}</span><span>{tr("ui752")}</span><span>{tr("ui753")}</span>{mode === '2d' && active && <span>{tr("ui754")}</span>}{mode === '3d' && active && <span>{tr("ui755")}</span>}</div>
 

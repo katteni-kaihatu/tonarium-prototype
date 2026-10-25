@@ -18,10 +18,13 @@ import { COMPAT_VERSION, PLAN_QUORUM, ROOM_HALF, STATUS_INFO, STATUS_TEXT_MAX, V
 import { GROUP_COLORS, canSeeSession } from '../shared/home.ts';
 import { WORLDS, WORLD_COUNTDOWN_MS, isWorldKind, pushOut, type WorldKind } from '../shared/worlds.ts';
 import { ITEM_INFO, MEDIA_URL_RE, ONLY_3D, applyItemAction, createItem, isDeltaAction, isHandheld, itemSummary, type Item } from '../shared/items.ts';
+import { telephoneAction, telephoneItemFor, telephoneState, tickTelephone, reconcileTelephoneHost, hasTelephoneHistory } from './telephone.ts';
+import type { TelephoneAction } from '../shared/telephone.ts';
 import { sanitizeParams } from '../shared/avatar.ts';
 import { VOICE_RANGE, clampAvatar, computePlaces, placeDistance } from '../shared/places.ts';
 import { CITY_HALF, clampCity } from '../shared/city.ts';
 import { callElevator, elevatorOf, resetElevator } from './city.ts';
+import { isStaleEvent, pruneEvents } from './events.ts';
 import { MarketLikes } from './market.ts';
 import { BIKE, clampBike, releaseBike } from '../shared/vehicle.ts';
 import { SOUNDS } from '../shared/sounds.ts';
@@ -29,7 +32,7 @@ import { EMOTES, isEmoteId } from '../shared/emotes.ts';
 import { DICE_MAX, ROLL_MS, isDieSides, type DiceRoll } from '../shared/dice.ts';
 import type { PeerOperation } from '../shared/session-events.ts';
 import { getOgp } from './ogp.ts';
-import { MEDIA_DIR, mediaExists, saveMedia, serveMedia } from './media.ts';
+import { MEDIA_DIR, mediaExists, pipeFile, saveMedia, serveMedia } from './media.ts';
 import { PERSON as PERSON_R, freeSpot, itemRadius, pushApart2D } from './spacing.ts';
 import { clearGame, eliminate, gameOf, resetGame, startGame, stepTile, type GameDeps } from './game.ts';
 import { chooseSurvivorGear, chooseSurvivorStyle, clearSurvivor, moveSurvivor, removeSurvivor, resetSurvivorUpgrades, rerollSurvivorChoice, startSurvivor, tickSurvivors, upgradeSurvivor, survivorOf, type SurvivorDeps } from './survivors.ts';
@@ -99,8 +102,25 @@ function survivorCount(value: unknown, max: number) {
     ? Math.min(max, Math.max(0, Math.floor(value)))
     : 0;
 }
+// 正規化（移行・返金・オブジェクト再構築）済みのプロフィール実体。再構築は冪等で、以降この実体に
+// 起きる変更は購入・リセット・実績追加など値の変更だけなので、2 回目以降は再構築を省ける。
+// 実体が差し替われば WeakSet に載っていないので、初回として再び正規化が走る。
+// ただし加算で増える points / upgrades / upgradeSpent は、旧実装が毎回クランプしていたため、
+// 高速パスでもこの3種のクランプだけは毎回行い、結果が旧実装と一致するようにする
+const normalizedSurvivorProfiles = new WeakSet<SurvivorProfile>();
 function survivorProfile(id: string): SurvivorProfile {
   const p = survivorProfiles[id] ??= newSurvivorProfile();
+  if (normalizedSurvivorProfiles.has(p)) {
+    p.points = survivorCount(p.points, Number.MAX_SAFE_INTEGER);
+    for (const key of Object.keys(SURVIVOR_META_UPGRADES) as SurvivorMetaUpgrade[]) {
+      p.upgrades[key] = survivorCount(p.upgrades[key], SURVIVOR_META_UPGRADES[key].max);
+      const spent = p.upgradeSpent[key] as number | null | undefined;
+      p.upgradeSpent[key] = spent == null
+        ? survivorUpgradeRefund(key, p.upgrades[key])
+        : survivorCount(spent, Number.MAX_SAFE_INTEGER);
+    }
+    return p;
+  }
   p.points = survivorCount(p.points, Number.MAX_SAFE_INTEGER);
   const upgrades = p.upgrades as Record<string, unknown> | null | undefined;
   const version = survivorCount(p.upgradeVersion, SURVIVOR_PROFILE_VERSION);
@@ -139,6 +159,7 @@ function survivorProfile(id: string): SurvivorProfile {
   p.achievements ??= [];
   p.discovered ??= [];
   p.runs ??= 0; p.bestLevel ??= 0; p.bestKills ??= 0;
+  normalizedSurvivorProfiles.add(p);
   return p;
 }
 
@@ -148,11 +169,22 @@ const iconFile = (name: string) => path.join(ICON_DIR, `${nameHash(name)}.jpg`);
 const avatarImageFile = (name: string) => path.join(AVATAR_DIR, `${nameHash(name)}.img`);
 const avatarParamsFile = (name: string) => path.join(AVATAR_DIR, `${nameHash(name)}.json`);
 const profileFile = (name: string) => path.join(PROFILE_DIR, `${nameHash(name)}.json`);
+// mtime とサイズが変わっていなければ前回の読み結果を使い、変わったら読み直す（サーバー経由・外部どちらの変更も検出できる）
+const bioCache = new Map<string, { mtimeMs: number; size: number; bio: string }>();
 function bioOf(name: string) {
-  try { return String((JSON.parse(fs.readFileSync(profileFile(name), 'utf-8')) as { bio?: unknown }).bio ?? ''); } catch { return ''; }
+  const file = profileFile(name);
+  let stat: fs.Stats | undefined;
+  try { stat = fs.statSync(file); } catch { stat = undefined; }
+  if (!stat) { bioCache.delete(file); return ''; }
+  const cached = bioCache.get(file);
+  if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) return cached.bio;
+  let bio = '';
+  try { bio = String((JSON.parse(fs.readFileSync(file, 'utf-8')) as { bio?: unknown }).bio ?? ''); } catch { /* 壊れたプロフィールは従来どおり空として扱う */ }
+  bioCache.set(file, { mtimeMs: stat.mtimeMs, size: stat.size, bio });
+  return bio;
 }
 const mtime = (file: string) => { try { return Math.floor(fs.statSync(file).mtimeMs); } catch { return 0; } };
-const iconVersion = (name: string) => (mtime(iconFile(name)) ? String(mtime(iconFile(name))) : null);
+const iconVersion = (name: string) => { const v = mtime(iconFile(name)); return v ? String(v) : null; };
 function avatarVersion(name: string) {
   const v = Math.max(mtime(avatarImageFile(name)), mtime(avatarParamsFile(name)));
   return v ? String(v) : null;
@@ -199,14 +231,19 @@ for (const ev of home.events) { ev.maybe ??= []; ev.declined ??= []; }
 guild.sessions.push(...home.sessions);
 /** 開始から 30 日以上過ぎたイベントは残さない。当日のものや開始時刻が読めないものは消さない */
 function pruneOldEvents() {
-  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  home.events = home.events.filter((ev) => !(Number.isFinite(ev.at) && ev.at < cutoff));
+  home.events = pruneEvents(home.events, Date.now());
 }
 const eventsBeforePrune = home.events.length;
 pruneOldEvents();
 // home はメモリ側が正で、ファイルへの書き込みは savePeople などと同じく遅らせてまとめる
 const saveHome = later(() => fs.writeFileSync(HOME_FILE, JSON.stringify(home)));
 if (home.events.length !== eventsBeforePrune) saveHome();
+// 常駐中に 30 日を跨いだイベントも残り続けないよう、起動時・作成時だけでなく日次でも剪定する
+setInterval(() => {
+  const before = home.events.length;
+  pruneOldEvents();
+  if (home.events.length !== before) { saveHome(); broadcastEvents(); }
+}, 24 * 60 * 60 * 1000);
 const sessionIds = new Set(guild.sessions.map((w) => w.id));
 const shortId = () => randomUUID().slice(0, 8);
 
@@ -288,7 +325,21 @@ const inbox = {
   convs: nullRecord(inboxRaw.convs ?? {}),
   reads: nullRecord(Object.fromEntries(Object.entries(inboxRaw.reads ?? {}).map(([name, r]) => [name, nullRecord(r)]))),
 };
-const saveInbox = later(() => fs.writeFileSync(MESSAGES_FILE, JSON.stringify(inbox)));
+/** 保存のたびに受信箱全体を文字列化しないよう、会話ごと・名前ごとの JSON を覚えておき、変わった分だけ作り直す。
+ * 中身を書き換える場所（pushMessage / 送信時の既読 / 既読 / RSVP）では、対応するキャッシュを必ず捨てること。
+ * 組み立て結果は JSON.stringify(inbox) とバイト単位で一致する（キー順・キーと値の文字列化は同じ規則） */
+const inboxPartJson = { convs: new Map<string, string>(), reads: new Map<string, string>() };
+function inboxJson() {
+  const part = (cache: Map<string, string>, key: string, value: unknown) => {
+    let s = cache.get(key);
+    if (s === undefined) { s = JSON.stringify(value) as string; cache.set(key, s); }
+    return `${JSON.stringify(key)}:${s}`;
+  };
+  const convs = Object.keys(inbox.convs).map((k) => part(inboxPartJson.convs, k, inbox.convs[k])).join(',');
+  const reads = Object.keys(inbox.reads).map((k) => part(inboxPartJson.reads, k, inbox.reads[k])).join(',');
+  return `{"convs":{${convs}},"reads":{${reads}}}`;
+}
+const saveInbox = later(() => fs.writeFileSync(MESSAGES_FILE, inboxJson()));
 
 /** セッションにだれかが入ってから全員が出るまで。終わったらまとめにする */
 const visits = new Map<string, { from: number; people: Set<string>; log: Recap['log'] }>();
@@ -309,7 +360,13 @@ function snapshotUsers(): UserSnapshot {
   }
   return { all, friendsByName, onlineNames: new Set(all.map((u) => u.name)) };
 }
-const sessionsVisibleTo = (name: string, snap = snapshotUsers()) => guild.sessions.filter((d) => canSeeSession(d, name, snap.friendsByName.get(name) ?? [], home.groups, snap.all));
+// 写しが渡されたとき（配信の一括計算）だけそれを使い、単発呼び出しでは全体の写しを作らない。
+// friendsOf は friendsByName と同じ friendPairs を同じ順に走査するので、対象者の一覧は写し経由と一致する
+const sessionsVisibleTo = (name: string, snap?: UserSnapshot) => {
+  const friends = snap ? snap.friendsByName.get(name) ?? [] : friendsOf(name);
+  const all = snap ? snap.all : [...users.values()];
+  return guild.sessions.filter((d) => canSeeSession(d, name, friends, home.groups, all));
+};
 const broadcastSessions = () => { const snap = snapshotUsers(); for (const u of users.values()) sendTo([u.id], { t: 'sessions', list: sessionsVisibleTo(u.name, snap) }); };
 const broadcastGroups = () => broadcast({ t: 'groups', list: home.groups });
 const broadcastEvents = () => broadcast({ t: 'events', list: home.events });
@@ -348,14 +405,20 @@ function pushMessage(conv: string, m: Message) {
   const list = (inbox.convs[conv] ??= []);
   list.push(m);
   if (list.length > 300) list.shift();
+  inboxPartJson.convs.delete(conv);
   saveInbox();
   sendToNames(convMembers(conv) ?? [], { t: 'msg', conv, m });
 }
-/** 見える会話だけ、新しい方から 100 件ずつ */
+/** 見える会話だけ、新しい方から 100 件ずつ。
+ * 全会話を走査せず、その人の会話のキーだけを組み立てて引く。拾う条件は convMembers と一致する
+ * （DM はフレンド同士の組だけ、チャンネルは入っているグループのものだけ）。
+ * 常駐の参加者インデックスは持たない（フレンド追加やグループの出入り・削除のたびに同期が必要で、ずれると会話が消えるため） */
 function convsOf(name: string) {
   const out: Record<string, Message[]> = {};
-  for (const [conv, list] of Object.entries(inbox.convs))
-    if (convMembers(conv)?.includes(name)) out[conv] = list.slice(-100);
+  const take = (conv: string) => { const list = inbox.convs[conv]; if (list) out[conv] = list.slice(-100); };
+  // DM のキーは名前順が正規形。保存済みデータに逆順のキー（旧データ）があっても従来どおり拾えるよう両方見る
+  for (const f of friendsOf(name)) { take(`dm:${name}\u0000${f}`); take(`dm:${f}\u0000${name}`); }
+  for (const g of home.groups) if (g.members.includes(name)) for (const c of g.channels) take(channelKey(g.id, c.id));
   return out;
 }
 
@@ -482,7 +545,21 @@ function releaseBikes(sid: string, id: string) {
 }
 /** 部屋の中だけの項目を落として、ホームにも配る形にする */
 const publicUser = ({ micOn, follow, pos, viewing, viewLive, display, ...u }: Participant): User => u;
-const presenceOf = ({ micOn, follow, pos, viewing, viewLive, display }: Participant): Presence => ({ micOn, follow, pos, viewing, viewLive, display });
+/**
+ * presence の組み立て結果を参加者ごとに覚えておき、変わっていない人は使い回す。
+ * pos / display / viewing はサーバー内でインプレースに書き換えられることが無く、常に新しい
+ * オブジェクトへの代入で差し替わる（代入箇所は index.ts と spacing.ts のみ）ため、6 項目が
+ * 全て一致すれば前回のオブジェクトをそのまま配っても pack 後の内容は完全一致する。
+ */
+const presenceCache = new WeakMap<Participant, Presence>();
+function presenceOf(u: Participant): Presence {
+  const prev = presenceCache.get(u);
+  if (prev && prev.micOn === u.micOn && prev.follow === u.follow && prev.pos === u.pos
+    && prev.viewing === u.viewing && prev.viewLive === u.viewLive && prev.display === u.display) return prev;
+  const p: Presence = { micOn: u.micOn, follow: u.follow, pos: u.pos, viewing: u.viewing, viewLive: u.viewLive, display: u.display };
+  presenceCache.set(u, p);
+  return p;
+}
 const inSession = (sid: string) => [...users.values()].filter((u) => u.session === sid);
 const othersIn = (sid: string, me: string) => inSession(sid).filter((u) => u.id !== me).map((u) => u.id);
 function broadcastUsers() {
@@ -491,9 +568,13 @@ function broadcastUsers() {
 /** セッションの中の人の状態を、その部屋の全員に配り直す */
 function sendPresence(sid: string) {
   const here = inSession(sid);
-  // 視点のライブは、ついてくる人がいなくなったら止める
+  refreshTelephones(sid);
+  // 視点のライブは、ついてくる人がいなくなったら止める。
+  // ついてくる人がいるかは全員分を先に集めておく（メンバーごとの some 走査だと O(N^2) になる）。
+  // follow はこのループ中では変わらないため、先に集めても判定は従来と一致する
+  const followed = new Set<string | null>(here.map((f) => f.follow));
   for (const u of here)
-    if (u.viewLive && (u.mode !== '3d' || !here.some((f) => f.follow === u.id))) u.viewLive = false;
+    if (u.viewLive && (u.mode !== '3d' || !followed.has(u.id))) u.viewLive = false;
   roomSend(sid, { t: 'presence', sid, all: Object.fromEntries(here.map((u) => [u.id, presenceOf(u)])) });
 }
 function sessionInfoOf(sid: string): SessionInfo {
@@ -511,7 +592,10 @@ setInterval(() => {
 }, 10_000);
 function sendItem(sid: string, it: Item) {
   markItemsDirty(sid);
-  roomSend(sid, { t: 'item', sid, item: it });
+  if (it.kind === 'telephone') {
+    const present = new Set(inSession(sid).map(u => u.id));
+    for (const u of inSession(sid)) roomSend(sid, { t: 'item', sid, item: telephoneItemFor(it, u.id, present) }, [u.id]);
+  } else roomSend(sid, { t: 'item', sid, item: it });
   broadcastSessionInfo();
 }
 function sendItemRemove(sid: string, id: string) {
@@ -538,12 +622,29 @@ function broadcastItemMove(sid: string, it: Item) {
     if (items.get(sid)?.get(it.id) === it) send();
   }, wait));
 }
+const telephonePresence = new WeakMap<object, string>();
+function refreshTelephones(sid: string) {
+  const present = new Set(inSession(sid).map(u => u.id));
+  const presenceKey = [...present].sort().join('\0');
+  for (const it of items.get(sid)?.values() ?? []) {
+    if (it.kind !== 'telephone') continue;
+    const g = telephoneState(it);
+    const progressed = tickTelephone(g, Date.now());
+    const hostChanged = reconcileTelephoneHost(g, present, Math.random);
+    const presenceChanged = telephonePresence.get(g) !== presenceKey;
+    telephonePresence.set(g, presenceKey);
+    if (progressed || hostChanged || presenceChanged) sendItem(sid, it);
+  }
+}
+setInterval(() => { for (const sid of items.keys()) refreshTelephones(sid); }, 250);
+
 function sendSessionSnapshot(sid: string, id: string) {
+  refreshTelephones(sid);
   roomSendSnapshot(sid, id, {
     sid,
     chats: (chats.get(sid) ?? []).filter((m) => !m.to || m.to.includes(id)),
     avatars: Object.fromEntries(avatars.get(sid) ?? []),
-    items: [...(items.get(sid)?.values() ?? [])],
+    items: [...(items.get(sid)?.values() ?? [])].map(it => telephoneItemFor(it, id, new Set(inSession(sid).map(u => u.id)))),
     presence: Object.fromEntries(inSession(sid).map((u) => [u.id, presenceOf(u)])),
     broadcast: broadcastMode.get(sid) ?? false,
     world: worldOf.get(sid) ?? 'room',
@@ -656,6 +757,7 @@ function leaveSession(u: Participant) {
   u.follow = null;
   u.pos = null;
   u.session = null;
+  refreshTelephones(sid);
   thumbnails.update(sid, inSession(sid));
   u.mode = '2d';
   u.micOn = false;
@@ -1006,6 +1108,15 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
     case 'itemAction': {
       const it = sessItems.get(msg.id);
       if (!it) return;
+      if (it.kind === 'telephone') {
+        if (!msg.action || typeof msg.action.a !== 'string' || !msg.action.a.startsWith('telephone')) return;
+        const present = new Set(inSession(sid).map(u => u.id));
+        if (telephoneAction(telephoneState(it), { id: me.id, name: me.name, kind: 'human' }, msg.action as TelephoneAction, present, Date.now(), Math.random)) {
+          it.updatedBy = me.id;
+          sendItem(sid, it);
+        }
+        return;
+      }
       if (it.kind === 'bike') {
         if (msg.action.a === 'bikeMount') {
           const av = avatars.get(sid)!.get(me.id);
@@ -1146,6 +1257,8 @@ function scheduleEmptyCheck(sessionId: string) {
     emptySessionTimers.delete(sessionId);
     const def = home.sessions.find((d) => d.id === sessionId);
     if (!def || !sessionIds.has(sessionId) || fixedSessionIds.has(sessionId) || inSession(sessionId).length) return;
+    // 全員不在でも進行と結果鑑賞へ復帰できるよう、履歴のある部屋を残す。
+    if (hasTelephoneHistory(items.get(sessionId)?.values() ?? [])) return;
     console.log(`session auto-delete: ${JSON.stringify({ id: sessionId, name: def.name, reason: 'empty for 5min' })}`);
     destroyUserSession(sessionId);
   }, EMPTY_SESSION_TTL_MS));
@@ -1274,6 +1387,7 @@ function handleHome(me: User, msg: ClientMsg, ws: WebSocket): boolean {
       });
       // 送った会話は読んだことにする
       (inbox.reads[me.name] ??= newRecord())[msg.conv] = Date.now();
+      inboxPartJson.reads.delete(me.name);
       return true;
     }
     case 'read': {
@@ -1282,6 +1396,7 @@ function handleHome(me: User, msg: ClientMsg, ws: WebSocket): boolean {
       const at = Math.min(Date.now(), Number(msg.at) || 0);
       if (at <= (reads[msg.conv] ?? 0)) return true;
       reads[msg.conv] = at;
+      inboxPartJson.reads.delete(me.name);
       saveInbox();
       sendToNames([me.name], { t: 'read', conv: msg.conv, at });
       return true;
@@ -1294,7 +1409,9 @@ function handleHome(me: User, msg: ClientMsg, ws: WebSocket): boolean {
       else if (msg.answer === 'yes' || msg.answer === 'maybe' || msg.answer === 'no') plan.answers[me.name] = msg.answer;
       const who = (a: Rsvp) => Object.keys(plan.answers).filter((n) => plan.answers[n] === a);
       let ev = plan.event ? home.events.find((x) => x.id === plan.event) : undefined;
-      if (!ev && who('yes').length >= PLAN_QUORUM) {
+      // 剪定済みの古い日程相談 (開始が保持期間を過ぎている) からはイベントを作り直さない。
+      // 回答の記録や既存イベントの出席更新は従来どおり行う
+      if (!ev && who('yes').length >= PLAN_QUORUM && !isStaleEvent(plan.at, Date.now())) {
         const group = msg.conv.split(':')[1];
         ev = { id: shortId(), title: m.text.split('\n')[0].slice(0, 60) || '集まり', at: plan.at, group, session: plan.session, owner: m.from || me.name, attendees: [], maybe: [], declined: [] };
         pruneOldEvents();
@@ -1303,6 +1420,7 @@ function handleHome(me: User, msg: ClientMsg, ws: WebSocket): boolean {
         plan.event = ev.id;
       }
       if (ev) { ev.attendees = who('yes'); ev.maybe = who('maybe'); ev.declined = who('no'); saveHome(); broadcastEvents(); }
+      inboxPartJson.convs.delete(msg.conv);
       saveInbox();
       sendToNames(convMembers(msg.conv) ?? [], { t: 'msg', conv: msg.conv, m });
       return true;
@@ -1428,7 +1546,7 @@ const MIME: Record<string, string> = {
 };
 
 const handleTranslation = createTranslationHandler(createTranslator(configuredTranslationModel(process.env, DEV)));
-const server = http.createServer(async (req, res) => {
+async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse) {
   // 絶対形式の壊れたリクエストターゲット（例: http://[::1）でも new URL が例外になるため、ここで 400 にする
   let url: URL;
   try { url = new URL(req.url ?? '/', 'http://x'); } catch { res.statusCode = 400; res.end('bad path'); return; }
@@ -1456,7 +1574,7 @@ const server = http.createServer(async (req, res) => {
     if (!g || !fs.existsSync(groupImageFile(g))) { res.statusCode = 404; res.end(); return; }
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Cache-Control', url.searchParams.get('v') ? 'public, max-age=31536000, immutable' : 'no-cache');
-    fs.createReadStream(groupImageFile(g)).pipe(res);
+    pipeFile(res, groupImageFile(g));
     return;
   }
   if (url.pathname === '/icon') {
@@ -1473,7 +1591,7 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('Content-Type', 'image/jpeg');
     // URL に版を付けて取得するので長期キャッシュしてよい
     res.setHeader('Cache-Control', url.searchParams.get('v') ? 'public, max-age=31536000, immutable' : 'no-cache');
-    fs.createReadStream(file).pipe(res);
+    pipeFile(res, file);
     return;
   }
   if (url.pathname === '/avatar' || url.pathname === '/avatar/params') {
@@ -1498,7 +1616,7 @@ const server = http.createServer(async (req, res) => {
     const head = fs.readFileSync(file).subarray(0, 4);
     res.setHeader('Content-Type', isParams ? 'application/json' : isPng(head) ? 'image/png' : 'image/jpeg');
     res.setHeader('Cache-Control', url.searchParams.get('v') ? 'public, max-age=31536000, immutable' : 'no-cache');
-    fs.createReadStream(file).pipe(res);
+    pipeFile(res, file);
     return;
   }
   if (url.pathname === '/profile') {
@@ -1543,7 +1661,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   // AD の保存・ランキング。Tonarium にアカウント認証は無く、URL の playerId をキーとしてそのまま受け入れる。
-  // Workers 版にあった他人セーブの 403 保護はここでは成立しない（docs/3d.md 参照）。
+  // Workers 版にあった他人セーブの 403 保護はここでは成立しない（docs/items.md の「AD ポータルと研究所パネル」参照）。
   const adSaveMatch = /^\/api\/save\/([^/]+)$/.exec(url.pathname);
   if (adSaveMatch) {
     let playerId: string;
@@ -1571,7 +1689,11 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/api/leaderboard') {
     res.setHeader('Content-Type', 'application/json');
     if (req.method === 'GET') {
-      res.end(JSON.stringify({ entries: adLeaderboard }));
+      // playerId はセーブの読み書きキーそのものなので応答には含めない (#210)。
+      // 自分の行の強調表示のため、クライアントが既に送っている X-User-Id と一致する行にだけ self を付ける。
+      const selfId = typeof req.headers['x-user-id'] === 'string' ? req.headers['x-user-id'].slice(0, 128) : '';
+      const entries = adLeaderboard.map(({ playerId, ...rest }) => (selfId && playerId === selfId ? { ...rest, self: true } : rest));
+      res.end(JSON.stringify({ entries }));
       return;
     }
     if (req.method === 'POST') {
@@ -1640,7 +1762,10 @@ const server = http.createServer(async (req, res) => {
   let pathname: string;
   try { pathname = decodeURIComponent(url.pathname); } catch { res.statusCode = 400; res.end('bad path'); return; }
   let file = path.join(DIST, pathname);
-  if (!file.startsWith(DIST) || !fs.existsSync(file) || fs.statSync(file).isDirectory())
+  // 接頭辞一致だと DIST の兄弟 (dist2 等) を通してしまうため、相対パスで「中にある」ことを厳密に見る
+  const relToDist = path.relative(DIST, file);
+  const insideDist = relToDist === '' || (!relToDist.startsWith(`..${path.sep}`) && !path.isAbsolute(relToDist));
+  if (!insideDist || !fs.existsSync(file) || fs.statSync(file).isDirectory())
     file = path.join(DIST, 'index.html');
   if (!fs.existsSync(file)) {
     res.statusCode = 404;
@@ -1660,10 +1785,26 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Content-Type', MIME[path.extname(file)] ?? 'application/octet-stream');
   // assets/ はハッシュ付き。index.html は毎回取り直させる
   res.setHeader('Cache-Control', file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache');
-  fs.createReadStream(file).pipe(res);
+  pipeFile(res, file);
+}
+
+// ハンドラ全体の安全網: 個別に潰していない例外経路が残っていても、未処理 rejection で
+// プロセスごと落とさず、このリクエストだけ 500 (応答開始済みなら切断) で終える
+const server = http.createServer((req, res) => {
+  handleRequest(req, res).catch((e) => {
+    console.error('request handler error', e);
+    if (res.writableEnded) return;
+    if (!res.headersSent) { res.statusCode = 500; res.end(); } else res.destroy();
+  });
 });
 
-const wss = new WebSocketServer({ noServer: true });
+/** ホーム WS で正当に届く最大のメッセージは thumbnailUpload（サムネイル画像 64KiB の data URL で約 87.5KB。
+ * server/thumbnails.ts の THUMBNAIL_MAX_BYTES と受付形式から算出）。それ以外のホーム用メッセージは
+ * 長くても数 KB（文章は各所で 2,000 字までに切り詰められる）。上限はその最大の約 12 倍に置き、
+ * 既定の 100MB 級フレームを受けて JSON.parse まで進むのをやめる。セッション内の操作（チャットの画像など）は
+ * このソケットではなく kokosync 側を通るので、ここには含めない */
+const HOME_WS_MAX_PAYLOAD = 1024 * 1024;
+const wss = new WebSocketServer({ noServer: true, maxPayload: HOME_WS_MAX_PAYLOAD });
 keepHomeSocketsAlive(wss);
 server.on('upgrade', (req, socket, head) => {
   // リクエスト側と同じく、壊れた URL で例外にして落とさない
@@ -1675,6 +1816,9 @@ server.on('upgrade', (req, socket, head) => {
 });
 wss.on('connection', (ws) => {
   const state = { id: null as string | null };
+  // maxPayload 超過などで ws が 'error' を出す。接続を閉じるのは ws 側が行う (超過時は 1009) が、
+  // リスナーが無いと例外として投げられプロセスごと落ちるため、受けるだけのハンドラを置く
+  ws.on('error', () => {});
   ws.on('message', (raw) => {
     try { handle(ws, state, JSON.parse(String(raw)) as ClientMsg); }
     catch (e) { console.error('bad message', e); }

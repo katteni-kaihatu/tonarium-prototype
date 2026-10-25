@@ -23,7 +23,7 @@ export const DEFAULT_PARAMS: AvatarParams = {
 };
 
 export const AVATAR_SCALE = 0.012;
-// GLB の頭の中心・基準寸法。上下・前方の比率を Web / Unity 共通の目の目印に使う。
+// GLB の頭の中心・基準寸法。上下・前方の比率を目の目印に使う。
 export const AVATAR_EYES = { up: 1 / 4, forward: 1 / 3, headSize: 39.825, headY: 76.224609375, centerY: 4.282142162322998 } as const;
 
 // Feet の拡縮と首・脚の移動で、既定モデルから足裏の高さが変わらないようにする。
@@ -33,7 +33,6 @@ export function getAvatarFloorOffset(params: AvatarParams): number {
   return (params.neckLength + params.legsDistanceFromBody - 20.573508 - bottom) * AVATAR_SCALE;
 }
 
-// shared/avatar.ts getAvatarEyeHeight と一致させること（Unity: OekakiModel.cs）。
 export function getAvatarEyeHeight(params: AvatarParams): number {
   return getAvatarFloorOffset(params)
     + (AVATAR_EYES.headY + AVATAR_EYES.centerY + Math.abs(AVATAR_EYES.headSize + params.headSize) * AVATAR_EYES.up) * AVATAR_SCALE;

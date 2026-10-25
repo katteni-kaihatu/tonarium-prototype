@@ -51,7 +51,7 @@ export function StatsPanel({ ad, notice }: { ad: AntimatterSlice; notice: (msg: 
             <thead><tr><th style={s.num}>#</th><th>名前</th><th style={s.num}>反物質</th><th style={s.num}>Infinity</th><th style={s.num}>プレイ時間</th></tr></thead>
             <tbody>
               {ad.leaderboard.map((e, i) => (
-                <tr key={`${e.playerId}-${i}`} style={e.playerId === ad.activeProfile?.id ? { fontWeight: 700 } : undefined}>
+                <tr key={`${e.name}-${i}`} style={e.self ? { fontWeight: 700 } : undefined}>
                   <td style={s.num}>{i + 1}</td>
                   <td>{e.name}</td>
                   <td style={s.num}>{formatFromLog10(e.antimatterLog10)}</td>

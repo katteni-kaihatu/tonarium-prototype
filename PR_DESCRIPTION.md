@@ -23,7 +23,7 @@
 |2026-10-25|古いイベントを自動整理|`cd17e68`：`docs/home.md`、`server/index.ts`（30日を過ぎたイベントの整理）|
 |2026-10-25|マップに声の湯気を追加|`b528ada`：`docs/screens.md`、`client/src/voiceHeat.ts`、`client/src/world/MapLayer.tsx`|
 |2026-10-25|Electron版の更新設定を追加|`ed57f09`：`docs/electron.md`、`electron/app/updater.cjs`、`electron/app/updates.js`（配布形式ごとの自動適用制約も反映）|
-|2026-10-25|Linux版とElectron版を追加|`6a1ca37`：`docs/native-linux.md`、`docs/electron.md`、`native/Tonarium.Desktop/Linux/`、`electron/app/main.cjs`|
+|2026-10-25|Electron版を追加|`6a1ca37`：`docs/electron.md`、`electron/app/main.cjs`|
 |2026-10-25|更新とメンテナンスをお知らせ|`94aefc6`：`docs/screens.md`、`client/public/sw.js`、`client/src/world/ServerNotices.tsx`|
 |2026-10-25|ガーデンワールドを追加|`489ea48`：`docs/3d.md`、`shared/worlds.ts`、`client/src/view3d/garden3d.tsx`|
 |2026-10-25|アバターのエモートを追加|`ac1c433`：`docs/screens.md`、`shared/emotes.ts`、`client/src/world/Emotes.tsx`、`client/src/view3d/Emote3D.tsx`|
@@ -40,7 +40,6 @@
 |2026-10-22|3Dの軽量設定を追加|`ecff87d`：`docs/3d.md`、`client/src/Profile.tsx`、`client/src/view3d/worlds3d.tsx`|
 |2026-10-22|スマートフォンの操作に対応|`e5218c5`：`docs/screens.md`、`client/src/phone.ts`、`client/src/world/WorldScreen.tsx`。タッチ端末の3Dは未対応のため記載しない|
 |2026-10-21|ログを読み返しやすく改善|`1a5936b`：`client/src/world/NoticeLog.tsx`（最下部を見ているときだけ追従）|
-|2026-10-21|Windows専用アプリを追加|`caa5ea5`：`docs/native-windows.md`、`native/Tonarium.Desktop/`、`native/Tonarium.Unity/`|
 |2026-10-20|ホームと交流機能を追加|`0aad014`：`docs/home.md`、`docs/messages.md`、`client/src/home/`、`shared/home.ts`|
 |2026-10-20|セッション中もホームを利用可能に|`046d6b2`、`0aad014`：`docs/screens.md`、`client/src/home/Home.tsx`、`client/src/world/WorldScreen.tsx`|
 |2026-10-20|3Dの持ち運びと会話表示を改善|`929dda8`：`docs/3d.md`、`client/src/view3d/interact.ts`、`client/src/view3d/Label.tsx`|

@@ -4,6 +4,41 @@ import type { KokosyncClient, Frame } from '../vendor/kokosync/index.js';
 import { base64, importKey, open, seal, type SyncConfig, type PositionPeer } from './session-wire.ts';
 import { POSITION_DIRECT_PEERS, POSITION_TOPIC, SessionPositions } from './session-position.ts';
 import { clampAvatar } from './places.ts';
+import { LEAN_ANGLE } from './protocol.ts';
+import { canLean, leanAngle, type LeanContext } from '../client/src/view3d/movementAbilities.ts';
+
+test('lean direction, intermediate angles and every cancellation reach multiple peers and server state', async () => {
+  const source = config('leaner', 0), sender = fixture(source);
+  const peers = [config('left-observer', 1), config('right-observer', 2)];
+  const receivers = peers.map(fixture);
+  await sender.positions.update(peers.map(p => member(p)));
+  sender.present(peers.map(p => p.peer));
+  for (const receiver of receivers) await receiver.positions.update([member(source)]);
+  const context: LeanContext = { enabled: true, locked: true, typing: false, survivor: false,
+    carrying: false, dragging: false, holdingTool: false, bike: false };
+  const states = [LEAN_ANGLE, LEAN_ANGLE / 2, -LEAN_ANGLE, 0,
+    leanAngle(LEAN_ANGLE, false, false, true, 2),
+    leanAngle(LEAN_ANGLE, true, true, true, 2),
+    ...(['enabled', 'locked', 'typing', 'survivor', 'carrying', 'dragging', 'holdingTool', 'bike'] as const)
+      .map(key => leanAngle(LEAN_ANGLE, true, false, canLean({ ...context, [key]: !context[key] }), 1 / 60))];
+  for (const lean of states) {
+    sender.sent.length = 0;
+    await sender.positions.send({ x: 1, z: 2, ry: 0, lean });
+    for (let i = 0; i < peers.length; i++) {
+      const packet = sender.sent.find(f => f.to?.includes(peers[i].peer))!;
+      await receivers[i].positions.receive({ ...packet, peer: source.peer });
+      const applied = receivers[i].applied.at(-1) as { state: any };
+      assert.equal(clampAvatar('room', applied.state).lean, lean);
+    }
+    const packet = sender.sent.find(f => f.to?.includes(source.server))!;
+    const decoded = await open(await importKey(source.positionKey!), source.token, 'position', packet.value);
+    assert.equal(clampAvatar('room', decoded.value.s).lean, lean);
+  }
+  assert.equal(clampAvatar('room', { x: 0, z: 0, ry: 0 }).lean, 0);
+  for (const sign of [-1, 1]) {
+    assert.equal(clampAvatar('room', { x: 0, z: 0, ry: 0, lean: sign * 100 }).lean, sign * LEAN_ANGLE);
+  }
+});
 
 test('walking start and stationary stop reach multiple peers through position sync', async () => {
   const source = config('walker', 0), sender = fixture(source);
@@ -79,6 +114,19 @@ test('bind received positions to approved peers, deduplicate, and reject departe
   assert.deepEqual(f.sent.map((p) => p.to), [['server']]);
 });
 
+test('jump pad height and jump count reach another participant through position sync', async () => {
+  const own = config('a', 0), other = config('b', 1), f = fixture(own);
+  await f.positions.update([member(other)]);
+  const key = await importKey(other.positionKey!);
+  for (const [i, y] of [0.18, 0.65, 0.18].entries()) {
+    const state = { x: 2, z: 3, ry: 0, jump: i === 2 ? 2 : 1, y, walking: false };
+    const value = await seal(key, other.token, 'position', i + 1, { t: 'avatar', s: state });
+    await f.positions.receive({ type: 'latest', key: `${POSITION_TOPIC}:0`, peer: other.peer, seq: BigInt(i + 1), value });
+    assert.deepEqual(f.applied.at(-1), { id: 'user-b', state });
+  }
+  assert.equal(f.applied.length, 3);
+});
+
 test('reject mismatched sequence and non-position payloads without applying them', async () => {
   const own = config('a', 0), other = config('b', 1), f = fixture(own), key = await importKey(other.positionKey!);
   await f.positions.update([member(other)]);
@@ -88,6 +136,10 @@ test('reject mismatched sequence and non-position payloads without applying them
   assert.equal(f.applied.length, 0);
   await f.positions.receive({ ...base, value: await seal(key, other.token, 'position', 3, { t: 'avatar', s: { x: 1, z: 1, ry: 0, walking: 'true' } }) });
   assert.equal(f.applied.length, 0);
+  for (const lean of [NaN, Infinity, 'left']) {
+    await f.positions.receive({ ...base, value: await seal(key, other.token, 'position', 3, { t: 'avatar', s: { x: 1, z: 1, ry: 0, lean } }) });
+    assert.equal(f.applied.length, 0);
+  }
   f.positions.close();
   await f.positions.receive({ ...base, value: await seal(key, other.token, 'position', 3, { t: 'avatar', s: { x: 1, z: 1, ry: 0 } }) });
   assert.equal(f.applied.length, 0);

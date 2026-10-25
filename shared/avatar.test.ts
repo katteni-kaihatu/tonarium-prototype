@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { AVATAR_EYES, AVATAR_SCALE, DEFAULT_EYE_HEIGHT, DEFAULT_PARAMS, getAvatarEyeHeight, getAvatarFloorOffset, sanitizeParams } from './avatar.ts';
 
-test('standard eye height stays in sync with the native expectation', () => {
+test('standard eye height matches the default avatar', () => {
   assert.ok(Math.abs(DEFAULT_EYE_HEIGHT - 1.085556018447876) < 1e-12);
   assert.equal(getAvatarEyeHeight(DEFAULT_PARAMS), DEFAULT_EYE_HEIGHT);
   assert.equal(getAvatarFloorOffset(DEFAULT_PARAMS), 0);
@@ -26,8 +26,6 @@ test('standard and extreme avatars use the same eye landmark as the rendered mod
   const geometry = JSON.parse(glb.subarray(20, 20 + glb.readUInt32LE(12)).toString('utf8')) as {
     nodes: { name: string; translation?: number[]; rotation?: number[]; scale?: number[]; children?: number[] }[];
   };
-  const native = JSON.parse(readFileSync(new URL('../native/Tonarium.Unity/Assets/Resources/OekakiGeometry.json', import.meta.url), 'utf8'));
-  assert.deepEqual(geometry.nodes, native.nodes);
   const nodes = geometry.nodes.map((node) => {
     const obj = new THREE.Object3D();
     obj.name = node.name;

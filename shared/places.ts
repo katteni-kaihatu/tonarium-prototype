@@ -1,4 +1,4 @@
-import { ROOM_HALF, spawnSlot, type AvatarState, type Participant } from './protocol.ts';
+import { LEAN_ANGLE, ROOM_HALF, spawnSlot, type AvatarState, type Participant } from './protocol.ts';
 import { WORLDS, type WorldKind } from './worlds.ts';
 import { CAR } from './city.ts';
 
@@ -79,6 +79,7 @@ export function clampAvatar(world: WorldKind, s: AvatarState): AvatarState {
     ry: Number(s.ry) || 0,
     ...(Number.isFinite(y) ? { y: Math.max(-30, Math.min(40, y)) } : {}),
     pitch: Math.max(-1.5, Math.min(1.5, Number(s.pitch) || 0)),
+    lean: Math.max(-LEAN_ANGLE, Math.min(LEAN_ANGLE, Number(s.lean) || 0)),
     jump: Math.max(0, Math.floor(Number(s.jump) || 0)),
     ...(s.walking !== undefined ? { walking: s.walking === true && !s.ride } : {}),
     ...(world === 'city' && s.ride ? { ride: cleanRide(s.ride) } : {}),

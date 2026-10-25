@@ -21,15 +21,9 @@
 
 Web 版と同じ 2D・3D・ゲームを専用ウィンドウで利用する別アプリ。サーバーに配信された Web 版の更新に追従する。Linux / Windows のビルドとインストールは [Electron 版](docs/electron.md) を参照。
 
-## Linux ネイティブ版
+## ネイティブ版の廃止
 
-Linux x86_64版のビルド・インストール・AUR用PKGBUILDは [Linux ネイティブ版](docs/native-linux.md) を参照。2DはAvalonia、3DはUnity Linuxプレイヤーを使用する。
-
-## Windows ネイティブ版
-
-`native/` に Avalonia の 2D クライアントと Unity の 3D クライアントがある。同じサーバーとセッションに接続する。2DはWeb版と共通の画像・アイコン・フォントを使用し、お絵描きアバターもネイティブでアニメーション表示する。起動は `powershell -ExecutionPolicy Bypass -File native/run-desktop.ps1`。初回は .NET 10 SDK が必要。3D のビルド、配布、確認状況は [Windows ネイティブ版](docs/native-windows.md) を参照。
-
-Windows版はローカルでビルドしたZIPをGit LFSでコミットし、`v0.0.1` のようなタグのpushでGitHub ActionsからReleaseへ添付する。[ビルドとリリース手順](docs/native-release.md)。
+Avalonia／Unity による Windows／Linux ネイティブ版は廃止しました。今後は Web 版または [Electron 版](docs/electron.md) を利用してください。ネイティブ版のコード・専用設定・自動配布処理は削除しました。公開済みの配布物は削除していません。
 
 ## セットアップ
 ```bash
@@ -69,6 +63,7 @@ http://localhost:5173 を開く。同じブラウザで別人として入るに�
 
 ## 主な機能
 
+- 単体ブラウザのWebXR初期実装（VR操作・仮想端末・対応表・検証範囲）→ [docs/webxr.md](docs/webxr.md)。Quest 3／Steam Frame実機は未検証、Electron版はVR非対応
 - 日本語・英語・韓国語の表示切り替え（端末保存・ブラウザ言語判定）→ [docs/languages.md](docs/languages.md)
 - チャットの自動翻訳・小さな原文と発言言語の表示（サーバーのOpenAI連携・ローカルモック）→ [docs/chat-translation.md](docs/chat-translation.md)
 - 変更履歴（主な更新の一覧・検索・未読の赤い点）→ [docs/home.md の変更履歴](docs/home.md#変更履歴)・[開発ガイド](docs/changelog.md)
@@ -78,7 +73,7 @@ http://localhost:5173 を開く。同じブラウザで別人として入るに�
 - 2D の画面（距離ごとのプレイヤー・アイテムのリスト、顔、通知・チャット、ウィンドウ、試験中のマップ、スマホ・PWA）→ [docs/screens.md](docs/screens.md)
 - 3D 空間（FPS 風の操作、ワールドの切り替え、ガーデン、街（マンション・電車・エレベーター）、お絵描きアバター、配信ディスプレイ）→ [docs/3d.md](docs/3d.md)
 - 距離で変わる声、ブロードキャストモード、ついていく → [docs/audio.md](docs/audio.md)
-- アイテム（付箋・ハンマー・チェス・サイコロ・キャンバス・カメラ・2048・AD ポータル・バイク）と画像・動画・YouTube の共有 → [docs/items.md](docs/items.md)。バイクの未完了項目は [検証記録](docs/bike-verification.md)、効果音の出典と取得状況は [素材記録](docs/assets.md)
+- アイテム（付箋・ハンマー・チェス・サイコロ・キャンバス・お絵描き伝言・カメラ・鏡・ジャンプ台・2048・AD ポータル・バイク）と画像・動画・YouTube の共有 → [docs/items.md](docs/items.md)。バイクの未完了項目は [検証記録](docs/bike-verification.md)、効果音の出典と取得状況は [素材記録](docs/assets.md)
 - 外から試す（cloudflared）・Coolify へのデプロイ → [docs/deploy.md](docs/deploy.md)
 - 同期の仕組み（kokosync、位置・チャット・キャンバス・サイコロのP2P配送、初回同期、大きいデータ、通信状態）→ [docs/sync.md](docs/sync.md)
 - セッション同期を汎用P2P通信へ広げる設計方針と段階的な実装 → [docs/peer-sync-plan.md](docs/peer-sync-plan.md)

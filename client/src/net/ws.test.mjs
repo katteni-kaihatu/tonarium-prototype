@@ -27,6 +27,40 @@ beforeEach(() => {
   globalThis.__tonariumWs = new WebSocket();
 });
 
+test('live room chat reception shows popups only for new eligible messages', () => {
+  Object.assign(state, { selfId: 'self', blocked: ['Blocked'], chats: {}, arrivals: {},
+    popupPausedUntil: 0, folded: { right: true } });
+  const receive = (id, from = 'other', fromName = 'Other', sid = 'existing') =>
+    onMessage({ t: 'chat', sid, m: { id, from, fromName, at: Date.now(), text: 'hello', scope: 'all' } });
+  receive('first');
+  assert.ok(state.arrivals.chat);
+  state.arrivals = {}; state.hubOpen = false; state.folded.right = false; state.rightView = 'log';
+  receive('visible');
+  assert.deepEqual(state.arrivals, {});
+  state.folded.right = true;
+  state.arrivals = {};
+  receive('first'); receive('self-message', 'self'); receive('blocked', 'blocked', 'Blocked');
+  receive('system', null); receive('other-room', 'other', 'Other', 'elsewhere');
+  assert.deepEqual(state.arrivals, {});
+  state.popupPausedUntil = Date.now() + 60_000;
+  receive('paused');
+  assert.deepEqual(state.arrivals, {});
+  state.popupPausedUntil = Date.now() - 1;
+  receive('resumed');
+  assert.ok(state.arrivals.chat);
+});
+
+test('DM reception targets its conversation and ignores updates and self messages', () => {
+  Object.assign(state, { selfName: 'Self', blocked: [], inbox: {}, arrivals: {},
+    popupPausedUntil: 0, folded: { right: true } });
+  const receive = (id, from = 'Other') => onMessage({ t: 'msg', conv: 'dm:Other\u0000Self', m: { id, from, at: Date.now(), text: 'hello' } });
+  receive('first');
+  assert.equal(state.arrivals.chat.conversation, 'dm:Other\u0000Self');
+  state.arrivals = {};
+  receive('first'); receive('self', 'Self');
+  assert.deepEqual(state.arrivals, {});
+});
+
 test('sessions broadcasts only update the list, even while awaiting creation', async () => {
   const pending = requestSession({ t: 'sessionCreate', name: 'new', topic: '', world: 'room', visibility: 'public' });
   const { requestId } = globalThis.__tonariumWs.sent[0];

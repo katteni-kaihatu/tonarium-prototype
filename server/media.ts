@@ -64,6 +64,19 @@ export async function saveMedia(req: http.IncomingMessage): Promise<{ url: strin
   return { url: `/media/${name}` };
 }
 
+/** ファイル配信のストリームエラーの受け皿。存在確認後にファイルが消える競合などで
+ * createReadStream が error を出しても、リスナーなしの未処理例外でプロセスごと落とさない。
+ * 応答が始まっていなければ 500、始まっていれば接続を切る */
+export function pipeFile(res: http.ServerResponse, file: string, range?: { start: number; end: number }) {
+  const rs = fs.createReadStream(file, range);
+  rs.on('error', (e) => {
+    console.error(`file stream error: ${file}`, e);
+    if (res.writableEnded) return;
+    if (!res.headersSent) { res.statusCode = 500; res.end(); } else res.destroy();
+  });
+  rs.pipe(res);
+}
+
 /** 動画のシークに Range が要る */
 export function serveMedia(req: http.IncomingMessage, res: http.ServerResponse, pathname: string) {
   const name = path.basename(pathname);
@@ -77,7 +90,7 @@ export function serveMedia(req: http.IncomingMessage, res: http.ServerResponse, 
   const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
   if (!m || (!m[1] && !m[2])) {
     res.setHeader('Content-Length', total);
-    fs.createReadStream(file).pipe(res);
+    pipeFile(res, file);
     return;
   }
   let start = m[1] ? Number(m[1]) : Math.max(0, total - Number(m[2]));
@@ -93,5 +106,5 @@ export function serveMedia(req: http.IncomingMessage, res: http.ServerResponse, 
   res.statusCode = 206;
   res.setHeader('Content-Range', `bytes ${start}-${end}/${total}`);
   res.setHeader('Content-Length', end - start + 1);
-  fs.createReadStream(file, { start, end }).pipe(res);
+  pipeFile(res, file, { start, end });
 }

@@ -1,6 +1,6 @@
 # Electron 版
 
-Electron 版は接続先サーバーの Web クライアントを、そのまま専用ウィンドウで開く。2D は React、3D は React Three Fiber / Three.js で、サバイバーズを含む描画・操作・音・通信は Web 版と同じコードを実行する。Avalonia / Unity のネイティブ版とは別のアプリで、並行して利用できる。
+Electron 版は接続先サーバーの Web クライアントを、そのまま専用ウィンドウで開く。2D は React、3D は React Three Fiber / Three.js で、サバイバーズを含む描画・操作・音・通信は Web 版と同じコードを実行する。Avalonia／Unity による Windows／Linux ネイティブ版は廃止し、デスクトップ向けの開発・配布は Electron 版に集約した。公開済みのネイティブ版配布物は保持する。
 
 初期接続先は `https://tonarium.rheni.work/`。サーバーに配信された Web 更新は、Electron 版でも再読み込み時に反映される。Web アセットやサーバーは配布物に同梱しないため、接続にはネットワークが必要。Electron 本体は GitHub Releases のコミット別 `nightly-<コミットSHA>` から更新できる。初回起動時に更新設定を選び、以後はメニューの「アプリの更新…」から変更する。
 
@@ -56,7 +56,7 @@ bash electron/install-linux-user.sh
 tonarium-electron
 ```
 
-アプリは `~/.local/opt/tonarium-electron/`、起動コマンドは `~/.local/bin/tonarium-electron`、アプリメニューには **Tonarium Electron** として登録する。再インストール時は新しい日時付きディレクトリに配置して `current` を切り替え、古いアプリを保持する。ネイティブ版の `tonarium` とインストール先を共有しない。ユーザーデータの既定位置は Linux では `$XDG_CONFIG_HOME/tonarium-electron`（通常 `~/.config/tonarium-electron`）、Windows では `%APPDATA%/tonarium-electron`。保存先は Web ブラウザーとも別のため、初回は Web 版と同様にログインが必要。
+アプリは `~/.local/opt/tonarium-electron/`、起動コマンドは `~/.local/bin/tonarium-electron`、アプリメニューには **Tonarium Electron** として登録する。再インストール時は新しい日時付きディレクトリに配置して `current` を切り替え、古いアプリを保持する。ユーザーデータの既定位置は Linux では `$XDG_CONFIG_HOME/tonarium-electron`（通常 `~/.config/tonarium-electron`）、Windows では `%APPDATA%/tonarium-electron`。保存先は Web ブラウザーとも別のため、初回は Web 版と同様にログインが必要。
 
 ## 機能と制約
 
@@ -97,6 +97,10 @@ Electronの「Tonarium Electron → マイク・スピーカー…」から、�
 
 ## Nightly配布
 
-main更新時はNative版と独立したLinux／Windowsジョブでビルドし、成功したOSから `nightly-<コミットSHA>` Releaseへ公開します。固定 `nightly` には自動更新の参照情報だけを上書きします。Nativeの失敗・実行待ちには影響されません。各成果物のソースコミットは対応する `.build.json` を確認してください。[公開構成](native-release.md#native--electron-nightly)。
+main更新時はLinux／Windowsの独立したジョブでビルドし、成功したOSから `nightly-<コミットSHA>` Releaseへ公開します。固定 `nightly` には自動更新の参照情報だけを上書きします。各成果物のソースコミットは対応する `.build.json` を確認してください。構成は [.github/workflows/electron-nightly.yml](../.github/workflows/electron-nightly.yml)、公開処理は [.github/scripts/publish-nightly.py](../.github/scripts/publish-nightly.py) にあります。
 
 `updates.cjs` はローカルページと実際の更新設定画面・コントローラーを用い、更新取得・適用だけを偽物に置き換えて初回選択、設定復元、確認のみ、自動適用、再起動操作を検証する。実際のReleaseへのアクセスやアプリの置換は行わない。
+
+## VRの利用について
+
+Electron版は今回のWebXR対応の対象外で、VR開始ボタンを無効化して「Electron非対応」と表示する。VRを試す場合は同じ接続先をWebXR対応の単体ブラウザで開く。通常の2D・3D利用は従来どおり。[対応条件と検証範囲](webxr.md) を参照。

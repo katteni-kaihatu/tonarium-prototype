@@ -19,7 +19,7 @@ import { useMyGroups, useOnlineFriends } from './common.tsx';
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="modalbg light" onClick={onClose}>
-      <div className="modal hmodal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal hmodal" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <h2>{title}</h2>
         {children}
       </div>

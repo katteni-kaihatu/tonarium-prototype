@@ -1,5 +1,6 @@
 import { msg, systemText, t as tr, type UiMessage } from './i18n/index.ts';
 import { LanguageSelect } from './i18n/LanguageSelect.tsx';
+import { PopupPauseSettings } from './world/NewArrivals.tsx';
 import { useEffect, useState } from 'react';
 import { iconUrl, pickIcon } from './icon.ts';
 import { avatarTextureUrl, uploadAvatarImage, uploadAvatarManifest } from './avatar.ts';
@@ -43,9 +44,10 @@ export function ProfileDialog({ name, onClose }: { name: string; onClose: () => 
 
   return (
     <div className="modalbg" onClick={onClose}>
-      <div className="modal profile" onClick={(e) => e.stopPropagation()}>
+      <div className="modal profile" role="dialog" aria-modal="true" aria-label={tr('ui584', n)} onClick={(e) => e.stopPropagation()}>
         <h2>{tr('ui584', n)}</h2>
         <section><LanguageSelect /></section>
+        <PopupPauseSettings />
         <div className="sub">{tr("ui47")}</div>
         <section>
           <h3>{tr("ui48")}</h3>

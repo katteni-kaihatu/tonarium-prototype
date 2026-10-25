@@ -1,3 +1,4 @@
+import { arrivalPatch } from '../newArrival.ts';
 import { sourceText as uiSource } from '../i18n/core.ts';
 import { COMPAT_VERSION, isRoomClientMsg, type ClientMsg, type ServerMsg, type SessionInfo, type SessionSnapshot } from '../../../shared/protocol.ts';
 import type { SurvivorState } from '../../../shared/survivor.ts';
@@ -173,7 +174,11 @@ export function onMessage(msg: ServerMsg) {
       set({ presence: msg.all });
       break;
     case 'chat':
-      set((s) => ({ chats: { ...s.chats, [msg.sid]: [...(s.chats[msg.sid] ?? []), msg.m].slice(-500) } }));
+      set((s) => ({
+        ...(msg.sid === s.session && msg.m.from && msg.m.from !== s.selfId && !s.blocked.includes(msg.m.fromName)
+          && !(s.chats[msg.sid] ?? []).some((m) => m.id === msg.m.id) ? arrivalPatch('chat', s) : {}),
+        chats: { ...s.chats, [msg.sid]: [...(s.chats[msg.sid] ?? []), msg.m].slice(-500) },
+      }));
       return;
     case 'avatar':
       set(applyAvatars(get(), msg.sid, msg.id, msg.s));
@@ -307,7 +312,10 @@ export function onMessage(msg: ServerMsg) {
         const list = s.inbox[msg.conv] ?? [];
         const i = list.findIndex((m) => m.id === msg.m.id);
         const next = i >= 0 ? list.map((m, j) => (j === i ? msg.m : m)) : [...list, msg.m].slice(-300);
-        return { inbox: { ...s.inbox, [msg.conv]: next } };
+        return {
+          ...(i < 0 && msg.m.from && msg.m.from !== s.selfName && !s.blocked.includes(msg.m.from) ? arrivalPatch('chat', s, Date.now(), msg.conv) : {}),
+          inbox: { ...s.inbox, [msg.conv]: next },
+        };
       });
       return;
     case 'read':

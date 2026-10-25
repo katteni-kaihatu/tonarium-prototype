@@ -4,14 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - '.github/workflows/native-nightly.yml'
-      - '.github/workflows/native-checks.yml'
+      - '.github/workflows/electron-nightly.yml'
       - '.github/workflows/nightly-checks.yml'
       - '.github/scripts/**'
   pull_request:
     paths:
-      - '.github/workflows/native-nightly.yml'
-      - '.github/workflows/native-checks.yml'
+      - '.github/workflows/electron-nightly.yml'
       - '.github/workflows/nightly-checks.yml'
       - '.github/scripts/**'
   workflow_dispatch:

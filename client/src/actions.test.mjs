@@ -16,11 +16,12 @@ stub('./spatial.ts', { placesOf: () => new Map(), resumeAudio() {} });
 stub('./phone.ts', { touchOnly: true });
 stub('./walk.ts', { stopWalk() {} });
 stub('../../shared/places.ts', { approach() {} });
-const { createSession, joinSession } = await import('./actions.ts');
+const { createSession, joinSession, leaveSession, pushNotice } = await import('./actions.ts');
 
 beforeEach(() => {
   calls = []; errors = []; serverSession = null;
   state = { session: null, voice: 'off', mode: '2d', hubOpen: true, homePage: 'worlds',
+    popupPausedUntil: 0, arrivals: {},
     selfAvatar: { x: 4, z: 2, ry: 1 }, windows: ['old-window'], maxWin: 'old-window', notices: [], selectedNote: null };
   request = async (msg) => {
     calls.push(msg.t);
@@ -42,6 +43,38 @@ test('creation joins the returned session and connects voice through the shared 
   assert.ok(calls.indexOf('sessionCreate') < calls.indexOf('join'));
   assert.ok(calls.includes('sync:start'));
   assert.deepEqual(errors, []);
+});
+
+test('new notices respect shared pause without changing unread handling', () => {
+  Object.assign(state, { session: 'room', blocked: [], folded: { right: true },
+    arrivals: {}, popupPausedUntil: 0 });
+  pushNotice('poke', 'other', 'Other');
+  assert.equal(state.notices[0].unread, true);
+  assert.equal(state.arrivals.notice.kind, 'notice');
+  state.arrivals = {}; state.hubOpen = false; state.folded.right = false; state.rightView = 'log';
+  pushNotice('poke', 'other', 'Other');
+  assert.deepEqual(state.arrivals, {});
+  state.folded.right = true;
+  state.arrivals = {}; state.popupPausedUntil = Date.now() + 60_000;
+  pushNotice('poke', 'other', 'Other');
+  assert.equal(state.notices.length, 3);
+  assert.deepEqual(state.arrivals, {});
+  state.popupPausedUntil = Date.now() - 1;
+  pushNotice('poke', 'other', 'Other');
+  assert.ok(state.arrivals.notice);
+});
+
+test('leaving and reentering clear popup pause and queued arrivals', async () => {
+  await joinSession('room');
+  state.popupPausedUntil = Date.now() + 60_000;
+  state.arrivals = { chat: { kind: 'chat', at: Date.now() } };
+  await leaveSession();
+  assert.equal(state.popupPausedUntil, 0);
+  assert.deepEqual(state.arrivals, {});
+  state.popupPausedUntil = Date.now() + 60_000;
+  await joinSession('room');
+  assert.equal(state.popupPausedUntil, 0);
+  assert.deepEqual(state.arrivals, {});
 });
 
 test('moving waits for both the old server membership and voice to leave', async () => {

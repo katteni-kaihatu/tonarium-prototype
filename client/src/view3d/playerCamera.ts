@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { LEAN_ANGLE } from '../../../shared/protocol.ts';
+
+export const LEAN_OFFSET = 0.25;
 
 export const CAMERA_DISTANCE = { initial: 3, min: 0.5, max: 6, wheelStep: 0.25, margin: 0.15 } as const;
 
@@ -8,6 +11,8 @@ export class PlayerCamera {
   actualDistance = 0;
   readonly avatarPosition = new THREE.Vector3();
   yaw = 0;
+  lean = 0;
+  private readonly anchor = new THREE.Vector3();
   private readonly direction = new THREE.Vector3();
   private readonly ray = new THREE.Raycaster();
   private readonly obstacles: THREE.Mesh[] = [];
@@ -24,11 +29,15 @@ export class PlayerCamera {
   }
 
   place(camera: THREE.Camera, scene: THREE.Scene, anchor: THREE.Vector3) {
-    camera.position.copy(anchor);
+    const offset = -this.lean / LEAN_ANGLE * LEAN_OFFSET;
+    this.anchor.copy(anchor);
+    this.anchor.x += Math.cos(camera.rotation.y) * offset;
+    this.anchor.z -= Math.sin(camera.rotation.y) * offset;
+    camera.position.copy(this.anchor);
     this.actualDistance = 0;
     if (!this.thirdPerson) { camera.updateMatrixWorld(); return; }
     this.direction.set(0, 0, 1).applyQuaternion(camera.quaternion);
-    this.ray.set(anchor, this.direction);
+    this.ray.set(this.anchor, this.direction);
     this.ray.near = 0;
     this.ray.far = this.desiredDistance;
     scene.updateMatrixWorld(true);

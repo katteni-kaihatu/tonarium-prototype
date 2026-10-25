@@ -78,12 +78,13 @@ export interface AdProfile {
   createdAt?: string | number | null;
 }
 
+/** ad/api.ts の LeaderboardEntry と同じ形（応答に playerId は含まれない。自分の行には self が付く） */
 export interface LeaderboardEntry {
-  playerId: string;
   name: string;
   antimatterLog10: number;
   infinities: number;
   playTimeSec: number;
+  self?: boolean;
 }
 
 export interface OfflineNotice {

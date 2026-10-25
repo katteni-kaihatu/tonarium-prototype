@@ -211,6 +211,8 @@ export function roomSend(sid: string, msg: RoomServerMsg, to?: string[], legacyP
       }).catch(() => {});
     }
   } else {
+    // この同期 pack には、呼び出し側 (survivors.ts の間引き送信など) が「呼び出し後に状態を変更しても
+    // 送信内容に混ざらない」前提で複製を省略して依存している。pack を非同期化すると前提が崩れるので注意
     const bytes = pack({ kind: 'message', message: msg });
     const operation = r.operation;
     let commit: Promise<SendCommit | undefined> | undefined;

@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -76,16 +75,4 @@ test('リポジトリの既存履歴を全件保持し、今回の移行項目�
   const result = aggregateChangelog();
   assert.deepEqual(result.filter(e => e.id.startsWith('legacy-')).map(({ id, ...e }) => e), legacy);
   assert.equal(result.filter(e => e.title === '作業別の変更履歴ファイルを自動集約').length, 1);
-});
-
-test('ネイティブ用の出力も同じ集約結果となり、再出力しても増えない', () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'tonarium-native-history-'));
-  try {
-    const output = join(cwd, 'changelog.json');
-    for (let i = 0; i < 2; i++) {
-      const run = spawnSync(process.execPath, [join(root, 'native/export-changelog.ts'), output], { encoding: 'utf8' });
-      assert.equal(run.status, 0, run.stderr);
-      assert.deepEqual(JSON.parse(readFileSync(output, 'utf8')), aggregateChangelog());
-    }
-  } finally { rmSync(cwd, { recursive: true, force: true }); }
 });

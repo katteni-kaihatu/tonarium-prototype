@@ -21,6 +21,7 @@ import { MediaControls, VideoHost, mediaVolume, videoEls } from '../mediaSync.ts
 import { YouTubePlayer, youTubeDuration } from '../youtube.tsx';
 import { send } from '../net/ws.ts';
 import { DiceBody } from './DiceBody.tsx';
+import { TelephoneBody } from '../items/TelephoneBody.tsx';
 import { SurvivorLibrary, SurvivorPanel } from './SurvivorPanel.tsx';
 import { AntimatterSpaceWindowBody, AntimatterWindowBody } from './antimatter/windowBodies.tsx';
 
@@ -144,6 +145,9 @@ function useResolved(key: string, compact: boolean): Resolved | null {
     };
   }
   if (item.kind === 'dice') return { kind: 'dice', dark: false, item, title: ITEM_INFO.dice.name, sub, width: 400, body: <DiceBody item={item} interactive={!compact} /> };
+  if (item.kind === 'telephone') return { kind: 'panel', dark: false, item, title: ITEM_INFO.telephone.name, sub, width: 640,
+    body: compact ? <p>お絵描き伝言・{item.game.phase === 'playing' ? `工程 ${item.game.step + 1}` : item.game.phase === 'results' ? '結果鑑賞' : '参加受付'}</p>
+      : <TelephoneBody item={item} interactive /> };
   // 入口だけのアイテム。開くのはワールド版と同じ自分の AD パネル
   if (item.kind === 'antimatter') return {
     kind: 'survivor', dark: true, item, title: 'AD 研究所', sub, width: 720, aspect: 1.2,

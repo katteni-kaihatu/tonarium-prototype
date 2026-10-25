@@ -1,0 +1,12 @@
+.xr-error { position: fixed; left: 12px; bottom: 12px; z-index: 100000; max-width: 560px; padding: 16px; background: #fff5e7; color: #352b23; border: 1px solid #d5b58d; border-radius: 12px; }
+.xr-tools { position: fixed; left: 8px; right: 8px; top: 8px; z-index: 100000; pointer-events: none; font: 14px sans-serif; color: #f4f1eb; }
+.xr-toolbar, .xr-tools p, .xr-keyboard, .xr-command-panel, .xr-options { pointer-events: auto; background: #252c36; padding: 8px; border-radius: 12px; border: 2px solid #899bb6; }
+.xr-toolbar { display: flex; gap: 8px; flex-wrap: wrap; width: fit-content; }
+.xr-tools p { width: fit-content; max-width: 900px; margin-top: 4px; }
+.xr-tools button { min-width: 36px; min-height: 36px; padding: 6px 10px; margin: 2px; border: 1px solid #8595ac; border-radius: 6px; background: #e7edf6; color: #152338; font: 14px sans-serif; }
+.xr-keyboard, .xr-command-panel, .xr-options { max-width: 960px; max-height: 42vh; overflow: auto; }
+.xr-keyboard { position: fixed; bottom: 8px; left: 8px; right: 8px; }
+.xr-keyboard span { display: inline-block; padding: 8px; }
+.xr-settings { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; padding: 8px; }
+.xr-settings label { display: flex; align-items: center; gap: 8px; }
+.xr-active .keyhelp { display: none; }

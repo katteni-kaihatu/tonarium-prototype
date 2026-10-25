@@ -1,0 +1,104 @@
+import assert from 'node:assert/strict';
+import { createServer } from 'vite';
+import react from '@vitejs/plugin-react';
+
+// Playwright を導入済みの環境で実行。第1引数には既存モジュールの file: URL も渡せる。
+const { chromium } = await import(process.argv[2] || 'playwright');
+const fixture = { name: 'xr-fixture', configureServer(server) { server.middlewares.use('/xr-fixture', async (_req, res) => { res.setHeader('Content-Type', 'text/html'); res.end(await server.transformIndexHtml('/xr-fixture', '<!doctype html><html><body style="margin:0;width:100vw;height:100vh"><main id="fixture"></main></body></html>')); }); } };
+const server = await createServer({ configFile: false, root: 'client', plugins: [fixture, react()], server: { host: '127.0.0.1', port: 5190, strictPort: true } });
+await server.listen();
+let browser;
+try {
+  browser = await chromium.launch({ headless: true, ...(process.argv[3] ? { executablePath: process.argv[3] } : {}) });
+  const page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
+  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+  await page.goto('http://127.0.0.1:5190/xr-fixture');
+  const result = await page.evaluate(async () => {
+    let checks = 0;
+    const check = (value, label) => { if (!value) throw new Error(label); checks++; };
+    const { TerminalPointer, writeField } = await import('/src/xr/domInput.ts');
+    const { TerminalSurface } = await import('/src/xr/surface.ts');
+    const runtime = await import('/src/xr/runtime.ts');
+    document.body.innerHTML = '<input id="text" value="あ😀い" style="position:absolute;left:20px;top:20px;width:200px;height:40px"><canvas id="game" width="300" height="200" style="position:absolute;left:40px;top:100px;width:300px;height:200px"></canvas><input id="range" type="range" min="15" max="180" step="15" value="15" style="position:absolute;left:20px;top:330px;width:200px;height:40px"><div class="view3d" style="position:absolute;top:400px;width:100px;height:100px"><canvas width="100" height="100"></canvas></div>';
+    const field = document.querySelector('#text');
+    field.setSelectionRange(1, 3);
+    let input = 0; field.addEventListener('input', () => input++);
+    writeField(field, '空');
+    check(field.value === 'あ空い' && input === 1, 'Unicode selection input event');
+    writeField(field, '', true);
+    check(field.value === 'あい', 'backspace');
+    const pointer = new TerminalPointer();
+    const game = document.querySelector('#game');
+    game.getContext('2d').fillStyle = '#00ff00'; game.getContext('2d').fillRect(0, 0, 300, 200);
+    let clicks = [], dragEnd = 0;
+    game.addEventListener('click', e => clicks.push([e.clientX, e.clientY]));
+    game.addEventListener('pointercancel', () => dragEnd++);
+    pointer.move(150, 150); pointer.press(); pointer.release();
+    check(clicks.length === 1 && clicks[0][0] === 150 && clicks[0][1] === 150, 'game pointer coordinates');
+    pointer.press(); pointer.move(600, 600); pointer.release(true);
+    check(dragEnd === 1 && clicks.length === 1, 'drag release outside surface');
+    pointer.move(210, 350); pointer.press(); pointer.release();
+    check(Number(document.querySelector('#range').value) >= 150, 'range adjustment');
+    const surface = new TerminalSurface(); surface.refresh();
+    const pixel = surface.mesh.material.map.image.getContext('2d').getImageData(150, 150, 1, 1).data;
+    check(pixel[1] === 255 && pixel[0] === 0, 'live 2D game capture');
+    check(document.querySelector('.view3d').style.display === '', 'restore desktop visibility after capture');
+    surface.refresh(); surface.dispose();
+    check(surface.mesh === null, 'dispose terminal GPU resources');
+    class Session extends EventTarget {
+      visibilityState = 'visible';
+      async end() { this.dispatchEvent(new Event('end')); }
+    }
+    let mockSession;
+    Object.defineProperty(navigator, 'xr', { configurable: true, value: { requestSession: async () => mockSession = new Session() } });
+    runtime.xr.renderer = { xr: { enabled: false, setReferenceSpaceType() {}, async setSession() {} } };
+    await runtime.startVR();
+    check(runtime.xrState().active && document.body.classList.contains('xr-active'), 'VR start');
+    runtime.xr.move = [1, -1]; runtime.xr.turn = 1;
+    mockSession.visibilityState = 'hidden'; mockSession.dispatchEvent(new Event('visibilitychange'));
+    check(runtime.xr.move.every(n => n === 0) && runtime.xr.turn === 0, 'visibility input reset');
+    mockSession.visibilityState = 'visible';
+    await runtime.endVR();
+    check(!runtime.xrState().active && !runtime.xrState().pending && !document.body.classList.contains('xr-active'), 'VR end restores normal state');
+    navigator.xr.requestSession = async () => { throw new Error('denied'); };
+    await runtime.startVR();
+    check(!runtime.xrState().active && !runtime.xrState().pending && runtime.xrState().error, 'permission failure recovers');
+    const { React, createRoot } = await import('/src/xr/browserFixture.ts');
+    const { XRControls } = await import('/src/xr/XRControls.tsx');
+    const { set } = await import('/src/store.ts');
+    const host = document.createElement('div'); document.body.appendChild(host);
+    const root = createRoot(host);
+    let reactValue = 'start';
+    function Form() { const [value, setValue] = React.useState('start'); return React.createElement('textarea', { id: 'controlled', value, onChange: e => { reactValue = e.target.value; setValue(e.target.value); }, style: { position: 'fixed', right: 20, top: 400, width: 200, height: 70 } }); }
+    set({ session: 'xr-test', mode: '3d' });
+    root.render(React.createElement(React.Fragment, null, React.createElement(Form), React.createElement(XRControls)));
+    navigator.xr.requestSession = async () => mockSession = new Session();
+    await runtime.startVR();
+    const settle = () => new Promise(resolve => setTimeout(resolve, 40));
+    await settle();
+    const click = el => { const r = el.getBoundingClientRect(); pointer.move(r.x + r.width / 2, r.y + r.height / 2); pointer.press(); pointer.release(); };
+    const controlled = document.querySelector('#controlled');
+    click(controlled); controlled.setSelectionRange(5, 5); await settle();
+    check(!!document.querySelector('.xr-keyboard'), 'controller opens keyboard by focusing input');
+    click([...document.querySelectorAll('.xr-keyboard button')].find(b => b.textContent === 'a')); await settle();
+    check(reactValue === 'starta', 'controller keyboard updates React controlled field');
+    click([...document.querySelectorAll('.xr-keyboard button')].find(b => b.textContent === 'キーボードを閉じる')); await settle();
+    click([...document.querySelectorAll('.xr-toolbar button')].find(b => b.textContent === '操作キー')); await settle();
+    let keyDown = 0, keyUp = 0;
+    window.addEventListener('keydown', e => { if (e.code === 'Space') keyDown++; });
+    window.addEventListener('keyup', e => { if (e.code === 'Space') keyUp++; });
+    click([...document.querySelectorAll('.xr-command-panel button')].find(b => b.textContent === 'ジャンプ / 上昇'));
+    check(keyDown === 1 && keyUp === 1, 'held command releases its key');
+    click(document.querySelector('.xr-settings select')); await settle();
+    click([...document.querySelectorAll('.xr-options button')].find(b => b.textContent === 'スムースターン')); await settle();
+    check(runtime.xr.settings.mode === 'smooth', 'controller chooses native select options');
+    click([...document.querySelectorAll('.xr-toolbar button')].find(b => b.textContent.startsWith('仮想端末を'))); await settle();
+    check(!runtime.xrState().open, 'controller folds personal terminal');
+    set({ mode: '2d' }); await settle();
+    check(!runtime.xrState().active && !document.querySelector('.xr-tools'), '2D mode ends VR and removes terminal input UI');
+    root.unmount(); set({ session: null, mode: '2d' });
+    return { checks };
+  });
+  assert.ok(result.checks >= 18);
+  console.log(`WebXR browser simulation: ${result.checks} checks passed (input, React keyboard, Canvas capture, session lifecycle).`);
+} finally { await browser?.close(); await server.close(); }

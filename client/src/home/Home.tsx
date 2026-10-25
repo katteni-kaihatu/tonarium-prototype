@@ -31,6 +31,7 @@ import { touchOnly, usePhone } from '../phone.ts';
 import { FEEDBACK_URL } from '../feedback.ts';
 import { CHANGELOG } from '../i18n/static.ts';
 import { useChangelog } from './changelog.ts';
+import { XRLaunch } from '../xr/XRControls.tsx';
 
 const NAV: { page: HomePage; name: string; icon: IconName }[] = localized([
   { page: 'home', name: uiSource('ui152'), icon: 'home' },
@@ -54,7 +55,7 @@ function useUnreadConvs() {
 }
 const useUpcoming = () => useStore((s) => s.events).filter((e) => e.at > Date.now() - 3_600_000 && e.at < Date.now() + WEEK);
 
-/** セッション中は今の 2D/3D を切り替え、外では次に入るときのモードを選ぶ。VR はまだ無い */
+/** セッション外では次に入るときのモードを選ぶ。 */
 function ClientMode() {
   const session = useStore((s) => s.session);
   const mode = useStore((s) => (s.session ? s.mode : touchOnly ? '2d' : s.joinMode));
@@ -73,7 +74,7 @@ function ClientMode() {
             <Icon name={m === '2d' ? 'flat' : 'cube'} size={14} />{m.toUpperCase()}
           </button>
         ))}
-        <button role="radio" aria-checked={false} aria-label={tr("ui160")} title={tr("ui161")} onClick={() => showToast(msg("ui162"))}><Icon name="vr" size={14} />VR</button>
+        <XRLaunch />
       </div>
     </div>
   );

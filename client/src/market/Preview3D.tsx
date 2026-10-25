@@ -17,6 +17,8 @@ import { createItem, type Item, type ItemKind } from '../../../shared/items.ts';
 import { ChessModel, HammerModel, NoteModel, PanelModel } from '../view3d/itemModels.tsx';
 import { CameraStand } from '../view3d/cameraModel.tsx';
 import { DiceStand } from '../view3d/diceModel.tsx';
+import { MirrorModel } from '../view3d/mirror3d.tsx';
+import { JumpPadModel } from '../view3d/jumpPad3d.tsx';
 import { Label } from '../view3d/Label.tsx';
 import { drawText, makeCanvasTexture } from '../view3d/textTexture.ts';
 import { drawCanvasPanel } from '../items/canvasDrawing.ts';
@@ -116,6 +118,9 @@ function InitialCanvas({ item }: { item: Item & { kind: 'canvas' } }) {
 
 function InitialModel({ item }: { item: Item }) {
   switch (item.kind) {
+    case 'telephone': return <><mesh position-y={0.5}><boxGeometry args={[1.4, 1, 0.25]} /><meshStandardMaterial color="#f6e4ec" /></mesh><Label text="お絵描き伝言" position={[0, 1.2, 0]} height={0.18} /></>;
+    case 'jumpPad': return <JumpPadModel />;
+    case 'mirror': return <MirrorModel />;
     case 'bike': return <BikeModel />;
     case 'note': return <InitialNote item={item} />;
     case 'hammer': return <HammerModel position={[0, 0.12, 0.3]} rotation-x={-Math.PI / 2} />;

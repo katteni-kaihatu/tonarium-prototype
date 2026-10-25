@@ -10,7 +10,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-NOTES = 'Native and Electron nightlies are published independently for each platform.\n\nThis release belongs to one immutable source commit. Missing platforms have not completed successfully.\nEach *.build.json records the source commit, workflow run and checksums.\nLinux native dependencies: docs/native-linux.md. Electron usage: docs/electron.md.\n'
+NOTES = 'Electron nightlies are published independently for each platform.\n\nThis release belongs to one immutable source commit. Missing platforms have not completed successfully.\nEach *.build.json records the source commit, workflow run and checksums.\nElectron usage: docs/electron.md.\n'
 COMPAT_NOTES = 'Compatibility update feed for Tonarium Electron.\n\nNew installers and archives are published in nightly-<full commit SHA> releases.\nOnly updater YAML and checksums are refreshed here. Existing legacy assets are retained.\nEach platform feed advances independently after its commit release upload succeeds.\n'
 
 def gh(*args, check=True):
@@ -60,11 +60,7 @@ def publish(component, runtime, directory):
     def current():
         return gh('api', f'repos/{repo}/git/ref/heads/main', '--jq', '.object.sha').stdout.strip() == sha
 
-    channel = None
-    if component == 'native':
-        names = [f'Tonarium-nightly-{runtime}' + ('.tar.gz' if runtime == 'linux-x64' else '.zip')]
-    else:
-        names, channel = electron_assets(directory, runtime)
+    names, channel = electron_assets(directory, runtime)
     assets = []
     hashes = {}
     for name in names:
@@ -145,7 +141,7 @@ def publish(component, runtime, directory):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('component', choices=['native', 'electron'])
+    parser.add_argument('component', choices=['electron'])
     parser.add_argument('runtime', choices=['linux-x64', 'win-x64'])
     parser.add_argument('directory')
     args = parser.parse_args()

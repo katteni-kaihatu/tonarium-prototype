@@ -1,5 +1,26 @@
 import { pushOut, type Solid } from '../../../shared/worlds.ts';
 import { CAR, PLATFORM_Y, carPose, toCarLocal, trainState, surfaceHeight, type Surface } from '../../../shared/city.ts';
+import { GRAVITY } from '../../../shared/protocol.ts';
+import { JUMP_PAD } from '../../../shared/jumpPad.ts';
+
+export interface LandingGround { y: number; jumpPad?: boolean }
+export function fallToGround(body: { y: number; vy: number; grounded: boolean; n: number }, ground: LandingGround | null, dt: number): boolean {
+  const previousY = body.y;
+  body.vy -= GRAVITY * dt;
+  body.y += body.vy * dt;
+  if (!ground || body.vy > 0 || body.y > ground.y) return false;
+  if (ground.jumpPad && previousY < ground.y) return false;
+  body.y = ground.y;
+  if (ground.jumpPad) {
+    body.vy = JUMP_PAD.velocity;
+    body.grounded = false;
+    body.n++;
+    return true;
+  }
+  body.vy = 0;
+  body.grounded = true;
+  return false;
+}
 
 export const MOVEMENT_MODES = { walk: '歩行', fly: 'フライ', noclip: 'ノークリップ' } as const;
 export type MovementMode = keyof typeof MOVEMENT_MODES;
