@@ -1,3 +1,4 @@
+import { DiceStand } from './diceModel.tsx';
 import { useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -100,19 +101,6 @@ function RollingDice({ roll, results }: { roll: DiceRoll; results: number[] | nu
   );
 }
 
-function Bowl() {
-  const geo = useMemo(() => {
-    const pts = [[0, 0], [0.26, 0], [0.38, 0.05], [0.45, 0.13], [0.47, 0.19], [0.45, 0.2], [0.43, 0.14], [0.36, 0.07], [0.25, 0.035], [0, 0.035]]
-      .map(([x, y]) => new THREE.Vector2(x, y));
-    return new THREE.LatheGeometry(pts, 48);
-  }, []);
-  return (
-    <mesh geometry={geo}>
-      <meshStandardMaterial color="#a06a42" roughness={0.75} side={THREE.DoubleSide} />
-    </mesh>
-  );
-}
-
 export function Dice3D({ item }: { item: Item & { kind: 'dice' } }) {
   const ref = useRef<THREE.Group>(null);
   useFollow(ref, item.id, item.x, item.z, item.ry);
@@ -139,18 +127,7 @@ export function Dice3D({ item }: { item: Item & { kind: 'dice' } }) {
   };
   return (
     <group ref={ref} position={[item.x, 0, item.z]} rotation-y={item.ry} userData={data}>
-      <mesh position-y={STAND_Y - 0.02}>
-        <cylinderGeometry args={[0.52, 0.52, 0.04, 32]} />
-        <meshStandardMaterial color="#7a4e30" roughness={0.8} />
-      </mesh>
-      <mesh position-y={(STAND_Y - 0.04) / 2}>
-        <cylinderGeometry args={[0.07, 0.16, STAND_Y - 0.04, 16]} />
-        <meshStandardMaterial color="#5a3826" roughness={0.8} />
-      </mesh>
-      <group position-y={STAND_Y}>
-        <Bowl />
-        {roll && <RollingDice key={roll.id} roll={roll} results={results} />}
-      </group>
+      <DiceStand>{roll && <RollingDice key={roll.id} roll={roll} results={results} />}</DiceStand>
       <Label text={label} position={[0, STAND_Y + 0.55, 0]} height={0.1} />
     </group>
   );

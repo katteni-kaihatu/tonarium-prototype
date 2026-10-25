@@ -38,7 +38,6 @@ const NAV: { page: HomePage; name: string; icon: IconName }[] = [
   { page: 'worlds', name: 'ワールド', icon: 'globe' },
   { page: 'items', name: 'アイテム', icon: 'box' },
   { page: 'market', name: 'マーケット', icon: 'market' },
-  { page: 'changelog', name: '変更履歴', icon: 'calendar' },
 ];
 
 const WEEK = 7 * 86_400_000;
@@ -108,7 +107,6 @@ export function Sidebar({ inSession, onPick }: { inSession?: boolean; onPick?: (
             <li key={n.page}>
               <button className={`ib hnavbtn ${page === n.page ? 'on' : ''}`} onClick={() => { goHome(n.page); picked(); }}>
                 <Icon name={n.icon} size={18} />{n.name}
-                {n.page === 'changelog' && changelogUnread && <i className="hdot" aria-label="未読の変更履歴あり" />}
                 {!!badge[n.page] && <span className={`hbadge ${n.page === 'friends' && unreadDm ? 'red' : ''}`}>{badge[n.page]}</span>}
               </button>
             </li>
@@ -131,6 +129,10 @@ export function Sidebar({ inSession, onPick }: { inSession?: boolean; onPick?: (
         </div>
         <ClientMode />
         <span className="spacer" />
+        <button className={`ib hnavbtn ${page === 'changelog' ? 'on' : ''}`} onClick={() => { goHome('changelog'); picked(); }}>
+          <Icon name="calendar" size={18} />変更履歴
+          {changelogUnread && <i className="hdot" aria-label="未読の変更履歴あり" />}
+        </button>
         <a className="ib hnavbtn hfeedback" href={FEEDBACK_URL} target="_blank" rel="noreferrer" title="フィードバックを送る（新しいタブで開きます）"><Icon name="heart" size={18} />フィードバック<Icon name="link" size={13} /></a>
         {inSession && <button className="ib hnavbtn hleave" onClick={leaveSession}><Icon name="leave" size={18} />セッションから離脱</button>}
         <div className="hself">

@@ -95,3 +95,11 @@ button.market-card-open { width: 100%; height: auto; padding: 0; gap: 0; display
 .market-share { position: relative; display: inline-flex; }
 .market-copy-toast { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); padding: 8px 12px; border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 12px; white-space: nowrap; pointer-events: none; box-shadow: var(--pop); z-index: 2; }
 .market-copy-toast::after { content: ''; position: absolute; top: 100%; left: calc(50% - 5px); border: 5px solid transparent; border-top-color: var(--ink); }
+.item-card-open { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 12px; width: 100%; height: auto; padding: 0; border: 0; border-radius: 12px; background: transparent; color: inherit; text-align: left; }
+.item-card-open:focus-visible { outline: 3px solid var(--accent, #9A3A62); outline-offset: 4px; }
+.icard:has(.item-card-open) { flex-direction: column; }
+.item-card-art { width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: contain; border-radius: 12px; }
+.item-illustration { display: block; width: 100%; max-width: 360px; height: auto; margin: 16px auto 0; border-radius: 16px; }
+.market-3d-preview + .item-illustration { max-width: 180px; }
+.hsec > .market-back { align-self: flex-start; }
+.hsec .market-detail-copy h2 { font-size: 26px; }

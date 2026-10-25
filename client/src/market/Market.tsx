@@ -1,3 +1,4 @@
+import { ItemDetail } from './ItemDetail.tsx';
 import { OriginBadge } from './OriginBadge.tsx';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { MARKET_CATEGORIES, MARKET_PRODUCTS, type MarketCategory, type MarketProduct } from '../../../shared/market.ts';
@@ -87,21 +88,16 @@ export function MarketPage({ q }: { q: string }) {
   return <section className="market-page">
     <div className="market-topline"><span className="market-wallet"><span aria-hidden="true">◉</span> 2,000 <small>コイン</small><span className="content-origin">体験用</span></span></div>
     {selected ? <>
-      <button className="ib market-back" onClick={() => { openMarketProduct(null); setSuccess(false); setPreviewing(false); }}><Icon name="left" />一覧に戻る</button>
-      <div className="market-detail">
-        <div>{selected.category !== 'sounds' ? <Suspense fallback={<div className="market-3d-stage market-3d-loading" role="status">3D プレビューを準備中…</div>}><Preview3D key={selected.id} product={selected} /></Suspense> : <ProductArt product={selected} />}{selected.category === 'sounds' && <div className="market-preview"><button disabled={previewing} onClick={() => { unlockEmoteAudio(); playSynth(selected.content, 1); setPreviewing(true); }}><Icon name="volume" />{previewing ? '試聴中…' : 'サウンドを試聴する'}</button><small>試聴は自分だけに聞こえます</small></div>}</div>
-        <div className="market-detail-copy">
-          <span className="market-category">{MARKET_CATEGORIES[selected.category]}</span>
-          <h2 ref={heading} tabIndex={-1}>{selected.name}</h2><span className="market-creator">制作：{selected.creator}</span>
-          <p>{selected.description}</p>
-          <div className="market-social"><LikeButton key={selected.id} product={selected.id} /><div className="market-share-actions"><span className="market-share"><button onClick={() => void copyLink()}><Icon name="link" />共有リンクをコピー</button>{copyStatus === 'copied' && <span className="market-copy-toast" role="status">コピーしました</span>}</span>{session && <button disabled={!connected} title={connected ? '参加中のセッション全体に共有します' : 'セッションへの接続後に共有できます'} onClick={shareToSession}><Icon name="send" />現在のセッションに共有</button>}</div></div>
-          {copyStatus === 'manual' && <label className="market-copy-fallback">リンクを選択してコピーしてください<input readOnly aria-label="共有リンク" value={shareProductUrl(selected.id)} onFocus={(e) => e.currentTarget.select()} /></label>}
-          <div className="market-tags"><span>2D / 3D 対応</span><span>モック商品</span></div>
-          <div className="market-price">◉ {selected.price.toLocaleString()} <small>コイン</small></div>
+      <ItemDetail name={selected.name} genre={MARKET_CATEGORIES[selected.category]} creator={selected.creator} description={selected.description}
+        headingRef={heading} onBack={() => { openMarketProduct(null); setSuccess(false); setPreviewing(false); }}
+        visual={<>{selected.category !== 'sounds' ? <Suspense fallback={<div className="market-3d-stage market-3d-loading" role="status">3D プレビューを準備中…</div>}><Preview3D key={selected.id} product={selected} /></Suspense> : <ProductArt product={selected} />}{selected.category === 'sounds' && <div className="market-preview"><button disabled={previewing} onClick={() => { unlockEmoteAudio(); playSynth(selected.content, 1); setPreviewing(true); }}><Icon name="volume" />{previewing ? '試聴中…' : 'サウンドを試聴する'}</button><small>試聴は自分だけに聞こえます</small></div>}</>}
+        social={<><div className="market-social"><LikeButton key={selected.id} product={selected.id} /><div className="market-share-actions"><span className="market-share"><button onClick={() => void copyLink()}><Icon name="link" />共有リンクをコピー</button>{copyStatus === 'copied' && <span className="market-copy-toast" role="status">コピーしました</span>}</span>{session && <button disabled={!connected} title={connected ? '参加中のセッション全体に共有します' : 'セッションへの接続後に共有できます'} onClick={shareToSession}><Icon name="send" />現在のセッションに共有</button>}</div></div>
+          {copyStatus === 'manual' && <label className="market-copy-fallback">リンクを選択してコピーしてください<input readOnly aria-label="共有リンク" value={shareProductUrl(selected.id)} onFocus={(e) => e.currentTarget.select()} /></label>}</>}
+        tags={<><span>2D / 3D 対応</span><span>モック商品</span></>}
+        usage={<>{selected.category === 'worlds' ? 'ワールド一覧から、このワールドでセッションを作成できます。参加中なら、確認後に全員のワールドを切り替えられます。' : selected.category === 'items' ? 'アイテム一覧やセッション内の所持アイテムから「目の前に出す」を選びます。質問・挨拶入りの付箋として配置され、自由に編集できます。' : selected.category === 'sounds' ? 'セッション下部のサウンドボードに追加されます。ボタンを押すと近くにいる人にサウンドが聞こえます。' : 'セッション下部のエモートメニューに追加されます。ボタンを押すと、アイコンやアバターが動きます。'}</>}>
+        <div className="market-price">◉ {selected.price.toLocaleString()} <small>コイン</small></div>
           {owned.includes(selected.id) ? <div className="market-success" role="status"><b><Icon name="check" />{success ? '購入しました！' : '購入済みです'}</b><p>「{MARKET_CATEGORIES[selected.category]}」に追加されています。</p><button className="primary" onClick={() => goHome(selected.category)}>{MARKET_CATEGORIES[selected.category]}を開く</button></div> : <><button className="primary market-buy" onClick={() => setConfirm(true)}>購入する</button><small>購入すると「{MARKET_CATEGORIES[selected.category]}」から使えます。</small></>}
-        </div>
-      </div>
-      <div className="market-about"><h3>このコンテンツの使い方</h3><p>{selected.category === 'worlds' ? 'ワールド一覧から、このワールドでセッションを作成できます。参加中なら、確認後に全員のワールドを切り替えられます。' : selected.category === 'items' ? 'アイテム一覧やセッション内の所持アイテムから「目の前に出す」を選びます。質問・挨拶入りの付箋として配置され、自由に編集できます。' : selected.category === 'sounds' ? 'セッション下部のサウンドボードに追加されます。ボタンを押すと近くにいる人にサウンドが聞こえます。' : 'セッション下部のエモートメニューに追加されます。ボタンを押すと、アイコンやアバターが動きます。'}</p></div>
+      </ItemDetail>
       {confirm && <PurchaseDialog product={selected} onClose={() => setConfirm(false)} onPurchased={() => { setConfirm(false); setSuccess(true); }} />}
     </> : <>
       <div className="market-filters"><div className="market-tabs" aria-label="商品ジャンル">{(['all', ...Object.keys(MARKET_CATEGORIES)] as const).map((cat) => <button key={cat} aria-pressed={category === cat} className={category === cat ? 'on' : ''} onClick={() => setCategory(cat as MarketCategory | 'all')}>{cat === 'all' ? 'すべて' : MARKET_CATEGORIES[cat as MarketCategory]}</button>)}</div><label className="market-owned">購入状態<select value={ownership} onChange={(e) => setOwnership(e.target.value as typeof ownership)}><option value="all">すべて表示</option><option value="owned">購入済みのみ</option><option value="unowned">購入したものを非表示</option></select></label></div>

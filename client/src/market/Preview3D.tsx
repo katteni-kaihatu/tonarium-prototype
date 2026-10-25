@@ -1,4 +1,4 @@
-import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Component, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -9,6 +9,13 @@ import { OekakiAvatar } from '../view3d/OekakiAvatar.tsx';
 import { useStore } from '../store.ts';
 import { Icon } from '../world/Icon.tsx';
 import { WorldMesh, WORLD_BG } from '../view3d/worlds3d.tsx';
+import { createItem, ITEM_INFO, type Item, type ItemKind } from '../../../shared/items.ts';
+import { ChessModel, HammerModel, NoteModel, PanelModel } from '../view3d/itemModels.tsx';
+import { CameraStand } from '../view3d/cameraModel.tsx';
+import { DiceStand } from '../view3d/diceModel.tsx';
+import { Label } from '../view3d/Label.tsx';
+import { drawText, makeCanvasTexture } from '../view3d/textTexture.ts';
+import { drawCanvasPanel } from '../items/canvasDrawing.ts';
 
 class PreviewBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -46,7 +53,7 @@ function NotePreview({ text }: { text: string }) {
   </group>;
 }
 
-export default function Preview3D({ product }: { product: MarketProduct }) {
+function ProductPreview({ product }: { product: MarketProduct }) {
   const name = useStore((s) => s.selfName);
   const avatar = useStore((s) => s.users.find((u) => u.id === s.selfId)?.avatar ?? null);
   const [emote, setEmote] = useState<ActiveEmote | null>(null);
@@ -79,4 +86,72 @@ export default function Preview3D({ product }: { product: MarketProduct }) {
     </div>
     <p className="sub wrap" role="status">{emote ? EMOTES[emote.id].caption : 'ドラッグで回転・スクロールで拡大。プレビューは自分だけに表示されます。'}</p>
   </div>;
+}
+
+function InitialNote({ item }: { item: Item & { kind: 'note' } }) {
+  const { canvas, tex } = useMemo(() => makeCanvasTexture(512, 384), []);
+  useEffect(() => {
+    drawText(canvas, [{ text: '（空の付箋）', color: '#78716c', size: 64 }], { bg: item.color });
+    tex.needsUpdate = true;
+  }, [canvas, tex, item.color]);
+  useEffect(() => () => tex.dispose(), [tex]);
+  return <NoteModel color={item.color} texture={tex} />;
+}
+
+function InitialCanvas({ item }: { item: Item & { kind: 'canvas' } }) {
+  const { canvas, tex } = useMemo(() => makeCanvasTexture(1280, 1040), []);
+  useEffect(() => {
+    const ctx = canvas.getContext('2d')!;
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    drawCanvasPanel(ctx, item, {});
+    tex.needsUpdate = true;
+  }, [canvas, tex, item]);
+  useEffect(() => () => tex.dispose(), [tex]);
+  return <PanelModel item={item} width={1.8 * 640 / 520} texture={tex} />;
+}
+
+function InitialModel({ item }: { item: Item }) {
+  switch (item.kind) {
+    case 'note': return <InitialNote item={item} />;
+    case 'hammer': return <HammerModel position={[0, 0.12, 0.3]} rotation-x={-Math.PI / 2} />;
+    case 'chess':
+    case 'chessAi': return <ChessModel item={item} />;
+    case 'canvas': return <InitialCanvas item={item} />;
+    case 'camera': return <CameraStand />;
+    case 'dice': return <><DiceStand /><Label text="サイコロ" position={[0, 1.25, 0]} height={0.1} /></>;
+    default: return null;
+  }
+}
+
+function StandardPreview({ kind }: { kind: ItemKind }) {
+  const controls = useRef<OrbitControlsImpl>(null);
+  const rememberView = useCallback((instance: OrbitControlsImpl | null) => {
+    controls.current = instance;
+    // target の適用後に保存し、リセットで原点へ向き直るのを防ぐ。
+    instance?.saveState();
+  }, []);
+  const item = useMemo(() => createItem(kind, { id: 'preview', x: 0, z: 0, ry: 0, createdBy: '' }, () => 0), [kind]);
+  const targetY = kind === 'hammer' ? 0.2 : kind === 'canvas' ? 1.4 : kind === 'note' ? 1.1 : 0.75;
+  const position: [number, number, number] = kind === 'hammer' ? [1.1, 1.1, 1.7] : [2.4, targetY + 1.6, kind === 'camera' ? -3.7 : 3.7];
+  if (!item || !ITEM_INFO[kind].in3d) return <img className="item-illustration" src={ITEM_INFO[kind].illustration} alt={ITEM_INFO[kind].name} />;
+  return <div className="market-3d-preview">
+    <div className="market-3d-stage" role="img" aria-label={`${ITEM_INFO[kind].name}の3Dプレビュー`}>
+      <PreviewBoundary>
+        <Canvas camera={{ position, fov: 35 }} dpr={[1, 1.5]} fallback={<p>このブラウザでは3D表示を利用できません。</p>}>
+          <color attach="background" args={[ITEM_INFO[kind].tint]} />
+          <ambientLight intensity={1.8} /><directionalLight position={[3, 5, 4]} intensity={2} />
+          <InitialModel item={item} />
+          <mesh rotation-x={-Math.PI / 2} position-y={-.03}><circleGeometry args={[1.45, 48]} /><meshStandardMaterial color="#fffdf9" /></mesh>
+          <OrbitControls ref={rememberView} target={[0, targetY, 0]} enablePan={false} minDistance={0.8} maxDistance={7} maxPolarAngle={Math.PI / 2} />
+        </Canvas>
+      </PreviewBoundary>
+      <span className="market-3d-label">3D プレビュー</span>
+    </div>
+    <div className="market-preview-controls"><button onClick={() => controls.current?.reset()}><Icon name="eye" />視点を戻す</button></div>
+    <p className="sub wrap">ドラッグで回転・スクロールで拡大。新しく置いたときの姿です。</p>
+  </div>;
+}
+
+export default function Preview3D(props: { product: MarketProduct; kind?: never } | { kind: ItemKind; product?: never }) {
+  return props.product ? <ProductPreview product={props.product} /> : <StandardPreview kind={props.kind} />;
 }
