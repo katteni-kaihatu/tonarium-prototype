@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { carrying } from './interact.ts';
 import { LEAN_ANGLE } from '../../../shared/protocol.ts';
 
 export const LEAN_OFFSET = 0.25;
@@ -50,7 +51,7 @@ export class PlayerCamera {
       let skip = false;
       // noRay は電車の壁にも使うため、カメラ用の除外条件にはしない。
       for (let o: THREE.Object3D | null = mesh; o; o = o.parent) {
-        if (!o.visible || o.userData.selfBody || o.userData.firstPerson) { skip = true; break; }
+        if (!o.visible || o.userData.selfBody || o.userData.firstPerson || (o.userData.mediaItemId && o.userData.mediaItemId === carrying.current?.id)) { skip = true; break; }
       }
       const materials = mesh.material;
       if ((Array.isArray(materials) ? materials : [materials]).every(m => !m.visible || (m.transparent && m.opacity === 0))) skip = true;

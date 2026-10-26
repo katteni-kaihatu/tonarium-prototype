@@ -2,7 +2,7 @@ name: Electron checks
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - 'electron/**'
       - '.github/workflows/electron-checks.yml'

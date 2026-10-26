@@ -1,0 +1,128 @@
+.tltabs { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(38, 38, 46, .06); flex-wrap: wrap; }
+.tltabs button { height: 32px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; color: var(--muted2); font-size: 13px; font-weight: 700; }
+.tltabs button:hover:not(.on) { background: var(--hover); }
+.tltabs button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(40, 30, 10, .12); }
+
+.tlpage { display: flex; flex-direction: column; gap: 10px; max-width: 640px; width: 100%; padding-bottom: 8px; flex: 1; }
+.tlbanner { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px; background: #E8EEFB; color: var(--accent); font-size: 12px; font-weight: 700; }
+.tllist { display: flex; flex-direction: column; border-radius: 16px; background: #fff; box-shadow: 0 1px 2px rgba(60, 40, 10, .06), 0 6px 20px rgba(60, 40, 10, .05); }
+/* 一覧が短くても欄の右下に置き、長ければスクロールしても右下に残す */
+.tlfab { position: sticky; bottom: 16px; margin-top: auto; align-self: flex-end; z-index: 5; height: 52px; padding: 0 22px 0 18px; gap: 8px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font-size: 15px; font-weight: 700; box-shadow: 0 8px 24px rgba(47, 95, 196, .35); }
+.tlfab:hover { background: #2752AB; }
+
+.tlpost { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 10px 14px 6px; border-top: 1px solid #F0EBE2; }
+/* 一覧に overflow: hidden を付けるとメニューが切れるので、角は端のカードで丸める */
+.tlpost:first-child { border-top: 0; border-top-left-radius: 16px; border-top-right-radius: 16px; }
+.tlpost:last-child { border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; }
+.tlpost.sel { background: var(--accentbg); }
+.tlopen { position: absolute; inset: 0; z-index: 1; height: auto; border: 0; padding: 0; border-radius: inherit; background: transparent; }
+.tlopen:hover { background: rgba(38, 38, 46, .025); }
+.tlrepostby { display: flex; align-items: center; gap: 5px; padding-left: 24px; font-size: 11px; font-weight: 700; color: var(--speak); }
+.tlrow { display: flex; gap: 10px; }
+.tlrow > .face { box-shadow: 0 0 0 2px #fff; }
+.tlbody { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+.tlhead { display: flex; align-items: baseline; gap: 5px; min-width: 0; white-space: nowrap; overflow: hidden; }
+.tlhead b { font-size: 13px; }
+.tlhead .sub { font-size: 11px; color: #75727D; overflow: visible; }
+.tlplace { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); white-space: nowrap; min-width: 0; }
+.tlplace .dim { opacity: .5; }
+.tlmode { display: flex; color: var(--ink); }
+.tltext { margin: -2px 0 0; font-size: 14px; line-height: 1.6; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.tltext.small { margin: 0; font-size: 13px; }
+
+/* カードの上を覆う「開く」ボタンより前に出す */
+.tlmedia, .tlacts { position: relative; z-index: 2; }
+.tlmedia { display: flex; flex-direction: column; gap: 5px; }
+.tlphoto { position: relative; display: block; width: 340px; max-width: 100%; height: auto; padding: 0; border: 0; border-radius: 12px; overflow: hidden; background: var(--sand); }
+.tlphoto img { display: block; width: 100%; max-height: 260px; object-fit: cover; }
+.tlshot { position: absolute; left: 8px; bottom: 8px; display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 7px; background: rgba(20, 20, 24, .62); color: #fff; font-size: 10px; font-weight: 700; }
+.tlshot .tlplace, .tlshot .tlmode { color: #fff; font-size: 10px; }
+.tlattach { display: flex; align-items: center; gap: 10px; padding: 7px 8px; max-width: 440px; border-radius: 12px; background: #FAF7F1; box-shadow: inset 0 0 0 1px #EAE4D9; }
+.tlattach .finfo { flex: 1; gap: 1px; }
+.tlattach .finfo b { font-size: 13px; }
+.tlattach .sub { display: flex; align-items: center; gap: 5px; font-size: 11px; }
+.tlthumb { width: 44px; height: 44px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex: none; color: var(--ink2); }
+.tlkind { font-size: 10px; font-weight: 700; color: var(--accent); }
+.tlkind.dim { font-size: 11px; color: var(--muted); }
+.tlfaces { display: inline-flex; }
+.tlfaces .face { margin-right: -4px; box-shadow: 0 0 0 1.5px #FAF7F1; }
+.tlfaces + * { margin-left: 6px; }
+.tlbtn { height: 28px; padding: 0 12px; border-radius: 9px; font-size: 12px; font-weight: 700; flex: none; }
+.tlquote { display: flex; flex-direction: column; align-items: stretch; gap: 2px; height: auto; padding: 7px 10px; max-width: 440px; border: 0; border-radius: 12px; background: #FAF7F1; box-shadow: inset 0 0 0 1px #EAE4D9; text-align: left; }
+.tlquote:hover { background: #F5F1E9; }
+.tlqhead { display: flex; align-items: center; gap: 5px; font-size: 11px; min-width: 0; }
+.tlqhead .sub { font-size: 11px; }
+.tlqtext { font-size: 12px; color: var(--ink2); white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+.tlacts { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-left: -5px; }
+.tlrx { height: 24px; padding: 0 7px; gap: 4px; border: 0; border-radius: 999px; background: rgba(38, 38, 46, .06); font-size: 13px; }
+.tlrx b { font-size: 11px; color: var(--ink2); }
+.tlrx.on { background: #E8EEFB; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.tlrx.on b { color: var(--accent); }
+.tlact { height: 28px; min-width: 28px; padding: 0 6px; gap: 3px; border-radius: 7px; color: #75727D; font-size: 11px; font-weight: 700; }
+.tlact.small { height: 22px; min-width: 22px; padding: 0 5px; }
+.tlact.reposted { color: var(--speak); }
+.tlpopwrap { display: inline-flex; }
+/* スマホのシート（z-index 50）より前に出す */
+.tlpop { position: fixed; z-index: 60; display: flex; flex-direction: column; min-width: 180px; padding: 6px; border-radius: 12px; background: var(--paper); box-shadow: var(--pop); }
+.tlpop button { justify-content: flex-start; height: 36px; padding: 0 10px; border-radius: 8px; font-size: 13px; white-space: nowrap; }
+.tlemojis { display: grid; grid-template-columns: repeat(6, 36px); gap: 2px; min-width: 0; }
+.tlemojis button { justify-content: center; width: 36px; height: 36px; padding: 0; font-size: 18px; }
+.tlemojis button.on { background: #E8EEFB; }
+
+/* 書く欄と返信の入力を下に固定し、中身だけをスクロールさせる */
+.hevents.tlaside { width: 340px; padding: 16px 14px; height: calc(100vh - 32px); overflow: hidden; }
+.home.sheet .hevents.tlaside { height: 100%; }
+.home.sheet .hevents.tlaside > .tlside { flex-shrink: 1; }
+.tlside { display: flex; flex-direction: column; gap: 14px; flex: 1; min-height: 0; }
+.tlsidehead { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.tlsidehead span { flex: 1; }
+.tlclose { width: 32px; height: 32px; padding: 0; border-radius: 9px; }
+.tlsidebody { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.tlside .tlpost { padding: 12px; }
+.tlcount { font-size: 12px; font-weight: 700; color: var(--muted); }
+.tlthread { display: flex; flex-direction: column; padding: 2px 12px 6px; border-radius: 12px; background: #FAF7F1; box-shadow: inset 0 0 0 1px #EAE4D9; }
+.tlreply { position: relative; display: flex; gap: 8px; padding: 8px 0 4px; }
+.tlreply > .face { position: relative; box-shadow: 0 0 0 2px #FAF7F1; }
+.tlreply .tlhead b { font-size: 12px; }
+.tlline { position: absolute; left: 13px; top: 34px; bottom: -4px; width: 2px; border-radius: 1px; background: #E7E1D6; }
+.tlreplybox { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border-radius: 14px; background: #fff; box-shadow: inset 0 0 0 1px #E2DBCF; flex: none; }
+.tlreplybox input { flex: 1; min-width: 0; height: 32px; padding: 0; border: 0; background: transparent; font-size: 13px; }
+.tlreplybox button { height: 32px; padding: 0 14px; border-radius: 9px; font-size: 12px; }
+
+.tlcompose { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 16px; background: #fff; box-shadow: 0 1px 2px rgba(60, 40, 10, .06), 0 6px 20px rgba(60, 40, 10, .05); }
+.tlwho { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.tlpublic { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 11px; font-weight: 700; color: var(--ink2); white-space: nowrap; }
+.tlcompose textarea { width: 100%; padding: 0; border: 0; border-radius: 0; resize: none; background: transparent; font-size: 14px; line-height: 1.7; }
+.tlpreview, .tlattached { position: relative; display: block; }
+.tlpreview img { display: block; width: 100%; max-height: 200px; object-fit: cover; border-radius: 12px; }
+.tlpreview button, .tlattached > button { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; padding: 0; border-radius: 50%; background: rgba(20, 20, 24, .62); color: #fff; }
+.tlpreview button:hover, .tlattached > button:hover { background: rgba(20, 20, 24, .8) !important; }
+.tlattached .tlattach { padding-right: 36px; }
+.tlattached .tlbtn { display: none; }
+.tlctx { display: inline-flex; align-self: flex-start; align-items: center; gap: 4px; height: 26px; padding: 0 2px 0 9px; border-radius: 999px; background: #E8EEFB; color: var(--accent); font-size: 11px; font-weight: 700; white-space: nowrap; max-width: 100%; }
+.tlctx button { width: 22px; height: 22px; padding: 0; border-radius: 50%; color: var(--accent); }
+.tladdctx { align-self: flex-start; height: 26px; padding: 0 9px; gap: 4px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--muted); }
+.tlcounter { display: flex; justify-content: flex-end; font-size: 11px; color: #75727D; }
+.tlattachbar { display: flex; flex-direction: column; gap: 6px; }
+.tlgrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.tlgrid button { flex-direction: column; gap: 3px; height: 52px; padding: 0; border-radius: 10px; background: #fff; box-shadow: inset 0 0 0 1px #EAE4D9; color: var(--ink2); font-size: 10px; font-weight: 700; }
+.tlgrid button.on { box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--accent); background: #fff; }
+.tlpicker { display: flex; flex-direction: column; max-height: 180px; overflow-y: auto; padding: 4px; border-radius: 12px; background: #fff; box-shadow: inset 0 0 0 1px #EAE4D9; }
+.tlpicker button { justify-content: flex-start; height: 34px; padding: 0 10px; border-radius: 8px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; }
+.tlpicker.tlemojis { display: grid; grid-template-columns: repeat(6, 1fr); max-height: none; }
+.tlpicker.tlemojis button { width: auto; justify-content: center; }
+.tlattachbar .err { color: var(--danger); white-space: normal; }
+.tlsubmit { height: 44px; border-radius: 12px; font-size: 14px; flex: none; }
+
+.tlsheetbg { align-items: flex-end; padding: 0; }
+.tlsheet { display: flex; flex-direction: column; width: 100%; max-height: 88vh; padding: 16px 14px calc(14px + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0; background: var(--paper); }
+.tlsheet .tlside { min-height: 60vh; }
+
+@media (max-width: 1100px) {
+  .hevents.tlaside { width: auto; height: 640px; max-height: 80vh; }
+}
+@media (max-width: 720px) {
+  .tlfab { bottom: 84px; }
+  .hhead:has(.tltabs) { flex-wrap: wrap; }
+}

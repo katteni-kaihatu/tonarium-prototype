@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { ITEM_INFO } from '../i18n/static.ts';
 import { NOTE_COLORS, type Item } from '../../../shared/items.ts';
+import { isCameraTimerItem } from '../../../shared/camera-timer-demo.ts';
 import { useStore, get, nameOf, type Win } from '../store.ts';
 import { useDistanceLabel } from '../spatial.ts';
 import { PANELS } from '../items/panels.ts';
@@ -24,6 +25,8 @@ import { DiceBody } from './DiceBody.tsx';
 import { TelephoneBody } from '../items/TelephoneBody.tsx';
 import { SurvivorLibrary, SurvivorPanel } from './SurvivorPanel.tsx';
 import { AntimatterSpaceWindowBody, AntimatterWindowBody } from './antimatter/windowBodies.tsx';
+import { SystemItemPanel } from '../systems/SystemItem.tsx';
+import { useXR } from '../xr/runtime.ts';
 
 const BAR = 40;
 type Kind = 'video' | 'panel' | 'note' | 'media' | 'face' | 'dice' | 'survivor';
@@ -122,6 +125,7 @@ function useResolved(key: string, compact: boolean): Resolved | null {
   const item = items[id];
   if (!item) return null;
   const sub = <>{item.createdBy === selfId ? tr("ui84") : name(item.createdBy)} {tr("ui840")}<ItemDist id={item.id} /></>;
+  if (item.mapPlacement?.mode === 'system') return { kind: 'panel', dark: false, item, title: itemLabel(item), sub, width: 360, body: <SystemItemPanel item={item} /> };
   if (key.startsWith('cam:')) {
     if (item.kind !== 'camera' || !item.live || !camFeeds[id]) return null;
     return {
@@ -167,6 +171,7 @@ function WindowFrame({ win, region, simple, z, compact = false }: {
   win: Win; region: { w: number; h: number }; simple: boolean; z: number; compact?: boolean;
 }) {
   const r = useResolved(win.key, compact);
+  const immersive = useXR().active;
   const maxWin = useStore((s) => s.maxWin);
   const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
   const gone = !r;
@@ -219,6 +224,7 @@ function WindowFrame({ win, region, simple, z, compact = false }: {
   const frame = (
     <section
       className={`win ${r.dark ? 'dark' : ''} k-${r.kind} ${compact ? 'compact' : ''}`} style={style} aria-label={r.title}
+      data-xr-surface={immersive ? win.key : undefined}
       title={compact ? tr("ui842") : undefined} onPointerDown={() => raiseWindow(win.key)}
     >
       <div
@@ -253,7 +259,7 @@ function WinButtons({ win, r, max }: { win: Win; r: Resolved; max: boolean }) {
     <>
         <Viewers keyName={win.key} dark={r.dark} />
         {r.item && /^(item|cam):/.test(win.key) && <AttentionButton keyName={win.key} />}
-        {r.item && r.kind !== 'video' && (
+        {r.item && (r.item.mapPlacement?.mode !== 'system' || isCameraTimerItem(r.item)) && r.kind !== 'video' && (
           <button className="ib wbtn" aria-label={tr("ui618")} title={tr("ui846")} onClick={() => removeItem(r.item!.id)}><Icon name="trash" size={14} /></button>
         )}
         {!r.noMax && <button className="ib wbtn" onClick={() => toggleMax(win.key)} aria-label={max ? tr("ui847") : tr("ui848")}><Icon name="maximize" size={14} /></button>}
@@ -264,10 +270,11 @@ function WinButtons({ win, r, max }: { win: Win; r: Resolved; max: boolean }) {
 
 /** 背面のウィンドウ。2D では画面共有が始まったら自動で開く */
 export function WindowLayer() {
+  const immersive = useXR().active;
   const windows = useStore((s) => s.windows);
   const winMode = useStore((s) => s.winMode);
   const mode = useStore((s) => s.mode);
-  const visibleWindows = mode === '3d' ? windows.filter((w) => w.key !== 'survivors') : windows;
+  const visibleWindows = mode === '3d' && !immersive ? windows.filter((w) => w.key !== 'survivors') : windows;
   const ref = useRef<HTMLDivElement>(null);
   const [region, setRegion] = useState({ w: 800, h: 500 });
   const [viewport, setViewport] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
@@ -300,7 +307,7 @@ export function WindowLayer() {
     return () => window.removeEventListener('keydown', onKey);
   }, [frontItem?.id, frontItem?.kind]);
 
-  const simple = winMode === 'simple';
+  const simple = !immersive && winMode === 'simple';
   return (
     <>
       <div className={`winregion ${simple ? 'simple' : ''} ${mode}`}>

@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "sdk": "tonarium-systems/1",
+  "id": "button",
+  "version": "1.0.0",
+  "title": "버튼",
+  "description": "맵에서 만든 오브젝트를 누르면 클릭한 사용자를 pressed 이벤트로 전달합니다. target에 상호작용할 오브젝트를 연결하세요.",
+  "license": "MIT",
+  "credits": [
+    "Tonarium contributors"
+  ],
+  "targets": {
+    "target": {
+      "capabilities": [
+        "interact"
+      ],
+      "required": true
+    }
+  },
+  "config": {},
+  "state": {},
+  "inputs": {
+    "press": {
+      "payload": {}
+    }
+  },
+  "outputs": {
+    "pressed": {
+      "payload": {
+        "user": "user"
+      }
+    }
+  },
+  "handlers": {
+    "press": [
+      {
+        "op": "emit",
+        "port": "pressed",
+        "payload": {
+          "user": {
+            "actor": true
+          }
+        }
+      }
+    ]
+  },
+  "interaction": {
+    "target": "target",
+    "input": "press"
+  }
+}

@@ -74,9 +74,9 @@ export function ChessModel({ item, ui, tableData, sqData, actions }: {
   const promoting = active && ui?.promotionTo !== undefined;
   return (
     <group>
-      <Label text={status} position={[0, 1.5, 0]} height={0.17} />
+      {item.mapPlacement?.mode !== 'system' && <><Label text={status} position={[0, 1.5, 0]} height={0.17} />
       <Label text={promoting ? tr("ui508") : active && ui?.chessMessage ? systemText(ui.chessMessage) : item.kind === 'chessAi' ? tr("ui509") : tr("ui510")} position={[0, 1.28, 0]} height={0.09} />
-      {actions ?? <group position={[0, TABLE_Y, 1.12]}><mesh><boxGeometry args={[0.8, 0.08, 0.25]} /><meshStandardMaterial color="#476b8c" /></mesh><Label text={tr("ui353")} position={[0, 0.14, 0]} height={0.08} /></group>}
+      {actions ?? <group position={[0, TABLE_Y, 1.12]}><mesh><boxGeometry args={[0.8, 0.08, 0.25]} /><meshStandardMaterial color="#476b8c" /></mesh><Label text={tr("ui353")} position={[0, 0.14, 0]} height={0.08} /></group>}</>}
       {/* 持ち運び・片付けは机に照準を合わせる */}
       <group userData={tableData}>
         <mesh position-y={TABLE_Y - 0.03}>

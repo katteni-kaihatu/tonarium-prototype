@@ -1,4 +1,6 @@
 import { t as tr } from '../i18n/index.ts';
+import { useRef, useState } from 'react';
+import { copySessionUrl } from '../sessionLinks.ts';
 import { useStore } from '../store.ts';
 import type { SessionDef, SessionInfo } from '../../../shared/protocol.ts';
 import { VISIBILITY_INFO } from '../i18n/static.ts';
@@ -19,6 +21,8 @@ const VIS_ICON = { public: 'globe', friends: 'people', groupPlus: 'flag', group:
 const NO_ITEMS: SessionInfo['items'] = [];
 
 export function SessionCard({ s, showDelete }: { s: SessionDef; showDelete?: boolean }) {
+  const [menu, setMenu] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const users = useStore((st) => st.users);
   const friends = useStore((st) => st.friends);
   const selfName = useStore((st) => st.selfName);
@@ -47,6 +51,15 @@ export function SessionCard({ s, showDelete }: { s: SessionDef; showDelete?: boo
         {current === s.id
           ? <span className="hhere"><i />{tr("ui192")}</span>
           : <button className="primary scjoin" onClick={() => joinSession(s.id)}>{current ? tr("ui193") : tr("ui194")}</button>}
+        <div className="scactions" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); setMenu(false); menuButton.current?.focus(); } }}
+          onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setMenu(false); }}>
+          <button ref={menuButton} type="button" className="ib" aria-label={tr('sessionActions')} aria-expanded={menu}
+            onClick={() => setMenu(!menu)}>︙</button>
+          {menu && <div className="sccopypop"><button type="button" className="ib" autoFocus
+            onClick={() => { void copySessionUrl(s.id); setMenu(false); menuButton.current?.focus(); }}>
+            <Icon name="link" size={14} />{tr('sessionLinkCopy')}</button></div>}
+        </div>
       </div>
       <div className="scbody">
         <div className="sctitle">

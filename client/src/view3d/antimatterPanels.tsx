@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { ANTIMATTER_EXHIBITS, type AdLabSnapshot, type AdPanelTarget } from '../../../shared/antimatterLayout.ts';
 import { drawText, makeCanvasTexture } from './textTexture.ts';
 import { emitAdFeedback } from '../ad/feedback.ts';
+import { uprightQuaternion } from '../xr/pose.ts';
 
 /** 親が engine へ結ぶ操作口。3D 側は数値計算もセーブもしない */
 export interface AdActions {
@@ -50,8 +51,11 @@ export function PanelBoard({ position, lines, hint, onOpen }: {
     return t;
   }, [shown]);
   useEffect(() => () => tex.dispose(), [tex]);
-  // ビルボードはカメラの向きをそのまま写す。drei Billboard と同じ見た目で依存を増やさない
-  useFrame(({ camera }) => { group.current?.quaternion.copy(camera.quaternion); });
+  useFrame(({ gl, camera }) => {
+    if (!group.current) return;
+    uprightQuaternion(gl.xr.isPresenting ? gl.xr.getCamera() : camera, group.current.quaternion);
+    if (group.current.parent) group.current.quaternion.premultiply(group.current.parent.getWorldQuaternion(new THREE.Quaternion()).invert());
+  });
   return (
     <group ref={group} position={position} userData={onOpen ? { hint, use: onOpen } : { noRay: true }}>
       <mesh position={[0, 0, -0.01]}>

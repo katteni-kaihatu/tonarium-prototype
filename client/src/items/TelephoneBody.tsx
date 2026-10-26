@@ -1,3 +1,4 @@
+import { useUpdateDraft } from '../updateDraft.ts';
 import { useRef, useState, useEffect } from 'react';
 import type { Item } from '../../../shared/items.ts';
 import { telephoneKind, TELEPHONE_MAX_POINTS, TELEPHONE_MAX_STROKES, type TelephoneAnswer, type TelephoneStroke } from '../../../shared/telephone.ts';
@@ -24,8 +25,8 @@ function Answer({ answer }: { answer: TelephoneAnswer }) {
 }
 function TelephoneTurn({ item, interactive }: { item: Extract<Item, { kind: 'telephone' }>; interactive: boolean }) {
   const g = item.game, assignment = g.assignment;
-  const [text, setText] = useState('');
-  const [strokes, setStrokes] = useState<TelephoneStroke[]>([]);
+  const [text, setText] = useUpdateDraft(`telephone.text.${item.id}.${g.deadline}`, '');
+  const [strokes, setStrokes] = useUpdateDraft<TelephoneStroke[]>(`telephone.strokes.${item.id}.${g.deadline}`, []);
   const [color, setColor] = useState('#111111');
   const [size, setSize] = useState(4);
   const pointer = useRef<number | null>(null);

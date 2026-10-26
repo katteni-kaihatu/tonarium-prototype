@@ -4,10 +4,13 @@ import { ItemArt, ItemVisual } from '../market/ItemVisual.tsx';
 import { ITEM_USAGE } from '../market/itemUsage.ts';
 import { GroupAvatar } from './GroupAvatar.tsx';
 import { useOwnedItems, type OwnedItem } from '../market/items.ts';
-import { MARKET_PRODUCTS, contentAvailable, productFor } from '../../../shared/market.ts';
+import { contentAvailable, productFor } from '../../../shared/market.ts';
+import { MARKET_PRODUCTS } from '../i18n/static.ts';
+import { contentFieldEntries, contentText } from '../content-translations.ts';
 import { useOwnedContent } from '../market/store.ts';
 import { OriginBadge } from '../market/OriginBadge.tsx';
 import { useEffect, useRef, useState } from 'react';
+import { useUpdateDraft } from '../updateDraft.ts';
 import { createPortal } from 'react-dom';
 import { CHANGELOG } from '../../../shared/changelog.ts';
 import { localized } from '../i18n/core.ts';
@@ -17,21 +20,19 @@ import { dmKey, type EventDef, type Group, type User } from '../../../shared/pro
 import { sortForHome } from '../../../shared/home.ts';
 import { WORLDS } from '../i18n/static.ts';
 import { WORLD_KINDS, type WorldKind } from '../../../shared/worlds.ts';
-import { askJoin, deleteEvent, deleteGroup, friendAccept, joinGroup, joinSession, leaveGroup, leaveSession, openDm, openGroup, removeNotice, toggleBlock, watchFriend } from '../actions.ts';
+import { askJoin, deleteEvent, deleteGroup, joinGroup, joinSession, leaveGroup, leaveSession, openDm, openGroup, toggleBlock, watchFriend } from '../actions.ts';
 import { spawnItem } from '../items/actions.ts';
 import { ONLY_3D } from '../../../shared/items.ts';
 import { Face } from '../world/common.tsx';
 import { Icon } from '../world/Icon.tsx';
 import { SessionCard } from './SessionCard.tsx';
 import { CreateEventDialog, CreateGroupDialog, CreateSessionDialog, InviteFriendDialog, InviteToGroupDialog } from './dialogs.tsx';
-import { Chip, Empty, EventAnswer, EventHost, ModeIcon, NameFace, Tabs, dateKey, timeLabel, uniqueByName, WEEKDAYS } from './common.tsx';
+import { Chip, Empty, EventAnswer, EventHost, FollowButton, ModeIcon, NameFace, Tabs, match, dateKey, timeLabel, uniqueByName, WEEKDAYS } from './common.tsx';
 import { Composer, Thread } from './messages.tsx';
 import { StatusDot, StatusText, useStatusOf } from './status.tsx';
 
-const match = (q: string, ...texts: (string | undefined)[]) => !q || texts.some((t) => t?.toLowerCase().includes(q.toLowerCase()));
-
 export function ChangelogPage({ q }: { q: string }) {
-  const [includeMaintenance, setIncludeMaintenance] = useState(false);
+  const [includeMaintenance, setIncludeMaintenance] = useUpdateDraft('changelog.maintenance', false);
   useEffect(() => markChangelogSeen(), []);
   const entries = filterChangelog(localized(filterChangelog(CHANGELOG, '', includeMaintenance)), q, true);
   return (
@@ -132,18 +133,18 @@ function DmPane({ u }: { u: FriendLike }) {
   );
 }
 
-function FriendRequests() {
-  const notices = useStore((s) => s.notices).filter((n) => n.kind === 'friend');
+function FollowList({ kind, q }: { kind: 'followers' | 'following'; q: string }) {
+  const names = useStore((s) => s[kind]).filter((n) => match(q, n));
+  const friends = useStore((s) => s.friends);
   return (
     <section className="hsec">
-      <h3 className="hsub">{tr("ui274")}</h3>
-      {notices.length === 0 && <Empty>{tr("ui275")}</Empty>}
-      {notices.map((n) => (
-        <div key={n.id} className="ftile">
-          <Face id={n.from} name={n.fromName} size={36} />
-          <span className="finfo"><b>{n.fromName}</b><span className="sub">{timeLabel(n.at)}</span></span>
-          <button onClick={() => removeNotice(n.id)}>{tr("ui276")}</button>
-          <button className="primary" onClick={() => friendAccept(n.from, n.id)}>{tr("ui277")}</button>
+      <p className="sub wrap">{tr(kind === 'followers' ? 'followFollowersDesc' : 'followFollowingDesc')}</p>
+      {names.length === 0 && <Empty>{tr(kind === 'followers' ? 'followNoFollowers' : 'followNoFollowing')}</Empty>}
+      {names.map((name) => (
+        <div key={name} className="ftile">
+          <NameFace name={name} size={36} />
+          <span className="finfo"><b>{name}</b>{friends.includes(name) && <span className="sub">{tr('ui153')}</span>}</span>
+          <FollowButton name={name} />
         </div>
       ))}
     </section>
@@ -171,7 +172,8 @@ export function FriendsPage({ q }: { q: string }) {
   const users = useStore((s) => s.users);
   const friends = useStore((s) => s.friends);
   const dmWith = useStore((s) => s.dmWith);
-  const requests = useStore((s) => s.notices).filter((n) => n.kind === 'friend').length;
+  const following = useStore((s) => s.following);
+  const notBack = useStore((s) => s.followers).filter((n) => !following.includes(n)).length;
   const tab = useStore((s) => s.friendsTab);
   const setTab = (friendsTab: typeof tab) => set({ friendsTab });
   const sessions = useStore((s) => s.guild.sessions);
@@ -182,13 +184,13 @@ export function FriendsPage({ q }: { q: string }) {
   const selected = [...online, ...offline].find((u) => u.name === dmWith) ?? online[0] ?? offline[0];
   return (
     <>
-      <Tabs value={tab} onChange={setTab} items={[{ id: 'all', label: tr("ui281") }, { id: 'now', label: tr("ui198") }, { id: 'req', label: tr("ui282"), badge: requests }, { id: 'block', label: tr("ui283") }]} />
+      <Tabs value={tab} onChange={setTab} items={[{ id: 'all', label: tr("ui281") }, { id: 'now', label: tr("ui198") }, { id: 'followers', label: tr('followFollowers'), badge: notBack }, { id: 'following', label: tr('followFollowingTab') }, { id: 'block', label: tr("ui283") }]} />
       {tab === 'now' && (withFriends.length === 0
         ? <Empty>{tr("ui190")}</Empty>
         : <div className="scards">{withFriends.map((d) => <SessionCard key={d.id} s={d} />)}</div>)}
-      {tab === 'req' && <FriendRequests />}
+      {(tab === 'followers' || tab === 'following') && <FollowList kind={tab} q={q} />}
       {tab === 'block' && <BlockedList />}
-      {tab === 'all' && friends.length === 0 && <Empty>{tr("ui284")}</Empty>}
+      {tab === 'all' && friends.length === 0 && <Empty>{tr('followNoFriends')}</Empty>}
       {tab === 'all' && friends.length > 0 && (
         <div className="fpage">
           <section className="flist" aria-label={tr("ui285")}>
@@ -272,7 +274,7 @@ function EventRow({ ev }: { ev: EventDef }) {
 
 /** 月曜はじまりの月のカレンダー。日を押すとその日のイベントだけを下に出す */
 function MonthCalendar({ events, picked, onPick }: { events: EventDef[]; picked: string | null; onPick: (key: string | null) => void }) {
-  const [offset, setOffset] = useState(0);
+  const [offset, setOffset] = useUpdateDraft('events.month', 0);
   const base = new Date();
   const month = new Date(base.getFullYear(), base.getMonth() + offset, 1);
   const lead = (month.getDay() + 6) % 7;
@@ -312,8 +314,8 @@ export function EventsPage({ q }: { q: string }) {
   const events = useStore((s) => s.events);
   const groups = useStore((s) => s.groups);
   const [create, setCreate] = useState(false);
-  const [view, setView] = useState<'list' | 'month'>('list');
-  const [picked, setPicked] = useState<string | null>(null);
+  const [view, setView] = useUpdateDraft<'list' | 'month'>('events.view', 'list');
+  const [picked, setPicked] = useUpdateDraft<string | null>('events.day', null);
   const all = events.filter((ev) => match(q, ev.title, groups.find((g) => g.id === ev.group)?.name));
   const list = view === 'month' && picked ? all.filter((ev) => dateKey(ev.at) === picked) : all;
   const days = new Map<string, EventDef[]>();
@@ -424,6 +426,7 @@ export function WorldsPage({ q, onSelected }: { q: string; onSelected?: () => vo
               <div className="wface" style={{ background: WORLD_FACE[k] }}><Icon name="globe" size={28} />{now && <span className="hhere"><i />{tr("ui306")}</span>}</div>
               <h3>{WORLDS[k].name}</h3><OriginBadge productId={productFor('worlds', k)?.id} />
               <p className="sub wrap">{WORLDS[k].desc}</p>
+              {!!contentFieldEntries(`world/${k}`, 'instructions.').length && <details><summary>{tr('ui372')}</summary><ul>{contentFieldEntries(`world/${k}`, 'instructions.').map(([id, text]) => <li key={id} style={{ whiteSpace: 'pre-wrap' }}>{text}</li>)}</ul></details>}
               <span className="sub">{tr("ui307")}{n} {tr("ui196")}</span>
               {session && <button className="primary" disabled={now || pending} onClick={() => pick(k)}>{now ? tr("ui306") : tr("ui308")}</button>}
               {!onSelected && <button className={session ? '' : 'dark'} onClick={() => setCreate(k)}><Icon name="plus" size={14} />{tr("ui309")}</button>}
@@ -450,7 +453,7 @@ export function ItemsPage({ q }: { q: string }) {
     if (selectedId) heading.current?.focus();
     else if (lastCard.current) cards.current.get(lastCard.current)?.focus();
   }, [selectedId]);
-  const spawn = (entry: OwnedItem) => { spawnItem(entry.kind, entry.text); set({ hubOpen: false }); };
+  const spawn = (entry: OwnedItem) => { spawnItem(entry.kind, entry.text, undefined, entry.variant); set({ hubOpen: false }); };
   const spawnButton = (entry: OwnedItem) => {
     const only3d = !!ONLY_3D[entry.kind] && mode !== '3d';
     return session && <button className="primary small ispawn" disabled={only3d} title={only3d ? tr("ui310") : undefined} onClick={() => spawn(entry)}><Icon name="plus" size={12} />{tr("ui197")}</button>;
@@ -460,7 +463,7 @@ export function ItemsPage({ q }: { q: string }) {
       headingRef={heading} onBack={() => setSelectedId(null)}
       visual={<ItemVisual kind={selected.kind} product={MARKET_PRODUCTS.find((p) => p.id === selected.productId)} />}
       tags={<>{selected.info.in2d && <span>{tr("ui311")}</span>}{selected.info.in3d && <span>{tr("ui312")}</span>}</>}
-      usage={selected.kind === 'bike' ? selected.info.desc : selected.productId ? tr("ui313") : ITEM_USAGE[selected.kind]}>
+      usage={<span style={{ whiteSpace: 'pre-wrap' }}>{selected.usage ?? (selected.productId && selected.text ? contentText(`product/${selected.productId}`, 'text', selected.text) : selected.kind === 'bike' ? selected.info.desc : selected.productId ? tr("ui313") : ITEM_USAGE[selected.kind])}</span>}>
       {spawnButton(selected)}
     </ItemDetail> : <>
       <h2>{tr("ui154")}<span className="sub">{session ? tr("ui314") : tr("ui315")}</span></h2>

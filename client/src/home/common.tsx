@@ -1,9 +1,9 @@
 import { sourceText as uiSource } from '../i18n/core.ts';
 import { localized, t as tr } from '../i18n/index.ts';
-import { useStore } from '../store.ts';
+import { get, useStore } from '../store.ts';
 import { RSVP_LABEL } from '../i18n/static.ts';
 import { type EventDef, type Mode, type Rsvp, type User } from '../../../shared/protocol.ts';
-import { answerEvent } from '../actions.ts';
+import { answerEvent, followUser } from '../actions.ts';
 import { Face } from '../world/common.tsx';
 import { Icon } from '../world/Icon.tsx';
 
@@ -46,6 +46,28 @@ export function EventHost({ ev }: { ev: EventDef }) {
   return (
     <span className="evhost"><NameFace name={ev.owner} size={18} /><span className="sub">{tr("ui83")}<b>{ev.owner === selfName ? tr("ui84") : ev.owner}</b></span></span>
   );
+}
+
+export const match = (q: string, ...texts: (string | undefined)[]) => !q || texts.some((t) => t?.toLowerCase().includes(q.toLowerCase()));
+
+/** フレンドのフォローを外すと DM も見えなくなるので、外す前に確かめる */
+export function toggleFollow(name: string, on: boolean) {
+  if (!on && get().friends.includes(name) && !confirm(tr('followUnfollowFriendConfirm', name))) return;
+  followUser(name, on);
+}
+
+/** フォローのボタン。お互いにフォローするとフレンドになる */
+export function FollowButton({ name }: { name: string }) {
+  const following = useStore((s) => s.following.includes(name));
+  const followsMe = useStore((s) => s.followers.includes(name));
+  if (following) {
+    return (
+      <button className={followsMe ? 'on' : ''} aria-pressed title={tr('followUnfollowHint')} onClick={() => toggleFollow(name, false)}>
+        <Icon name="check" size={14} />{followsMe ? tr('ui153') : tr('followFollowing')}
+      </button>
+    );
+  }
+  return <button className="primary" onClick={() => followUser(name, true)}>{followsMe ? tr('followBack') : tr('followFollow')}</button>;
 }
 
 export function Chip({ kind, children }: { kind: string; children: React.ReactNode }) {

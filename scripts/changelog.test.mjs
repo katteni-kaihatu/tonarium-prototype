@@ -6,6 +6,7 @@ import test from 'node:test';
 import { aggregateChangelog, parseFragment, root } from './changelog.mjs';
 import { parseChangelog } from './legacy-changelog.mjs';
 import { changelogPlugin } from './changelog-plugin.mjs';
+import { EventEmitter } from 'node:events';
 
 const entry = (date, title) => ({ date, title, items: ['実施内容'] });
 
@@ -75,4 +76,33 @@ test('リポジトリの既存履歴を全件保持し、今回の移行項目�
   const result = aggregateChangelog();
   assert.deepEqual(result.filter(e => e.id.startsWith('legacy-')).map(({ id, ...e }) => e), legacy);
   assert.equal(result.filter(e => e.title === '作業別の変更履歴ファイルを自動集約').length, 1);
+});
+
+test('開発監視はディレクトリを import にせず Windows パスを正規化する', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'tonarium-history-watch-'));
+  try {
+    mkdirSync(join(cwd, 'shared')); mkdirSync(join(cwd, 'changelog'));
+    writeFileSync(join(cwd, 'shared/changelog.ts'), `export const CHANGELOG = ${JSON.stringify([entry('2026-10-24', '既存')])};`);
+    const fragment = join(cwd, 'changelog/2026-10-25-watch.json');
+    writeFileSync(fragment, JSON.stringify(entry('2026-10-25', '追加')));
+    const plugin = changelogPlugin(cwd), watched = [];
+    const source = plugin.transform.call({ addWatchFile: file => watched.push(file) }, '', join(cwd, 'shared/changelog.ts').replaceAll('/', '\\') + '?v=1');
+    assert.ok(source.code.includes('追加'));
+    assert.ok(watched.length >= 2);
+    assert.ok(watched.every(file => !file.includes('\\')));
+    assert.ok(watched.every(file => file !== join(cwd, 'changelog').replaceAll('\\', '/')));
+
+    const watcher = new EventEmitter(), httpServer = new EventEmitter(), added = [], messages = [], invalidated = [];
+    watcher.add = file => added.push(file);
+    const module = { id: join(cwd, 'shared/changelog.ts').replaceAll('\\', '/') };
+    plugin.configureServer({ watcher, httpServer, moduleGraph: { getModuleById: id => id === module.id ? module : undefined, invalidateModule: value => invalidated.push(value) }, ws: { send: message => messages.push(message) } });
+    assert.deepEqual(added, [join(cwd, 'changelog').replaceAll('\\', '/')]);
+    for (const event of ['add', 'change', 'unlink']) watcher.emit(event, fragment.replaceAll('/', '\\'));
+    assert.equal(messages.length, 3); assert.equal(invalidated.length, 3);
+    watcher.emit('add', join(cwd, 'changelog/ignored.txt'));
+    watcher.emit('add', join(cwd, 'changelog/sub/ignored.json'));
+    assert.equal(messages.length, 3);
+    httpServer.emit('close'); watcher.emit('add', fragment);
+    assert.equal(messages.length, 3);
+  } finally { rmSync(cwd, { recursive: true, force: true }); }
 });

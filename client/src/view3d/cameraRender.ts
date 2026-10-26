@@ -5,23 +5,21 @@ import type { Item } from '../../../shared/items.ts';
 import { get, set } from '../store.ts';
 import { postImage } from '../items/actions.ts';
 import { playShutter } from '../items/effects.ts';
+import { placedCameraPose } from './cameraPlacement.ts';
 
 export const world = { scene: null as THREE.Scene | null, camera: null as THREE.PerspectiveCamera | null, pitch: 0 };
 /** そのカメラから描くときは本体が写り込まないよう隠す */
 export const cameraModels = new Map<string, THREE.Object3D>();
 export const localFeeds = new Map<string, HTMLCanvasElement>();
 
-export const CAM_Y = 1.5;
-
 export function cameraPose(item: Item & { kind: 'camera' }) {
   const pos = new THREE.Vector3();
   const quat = new THREE.Quaternion();
   if (item.holder === get().selfId && world.camera) {
-    pos.copy(world.camera.position);
-    quat.copy(world.camera.quaternion);
+    world.camera.getWorldPosition(pos);
+    world.camera.getWorldQuaternion(quat);
   } else {
-    pos.set(item.x, CAM_Y, item.z);
-    quat.setFromEuler(new THREE.Euler(item.pitch, item.ry, 0, 'YXZ'));
+    return placedCameraPose(item, !item.holder ? cameraModels.get(item.id) : undefined);
   }
   return { pos, quat };
 }

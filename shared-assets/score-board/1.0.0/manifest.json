@@ -1,0 +1,14 @@
+{
+  "schema": 2,
+  "id": "score-board",
+  "version": "1.0.0",
+  "title": "非空間の集計システム",
+  "kind": "system",
+  "sdk": "tonarium-rules/0.2",
+  "dependencies": [],
+  "files": [],
+  "fields": { "score": { "initial": 0, "min": 0, "max": 1000, "scope": "session" } },
+  "inputs": ["point"],
+  "outputs": [],
+  "rules": [{ "event": "point", "field": "score", "op": "add", "value": 3 }]
+}

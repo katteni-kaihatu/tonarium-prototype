@@ -4,6 +4,7 @@ import { useStore, set, sessionOf } from '../store.ts';
 import { Icon } from '../world/Icon.tsx';
 import { Home, Sidebar } from './Home.tsx';
 import { touchOnly } from '../phone.ts';
+import { copySessionUrl } from '../sessionLinks.ts';
 
 /** セッション中に、背面を暗くぼかしてホームをシートで重ねる。Esc か背面のクリックで閉じる */
 function HomeOverlay() {
@@ -26,6 +27,7 @@ function HomeOverlay() {
 
 /** セッション中の左上のメニュー。ホバーで項目が左から出て、ボタンを押すと最後に開いたページを重ねて開く */
 export function SessionMenu() {
+  const session = useStore((s) => s.session);
   const hubOpen = useStore((s) => s.hubOpen);
   const [hover, setHover] = useState(false);
   // 項目へ動かす途中で一瞬外れても閉じないよう、少し待ってから閉じる
@@ -41,6 +43,9 @@ export function SessionMenu() {
           className={`smenubtn ${hubOpen ? 'on' : ''}`} aria-label={tr("ui326")} title={tr("ui327")} aria-expanded={hubOpen}
           onClick={() => { set({ hubOpen: !hubOpen }); setHover(false); }}
         ><Icon name="menu" size={20} /></button>
+        {session && <button type="button" className="smenubtn session-copy" aria-label={tr('sessionLinkCopy')} title={tr('sessionLinkCopy')}
+          onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); void copySessionUrl(session); }}><Icon name="link" size={20} /></button>}
         <div className="smenubridge" aria-hidden="true" style={{ pointerEvents: show ? 'auto' : 'none' }} />
         <div className={`smenunav ${show ? 'show' : ''}`} aria-hidden={!show}>
           <Sidebar inSession onPick={() => { set({ hubOpen: true }); setHover(false); }} />

@@ -1,5 +1,7 @@
 import { sourceText as uiSource } from '../i18n/core.ts';
 import { applyItemAction, type ItemAction, type ItemKind, type MediaInit } from '../../../shared/items.ts';
+import type { ItemVariant } from '../../../shared/item-variants.ts';
+import { isCameraTimerItem } from '../../../shared/camera-timer-demo.ts';
 import { ROOM_HALF, spawnSlot, type AvatarState } from '../../../shared/protocol.ts';
 import { approach } from '../../../shared/places.ts';
 import { get, set, recompute, heldHammer, heldCamera, type ItemUi } from '../store.ts';
@@ -12,18 +14,19 @@ const clamp = (v: number) => Math.max(-LIMIT, Math.min(LIMIT, v));
 export const clampRoomPos = (p: AvatarState): AvatarState => ({ ...p, x: clamp(p.x), z: clamp(p.z) });
 
 /** 自分の前に出す */
-export function spawnItem(kind: ItemKind, text?: string, media?: MediaInit) {
+export function spawnItem(kind: ItemKind, text?: string, media?: MediaInit, variant?: ItemVariant) {
   const s = get();
   if (!s.session) return;
   const me = placesOf(s).get(s.selfId) ?? { ...spawnSlot(0), ry: 0 };
   const gap = s.mode === '3d' ? 2.2 : 1.2;
   const x = me.x - Math.sin(me.ry) * gap;
   const z = me.z - Math.cos(me.ry) * gap;
-  send({ t: 'itemCreate', kind, text, media, x: clamp(x), z: clamp(z), ry: me.ry });
+  send({ t: 'itemCreate', kind, text, media, variant, x: clamp(x), z: clamp(z), ry: me.ry });
 }
 
 /** 入力が途切れないよう手元にすぐ反映してから送る */
 export function editNote(id: string, patch: { text?: string; color?: string }) {
+  if (get().items[id]?.mapPlacement?.mode === 'system') return;
   const sid = get().session;
   if (!sid) return;
   set((s) => {
@@ -39,22 +42,26 @@ export function postImage(text: string, image: string) {
 }
 
 export function removeItem(id: string) {
+  const item = get().items[id];
+  if (item?.mapPlacement?.mode === 'system' && !isCameraTimerItem(item)) return;
   send({ t: 'itemRemove', id });
 }
 
 export function itemAction(id: string, action: ItemAction) {
+  if (get().items[id]?.mapPlacement?.mode === 'system') return;
   send({ t: 'itemAction', id, action });
 }
 
-export function moveItem(id: string, x: number, z: number, ry: number) {
+export function moveItem(id: string, x: number, z: number, ry: number, transform: { y?: number; scale?: number } = {}) {
+  if (get().items[id]?.mapPlacement?.mode === 'system') return;
   const sid = get().session;
   if (!sid) return;
   set((s) => {
     const it = s.itemsBy[sid]?.[id];
-    return it ? { itemsBy: { ...s.itemsBy, [sid]: { ...s.itemsBy[sid], [id]: { ...it, x, z, ry } } } } : {};
+    return it ? { itemsBy: { ...s.itemsBy, [sid]: { ...s.itemsBy[sid], [id]: { ...it, x, z, ry, ...transform } } } } : {};
   });
   recompute();
-  send({ t: 'itemMove', id, x, z, ry });
+  send({ t: 'itemMove', id, x, z, ry, ...transform });
 }
 
 export function setItemUi(id: string, ui: ItemUi) {
@@ -63,7 +70,7 @@ export function setItemUi(id: string, ui: ItemUi) {
 
 export function applyDelta(sid: string, id: string, action: ItemAction, by: string) {
   const cur = get().itemsBy[sid]?.[id];
-  if (!cur) return;
+  if (!cur || cur.mapPlacement?.mode === 'system') return;
   const next = cur.kind === 'canvas' ? { ...cur, strokes: [...cur.strokes] } : { ...cur };
   if (!applyItemAction(next, action, by, Math.random)) return;
   set((s) => ({ itemsBy: { ...s.itemsBy, [sid]: { ...s.itemsBy[sid], [id]: next } } }));
@@ -71,6 +78,7 @@ export function applyDelta(sid: string, id: string, action: ItemAction, by: stri
 }
 
 export function deltaAction(id: string, action: ItemAction) {
+  if (get().items[id]?.mapPlacement?.mode === 'system') return;
   const s = get();
   if (!s.session) return;
   // P2P対応時は全消去との競合も送り主を含めて同じ順序で確定する。
@@ -90,12 +98,14 @@ export function dropHammer() {
   }
 }
 
-export function dropCamera(pitch: number) {
+export function dropCamera(pitch: number, cameraY?: number, groundAt?: (x: number, z: number) => number) {
   const s = get();
   const c = heldCamera(s);
   if (!c) return;
   const a = s.selfAvatar;
-  itemAction(c.id, { a: 'drop', x: clamp(a.x - Math.sin(a.ry) * 0.7), z: clamp(a.z - Math.cos(a.ry) * 0.7), ry: a.ry, pitch });
+  const x = clamp(a.x - Math.sin(a.ry) * 0.7);
+  const z = clamp(a.z - Math.cos(a.ry) * 0.7);
+  itemAction(c.id, { a: 'drop', x, z, ry: a.ry, pitch, cameraY, groundY: groundAt?.(x, z) });
 }
 
 export function toggleLive(id: string) {

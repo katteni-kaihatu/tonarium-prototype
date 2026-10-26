@@ -3,6 +3,31 @@ import { fxVolume } from '../volume.ts';
 
 let audio: AudioContext | null = null;
 
+export function prepareCountdownSound() {
+  try {
+    if (!audio || audio.state === 'closed') audio = new AudioContext();
+    if (audio.state === 'suspended') void audio.resume().catch(() => {});
+  } catch { /* 音が出せない環境では無視 */ }
+}
+
+export function playCountdownBeep() {
+  try {
+    if (!audio || audio.state !== 'running' || fxVolume() <= 0) return;
+    const t = audio.currentTime;
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, t);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.1 * fxVolume(), t + 0.01);
+    gain.gain.linearRampToValueAtTime(0, t + 0.1);
+    osc.connect(gain).connect(audio.destination);
+    osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+    osc.start(t);
+    osc.stop(t + 0.11);
+  } catch { /* 音が出せない環境では無視 */ }
+}
+
 export function playPico() {
   try {
     audio ??= new AudioContext();

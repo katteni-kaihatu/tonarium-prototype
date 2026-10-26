@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { decompressFrames, parseGIF } from 'gifuct-js';
-import { GifPlayback } from './gifPlayback.ts';
+import { GifPlayback, gifWithinLimits } from './gifPlayback.ts';
 
 export function createImageTexture(url: string) {
   const texture = new THREE.Texture();
@@ -40,6 +40,8 @@ export function createImageTexture(url: string) {
       const bytes = await response.arrayBuffer();
       if (disposed) return;
       const gif = parseGIF(bytes);
+      // 上限を超える GIF は全フレーム展開せず、静止画として表示する（既存の失敗時フォールバックへ合流）
+      if (!gifWithinLimits(gif)) throw new Error('GIF exceeds size limits');
       const frames = decompressFrames(gif, true);
       const background = frames[0]?.transparentIndex === undefined
         ? [...(gif.gct?.[gif.lsd.backgroundColorIndex] ?? [0, 0, 0]), 255]

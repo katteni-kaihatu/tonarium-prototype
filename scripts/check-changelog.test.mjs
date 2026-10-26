@@ -110,6 +110,9 @@ test('CLI はタスク全体の Git 比較元と作業ツリーを比較し、�
     git('-c', 'core.hooksPath=', 'commit', '-m', 'task maintenance');
     assert.equal(run('--base', baseCommit).status, 0);
     assert.equal(run().status, 0);
+    git('update-ref', 'refs/remotes/origin/develop', 'HEAD');
+    assert.equal(run().status, 1);
+    git('update-ref', '-d', 'refs/remotes/origin/develop');
     assert.equal(run('--base', 'HEAD^').status, 1);
     const existingBase = git('rev-parse', 'HEAD');
     const second = join(cwd, 'changelog/2026-10-25-second-task.json');
@@ -138,9 +141,9 @@ test('CLI はタスク全体の Git 比較元と作業ツリーを比較し、�
 
 test('完了処理と全 PR の CI が履歴チェックを必須で実行する', () => {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.equal(pkg.scripts['check:completion'], 'npm run check:changelog && npm run typecheck && npm run build');
+  assert.equal(pkg.scripts['check:completion'], 'npm run check:changelog && npm run check:content-locales && npm run typecheck && npm run build');
   const ci = readFileSync(new URL('../.github/workflows/web-checks.yml', import.meta.url), 'utf8');
-  assert.match(ci, /pull_request:\s+branches: \[main\]/);
+  assert.match(ci, /pull_request:\s+branches: \[main, develop\]/);
   assert.doesNotMatch(ci, /paths(?:-ignore)?:|continue-on-error:/);
   assert.match(ci, /fetch-depth: 0/);
   assert.match(ci, /CHANGELOG_BASE:.*github.event.pull_request.base.sha/);

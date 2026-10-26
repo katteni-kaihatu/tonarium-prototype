@@ -22,6 +22,7 @@ import { JumpPadModel } from '../view3d/jumpPad3d.tsx';
 import { Label } from '../view3d/Label.tsx';
 import { drawText, makeCanvasTexture } from '../view3d/textTexture.ts';
 import { drawCanvasPanel } from '../items/canvasDrawing.ts';
+import { contentText } from '../content-translations.ts';
 
 class PreviewBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -78,7 +79,7 @@ function ProductPreview({ product }: { product: MarketProduct }) {
           <color attach="background" args={[product.category === 'worlds' ? WORLD_BG[product.content] : product.color]} />
           {!world && <><ambientLight intensity={1.8} /><directionalLight position={[3, 5, 4]} intensity={2} /></>}
           <Suspense fallback={null}>
-            {product.category === 'worlds' ? <WorldMesh kind={product.content} /> : product.category === 'items' ? product.kind === 'bike' ? <BikeModel /> : <NotePreview text={product.text} /> : <OekakiAvatar name={name} version={avatar} speaking={false} previewEmote={emote} />}
+            {product.category === 'worlds' ? <WorldMesh kind={product.content} /> : product.category === 'items' ? product.kind === 'bike' ? <BikeModel /> : <NotePreview text={contentText(`product/${product.id}`, 'text', product.text)} /> : <OekakiAvatar name={name} version={avatar} speaking={false} previewEmote={emote} />}
           </Suspense>
           {!world && <mesh rotation-x={-Math.PI / 2} position-y={-.03}><circleGeometry args={[1.45, 48]} /><meshStandardMaterial color="#fffdf9" /></mesh>}
           <OrbitControls ref={controls} target={[0, world ? 0 : item ? 1.1 : .85, 0]} enablePan={false} minDistance={world ? 10 : 2.5} maxDistance={world ? 60 : 7} maxPolarAngle={world ? Math.PI / 2.6 : Math.PI / 2} />

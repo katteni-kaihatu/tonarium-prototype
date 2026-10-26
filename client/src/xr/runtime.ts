@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from 'react';
 import * as THREE from 'three';
 import { DEFAULT_TURN, turnSettings } from './input.ts';
+import type { AvatarXR } from '../../../shared/xr-pose.ts';
 
-let snapshot = { active: false, open: true, ready: false, pending: false, error: '' };
+let snapshot = { active: false, open: true, ready: false, pending: false, error: '', panels: [] as { id: string; title: string; open: boolean }[] };
 const listeners = new Set<() => void>();
 export const xrState = () => snapshot;
 export function xrPatch(patch: Partial<typeof snapshot>) { snapshot = { ...snapshot, ...patch }; listeners.forEach(fn => fn()); }
@@ -13,11 +14,17 @@ export const xr = {
   session: null as XRSession | null,
   move: [0, 0] as [number, number], turn: 0, headYaw: 0, headPitch: 0,
   ray: null as THREE.Ray | null,
+  pose: undefined as AvatarXR | undefined,
+  carryRay: null as THREE.Ray | null,
+  togglePanel: null as null | ((id: string) => void),
+  clearControllers: null as null | (() => void),
   settings: loadTurn(),
-  use: null as null | (() => void), release: null as null | (() => void), carry: null as null | (() => void),
+  use: null as null | (() => void), release: null as null | (() => void), carry: null as null | (() => boolean),
   cancel: null as null | (() => void),
 };
 export function resetXRInput() {
+  xr.clearControllers?.();
+  xr.pose = undefined; xr.carryRay = null;
   xr.move = [0, 0]; xr.turn = 0; xr.ray = null; xr.headYaw = 0; xr.headPitch = 0;
   window.dispatchEvent(new Event('blur'));
   xr.release?.();

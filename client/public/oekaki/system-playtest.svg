@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="1024" viewBox="0 0 1800 900">
+  <defs>
+    <g id="head" stroke="#27354c" stroke-width="6" stroke-linejoin="round">
+      <path d="M54 164 58 65 109 111Q150 93 191 111L242 65 247 164Q271 277 150 283 29 277 54 164Z" fill="#edaf65"/>
+      <path d="m69 90 29 33-31 25Zm162 0-29 33 31 25Z" fill="#d87974" stroke="none"/>
+      <path d="M77 184Q150 150 224 184L218 227Q212 269 150 271 88 269 81 227Z" fill="#fff2d5" stroke="none"/>
+      <path d="m139 220 11 9 11-9Z" fill="#27354c" stroke-width="3"/>
+      <path d="M150 103v24m-22-21 5 18m39-18-5 18" fill="none" stroke="#b96c39"/>
+    </g>
+    <g id="eyes" fill="#27354c"><ellipse cx="113" cy="189" rx="9" ry="16"/><ellipse cx="187" cy="189" rx="9" ry="16"/></g>
+    <path id="smile" d="M129 235q10 14 21 0 11 14 21 0" fill="none" stroke="#27354c" stroke-width="5" stroke-linecap="round"/>
+    <g id="body" stroke="#27354c" stroke-width="6">
+      <path d="M150 355q-59 0-70 64l-13 96q-8 64 83 65 91-1 83-65l-13-96q-11-64-70-64Z" fill="#347f9d"/>
+      <path d="M114 380h72v156h-72Z" fill="#55b3b2" stroke="none"/>
+      <path d="M82 514q68 20 136 0v38q-68 26-136 0Z" fill="#263e61" stroke="none"/>
+    </g>
+    <g id="hand" stroke="#27354c" stroke-width="6">
+      <path d="M90 575 77 516q-28-10-24-37 1-21 20-24l-2-48q0-24 18-24 13-1 18 12 7-39 30-33 13 2 17 23 15-36 36-20 10 9 8 30 21-20 34-5 14 14 5 37l-9 60q17 51-17 88Z" fill="#edaf65"/>
+      <path d="M93 535h109v40H93Z" fill="#347f9d" stroke="none"/>
+    </g>
+    <g id="foot" stroke="#27354c" stroke-width="6">
+      <path d="M146 655q-71 0-74 72-5 43 20 76l-7 45q-3 35 65 35 68 0 65-35l-7-45q25-33 20-76-3-72-82-72Z" fill="#263e61"/>
+      <path d="M93 813q57-23 114 0v37q-57-17-114 0Z" fill="#55b3b2" stroke="none"/>
+      <path d="M115 834h70m-68 15h66" stroke="#fff2d5" stroke-width="5"/>
+    </g>
+    <g id="tail" stroke="#27354c" stroke-width="6">
+      <path d="M113 866q-71-53-32-140 21-48 68-69-6 65 24 112 20 29 58 22-2 70-68 89Z" fill="#edaf65"/>
+      <path d="m95 736 51 20m-49 30 67 15m-54 35 63 11" stroke="#b96c39" stroke-width="13"/>
+    </g>
+  </defs>
+  <use href="#head"/><use href="#eyes"/><ellipse cx="150" cy="245" rx="18" ry="17" fill="#87435a" stroke="#27354c" stroke-width="5"/>
+  <g transform="translate(300)"><use href="#head"/><use href="#eyes"/><use href="#smile"/></g>
+  <g transform="translate(600)"><use href="#head"/><path d="m100 189 26 0m48 0h26" stroke="#27354c" stroke-width="6" stroke-linecap="round"/><use href="#smile"/></g>
+  <g transform="translate(1200)"><use href="#head"/><path d="M90 169q60-41 120 0M87 192q63-43 126 0" fill="none" stroke="#b96c39" stroke-width="13"/></g>
+  <use href="#hand"/>
+  <g transform="translate(300)"><use href="#body"/><circle cx="150" cy="447" r="20" fill="#fff2d5"/><path d="m140 447 8 8 15-18" fill="none" stroke="#347f9d" stroke-width="6"/></g>
+  <use href="#hand" transform="translate(600)"/>
+  <use href="#hand" transform="translate(900)"/>
+  <use href="#body" transform="translate(1200)"/>
+  <use href="#hand" transform="translate(1500)"/>
+  <use href="#foot"/><use href="#tail" transform="translate(300)"/><use href="#foot" transform="translate(600)"/>
+  <use href="#foot" transform="translate(900)"/><use href="#tail" transform="translate(1200)"/><use href="#foot" transform="translate(1500)"/>
+</svg>

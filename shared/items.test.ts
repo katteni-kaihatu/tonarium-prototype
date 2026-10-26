@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { STROKE_ADD_MAX_NUMS, STROKE_MAX_NUMS, applyItemAction, createItem, type Item } from './items.ts';
+import { MIRROR_MAX, STROKE_ADD_MAX_NUMS, STROKE_MAX_NUMS, applyItemAction, canAddMirror, createItem, type Item } from './items.ts';
 
 type CanvasItem = Extract<Item, { kind: 'canvas' }>;
 const newCanvas = (): CanvasItem => {
@@ -52,4 +52,17 @@ test('strokeAdd rejects a non-array point list', () => {
   const bad = { a: 'strokeAdd', id: 's1', pts: 'x' } as unknown as Parameters<typeof applyItemAction>[1];
   assert.equal(applyItemAction(it, bad, 'alice', Math.random), false);
   assert.equal(it.strokes[0].pts.length, 2);
+});
+
+test('mirror placement is capped per session', () => {
+  const mk = (kind: 'mirror' | 'note', id: string) => createItem(kind, { id, x: 0, z: 0, ry: 0, createdBy: 'alice' }, Math.random)!;
+  const items: Item[] = [mk('note', 'n1')];
+  assert.equal(canAddMirror(items), true);
+  for (let i = 0; i < MIRROR_MAX; i++) {
+    assert.equal(canAddMirror(items), true);
+    items.push(mk('mirror', `m${i}`));
+  }
+  assert.equal(canAddMirror(items), false);
+  items.splice(items.findIndex((i) => i.kind === 'mirror'), 1);
+  assert.equal(canAddMirror(items), true);
 });

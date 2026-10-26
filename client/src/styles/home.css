@@ -52,6 +52,16 @@
 
 .scards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 14px; }
 .scard { background: var(--paper); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; }
+.scactions { position: relative; margin-left: auto; }
+.scard .schead { flex-wrap: wrap; }
+.sccopypop { position: absolute; right: 0; top: 100%; z-index: 5; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: var(--shadow); }
+.sccopypop button { white-space: nowrap; }
+.smenu .session-copy { left: 72px; top: 20px; }
+.world.phone .smenu .session-copy { left: calc(var(--phone-left, 10px) + 52px); top: 8px; }
+.shared-session { width: min(440px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; border: 1px solid var(--line); border-radius: 18px; padding: 20px; background: var(--paper); color: var(--ink); box-shadow: var(--shadow); }
+.shared-session::backdrop { background: #0006; }
+.shared-session > h2 { margin: 0 0 14px; }
+.shared-session > button { margin-top: 14px; }
 .scthumbnail { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; flex-shrink: 0; }
 .schead { display: flex; align-items: center; gap: 6px; padding: 10px 12px; min-height: 56px; }
 .scworld { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted2); }

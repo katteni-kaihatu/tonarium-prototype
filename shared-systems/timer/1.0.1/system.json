@@ -1,0 +1,361 @@
+{
+  "schema": 1,
+  "sdk": "tonarium-systems/1",
+  "id": "timer",
+  "version": "1.0.1",
+  "title": "타이머",
+  "description": "서버 시간을 기준으로 초 단위 카운트다운을 실행합니다. duration에 시간을 설정하고 display에 표시할 텍스트를 연결하세요. start·pause·reset 입력으로 제어하며 완료 시 finished 이벤트를 전달합니다.",
+  "license": "MIT",
+  "credits": [
+    "Tonarium contributors"
+  ],
+  "targets": {
+    "display": {
+      "capabilities": [
+        "text"
+      ],
+      "required": false
+    }
+  },
+  "config": {
+    "duration": {
+      "type": "number",
+      "default": 10,
+      "min": 0.001,
+      "max": 86400
+    }
+  },
+  "state": {
+    "running": {
+      "type": "boolean",
+      "default": false
+    },
+    "remaining": {
+      "type": "number",
+      "default": 10,
+      "min": 0,
+      "max": 86400
+    },
+    "deadline": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 9007199254740991
+    }
+  },
+  "inputs": {
+    "start": {
+      "payload": {}
+    },
+    "pause": {
+      "payload": {}
+    },
+    "reset": {
+      "payload": {}
+    },
+    "tick": {
+      "payload": {}
+    }
+  },
+  "outputs": {
+    "started": {
+      "payload": {}
+    },
+    "paused": {
+      "payload": {}
+    },
+    "finished": {
+      "payload": {}
+    }
+  },
+  "handlers": {
+    "$mount": [
+      {
+        "op": "set",
+        "field": "remaining",
+        "value": {
+          "config": "duration"
+        }
+      },
+      {
+        "op": "text",
+        "target": "display",
+        "value": {
+          "calc": "clock",
+          "args": [
+            {
+              "state": "remaining"
+            }
+          ]
+        }
+      }
+    ],
+    "start": [
+      {
+        "op": "if",
+        "condition": {
+          "calc": "not",
+          "args": [
+            {
+              "state": "running"
+            }
+          ]
+        },
+        "then": [
+          {
+            "op": "set",
+            "field": "deadline",
+            "value": {
+              "calc": "add",
+              "args": [
+                {
+                  "now": true
+                },
+                {
+                  "calc": "mul",
+                  "args": [
+                    {
+                      "state": "remaining"
+                    },
+                    1000
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "op": "set",
+            "field": "running",
+            "value": true
+          },
+          {
+            "op": "schedule",
+            "key": "tick",
+            "delayMs": {
+              "calc": "min",
+              "args": [
+                200,
+                {
+                  "calc": "mul",
+                  "args": [
+                    {
+                      "state": "remaining"
+                    },
+                    1000
+                  ]
+                }
+              ]
+            },
+            "input": "tick",
+            "payload": {}
+          },
+          {
+            "op": "emit",
+            "port": "started",
+            "payload": {}
+          }
+        ]
+      }
+    ],
+    "pause": [
+      {
+        "op": "if",
+        "condition": {
+          "state": "running"
+        },
+        "then": [
+          {
+            "op": "set",
+            "field": "remaining",
+            "value": {
+              "calc": "max",
+              "args": [
+                0,
+                {
+                  "calc": "div",
+                  "args": [
+                    {
+                      "calc": "sub",
+                      "args": [
+                        {
+                          "state": "deadline"
+                        },
+                        {
+                          "now": true
+                        }
+                      ]
+                    },
+                    1000
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "op": "set",
+            "field": "running",
+            "value": false
+          },
+          {
+            "op": "cancel",
+            "key": "tick"
+          },
+          {
+            "op": "text",
+            "target": "display",
+            "value": {
+              "calc": "clock",
+              "args": [
+                {
+                  "state": "remaining"
+                }
+              ]
+            }
+          },
+          {
+            "op": "emit",
+            "port": "paused",
+            "payload": {}
+          }
+        ]
+      }
+    ],
+    "reset": [
+      {
+        "op": "cancel",
+        "key": "tick"
+      },
+      {
+        "op": "set",
+        "field": "running",
+        "value": false
+      },
+      {
+        "op": "set",
+        "field": "remaining",
+        "value": {
+          "config": "duration"
+        }
+      },
+      {
+        "op": "set",
+        "field": "deadline",
+        "value": 0
+      },
+      {
+        "op": "text",
+        "target": "display",
+        "value": {
+          "calc": "clock",
+          "args": [
+            {
+              "state": "remaining"
+            }
+          ]
+        }
+      }
+    ],
+    "tick": [
+      {
+        "op": "if",
+        "condition": {
+          "state": "running"
+        },
+        "then": [
+          {
+            "op": "set",
+            "field": "remaining",
+            "value": {
+              "calc": "max",
+              "args": [
+                0,
+                {
+                  "calc": "div",
+                  "args": [
+                    {
+                      "calc": "sub",
+                      "args": [
+                        {
+                          "state": "deadline"
+                        },
+                        {
+                          "now": true
+                        }
+                      ]
+                    },
+                    1000
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "op": "text",
+            "target": "display",
+            "value": {
+              "calc": "clock",
+              "args": [
+                {
+                  "state": "remaining"
+                }
+              ]
+            }
+          },
+          {
+            "op": "if",
+            "condition": {
+              "calc": "gt",
+              "args": [
+                {
+                  "state": "remaining"
+                },
+                0
+              ]
+            },
+            "then": [
+              {
+                "op": "schedule",
+                "key": "tick",
+                "delayMs": {
+                  "calc": "min",
+                  "args": [
+                    200,
+                    {
+                      "calc": "mul",
+                      "args": [
+                        {
+                          "state": "remaining"
+                        },
+                        1000
+                      ]
+                    }
+                  ]
+                },
+                "input": "tick",
+                "payload": {}
+              }
+            ],
+            "else": [
+              {
+                "op": "set",
+                "field": "running",
+                "value": false
+              },
+              {
+                "op": "emit",
+                "port": "finished",
+                "payload": {}
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "$dispose": [
+      {
+        "op": "cancel",
+        "key": "tick"
+      }
+    ]
+  }
+}

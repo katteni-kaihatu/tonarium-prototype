@@ -6,11 +6,15 @@ import { useShallow } from 'zustand/react/shallow';
 import type { Participant } from '../../../shared/protocol.ts';
 import { ITEM_INFO } from '../i18n/static.ts';
 import { ONLY_3D, type Item, type ItemKind } from '../../../shared/items.ts';
+import { isCameraTimerItem } from '../../../shared/camera-timer-demo.ts';
 import { useStore, get, set, save, nameOf, heldHammer } from '../store.ts';
 import { follow, goNear, poke } from '../actions.ts';
 import { dropHammer, hitAndMove, itemAction, removeItem, spawnItem } from '../items/actions.ts';
+import { requestTimedCamera } from '../items/useTimedCamera.ts';
 import { formatDistance, useTrend } from '../spatial.ts';
 import { Icon } from './Icon.tsx';
+import { ImageItemMark } from './ImageItemMark.tsx';
+import { imageItemCreator } from './imageItemCreator.ts';
 import {
   BANDS, Badge3D, Face, ItemMark, Popover, glowStyle, itemLabel, useItemsNear, usePlayers, windowKeyOf,
   type Band, type PlayerEntry,
@@ -18,6 +22,7 @@ import {
 import { openWindow, toggleFromList, useIsOpen } from './windows.ts';
 import { PeerVolume } from './VolumeMenus.tsx';
 import { EmoteBadge } from './Emotes.tsx';
+import { SystemItemPanel } from '../systems/SystemItem.tsx';
 
 type Menu = { kind: 'user'; id: string; rect: DOMRect } | { kind: 'item'; id: string; rect: DOMRect };
 
@@ -114,14 +119,18 @@ function ItemRow({ item, d, band, heldBy, onMenu, menuOpen }: {
   const camFeeds = useStore((s) => s.camFeeds);
   const selfId = useStore((s) => s.selfId);
   useStore((s) => s.participants);
+  const creatorName = useStore((s) => imageItemCreator(item, s.users));
   const key = windowKeyOf(item, camFeeds);
   const attn = useStore((s) => (s.attention[item.id] ?? 0) > performance.now());
   const open = useIsOpen(key ?? '');
-  const label = itemLabel(item);
+  const label = itemLabel(item, creatorName);
+  const mark = (size: number) => item.kind === 'image'
+    ? <ImageItemMark key={`${item.id}:${item.url}`} item={item} size={size} label={label} />
+    : <ItemMark item={item} size={size} />;
   if (band === 'far') {
     return (
       <button className="farchip ib" title={formatDistance(d)} onClick={() => key && openWindow(key)}>
-        <ItemMark item={item} size={20} />{label}
+        {mark(20)}{label}
       </button>
     );
   }
@@ -130,7 +139,7 @@ function ItemRow({ item, d, band, heldBy, onMenu, menuOpen }: {
   return (
     <div className={`prow item ${big ? 'big' : ''} ${open ? 'winon' : ''} ${menuOpen ? 'menuon' : ''} ${attn ? 'attn' : ''}`}>
       <button className="pmain" data-popanchor onClick={(ev) => (key ? openWindow(key) : onMenu(ev.currentTarget.getBoundingClientRect()))}>
-        <ItemMark item={item} size={big ? 32 : 22} />
+        {mark(big ? 32 : 22)}
         <span className="ptext">
           <span className="pname">{label}{!big && status && <span className="pstat">{status}</span>}</span>
           {big && status && <span className="pstat">{status}</span>}
@@ -179,7 +188,7 @@ function MenuItem({ icon, label, onClick, disabled }: { icon: Parameters<typeof 
 
 function ActionMenu({ menu, onClose }: { menu: Menu; onClose: () => void }) {
   const s = useStore(useShallow((st) => ({
-    participants: st.participants, selfId: st.selfId, items: st.items, camFeeds: st.camFeeds,
+    participants: st.participants, selfId: st.selfId, items: st.items, camFeeds: st.camFeeds, mode: st.mode,
   })));
   const me = s.participants.find((p) => p.id === s.selfId);
   const run = (f: () => void) => () => { f(); onClose(); };
@@ -201,12 +210,22 @@ function ActionMenu({ menu, onClose }: { menu: Menu; onClose: () => void }) {
   const it = s.items[menu.id];
   if (!it) return null;
   const key = windowKeyOf(it, s.camFeeds);
+  if (it.mapPlacement?.mode === 'system') return <Popover anchor={menu.rect} onClose={onClose} className="menu">
+    <span className="menutitle">{itemLabel(it)}</span>
+    <MenuItem icon="near" label={tr("ui611")} onClick={run(() => goNear(`item:${it.id}`))} />
+    <MenuItem icon="window" label={tr("ui617")} onClick={run(() => openWindow(`item:${it.id}`))} />
+    <SystemItemPanel item={it} />
+    {isCameraTimerItem(it) && <MenuItem icon="trash" label={tr("ui618")} onClick={run(() => removeItem(it.id))} />}
+  </Popover>;
   const holder = 'holder' in it ? it.holder : null;
   const iHold = !!heldHammer(s);
   return (
     <Popover anchor={menu.rect} onClose={onClose} className="menu">
       <span className="menutitle">{itemLabel(it)}</span>
       <MenuItem icon="near" label={tr("ui611")} onClick={run(() => goNear(`item:${it.id}`))} />
+      {it.kind === 'camera' && it.variant === 'camera-timer' && s.mode === '3d' && <MenuItem icon="camera"
+        label={tr('cameraTimerShoot')} disabled={!!it.timerState?.systems.find(system => system.instanceId === 'camera-shot')?.state.busy}
+        onClick={run(() => requestTimedCamera(it.id))} />}
       {it.kind === 'hammer' && !holder && <MenuItem icon="hand" label={tr("ui614")} disabled={iHold} onClick={run(() => itemAction(it.id, { a: 'pick' }))} />}
       {it.kind === 'hammer' && holder === s.selfId && <MenuItem icon="hand" label={tr("ui615")} onClick={run(dropHammer)} />}
       {key && <MenuItem icon="window" label={it.kind === 'camera' ? tr("ui616") : tr("ui617")} onClick={run(() => openWindow(key))} />}
@@ -248,6 +267,7 @@ function ItemPicker({ anchor, onClose }: { anchor: DOMRect; onClose: () => void 
       <section className="pickdetail" aria-label={tr("ui622", info.name)}>
         <div className="thumb" style={{ background: info.tint, color: info.ink }}><span>{info.mark}</span></div>
         <h3>{info.name}</h3>
+        <code>itemId: {selected.id}</code>
         <span className="sub">{tr("ui371")}{selected.creator}</span>
         <p>{info.desc}</p>
         <div className="tags">
@@ -258,7 +278,7 @@ function ItemPicker({ anchor, onClose }: { anchor: DOMRect; onClose: () => void 
         <span className="spacer" />
         <button
           className="primary big" disabled={disabledOf(selected.kind)}
-          onClick={() => { spawnItem(selected.kind, selected.text); onClose(); }}
+          onClick={() => { spawnItem(selected.kind, selected.text, undefined, selected.variant); onClose(); }}
         ><Icon name="plus" size={14} stroke={2.4} />{disabledOf(selected.kind) ? tr("ui623") : tr("ui197")}</button>
       </section>
     </Popover>

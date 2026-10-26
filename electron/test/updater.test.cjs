@@ -16,7 +16,7 @@ class FakeUpdater extends EventEmitter {
     this.emit('update-not-available');
     return null;
   }
-  quitAndInstall() { this.installs++; }
+  quitAndInstall(_silent, restartAfter) { this.installs++; this.restartAfter = restartAfter; }
 }
 function fixture(t, options = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'tonarium-updater-'));
@@ -33,8 +33,10 @@ function fixture(t, options = {}) {
     app: { isPackaged: options.isPackaged ?? true, getPath: name => name === 'exe' ? path.join(directory, 'Tonarium Electron.exe') : directory, getVersion: () => '0.0.8' },
     autoUpdater: () => { initialized++; return updater; },
     fetch: options.fetch, buildConfigPath, platform: options.platform ?? 'linux', env: options.env ?? { APPIMAGE: '/tmp/Tonarium.AppImage' },
+    now: options.now, beforeInstall: options.beforeInstall, onInstallAborted: options.onInstallAborted,
     onChange: state => changes.push(state), onNeedsConfiguration: () => prompts++,
   });
+  t.after(() => controller.dispose());
   return { controller, updater, directory, changes, initialized: () => initialized, prompts: () => prompts };
 }
 
@@ -44,6 +46,108 @@ test('first launch asks once and never initializes updater without a preference'
   assert.equal(f.controller.state().autoInstall, false);
   await f.controller.start(); await f.controller.start();
   assert.equal(f.prompts(), 1); assert.equal(f.initialized(), 0);
+});
+
+test('automatic restart defaults off with five seconds and persists validated preferences', async t => {
+  const f = fixture(t);
+  assert.equal(f.controller.state().autoRestart, false);
+  assert.equal(f.controller.state().restartSeconds, 5);
+  for (const restartSeconds of [0, 301, 1.5, '5', NaN]) assert.throws(() => f.controller.configure({ checkOnStartup: true, autoInstall: false, restartSeconds }));
+  for (const restartSeconds of [1, 300]) {
+    f.controller.configure({ checkOnStartup: true, autoInstall: false, autoRestart: true, restartSeconds });
+    const saved = JSON.parse(fs.readFileSync(path.join(f.directory, 'updates.json')));
+    assert.equal(saved.restartSeconds, restartSeconds); assert.equal(saved.autoRestart, true);
+  }
+  await f.controller.start();
+  assert.equal(f.updater.autoDownload, true); assert.equal(f.updater.autoInstallOnAppQuit, false);
+});
+
+test('automatic restart on/off and both delay boundaries survive a fresh controller', t => {
+  for (const autoRestart of [false, true]) for (const restartSeconds of [1, 300]) {
+    const f = fixture(t);
+    f.controller.configure({ checkOnStartup: true, autoInstall: false, autoRestart, restartSeconds });
+    const preferences = JSON.parse(fs.readFileSync(path.join(f.directory, 'updates.json')));
+    const restored = fixture(t, { preferences });
+    assert.equal(restored.controller.state().autoRestart, autoRestart);
+    assert.equal(restored.controller.state().restartSeconds, restartSeconds);
+  }
+});
+
+test('settings changes and newer completed downloads preserve deadline and replace target', async t => {
+  const f = fixture(t, { now: () => 1000 });
+  f.controller.configure({ checkOnStartup: true, autoInstall: false, autoRestart: true, restartSeconds: 5 });
+  await f.controller.start();
+  f.updater.emit('update-downloaded', { version: 'v2' });
+  assert.equal(f.controller.state().deadline, 6000);
+  f.controller.configure({ checkOnStartup: true, autoInstall: false, autoRestart: false, restartSeconds: 300 });
+  assert.equal(f.controller.state().deadline, 6000);
+  f.updater.emit('update-available', { version: 'v3' });
+  assert.equal(await f.controller.prepareAndInstall(), false);
+  f.updater.emit('update-downloaded', { version: 'v3' });
+  assert.equal(f.controller.state().deadline, 6000);
+  assert.equal(f.controller.state().downloadedVersion, 'v3');
+});
+
+test('cancelled version stays cancelled after preference changes and a repeated completion', async t => {
+  const f = fixture(t, { now: () => 1000 });
+  f.controller.configure({ checkOnStartup: true, autoInstall: true, autoRestart: true, restartSeconds: 5 });
+  await f.controller.start();
+  f.updater.emit('update-downloaded', { version: 'v2' }); f.controller.cancelRestart();
+  f.controller.configure({ checkOnStartup: true, autoInstall: true, autoRestart: true, restartSeconds: 1 });
+  f.updater.emit('update-downloaded', { version: 'v2' });
+  assert.equal(f.controller.state().deadline, null);
+  assert.equal(f.updater.autoInstallOnAppQuit, false);
+  f.updater.emit('update-downloaded', { version: 'v3' });
+  assert.equal(f.controller.state().deadline, 2000);
+});
+
+test('manual install saves state and applies once with quit installation disabled', async t => {
+  let saved = 0;
+  const f = fixture(t, { beforeInstall: async () => { saved++; }, preferences: { checkOnStartup: true, autoInstall: true } });
+  await f.controller.start(); f.updater.emit('update-downloaded', { version: 'v2' });
+  assert.equal(await f.controller.prepareAndInstall(), true);
+  assert.equal(await f.controller.prepareAndInstall(), false);
+  assert.equal(f.controller.install(), false);
+  assert.equal(saved, 1); assert.equal(f.updater.installs, 1); assert.equal(f.updater.autoInstallOnAppQuit, false);
+});
+
+test('save failure cancels countdown and reports a reason without installing', async t => {
+  const f = fixture(t, { beforeInstall: async () => { throw new Error('storage unavailable'); } });
+  f.controller.configure({ checkOnStartup: true, autoInstall: false, autoRestart: true, restartSeconds: 5 });
+  await f.controller.start(); f.updater.emit('update-downloaded', { version: 'v2' });
+  assert.equal(await f.controller.prepareAndInstall(), false);
+  assert.equal(f.controller.state().deadline, null); assert.equal(f.controller.state().error, 'storage unavailable');
+  assert.equal(f.updater.installs, 0);
+});
+
+test('cancel during state saving prevents the pending installation', async t => {
+  let complete;
+  const f = fixture(t, { beforeInstall: () => new Promise(resolve => { complete = resolve; }) });
+  await f.controller.check(); f.updater.emit('update-downloaded', { version: 'v2' });
+  const install = f.controller.prepareAndInstall(); f.controller.cancelRestart(); complete();
+  assert.equal(await install, false); assert.equal(f.updater.installs, 0);
+});
+
+test('quit and immediate installation share preparation and cannot apply twice', async t => {
+  let finish, saves = 0;
+  const f = fixture(t, { beforeInstall: () => { saves++; return new Promise(resolve => { finish = resolve; }); } });
+  await f.controller.check(); f.updater.emit('update-downloaded', { version: 'v2' });
+  const quitting = f.controller.prepareAndInstall(false);
+  assert.equal(await f.controller.prepareAndInstall(), false);
+  finish(); assert.equal(await quitting, true);
+  assert.equal(f.updater.restartAfter, false);
+  assert.equal(saves, 1); assert.equal(f.updater.installs, 1);
+  assert.equal(f.updater.autoInstallOnAppQuit, false);
+});
+
+test('elapsed countdown applies automatically once after saving state', async t => {
+  let saves = 0;
+  const f = fixture(t, { beforeInstall: async () => { saves++; } });
+  f.controller.configure({ checkOnStartup: true, autoInstall: false, autoRestart: true, restartSeconds: 1 });
+  await f.controller.start();
+  f.updater.emit('update-downloaded', { version: 'v2' });
+  await new Promise(resolve => setTimeout(resolve, 1100));
+  assert.equal(saves, 1); assert.equal(f.updater.installs, 1);
 });
 
 test('disabled build, missing build, development and unsupported OS never check remotely', async t => {
@@ -71,7 +175,7 @@ test('startup checks feed only after consent and configures nondowngrading night
   assert.deepEqual(f.updater.feed, { provider: 'generic', url: FEED_URL, channel: 'nightly' });
   assert.equal(f.updater.channel, 'nightly'); assert.equal(f.updater.allowPrerelease, true);
   assert.equal(f.updater.allowDowngrade, false); assert.equal(f.updater.autoDownload, true);
-  assert.equal(f.updater.autoInstallOnAppQuit, true); assert.equal(f.updater.installs, 0);
+  assert.equal(f.updater.autoInstallOnAppQuit, false); assert.equal(f.updater.installs, 0);
 });
 
 test('preferences persist atomically and invalid auto-install combination is rejected', t => {
@@ -79,7 +183,7 @@ test('preferences persist atomically and invalid auto-install combination is rej
   assert.throws(() => f.controller.configure({ checkOnStartup: false, autoInstall: true }));
   f.controller.configure({ checkOnStartup: true, autoInstall: false });
   const filename = path.join(f.directory, 'updates.json');
-  assert.deepEqual(JSON.parse(fs.readFileSync(filename)), { checkOnStartup: true, autoInstall: false });
+  assert.deepEqual(JSON.parse(fs.readFileSync(filename)), { checkOnStartup: true, autoInstall: false, autoRestart: false, restartSeconds: 5 });
   if (process.platform !== 'win32') assert.equal(fs.statSync(filename).mode & 0o777, 0o600);
   assert.equal(fs.readdirSync(f.directory).some(name => name.endsWith('.tmp')), false);
   assert.equal(f.controller.state().needsConfiguration, false);
@@ -111,7 +215,7 @@ test('download completion only notifies; disabling prevents install on quit', as
   f.controller.configure({ checkOnStartup: false, autoInstall: false });
   assert.equal(f.updater.autoInstallOnAppQuit, false);
   assert.equal(f.updater.autoDownload, false);
-  await f.controller.check(); assert.equal(f.updater.calls, 1);
+  await f.controller.check(); assert.equal(f.updater.calls, 2);
   assert.equal(f.controller.install(), true); assert.equal(f.updater.installs, 1);
 });
 
@@ -210,7 +314,7 @@ test('re-enabling automatic installation rechecks cached completion to arm quit 
   f.controller.configure({ checkOnStartup: true, autoInstall: true });
   f.updater.checkForUpdates = async () => {
     f.updater.calls++;
-    assert.equal(f.updater.autoInstallOnAppQuit, true);
+    assert.equal(f.updater.autoInstallOnAppQuit, false);
     f.updater.emit('update-downloaded', { version: '0.0.9-nightly.2' });
   };
   await f.controller.check();

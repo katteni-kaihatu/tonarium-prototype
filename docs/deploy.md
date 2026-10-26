@@ -40,7 +40,7 @@ cloudflared 以外（ngrok など）を使う場合は、`.env` の `ALLOWED_HOS
 
 デプロイ中と更新の案内:
 - 開いている人は、ホーム用 WebSocket が 5 秒以上切れていて、インターネットにはつながっているのに `/healthz` が通らない間、全面に「メンテナンス中です」が出る。つながり直すと自動で消える（`client/src/world/ServerNotices.tsx`）
-- サーバーは `client/dist/index.html` のハッシュを画面の版として、配る `index.html` の `<meta name="tonarium-version">` と `snapshot` の `version` に入れる。つなぎ直した先の版がページの版と違うと、上部に「新しいバージョンがあります」と「更新する」（再読み込み。セッション中なら一度抜ける）・「あとで」（その版のあいだ隠す）が出る。画面のファイルが変わらないサーバーだけの変更では出ない。`npm run dev` では出ない
+- サーバーは `client/dist/index.html` のハッシュを画面の版として、配る `index.html` の `<meta name="tonarium-version">` と `snapshot` の `version` に入れる。つなぎ直した先の版がページの版と違うと、上部に更新通知とカウントダウン・即時更新・キャンセルが出る。画面のファイルが変わらないサーバーだけの変更では出ない。`npm run dev` では出ない。設定と更新後の復元範囲は [updates.md](updates.md) を参照
 
 メモ:
 - HTTP・ホーム用 WebSocket（`/ws`）・同期シグナリング（`/sync/offer`）・同期用 WebSocket（`/sync/ws`）・LiveKit トークン（`/token`）は同じポート。HTTPS は Coolify（Traefik）が付ける。`/sync/ws` も WebSocket Upgrade を許可する

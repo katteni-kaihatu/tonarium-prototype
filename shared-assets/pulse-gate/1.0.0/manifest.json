@@ -1,0 +1,24 @@
+{
+  "schema": 2,
+  "id": "pulse-gate",
+  "version": "1.0.0",
+  "title": "加算ゲート（提出ルールの実証）",
+  "kind": "spatial",
+  "sdk": "tonarium-rules/0.2",
+  "dependencies": [],
+  "files": [],
+  "fields": {
+    "charge": { "initial": 0, "min": 0, "max": 100, "scope": "instance" },
+    "visits": { "initial": 0, "min": 0, "max": 100, "scope": "participant" },
+    "total": { "initial": 0, "min": 0, "max": 1000, "scope": "session" }
+  },
+  "inputs": ["advance", "reset"],
+  "outputs": ["advance"],
+  "rules": [
+    { "event": "advance", "field": "charge", "op": "add", "value": 7 },
+    { "event": "advance", "field": "visits", "op": "add", "value": 1 },
+    { "event": "advance", "field": "total", "op": "add", "value": 1 },
+    { "event": "reset", "field": "charge", "op": "set", "value": 0 }
+  ],
+  "presentation": { "label": "ゲート", "field": "charge", "color": "#57854c", "solid": true }
+}

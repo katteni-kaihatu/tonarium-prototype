@@ -63,6 +63,52 @@ test('walking start and stationary stop reach multiple peers through position sy
 });
 
 const secret = () => base64(crypto.getRandomValues(new Uint8Array(32)));
+
+test('head and both hand poses reach two peers and server state; ending VR removes poses', async () => {
+  const source = config('vr-user', 0), sender = fixture(source);
+  const peers = [config('vr-observer-a', 1), config('vr-observer-b', 2)], receivers = peers.map(fixture);
+  await sender.positions.update(peers.map(p => member(p))); sender.present(peers.map(p => p.peer));
+  for (const receiver of receivers) await receiver.positions.update([member(source)]);
+  const pose = { head: { p: [.1, 1.2, -.1], q: [0, 0, 0, 1] },
+    left: { p: [-.4, .8, -.3], q: [0, Math.SQRT1_2, 0, Math.SQRT1_2] }, right: { p: [.3, .9, -.5], q: [0, 0, 0, 1] } } as const;
+  for (const xr of [pose, { head: pose.head, right: pose.right }, undefined]) {
+    const state = { x: 1, z: 2, ry: .5, ...(xr ? { xr } : {}) } as unknown as import('./protocol.ts').AvatarState;
+    sender.sent.length = 0; await sender.positions.send(state);
+    for (let i = 0; i < peers.length; i++) {
+      const packet = sender.sent.find(f => f.to?.includes(peers[i].peer))!;
+      await receivers[i].positions.receive({ ...packet, peer: source.peer });
+      const applied = receivers[i].applied.at(-1) as { state: import('./protocol.ts').AvatarState };
+      assert.deepEqual(clampAvatar('room', applied.state).xr, xr);
+    }
+    const packet = sender.sent.find(f => f.to?.includes(source.server))!;
+    const decoded = await open(await importKey(source.positionKey!), source.token, 'position', packet.value);
+    assert.deepEqual(clampAvatar('room', decoded.value.s).xr, xr);
+  }
+});
+
+test('crouching and standing reach every peer and the server snapshot state', async () => {
+  const source = config('croucher', 0), sender = fixture(source);
+  const peers = [config('crouch-observer-a', 1), config('crouch-observer-b', 2)];
+  const receivers = peers.map(fixture);
+  await sender.positions.update(peers.map(p => member(p)));
+  sender.present(peers.map(p => p.peer));
+  for (const receiver of receivers) await receiver.positions.update([member(source)]);
+  for (const crouching of [true, false, true, false]) {
+    sender.sent.length = 0;
+    await sender.positions.send({ x: 1, z: 2, ry: 0, crouching });
+    for (let i = 0; i < peers.length; i++) {
+      const packet = sender.sent.find(f => f.to?.includes(peers[i].peer))!;
+      await receivers[i].positions.receive({ ...packet, peer: source.peer });
+      const applied = receivers[i].applied.at(-1) as { state: any };
+      assert.equal(clampAvatar('room', applied.state).crouching, crouching);
+    }
+    const packet = sender.sent.find(f => f.to?.includes(source.server))!;
+    const decoded = await open(await importKey(source.positionKey!), source.token, 'position', packet.value);
+    assert.equal(clampAvatar('room', decoded.value.s).crouching, crouching);
+  }
+  assert.equal(clampAvatar('room', { x: 0, z: 0, ry: 0 }).crouching, false);
+  assert.equal(clampAvatar('room', { x: 0, z: 0, ry: 0, crouching: 'true' } as any).crouching, false);
+});
 const config = (peer: string, slot: number): SyncConfig => ({ sid: 'room', room: 'wire-room', server: 'server', peer,
   token: `grant-${peer}`, key: secret(), positionKey: secret(), slot });
 const member = (c: SyncConfig, key = true): PositionPeer => ({ peer: c.peer, grant: c.token, slot: c.slot, user: `user-${c.peer}`, ...(key ? { key: c.positionKey } : {}) });
@@ -138,6 +184,10 @@ test('reject mismatched sequence and non-position payloads without applying them
   assert.equal(f.applied.length, 0);
   for (const lean of [NaN, Infinity, 'left']) {
     await f.positions.receive({ ...base, value: await seal(key, other.token, 'position', 3, { t: 'avatar', s: { x: 1, z: 1, ry: 0, lean } }) });
+    assert.equal(f.applied.length, 0);
+  }
+  for (const crouching of ['true', 1, null]) {
+    await f.positions.receive({ ...base, value: await seal(key, other.token, 'position', 3, { t: 'avatar', s: { x: 1, z: 1, ry: 0, crouching } }) });
     assert.equal(f.applied.length, 0);
   }
   f.positions.close();

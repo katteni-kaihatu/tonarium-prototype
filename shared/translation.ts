@@ -1,6 +1,6 @@
 export const TRANSLATION_LANGUAGES = ['ja', 'en', 'ko'] as const;
 export type TranslationLanguage = typeof TRANSLATION_LANGUAGES[number];
-export interface TranslationRequest { text: string; targetLanguage: TranslationLanguage }
+export interface TranslationRequest { text: string; targetLanguage: TranslationLanguage; context?: string }
 export interface TranslationResult {
   text: string;
   sourceLanguage: string | null;

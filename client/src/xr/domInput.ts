@@ -16,6 +16,7 @@ export function writeField(field: TextField, text: string, backspace = false) {
 }
 
 export class TerminalPointer {
+  root: HTMLElement | null = null;
   private down: Element | null = null;
   private hover: Element | null = null;
   private x = 0;
@@ -24,7 +25,7 @@ export class TerminalPointer {
   button = 0;
   move(x: number, y: number) {
     this.x = x; this.y = y;
-    const hit = document.elementFromPoint(x, y);
+    const hit = this.hit(x, y);
     if (hit !== this.hover) {
       this.hover?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: hit }));
       hit?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: this.hover }));
@@ -33,7 +34,7 @@ export class TerminalPointer {
     this.emit(this.down ?? hit, 'pointermove');
   }
   press() {
-    this.down = document.elementFromPoint(this.x, this.y);
+    this.down = this.hit(this.x, this.y);
     this.start = [this.x, this.y];
     this.emit(this.down, 'pointerdown');
     this.emit(this.down, 'mousedown');
@@ -44,7 +45,7 @@ export class TerminalPointer {
     this.down = null;
     this.emit(target, cancel ? 'pointercancel' : 'pointerup');
     this.emit(target, 'mouseup');
-    if (!cancel && this.button === 0 && document.elementFromPoint(this.x, this.y) === target && Math.hypot(this.x - this.start[0], this.y - this.start[1]) < 8) {
+    if (!cancel && this.button === 0 && this.hit(this.x, this.y) === target && Math.hypot(this.x - this.start[0], this.y - this.start[1]) < 8) {
       if (target instanceof HTMLInputElement && target.type === 'range') {
         const r = target.getBoundingClientRect();
         const min = Number(target.min || 0), max = Number(target.max || 100), step = Number(target.step || 1);
@@ -59,7 +60,7 @@ export class TerminalPointer {
     }
   }
   scroll(dy: number, dx = 0) {
-    const target = document.elementFromPoint(this.x, this.y);
+    const target = this.hit(this.x, this.y);
     const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: this.x, clientY: this.y, deltaY: dy, deltaX: dx });
     if (!target?.dispatchEvent(event)) return;
     for (let el: Element | null = target; el; el = el.parentElement) {
@@ -69,5 +70,15 @@ export class TerminalPointer {
   private emit(target: Element | null, type: string) {
     const init = { bubbles: true, cancelable: true, clientX: this.x, clientY: this.y, button: this.button, buttons: this.down ? this.button === 1 ? 4 : 1 : 0, pointerId: 704, pointerType: 'mouse', isPrimary: true };
     target?.dispatchEvent(type.startsWith('pointer') ? new PointerEvent(type, init) : new MouseEvent(type, init));
+  }
+  private hit(x: number, y: number) {
+    const root = this.root;
+    if (!root) return document.elementFromPoint(x, y);
+    if (!root.isConnected) return null;
+    const { pointerEvents } = root.style;
+    root.style.pointerEvents = 'auto';
+    try {
+      return document.elementsFromPoint(x, y).find(hit => root.contains(hit)) ?? null;
+    } finally { root.style.pointerEvents = pointerEvents; }
   }
 }

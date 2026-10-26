@@ -2,8 +2,9 @@ import { t as tr } from '../i18n/index.ts';
 import { ItemDetail } from './ItemDetail.tsx';
 import { OriginBadge } from './OriginBadge.tsx';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { MARKET_CATEGORIES } from '../i18n/static.ts';
-import { MARKET_PRODUCTS, type MarketCategory, type MarketProduct } from '../../../shared/market.ts';
+import { MARKET_CATEGORIES, MARKET_PRODUCTS } from '../i18n/static.ts';
+import { type MarketCategory, type MarketProduct } from '../../../shared/market.ts';
+import { contentText } from '../content-translations.ts';
 import { ITEM_INFO } from '../i18n/static.ts';
 import { Icon } from '../world/Icon.tsx';
 import { playSynth, unlockEmoteAudio } from '../world/sounds.ts';
@@ -100,7 +101,7 @@ export function MarketPage({ q }: { q: string }) {
         social={<><div className="market-social"><LikeButton key={selected.id} product={selected.id} /><div className="market-share-actions"><span className="market-share"><button onClick={() => void copyLink()}><Icon name="link" />{tr("ui405")}</button>{copyStatus === 'copied' && <span className="market-copy-toast" role="status">{tr("ui406")}</span>}</span>{session && <button disabled={!connected} title={connected ? tr("ui407") : tr("ui408")} onClick={shareToSession}><Icon name="send" />{tr("ui409")}</button>}</div></div>
           {copyStatus === 'manual' && <label className="market-copy-fallback">{tr("ui410")}<input readOnly aria-label={tr("ui411")} value={shareProductUrl(selected.id)} onFocus={(e) => e.currentTarget.select()} /></label>}</>}
         tags={<><span>{selected.category === 'items' && selected.kind && !ITEM_INFO[selected.kind].in2d ? tr('merge3dOnly') : tr("ui412")}</span><span>{tr("ui413")}</span></>}
-        usage={<>{selected.category === 'worlds' ? tr("ui414") : selected.category === 'items' && selected.kind ? ITEM_INFO[selected.kind].desc : selected.category === 'items' ? tr("ui313") : selected.category === 'sounds' ? tr("ui415") : tr("ui416")}</>}>
+        usage={<span style={{ whiteSpace: 'pre-wrap' }}>{selected.category === 'items' && selected.text ? contentText(`product/${selected.id}`, 'text', selected.text) : selected.category === 'worlds' ? tr("ui414") : selected.category === 'items' && selected.kind ? ITEM_INFO[selected.kind].desc : selected.category === 'items' ? tr("ui313") : selected.category === 'sounds' ? tr("ui415") : tr("ui416")}</span>}>
         <div className="market-price">◉ {selected.price.toLocaleString()} <small>{tr("ui396")}</small></div>
           {owned.includes(selected.id) ? <div className="market-success" role="status"><b><Icon name="check" />{success ? tr("ui417") : tr("ui418")}</b><p>「{MARKET_CATEGORIES[selected.category]}{tr("ui419")}</p><button className="primary" onClick={() => goHome(selected.category)}>{MARKET_CATEGORIES[selected.category]}{tr("ui420")}</button></div> : <><button className="primary market-buy" onClick={() => setConfirm(true)}>{tr("ui421")}</button><small>{tr("ui422")}{MARKET_CATEGORIES[selected.category]}{tr("ui423")}</small></>}
       </ItemDetail>

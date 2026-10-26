@@ -1,7 +1,8 @@
 import { t as tr, msg, systemText, type UiMessage } from '../i18n/index.ts';
 import { useState } from 'react';
+import { FollowButton } from '../home/common.tsx';
 import { useStore, set, colorOf } from '../store.ts';
-import { follow, friendRequest, goNear, poke, report, toggleBlock } from '../actions.ts';
+import { follow, goNear, poke, report, toggleBlock } from '../actions.ts';
 import { useDistanceLabel } from '../spatial.ts';
 import { Icon } from './Icon.tsx';
 import { Face } from './common.tsx';
@@ -16,7 +17,6 @@ export function ProfileCard() {
   const me = useStore((s) => s.participants.find((p) => p.id === s.selfId));
   const friends = useStore((s) => s.friends);
   const blocked = useStore((s) => s.blocked);
-  const [requested, setRequested] = useState<string | null>(null);
   const [reporting, setReporting] = useState(false);
   const [reason, setReason] = useState('');
   const [done, setDone] = useState<string | UiMessage>('');
@@ -59,10 +59,7 @@ export function ProfileCard() {
           )}
           {!self && (
             <div className="pcfoot">
-              <button
-                className="ib" disabled={isFriend || requested === u.id}
-                onClick={() => { friendRequest(u.id); setRequested(u.id); }}
-              >{isFriend ? tr("ui153") : requested === u.id ? tr("ui673") : tr("ui674")}</button>
+              <FollowButton name={u.name} />
               <span className="spacer" />
               <button className="ib" onClick={() => toggleBlock(u.name)}>{isBlocked ? tr("ui675") : tr("ui676")}</button>
               <button className="ib danger" onClick={() => setReporting(!reporting)}>{tr("ui677")}</button>

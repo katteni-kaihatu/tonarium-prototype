@@ -85,6 +85,32 @@ function updateChanged(state) {
   }
 }
 
+let pendingUpdatePreparation;
+function prepareRemoteUpdate() {
+  if (!trustedContents(mainWindow?.webContents)) return Promise.reject(new Error('更新前の画面状態を保存できません。接続先を確認してください。'));
+  if (pendingUpdatePreparation) return pendingUpdatePreparation.promise;
+  const id = require('node:crypto').randomUUID();
+  let finish;
+  const promise = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { pendingUpdatePreparation = null; reject(new Error('更新前の状態保存がタイムアウトしました。')); }, 15000);
+    finish = error => { clearTimeout(timer); pendingUpdatePreparation = null; error ? reject(new Error(error)) : resolve(); };
+  });
+  pendingUpdatePreparation = { id, finish, promise };
+  mainWindow.webContents.send('shell:prepare-update', id);
+  return promise;
+}
+function prepareQuitUpdate(event) {
+  const state = updateController?.state();
+  if (state?.installing || !state?.autoInstall || !state.downloadedVersion || !state.supported || state.updateVersion !== state.downloadedVersion) return;
+  event.preventDefault();
+  void updateController.prepareAndInstall(false);
+}
+ipcMain.on('shell:prepared-update', (event, id, error) => {
+  if (trustedContents(event.sender) && event.senderFrame === event.sender.mainFrame && pendingUpdatePreparation?.id === id) {
+    pendingUpdatePreparation.finish(typeof error === 'string' ? error.slice(0, 500) : null);
+  }
+});
+
 function audioConfig() {
   try {
     const all = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'audio-devices.json'), 'utf8'));
@@ -224,6 +250,7 @@ function createMainWindow() {
   });
   mainWindow.webContents.on('render-process-gone', () => { connectionError = '画面の処理が終了しました。再読み込みで接続し直してください。'; showSettings(); });
   mainWindow.on('closed', () => { permissionEpoch++; captureState?.finish(null); mainWindow = undefined; });
+  mainWindow.on('close', prepareQuitUpdate);
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Tonarium Electron', submenu: [
       { label: '接続先を変更…', click: showSettings },
@@ -248,18 +275,14 @@ ipcMain.handle('shell:update-configure', async (event, value) => {
   return state.checkOnStartup ? updateController.check() : state;
 });
 ipcMain.handle('shell:update-check', event => { requireUpdateSender(event); return updateController.check(); });
+ipcMain.handle('shell:update-cancel', event => { requireUpdateSender(event); updateController.cancelRestart(); return updateController.state(); });
 ipcMain.handle('shell:update-release', event => {
   requireUpdateSender(event);
   return shell.openExternal(updateController.state().releaseUrl);
 });
 ipcMain.handle('shell:update-install', async event => {
   requireUpdateSender(event);
-  const result = await dialog.showMessageBox(updatesWindow, {
-    type: 'question', title: '再起動して更新', message: 'Tonarium Electronを終了して更新しますか？',
-    detail: '通話は切断されます。入力中の内容を送信・保存してから実行してください。',
-    buttons: ['キャンセル', '更新する'], defaultId: 0, cancelId: 0,
-  });
-  if (result.response === 1) return updateController.install();
+  return updateController.prepareAndInstall();
 });
 
 ipcMain.on('shell:audio-config', event => {
@@ -317,9 +340,12 @@ else {
     updateController = createUpdateController({
       app, autoUpdater: () => require('electron-updater').autoUpdater,
       onChange: updateChanged, onNeedsConfiguration: showUpdates,
+      beforeInstall: prepareRemoteUpdate,
+      onInstallAborted: () => { if (trustedContents(mainWindow?.webContents)) mainWindow.webContents.send('shell:update-aborted'); },
     });
     createMainWindow();
     Promise.resolve(updateController.start()).catch(error => console.error('更新:', error.message));
   }).catch(error => { console.error(error); app.quit(); });
   app.on('window-all-closed', () => app.quit());
+  app.on('before-quit', prepareQuitUpdate);
 }

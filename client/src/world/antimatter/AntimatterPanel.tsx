@@ -68,7 +68,7 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
       {tab === 'layers' && <LayerTabs ad={ad} />}
       <AdPurchaseParticles root={root} />
       {offlineGained && createPortal(
-        <div style={s.modal} onClick={() => ad.dismissOffline()}>
+        <div style={s.modal} data-xr-surface="ad-offline" data-xr-title="ADオフライン報酬" onClick={() => ad.dismissOffline()}>
           <div style={s.modalBox} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ margin: 0 }}>おかえりなさい</h3>
             <p style={{ margin: 0 }}>

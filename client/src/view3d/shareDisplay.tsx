@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useStore, get, nameOf } from '../store.ts';
 import { shareAnnotations, shareVideoEl } from '../net/livekit.ts';
-import { annotationColor, paintAnnotations } from '../shareAnnotations.ts';
+import { annotationColor, paintAnnotations, type Point } from '../shareAnnotations.ts';
 import { placesOf } from '../spatial.ts';
 import { Label } from './Label.tsx';
 import { carrying, type Interactable } from './interact.ts';
@@ -24,10 +24,27 @@ function useShareAspect() {
   return aspect;
 }
 
+/** カーソルは線のテクスチャに焼かず印だけを重ねる。動いてもテクスチャの再転送が起きないようにするため */
+function CursorMarks({ w, h, cursors }: { w: number; h: number; cursors: Map<string, Point> }) {
+  return (
+    <>
+      {[...cursors].map(([id, point]) => (
+        <group key={id} position={[(point.x - 0.5) * w, (0.5 - point.y) * h, 0]}>
+          <mesh renderOrder={9}>
+            <circleGeometry args={[w * 0.006, 20]} />
+            <meshBasicMaterial color={annotationColor(id)} transparent depthWrite={false} toneMapped={false} />
+          </mesh>
+          <Label position={[w * 0.035, -h * 0.028, 0]} height={h * 0.045} text={nameOf(id)} bg="rgba(21,24,32,0.9)" fg={annotationColor(id)} />
+        </group>
+      ))}
+    </>
+  );
+}
+
 /** 裏から見ても左右が反転しないよう、表と裏に 1 枚ずつ貼る */
 function VideoPanel({ w, h, tex }: { w: number; h: number; tex: THREE.Texture }) {
   const annotations = useSyncExternalStore(shareAnnotations.subscribe, shareAnnotations.snapshot);
-  const participants = useStore((s) => s.participants);
+  useStore((s) => s.participants);
   const overlay = useMemo(() => {
     const texture = new THREE.CanvasTexture(document.createElement('canvas'));
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -38,26 +55,9 @@ function VideoPanel({ w, h, tex }: { w: number; h: number; tex: THREE.Texture })
     const canvas = overlay.image as HTMLCanvasElement;
     canvas.width = 1024;
     canvas.height = Math.max(1, Math.round(1024 * h / w));
-    const ctx = canvas.getContext('2d')!;
-    paintAnnotations(ctx, annotations.segments);
-    ctx.font = '18px sans-serif';
-    for (const [id, point] of annotations.cursors) {
-      const x = point.x * canvas.width, y = point.y * canvas.height;
-      ctx.fillStyle = annotationColor(id);
-      ctx.beginPath();
-      ctx.arc(x, y, 6, 0, Math.PI * 2);
-      ctx.fill();
-      const name = nameOf(id);
-      const width = Math.min(canvas.width, ctx.measureText(name).width + 12);
-      const left = Math.max(0, Math.min(x + 10, canvas.width - width));
-      const top = Math.max(0, Math.min(y + 10, canvas.height - 26));
-      ctx.fillStyle = '#151820';
-      ctx.fillRect(left, top, width, 26);
-      ctx.fillStyle = annotationColor(id);
-      ctx.fillText(name, left + 6, top + 19, width - 12);
-    }
+    paintAnnotations(canvas.getContext('2d')!, annotations.segments);
     overlay.needsUpdate = true;
-  }, [annotations, participants, overlay, w, h]);
+  }, [annotations.segments, overlay, w, h]);
   return (
     <>
       <mesh position-z={0.026}>
@@ -76,6 +76,12 @@ function VideoPanel({ w, h, tex }: { w: number; h: number; tex: THREE.Texture })
         <planeGeometry args={[w, h]} />
         <meshBasicMaterial map={overlay} transparent depthWrite={false} toneMapped={false} />
       </mesh>
+      <group position-z={0.028}>
+        <CursorMarks w={w} h={h} cursors={annotations.cursors} />
+      </group>
+      <group position-z={-0.028} rotation-y={Math.PI}>
+        <CursorMarks w={w} h={h} cursors={annotations.cursors} />
+      </group>
       <mesh>
         <boxGeometry args={[w + 0.06, h + 0.06, 0.05]} />
         <meshStandardMaterial color="#1e1f24" roughness={0.6} />

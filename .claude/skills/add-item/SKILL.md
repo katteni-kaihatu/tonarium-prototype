@@ -7,6 +7,12 @@ description: Tonarium に新しいアイテム（サイコロ・チェス・付�
 
 先に CLAUDE.md のルールに従う（特に、仕様が曖昧なら実装前に質問する）。よく聞くこと：2D/3D のどちらで使えるか、結果を誰が決めるか、誰に見えるか、チャットに残すか、個数や大きさの上限。
 
+既存の付箋やチェス盤などのモデルにボタン・タイマー・着席の動作をつなぐには、先に[ワールド制作の共有システム例](../add-world/SKILL.md#共有システムを使ってマップを作る)を参照する。新しいアイテムの種類を作らず、コードマップの `.item()` と `bindings` で既存モデルを再利用できる。対応するアイテムと制約は[共有システムの案内](../../../docs/shared-systems/README.md)を参照する。
+
+カタログの保存場所は `docs/shared-systems/`。[全体の目次](../../../docs/shared-systems/README.md)からIDを選ぶか、[アイテム別の `items/`](../../../docs/shared-systems/items/)と[システム別の `systems/`](../../../docs/shared-systems/systems/)を開く。各文書のファイル名は `<itemId>.md` または `<systemId>.md`。
+
+既存モデルのまま別の所持アイテムとして選ばせる場合は、`shared/item-variants.ts` の `camera-timer` を参考にする。通常の `kind: 'camera'` と区別する `variant` を作成要求・保存・メニューに渡し、カメラごとのサーバー処理とクライアント操作を接続する。登録だけでは新しい動作は実装されない。5秒タイマーカメラは `server/timed-camera-items.ts` と `client/src/items/useTimedCamera.ts` で共有タイマーを使い、通常の出現時にそのアイテムだけの実行状態を作る。セッションのコードマップは置き換えない。使い方は[接続例](../../../docs/shared-systems/camera-timer-test.md)を参照する。
+
 ## 触るファイル
 
 1. `shared/items.ts`（必須）

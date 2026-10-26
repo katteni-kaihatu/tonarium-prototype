@@ -10,3 +10,48 @@
 .xr-settings { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; padding: 8px; }
 .xr-settings label { display: flex; align-items: center; gap: 8px; }
 .xr-active .keyhelp { display: none; }
+.xr-active .xr-source {
+  position: fixed !important;
+  inset: 0 auto auto 0 !important;
+  width: min(390px, 100vw) !important;
+  max-width: 100vw !important;
+  max-height: min(680px, 100vh) !important;
+  margin: 0 !important;
+  transform: none !important;
+  box-sizing: border-box;
+  pointer-events: auto;
+  overflow: auto !important;
+  font: 18px/1.5 "Segoe UI", "Noto Sans JP", sans-serif;
+  color: #f4f1eb;
+  background: #252c36;
+  border: 2px solid #899bb6;
+  border-radius: 12px;
+  padding: 12px;
+}
+.xr-active .xr-source.win { height: min(680px, 100vh) !important; display: flex !important; flex-direction: column; }
+.xr-active .xr-source .winbar { min-height: 56px; flex-shrink: 0; flex-wrap: wrap; }
+.xr-active .xr-source .winbody { min-height: 0; overflow: auto; flex: 1; }
+.xr-active .xr-source :is(button, input, select, textarea) { font-size: 18px; }
+.xr-active .xr-source button { min-width: 44px; min-height: 44px; padding: 8px 10px; }
+.xr-active .xr-source button:disabled { opacity: .5; }
+.xr-active .xr-source button:focus-visible { outline: 3px solid #fff3a6; outline-offset: 2px; }
+.xr-active .xr-source :is(.modal, .confirm, .profilecard, .survivor-choices) { width: 100% !important; max-width: 100% !important; max-height: none; margin: 0; box-sizing: border-box; }
+.xr-active .xr-source:is(.nearlist, .noticelog, .worldbadge, .dock, .hoverlay, .survivor-panel) { display: flex !important; flex-direction: column; gap: 8px; }
+.xr-active .xr-source .panelcanvas { max-width: 100%; height: auto; }
+.xr-active .xr-source :is(.hgrid, .hmain, .home) { min-width: 0; width: 100%; grid-template-columns: 1fr; }
+.xr-active .xr-wrist { display: flex; flex-direction: column; gap: 6px; }
+.xr-active .xr-wrist h2 { margin: 0; font-size: 22px; }
+.xr-active .xr-wrist p { margin: 0; padding: 0; border: 0; }
+.xr-active .xr-source.xr-keyboard { display: flex; flex-wrap: wrap; gap: 4px; }
+.xr-active .xr-source.xr-keyboard button { min-width: 48px; min-height: 48px; }
+.xr-active .xr-source.xr-keyboard span { flex-basis: 100%; }
+.xr-active .xr-source:is(.hoverlay, .nearlist, .noticelog) { height: min(680px, 100vh) !important; }
+.xr-active .xr-source .home.sheet { position: static; inset: auto; overflow: visible; min-height: 0; display: flex; flex-direction: column; padding: 0; }
+.xr-active .xr-source .home.sheet :is(.hside, .hevents) { position: static; max-height: none; width: auto; }
+.xr-active .xr-source .home.sheet .hcontent { overflow: visible; }
+.xr-active .xr-source :is(img, video, canvas) { max-width: 100%; }
+.xr-active .world.locked .front > .xr-source { opacity: 1; pointer-events: auto; }
+.xr-active .xr-source :is(p, span, td, th, small, label, a) { font-size: 18px !important; }
+.xr-active .xr-source :is(input, select, textarea) { min-height: 44px; max-width: 100%; box-sizing: border-box; }
+.xr-active .xr-source button[aria-label] { min-width: 72px; width: auto; }
+.xr-active .xr-source .xr-settings label { flex-wrap: wrap; }

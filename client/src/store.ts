@@ -16,6 +16,9 @@ import { newSurvivorProfile, type SurvivorProfile, type SurvivorState } from '..
 import { createAdSlice, type AdSlice } from './ad/slice.ts';
 import type { AdPanelTarget } from '../../shared/antimatterLayout.ts';
 import { deriveSession } from './sessionView.ts';
+import { storedHomePageOf, type HomePage } from './homePage.ts';
+export type { HomePage } from './homePage.ts';
+import type { Post, TimelineTab } from '../../shared/timeline.ts';
 import type { Walk } from './walk.ts';
 
 export type VoiceStatus = 'off' | 'connecting' | 'connected' | 'unavailable';
@@ -23,8 +26,7 @@ export type WinMode = 'simple' | 'free';
 /** ウィンドウのキー: share（画面共有）/ cam:<アイテムID> / view:<ユーザーID> / item:<アイテムID> */
 export interface Win { key: string; x: number; y: number }
 /** key は attention ならウィンドウのキー、invite なら session:<id> / group:<id>、askJoin なら session:<id> */
-export interface Notice { id: number; kind: 'poke' | 'hit' | 'friend' | 'live' | 'attention' | 'invite' | 'askJoin' | 'online'; from: string; key?: string; fromName: string; at: number; unread: boolean }
-export type HomePage = 'home' | 'friends' | 'sessions' | 'events' | 'groups' | 'group' | 'worlds' | 'items' | 'market' | 'changelog' | 'sounds' | 'emotes';
+export interface Notice { id: number; kind: 'poke' | 'hit' | 'follow' | 'live' | 'attention' | 'invite' | 'askJoin' | 'online'; from: string; key?: string; fromName: string; at: number; unread: boolean }
 /** ホームの右の欄に出すもの */
 export type SideWidget = 'now' | 'events' | 'sessions' | 'worlds' | 'items';
 
@@ -35,6 +37,7 @@ interface State extends AdSlice {
   selfName: string;
   joined: boolean;
   wsConnected: boolean;
+  wsReady: boolean;
   /** つなぎ直した先のサーバーが、このページと違う版の画面を出している */
   updateVersion: string | null;
   /** 互換性バージョンがサーバーと合わず、接続を断たれた。更新するまで全面表示で止める */
@@ -122,7 +125,15 @@ interface State extends AdSlice {
   /** セッション中にホームを重ねて開いている */
   hubOpen: boolean;
   /** フレンドのページで開いているタブ（ホームの「もっと見る」から選んで開く） */
-  friendsTab: 'all' | 'now' | 'req' | 'block';
+  friendsTab: 'all' | 'now' | 'followers' | 'following' | 'block';
+  timelineTab: TimelineTab;
+  /** タイムラインの右の欄を上書きしているもの。compose か post:<ID>。null なら通常の右の欄 */
+  timelineSide: string | null;
+  /** 引用して書くポスト */
+  composeQuote: string | null;
+  /** タイムラインのページに貼った・落とした写真。書く欄が受け取って上げる。'unsupported' は写真以外だったとき */
+  composeImage: File | 'unsupported' | null;
+  posts: Post[];
   /** スマホ幅のセッション画面で、下のタブで選んでいるもの */
   phoneTab: 'screen' | 'list' | 'log';
   sideWidget: SideWidget;
@@ -158,6 +169,10 @@ interface State extends AdSlice {
   profileOf: string | null;
   notices: Notice[];
   friends: string[];
+  following: string[];
+  followers: string[];
+  /** フレンドのフレンド（自分とフレンドは除く） */
+  fof: string[];
   /** 名前単位。手元だけに保存する */
   blocked: string[];
   /** 3D で「そばにいく」したとき Player が拾う */
@@ -213,6 +228,8 @@ export function spawnPoint(): AvatarState {
   return { x: SPAWN.x + Math.sin(a) * r, z: SPAWN.z + Math.cos(a) * r, ry: 0 };
 }
 
+const savedAudioVol = load<Partial<State['audioVol']>>('tonarium.audioVol', {});
+
 export const useStore = create<State>((set, get) => ({
   adSpaceTarget: null,
   ...createAdSlice((p) => set(p as Partial<State>), () => get() as unknown as AdSlice),
@@ -220,6 +237,7 @@ export const useStore = create<State>((set, get) => ({
   selfName: '',
   joined: false,
   wsConnected: false,
+  wsReady: false,
   updateVersion: null,
   incompatible: false,
   guild: { name: 'Tonarium', sessions: [] },
@@ -233,8 +251,7 @@ export const useStore = create<State>((set, get) => ({
   presence: {},
   session: null,
   mode: '2d',
-  // 個別のグループは開き直せないので一覧に戻す
-  homePage: ((p: HomePage) => (p === 'group' ? 'groups' : p))(load<HomePage>('tonarium.homePage', 'home')),
+  homePage: storedHomePageOf(load<unknown>('tonarium.homePage', 'home')),
   marketProductId: null,
   marketLikes: null,
   homeGroup: null,
@@ -282,17 +299,30 @@ export const useStore = create<State>((set, get) => ({
   voiceHeat: load('tonarium.voiceHeat', true),
   walk: null,
   volumes: {},
-  audioVol: load('tonarium.audioVol', { voice: 1, fx: 1, media: 1 }),
+  audioVol: {
+    voice: savedAudioVol.voice ?? 1,
+    fx: savedAudioVol.fx ?? 0.05,
+    media: savedAudioVol.media ?? 0.05,
+  },
   peerVolume: load('tonarium.peerVolume', {}),
   peerMuted: load('tonarium.peerMuted', []),
   hubOpen: false,
   phoneTab: 'screen',
   friendsTab: 'all',
+  timelineTab: load('tonarium.timelineTab', 'home'),
+  // スマホでは右の欄が下からのシートになるので、開いた途端に覆わないよう閉じておく
+  timelineSide: typeof matchMedia === 'function' && matchMedia('(max-width: 720px)').matches ? null : 'compose',
+  composeQuote: null,
+  composeImage: null,
+  posts: [],
   sideWidget: load('tonarium.sideWidget', 'events'),
   joinMode: load('tonarium.joinMode', '2d'),
   dice: load('tonarium.dice', { sides: 6 as DieSides, count: 2, secret: false }),
   notices: [],
   friends: [],
+  following: [],
+  followers: [],
+  fof: [],
   blocked: load('tonarium.blocked', []),
   teleport: null,
   hits: {},

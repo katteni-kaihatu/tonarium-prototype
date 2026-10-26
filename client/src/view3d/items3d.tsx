@@ -31,6 +31,8 @@ import { Telephone3D } from './telephone3d.tsx';
 import { Mirror3D } from './mirror3d.tsx';
 import { JumpPad3D } from './jumpPad3d.tsx';
 import { createImageTexture } from './imageTexture.ts';
+import { boardSize, mediaTransform } from '../../../shared/media-placement.ts';
+import { SystemItemBoundary } from '../systems/SystemItem.tsx';
 
 const TABLE_Y = 0.78;
 
@@ -199,14 +201,6 @@ function CompatPanel3D({ item }: { item: Item }) {
 }
 
 const BOARD_Y = 1.6;
-/** 板の大きさ（m）。縦長も横長も収まるように */
-function boardSize(w: number, h: number): [number, number] {
-  const a = w / h;
-  let bw = 1.8;
-  let bh = bw / a;
-  if (bh > 1.3) { bh = 1.3; bw = bh * a; }
-  return [bw, bh];
-}
 
 type ClockItem = Item & { kind: 'video' | 'youtube' };
 const playToggle = (item: ClockItem): Interactable => ({
@@ -226,22 +220,25 @@ function Board({ item, w, h, data, children, label }: {
   item: Item; w: number; h: number; data: Interactable; children: React.ReactNode; label?: string;
 }) {
   const ref = useRef<THREE.Group>(null);
-  useFollow(ref, item.id, item.x, item.z, item.ry);
+  const floating = item.kind === 'image' || item.kind === 'video';
+  const { y, scale } = floating ? mediaTransform(item) : { y: 0, scale: 1 };
+  const center = floating ? 0 : BOARD_Y;
+  useFollow(ref, item.id, item.x, item.z, item.ry, y, scale);
   return (
-    <group ref={ref} position={[item.x, 0, item.z]} rotation-y={item.ry}>
-      <mesh position-y={(BOARD_Y - h / 2) / 2}>
+    <group ref={ref} position={[item.x, y, item.z]} rotation-y={item.ry} scale={scale} userData={floating ? { mediaItemId: item.id } : {}}>
+      {!floating && <mesh position-y={(BOARD_Y - h / 2) / 2}>
         <cylinderGeometry args={[0.04, 0.04, BOARD_Y - h / 2]} />
         <meshStandardMaterial color="#4e5058" />
-      </mesh>
-      <mesh position={[0, BOARD_Y, -0.03]}>
+      </mesh>}
+      <mesh position={[0, center, -0.03]}>
         <boxGeometry args={[w + 0.08, h + 0.08, 0.04]} />
         <meshStandardMaterial color="#1e1f22" />
       </mesh>
-      <mesh position-y={BOARD_Y} userData={data}>
+      <mesh position-y={center} userData={data}>
         <planeGeometry args={[w, h]} />
         {children}
       </mesh>
-      {label && <Label position={[0, BOARD_Y + h / 2 + 0.18, 0]} height={0.16} text={label} />}
+      {label && <Label position={[0, center + h / 2 + 0.18, 0]} height={0.16} text={label} />}
     </group>
   );
 }
@@ -355,6 +352,11 @@ export function AttentionGlow({ item }: { item: Item }) {
 }
 
 export function Item3D({ item }: { item: Item }) {
+  const content = <NativeItem3D item={item} />;
+  return item.mapPlacement?.mode === 'system' ? <SystemItemBoundary item={item}>{content}</SystemItemBoundary> : content;
+}
+
+function NativeItem3D({ item }: { item: Item }) {
   switch (item.kind) {
     case 'telephone': return <Telephone3D item={item} />;
     case 'jumpPad': return <JumpPad3D item={item} />;

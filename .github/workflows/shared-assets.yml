@@ -1,0 +1,61 @@
+name: Shared submission checks
+
+on:
+  pull_request_target:
+    branches: [main]
+    paths: ['shared-assets/**', 'shared-maps/**']
+  push:
+    branches: [main]
+    paths: ['shared-assets/**', 'shared-maps/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: trusted
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: submission
+          persist-credentials: false
+          lfs: false
+          sparse-checkout: |
+            shared-assets
+            shared-maps
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+          path: baseline
+          persist-credentials: false
+          sparse-checkout: |
+            shared-assets
+            shared-maps
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Validate data using only base-branch validator
+        env:
+          CANDIDATE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+        run: node --experimental-transform-types trusted/scripts/check-shared-submission.ts submission "$CANDIDATE_COMMIT" baseline "$BASE_COMMIT"
+      - name: Recheck finalized main commit and stage trial distribution
+        if: github.event_name != 'pull_request_target'
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: node --experimental-transform-types trusted/scripts/shared-assets.ts publish submission "$RELEASE_COMMIT" trial-store
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: github.event_name != 'pull_request_target'
+        with:
+          name: shared-assets-trial-${{ github.sha }}
+          path: trial-store
+          retention-days: 7

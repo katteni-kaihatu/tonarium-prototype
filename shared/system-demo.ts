@@ -1,0 +1,22 @@
+import { createSystemMap } from './system-map.ts';
+
+export const systemDemoMap = createSystemMap('system-demo')
+  .object({ id: 'start-button', capabilities: ['interact'], position: [-2, 0.7, -3], size: [0.5, 0.3, 0.5], color: '#49ad75' })
+  .object({ id: 'pause-button', capabilities: ['interact'], position: [-1, 0.7, -3], size: [0.5, 0.3, 0.5], color: '#c6a341' })
+  .object({ id: 'reset-button', capabilities: ['interact'], position: [0, 0.7, -3], size: [0.5, 0.3, 0.5], color: '#b65d5d' })
+  .item({ id: 'timer-text', itemId: 'note', itemMode: 'system', capabilities: ['text'], position: [-1, 0, -3], text: '00:10' })
+  .item({ id: 'menu-chess-button', itemId: 'chess', itemMode: 'system', capabilities: ['interact'], position: [1.5, 0, 0], text: '클릭: 타이머 시작' })
+  .object({ id: 'chair-object', capabilities: ['interact', 'seat'], position: [-3, 0.4, -1], rotation: Math.PI, size: [0.7, 0.8, 0.7], color: '#96764c', seatOffset: [0, 0.4, 0] })
+  .system({ instanceId: 'start', systemId: 'button', bindings: { target: ['start-button'] }, config: {} })
+  .system({ instanceId: 'pause', systemId: 'button', bindings: { target: ['pause-button'] }, config: {} })
+  .system({ instanceId: 'reset', systemId: 'button', bindings: { target: ['reset-button'] }, config: {} })
+  .system({ instanceId: 'countdown', systemId: 'timer', bindings: { display: ['timer-text'] }, config: { duration: 10 } })
+  .system({ instanceId: 'menu-start', systemId: 'button', bindings: { target: ['menu-chess-button'] }, config: {} })
+  .system({ instanceId: 'seat-trigger', systemId: 'button', bindings: { target: ['chair-object'] }, config: {} })
+  .system({ instanceId: 'seat', systemId: 'chair', bindings: { seat: ['chair-object'] }, config: {} })
+  .connect({ from: 'start', output: 'pressed', to: 'countdown', input: 'start' })
+  .connect({ from: 'pause', output: 'pressed', to: 'countdown', input: 'pause' })
+  .connect({ from: 'reset', output: 'pressed', to: 'countdown', input: 'reset' })
+  .connect({ from: 'menu-start', output: 'pressed', to: 'countdown', input: 'start' })
+  .connect({ from: 'seat-trigger', output: 'pressed', to: 'seat', input: 'sit', mapping: { user: 'user' } })
+  .build();

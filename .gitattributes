@@ -1,2 +1,5 @@
 *.png binary
 releases/windows/**/*.zip filter=lfs diff=lfs merge=lfs -text
+shared-assets/** -text
+shared-maps/** -text
+shared-systems/** -text

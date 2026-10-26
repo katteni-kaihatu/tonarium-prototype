@@ -127,8 +127,10 @@ function attachRemote(track: RemoteTrack, pub: RemoteTrackPublication, identity:
   if (track.kind === Track.Kind.Audio) {
     const el = track.attach();
     if (track.source === Track.Source.Microphone) {
-      // 空間オーディオで鳴らす。Chrome では要素にもつながないと音が流れないので、要素はミュートして残す
+      // 空間オーディオで鳴らす。Chrome では要素にもつながないと音が流れないので、要素は無音にして残す。
+      // LiveKit は startAudio や相手のミュート解除で muted を外すので、音量も 0 にしないと二重に鳴る
       el.muted = true;
+      el.volume = 0;
       addVoice(identity, track.mediaStreamTrack);
     } else {
       el.volume = get().audioVol.media;

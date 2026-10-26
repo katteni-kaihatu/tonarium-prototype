@@ -1,6 +1,9 @@
 import { scheduleChessAiReply } from './chess-ai.ts';
 import 'dotenv/config';
 import { configuredTranslationModel, createTranslationHandler, createTranslator } from './translation.ts';
+import { ContentTranslationStore } from './content-translations.ts';
+import { collectContentDocuments, readContentMetadata } from './content-translation-sources.ts';
+import { contentTranslationConfig } from './content-translation-config.ts';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,7 +20,8 @@ import type {
 import { COMPAT_VERSION, PLAN_QUORUM, ROOM_HALF, STATUS_INFO, STATUS_TEXT_MAX, VISIBILITY_INFO, channelKey, isGroupVisibility } from '../shared/protocol.ts';
 import { GROUP_COLORS, canSeeSession } from '../shared/home.ts';
 import { WORLDS, WORLD_COUNTDOWN_MS, isWorldKind, pushOut, type WorldKind } from '../shared/worlds.ts';
-import { ITEM_INFO, MEDIA_URL_RE, ONLY_3D, applyItemAction, createItem, isDeltaAction, isHandheld, itemSummary, type Item } from '../shared/items.ts';
+import { ITEM_INFO, MEDIA_URL_RE, ONLY_3D, applyItemAction, canAddMirror, createItem, isDeltaAction, isHandheld, itemSummary, type Item } from '../shared/items.ts';
+import { mediaTransform } from '../shared/media-placement.ts';
 import { telephoneAction, telephoneItemFor, telephoneState, tickTelephone, reconcileTelephoneHost, hasTelephoneHistory } from './telephone.ts';
 import type { TelephoneAction } from '../shared/telephone.ts';
 import { sanitizeParams } from '../shared/avatar.ts';
@@ -25,6 +29,7 @@ import { VOICE_RANGE, clampAvatar, computePlaces, placeDistance } from '../share
 import { CITY_HALF, clampCity } from '../shared/city.ts';
 import { callElevator, elevatorOf, resetElevator } from './city.ts';
 import { isStaleEvent, pruneEvents } from './events.ts';
+import { logHammerHit } from './hammer.ts';
 import { MarketLikes } from './market.ts';
 import { BIKE, clampBike, releaseBike } from '../shared/vehicle.ts';
 import { SOUNDS } from '../shared/sounds.ts';
@@ -33,10 +38,22 @@ import { DICE_MAX, ROLL_MS, isDieSides, type DiceRoll } from '../shared/dice.ts'
 import type { PeerOperation } from '../shared/session-events.ts';
 import { getOgp } from './ogp.ts';
 import { MEDIA_DIR, mediaExists, pipeFile, saveMedia, serveMedia } from './media.ts';
+import { SharedService } from './shared-service.ts';
+import { sharedSolids } from '../shared/shared-presentation.ts';
+import { SystemService } from './system-service.ts';
+import { TimedCameraItems } from './timed-camera-items.ts';
+import { systemMaps } from './system-maps.ts';
+import { isSystemControlledItem, reconcileSystemItems } from './system-items.ts';
+import { cameraTimerRemoval } from '../shared/camera-timer-demo.ts';
+import { systemSeat, systemSolids } from '../shared/system-presentation.ts';
+import { assetDelta } from '../shared/shared-sync.ts';
 import { PERSON as PERSON_R, freeSpot, itemRadius, pushApart2D } from './spacing.ts';
 import { clearGame, eliminate, gameOf, resetGame, startGame, stepTile, type GameDeps } from './game.ts';
 import { chooseSurvivorGear, chooseSurvivorStyle, clearSurvivor, moveSurvivor, removeSurvivor, resetSurvivorUpgrades, rerollSurvivorChoice, startSurvivor, tickSurvivors, upgradeSurvivor, survivorOf, type SurvivorDeps } from './survivors.ts';
 import { newSurvivorProfile, SURVIVOR_META_UPGRADES, SURVIVOR_PROFILE_VERSION, SURVIVOR_TICK_MS, survivorUpgradeRefund, type SurvivorMetaUpgrade, type SurvivorProfile, type SurvivorStyle } from '../shared/survivor.ts';
+import { Follows } from './follows.ts';
+import { POST_RATE, Timeline, UPLOAD_RATE } from './timeline.ts';
+import { POST_IMAGE_MAX_BYTES, isImageId, type Post } from '../shared/timeline.ts';
 import { createSyncGrant, handleSyncOffer, upgradeSync, revokeSync, revokeUserSync, leaveRoom, livekitRoom, roomSend, roomSendSnapshot, shutdownRooms, type RoomHandlers } from './rooms.ts';
 
 const PORT = Number(process.env.SERVER_PORT ?? 3001);
@@ -49,10 +66,30 @@ const CLIENT_VERSION = (() => {
   try { return createHash('sha1').update(fs.readFileSync(path.join(DIST, 'index.html'))).digest('hex').slice(0, 12); } catch { return null; }
 })();
 const DATA_DIR = process.env.DATA_DIR ?? path.join(ROOT, 'data');
+const sharedAssets = new SharedService(DATA_DIR);
+const systems = new SystemService(DATA_DIR, ROOT);
+const timedCameras = new TimedCameraItems(systems);
+for (const error of systems.startupErrors) console.error(error);
+const contentConfig = contentTranslationConfig(process.env, DEV);
+const contentMetadata = (() => {
+  try { return readContentMetadata(ROOT); }
+  catch { console.error('Content translation metadata is invalid; original text remains available.'); return { schema: 1 as const, glossary: {}, entries: {} }; }
+})();
+const contentTranslations = new ContentTranslationStore(path.join(DATA_DIR, 'content-translations'), contentConfig.translate, {
+  glossary: contentMetadata.glossary, profile: contentConfig.profile,
+});
+try {
+  void contentTranslations.register(collectContentDocuments(systems.catalog.current(), contentMetadata)).catch(() => {
+    console.error('Content translation registration failed; original text remains available.');
+  });
+} catch { console.error('Content translation registration failed; original text remains available.'); }
 const ICON_DIR = path.join(DATA_DIR, 'icons');
 const AVATAR_DIR = path.join(DATA_DIR, 'avatars');
 const PROFILE_DIR = path.join(DATA_DIR, 'profiles');
 const FRIENDS_FILE = path.join(DATA_DIR, 'friends.json');
+const FOLLOWS_FILE = path.join(DATA_DIR, 'follows.json');
+const TIMELINE_FILE = path.join(DATA_DIR, 'timeline.json');
+const TIMELINE_IMAGE_DIR = path.join(DATA_DIR, 'timeline-images');
 const HOME_FILE = path.join(DATA_DIR, 'home.json');
 const GROUP_IMAGE_DIR = path.join(DATA_DIR, 'group-images');
 const REPORTS_FILE = path.join(DATA_DIR, 'reports.log');
@@ -247,27 +284,24 @@ setInterval(() => {
 const sessionIds = new Set(guild.sessions.map((w) => w.id));
 const shortId = () => randomUUID().slice(0, 8);
 
-// フレンドは名前の組で保存する（アイコンなどと同じく名前が本人の識別）
-const pairKey = (a: string, b: string) => [a, b].sort().join('\u0000');
-const friendPairs = new Set<string>();
-try { for (const [a, b] of JSON.parse(fs.readFileSync(FRIENDS_FILE, 'utf-8')) as [string, string][]) friendPairs.add(pairKey(a, b)); } catch { /* まだ無い */ }
-const saveFriends = () => fs.writeFileSync(FRIENDS_FILE, JSON.stringify([...friendPairs].map((k) => k.split('\u0000'))));
-function friendsOf(name: string) {
-  const out: string[] = [];
-  for (const k of friendPairs) {
-    const [a, b] = k.split('\u0000');
-    if (a === name) out.push(b); else if (b === name) out.push(a);
-  }
-  return out;
-}
-/** 申請先の名前 → 申請した人の名前 */
-const pendingFriends = new Map<string, Set<string>>();
+// フォローは名前の組で保存する（アイコンなどと同じく名前が本人の識別）。お互いにフォローしているとフレンド。
+// follows.json が無いときは旧 friends.json のフレンドを相互フォローとして引き継ぐ（friends.json は書き換えない）
+const follows = fs.existsSync(FOLLOWS_FILE)
+  ? new Follows(readJson<[string, string][]>(FOLLOWS_FILE, []))
+  : Follows.fromFriendPairs(readJson<[string, string][]>(FRIENDS_FILE, []));
+const saveFollows = later(() => fs.writeFileSync(FOLLOWS_FILE, JSON.stringify(follows.edges())));
+if (!fs.existsSync(FOLLOWS_FILE)) saveFollows();
+const friendsOf = (name: string) => follows.friendsOf(name);
+/** 付け外しを繰り返しても、同じ人からのフォロー通知はこの間に 1 回だけ */
+const FOLLOW_NOTICE_MS = 60 * 60 * 1000;
+const followNoticeAt = new Map<string, number>();
 
 const users = new Map<string, Participant>();
 const sockets = new Map<string, Set<WebSocket>>(); // 同じIDで複数タブを開ける
 const chats = new Map<string, ChatMessage[]>();
 const avatars = new Map<string, Map<string, AvatarState>>();
 const items = new Map<string, Map<string, Item>>();
+const systemItemRooms = new Set<string>();
 const broadcastMode = new Map<string, boolean>();
 const lastAttention = new Map<string, number>();
 const emoteUntil = new WeakMap<Participant, number>();
@@ -351,17 +385,10 @@ for (const w of guild.sessions) {
 interface UserSnapshot { all: Participant[]; friendsByName: Map<string, string[]>; onlineNames: Set<string> }
 function snapshotUsers(): UserSnapshot {
   const all = [...users.values()];
-  const friendsByName = new Map<string, string[]>();
-  const add = (n: string, f: string) => { const l = friendsByName.get(n); if (l) l.push(f); else friendsByName.set(n, [f]); };
-  for (const k of friendPairs) {
-    const [a, b] = k.split('\u0000');
-    add(a, b);
-    if (b !== a) add(b, a);
-  }
-  return { all, friendsByName, onlineNames: new Set(all.map((u) => u.name)) };
+  return { all, friendsByName: follows.friendMap(), onlineNames: new Set(all.map((u) => u.name)) };
 }
 // 写しが渡されたとき（配信の一括計算）だけそれを使い、単発呼び出しでは全体の写しを作らない。
-// friendsOf は friendsByName と同じ friendPairs を同じ順に走査するので、対象者の一覧は写し経由と一致する
+// friendsOf と friendsByName は同じ follows から求めるので、対象者の集合は写し経由と一致する
 const sessionsVisibleTo = (name: string, snap?: UserSnapshot) => {
   const friends = snap ? snap.friendsByName.get(name) ?? [] : friendsOf(name);
   const all = snap ? snap.all : [...users.values()];
@@ -391,7 +418,7 @@ const isOnline = (name: string) => [...users.values()].some((u) => u.name === na
 function convMembers(conv: string): string[] | null {
   if (conv.startsWith('dm:')) {
     const pair = conv.slice(3).split('\u0000');
-    return pair.length === 2 && friendPairs.has(pairKey(pair[0], pair[1])) ? pair : null;
+    return pair.length === 2 && follows.isFriend(pair[0], pair[1]) ? pair : null;
   }
   const m = /^ch:([^:]+):([^:]+)$/.exec(conv);
   const g = m && home.groups.find((x) => x.id === m[1]);
@@ -441,6 +468,58 @@ function sendWatching(name: string) {
 function broadcastPeople() {
   const snap = snapshotUsers();
   for (const u of users.values()) sendTo([u.id], { t: 'people', list: knownPeopleOf(u.name, snap.friendsByName).map((n) => personOf(n, snap.onlineNames)) });
+}
+function followsMsg(name: string, friendMap?: Map<string, string[]>): ServerMsg {
+  return { t: 'follows', following: follows.following(name), followers: follows.followers(name), fof: follows.friendsOfFriends(name, friendMap) };
+}
+// フレンドのフレンドはだれかのフォロー 1 つで遠くの人まで変わるので、全員に送り直す
+function broadcastFollows() {
+  const map = follows.friendMap();
+  for (const name of new Set([...users.values()].map((u) => u.name))) sendToNames([name], followsMsg(name, map));
+}
+
+const saveTimeline = later(() => fs.writeFileSync(TIMELINE_FILE, timeline.serialize()));
+const timeline = new Timeline(TIMELINE_FILE, TIMELINE_IMAGE_DIR, () => saveTimeline());
+timeline.sweepImages();
+setInterval(() => {
+  const gone = timeline.prune();
+  if (gone.length) broadcast({ t: 'postsRemoved', ids: gone });
+  timeline.sweepImages();
+}, 60 * 60 * 1000);
+/** 非公開のセッション名はポストに残さない（ポストは全員に配るため） */
+const publicSessionName = (def: SessionDef) => ((def.visibility ?? 'public') === 'public' ? def.name : null);
+
+function handleTimeline(me: User, msg: ClientMsg): boolean {
+  switch (msg.t) {
+    case 'postCreate': {
+      if (!timeline.allow(`post:${me.name}`, POST_RATE)) return true;
+      const here = me.session ? guild.sessions.find((d) => d.id === me.session) : undefined;
+      const post = timeline.create(me.name, msg, {
+        place: msg.withPlace && here ? { sid: here.id, name: publicSessionName(here), mode: me.mode } : null,
+        session: (id) => {
+          const def = guild.sessions.find((d) => d.id === id);
+          return def && canSeeSession(def, me.name, friendsOf(me.name), home.groups, [...users.values()]) ? { name: publicSessionName(def) } : null;
+        },
+      });
+      if (!post) return true;
+      broadcast({ t: 'post', p: post });
+      const gone = timeline.prune();
+      if (gone.length) broadcast({ t: 'postsRemoved', ids: gone });
+      return true;
+    }
+    case 'postDelete': {
+      const gone = timeline.remove(msg.id, me.name);
+      if (gone.length) broadcast({ t: 'postsRemoved', ids: gone });
+      return true;
+    }
+    case 'postReact':
+    case 'postRepost': {
+      const p: Post | null = msg.t === 'postReact' ? timeline.react(msg.id, me.name, msg.emoji, !!msg.on) : timeline.repost(msg.id, me.name, !!msg.on);
+      if (p) broadcast({ t: 'post', p });
+      return true;
+    }
+  }
+  return false;
 }
 
 function finishVisit(sid: string) {
@@ -603,6 +682,29 @@ function sendItemRemove(sid: string, id: string) {
   roomSend(sid, { t: 'itemRemove', sid, id });
   broadcastSessionInfo();
 }
+function syncSystemItems(sid: string, createMissingNative = !systemItemRooms.has(sid), notify = true) {
+  const current = items.get(sid);
+  if (!current) return;
+  const changes = reconcileSystemItems(current, systems.view(sid), { createMissingNative });
+  for (const id of changes.removed) {
+    const item = current.get(id);
+    if (item) timedCameras.remove(sid, item);
+    current.delete(id);
+  }
+  for (const item of changes.changed) {
+    const previous = current.get(item.id);
+    if (previous?.kind === 'camera' && previous.variant === 'camera-timer'
+      && (item.kind !== 'camera' || item.variant !== 'camera-timer')) timedCameras.remove(sid, previous);
+    current.set(item.id, item);
+  }
+  systemItemRooms.add(sid);
+  if (!changes.changed.length && !changes.removed.length) return;
+  markItemsDirty(sid);
+  if (notify) {
+    for (const id of changes.removed) sendItemRemove(sid, id);
+    for (const item of changes.changed) sendItem(sid, item);
+  }
+}
 /** 移動の配信は位置だけにし、アイテムごとに間引く。止まったときの最後の位置は必ず届ける */
 const ITEM_MOVE_MS = 80;
 const itemMoveSentAt = new Map<string, number>();
@@ -612,7 +714,8 @@ function broadcastItemMove(sid: string, it: Item) {
   const key = `${sid}\0${it.id}`;
   const send = () => {
     itemMoveSentAt.set(key, Date.now());
-    roomSend(sid, { t: 'itemMove', sid, id: it.id, x: it.x, z: it.z, ry: it.ry });
+    roomSend(sid, { t: 'itemMove', sid, id: it.id, x: it.x, z: it.z, ry: it.ry,
+      ...((it.kind === 'image' || it.kind === 'video') ? mediaTransform(it) : {}) });
   };
   const wait = ITEM_MOVE_MS - (Date.now() - (itemMoveSentAt.get(key) ?? 0));
   if (wait <= 0) { send(); return; }
@@ -627,7 +730,7 @@ function refreshTelephones(sid: string) {
   const present = new Set(inSession(sid).map(u => u.id));
   const presenceKey = [...present].sort().join('\0');
   for (const it of items.get(sid)?.values() ?? []) {
-    if (it.kind !== 'telephone') continue;
+    if (it.kind !== 'telephone' || isSystemControlledItem(it)) continue;
     const g = telephoneState(it);
     const progressed = tickTelephone(g, Date.now());
     const hostChanged = reconcileTelephoneHost(g, present, Math.random);
@@ -639,9 +742,13 @@ function refreshTelephones(sid: string) {
 setInterval(() => { for (const sid of items.keys()) refreshTelephones(sid); }, 250);
 
 function sendSessionSnapshot(sid: string, id: string) {
+  syncSystemItems(sid);
+  for (const item of timedCameras.tick(sid, items.get(sid)?.values() ?? [], inSession(sid).map(user => user.id))) sendItem(sid, item);
   refreshTelephones(sid);
   roomSendSnapshot(sid, id, {
     sid,
+    sharedAssets: sharedAssets.view(sid, id),
+    systems: systems.view(sid),
     chats: (chats.get(sid) ?? []).filter((m) => !m.to || m.to.includes(id)),
     avatars: Object.fromEntries(avatars.get(sid) ?? []),
     items: [...(items.get(sid)?.values() ?? [])].map(it => telephoneItemFor(it, id, new Set(inSession(sid).map(u => u.id)))),
@@ -666,7 +773,7 @@ const modeLabel = (m: Mode) => (m === '3d' ? '3D' : '2D');
 const clampRoom = (v: number) => Math.max(-ROOM_HALF + 0.5, Math.min(ROOM_HALF - 0.5, v));
 /** クライアント由来の数値を有限数にする（NaN や Infinity が共有状態に残らないように） */
 const finNum = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
-const solidsOf = (sid: string) => WORLDS[worldOf.get(sid) ?? 'room'].solids;
+const solidsOf = (sid: string) => [...WORLDS[worldOf.get(sid) ?? 'room'].solids, ...sharedSolids(sharedAssets.view(sid, 'server'), sharedAssets.catalog.current()), ...systemSolids(systems.view(sid))];
 /** 部屋（街なら街）の中に収め、家具にめり込んでいたら外へ出す。アイテムと 2D の人は地上にいる */
 function placeIn(sid: string, x: number, z: number, r: number) {
   const world = worldOf.get(sid) ?? 'room';
@@ -695,9 +802,13 @@ function switchWorld(sid: string, world: WorldKind, clear: boolean, byName: stri
   const sessItems = items.get(sid)!;
   for (const u of inSession(sid)) releaseBikes(sid, u.id);
   if (clear) {
-    for (const id of [...sessItems.keys()]) { sessItems.delete(id); sendItemRemove(sid, id); }
+    for (const [id, item] of [...sessItems]) if (!isSystemControlledItem(item)) {
+      timedCameras.remove(sid, item);
+      sessItems.delete(id); sendItemRemove(sid, id);
+    }
   } else {
     for (const it of sessItems.values()) {
+      if (isSystemControlledItem(it)) continue;
       if ('holder' in it && it.holder) continue;
       const p = placeIn(sid, it.x, it.z, itemRadius(it) * 0.6);
       if (Math.abs(p.x - it.x) + Math.abs(p.z - it.z) < 1e-3) continue;
@@ -757,6 +868,13 @@ function leaveSession(u: Participant) {
   u.follow = null;
   u.pos = null;
   u.session = null;
+  try {
+    for (const item of timedCameras.leave(sid, u.id, items.get(sid)!.values())) sendItem(sid, item);
+    const changed = systems.leave(sid, u.id);
+    syncSystemItems(sid, false);
+    if (changed) roomSend(sid, { t: 'systemState', sid, view: systems.view(sid) });
+  }
+  catch (error) { console.error('system departure cleanup', error); }
   refreshTelephones(sid);
   thumbnails.update(sid, inSession(sid));
   u.mode = '2d';
@@ -767,7 +885,11 @@ function leaveSession(u: Participant) {
   u.display = null;
   event(sid, `${u.name} が退出しました`);
   if (inSession(sid).length) sendPresence(sid);
-  else { finishVisit(sid); void leaveRoom(sid); scheduleEmptyCheck(sid); }
+  else {
+    finishVisit(sid); sharedAssets.release(sid); systems.release(sid);
+    timedCameras.release(sid, items.get(sid)!.values());
+    void leaveRoom(sid); scheduleEmptyCheck(sid);
+  }
 }
 
 function handle(ws: WebSocket, state: { id: string | null; syncRequest?: string }, msg: ClientMsg) {
@@ -813,6 +935,8 @@ function handle(ws: WebSocket, state: { id: string | null; syncRequest?: string 
     });
     send(ws, { t: 'survivorProfile', profile: survivorProfile(msg.id) });
     send(ws, { t: 'marketLikes', ...marketLikes.snapshot(msg.id) });
+    send(ws, followsMsg(name));
+    send(ws, { t: 'posts', list: timeline.posts });
     broadcastUsers();
     if (cameOnline) {
       // 来たら知らせる は 1 回きり
@@ -841,24 +965,25 @@ function handle(ws: WebSocket, state: { id: string | null; syncRequest?: string 
     broadcastUsers();
     return;
   }
-  if (msg.t === 'friendRequest' || msg.t === 'friendAccept') {
-    const other = users.get(msg.to);
-    if (!other || other.name === me.name || friendPairs.has(pairKey(me.name, other.name))) return;
-    if (msg.t === 'friendRequest') {
-      const set = pendingFriends.get(other.name) ?? new Set();
-      set.add(me.name);
-      pendingFriends.set(other.name, set);
-      sendTo(idsByName(other.name), { t: 'friendRequest', from: me.id, fromName: me.name });
-      return;
+  if (msg.t === 'followUser') {
+    const target = typeof msg.name === 'string' ? msg.name : '';
+    // 一度でも来たことのある名前だけ。打ち間違いや存在しない名前の辺を溜めない
+    if (target === me.name || !Object.hasOwn(people, target)) return;
+    const changed = msg.on ? follows.add(me.name, target) : follows.remove(me.name, target);
+    if (!changed) return;
+    saveFollows();
+    const noticeKey = `${me.name}\u0000${target}`;
+    if (msg.on && !(Date.now() - (followNoticeAt.get(noticeKey) ?? 0) < FOLLOW_NOTICE_MS)) {
+      followNoticeAt.set(noticeKey, Date.now());
+      sendToNames([target], { t: 'followed', from: me.id, fromName: me.name });
     }
-    if (!pendingFriends.get(me.name)?.delete(other.name)) return;
-    friendPairs.add(pairKey(me.name, other.name));
-    saveFriends();
-    for (const n of [me.name, other.name]) sendTo(idsByName(n), { t: 'friends', names: friendsOf(n) });
+    for (const n of [me.name, target]) sendToNames([n], { t: 'friends', names: friendsOf(n) });
+    broadcastFollows();
     broadcastSessions();
     broadcastPeople();
     return;
   }
+  if (handleTimeline(me, msg)) return;
   if (handleHome(me, msg, ws)) return;
   const sid = me.session;
 
@@ -916,6 +1041,49 @@ function handle(ws: WebSocket, state: { id: string | null; syncRequest?: string 
 function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPositions = false, peerEvent?: PeerOperation) {
   const sessItems = items.get(sid)!;
   switch (msg.t) {
+    case 'systemResync':
+      syncSystemItems(sid);
+      roomSend(sid, { t: 'systemState', sid, view: systems.view(sid) }, [me.id]);
+      return;
+    case 'systemLoad':
+    case 'systemCommand': {
+      let error: string | undefined;
+      let outcome: 'applied' | 'duplicate' = 'applied';
+      try {
+        const participants = inSession(sid).map(u => u.id);
+        if (msg.t === 'systemLoad') {
+          const map = systemMaps.get(msg.mapId);
+          if (!map) throw new Error('Unknown registered code map');
+          systems.load(sid, me.id, map, participants);
+        } else outcome = systems.apply(sid, me.id, msg.command, participants);
+        syncSystemItems(sid, msg.t === 'systemLoad');
+      } catch (reason) { error = reason instanceof Error ? reason.message : 'System operation failed'; }
+      roomSend(sid, { t: 'systemState', sid, view: systems.view(sid), ...(error ? { error } : {}),
+        ...(msg.t === 'systemCommand' && typeof msg.command?.id === 'string' ? {
+          commandResult: { id: msg.command.id, outcome: error ? 'rejected' : outcome },
+        } : {}),
+      }, error ? [me.id] : undefined);
+      return;
+    }
+    case 'sharedResync': {
+      roomSend(sid, { t: 'sharedState', sid, view: sharedAssets.view(sid, me.id) }, [me.id]);
+      return;
+    }
+    case 'sharedCommand': {
+      let error: string | undefined;
+      const recipients = inSession(sid);
+      const before = new Map(recipients.map(u => [u.id, sharedAssets.view(sid, u.id)]));
+      let result: string | undefined;
+      try { result = sharedAssets.apply(sid, me.id, msg.command); }
+      catch { error = '共有アセットの操作を確定できませんでした。状態を確認して再試行してください。'; }
+      const commandId = typeof msg.command?.id === 'string' ? msg.command.id.slice(0, 64) : undefined;
+      for (const user of error ? [me] : recipients) {
+        const view = sharedAssets.view(sid, user.id);
+        if (result === 'applied' && msg.command.kind === 'events') roomSend(sid, { t: 'sharedDelta', sid, delta: assetDelta(before.get(user.id)!, view), commandId }, [user.id]);
+        else roomSend(sid, { t: 'sharedState', sid, view, commandId, ...(user.id === me.id && error ? { error } : {}) }, [user.id]);
+      }
+      return;
+    }
     case 'sync': {
       sendSessionSnapshot(sid, me.id);
       return;
@@ -1067,6 +1235,7 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
     case 'itemCreate': {
       if (!Object.hasOwn(ITEM_INFO, msg.kind)) return;
       if (ONLY_3D[msg.kind] && me.mode !== '3d') return;
+      if (msg.kind === 'mirror' && !canAddMirror(sessItems.values())) return;
       if (msg.media && 'url' in msg.media && !mediaExists(msg.media.url)) return;
       let at = placeIn(sid, msg.x, msg.z, 0.4);
       // 2D は細かい位置を選べないので、出す瞬間だけ空いている場所へずらす
@@ -1078,10 +1247,12 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
         }
       }
       const it = createItem(msg.kind, {
-        id: randomUUID(), x: at.x, z: at.z, ry: finNum(msg.ry), createdBy: me.id,
+        id: randomUUID(), x: at.x, z: at.z, ry: finNum(msg.ry), createdBy: me.id, variant: msg.variant,
       }, Math.random, msg.media);
       if (!it) return;
+      if (it.kind === 'image') it.createdByName = me.name;
       if (it.kind === 'note' && msg.text) it.text = msg.text.slice(0, 300);
+      timedCameras.tick(sid, [it], inSession(sid).map(user => user.id));
       sessItems.set(it.id, it);
       sendItem(sid, it);
       event(sid, `${me.name} が ${ITEM_INFO[msg.kind].name} を出しました`);
@@ -1089,25 +1260,53 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
     }
     case 'itemRemove': {
       const it = sessItems.get(msg.id);
-      if (!it || (it.kind === 'bike' && it.rider) || !sessItems.delete(msg.id)) return;
+      if (it && isSystemControlledItem(it)) {
+        const map = cameraTimerRemoval(systems.view(sid), it);
+        if (!map) return;
+        try {
+          systems.load(sid, me.id, map, inSession(sid).map(user => user.id));
+          syncSystemItems(sid, false);
+          roomSend(sid, { t: 'systemState', sid, view: systems.view(sid) });
+          event(sid, `${me.name} が ${ITEM_INFO[it.kind].name} をしまいました`);
+        } catch (reason) {
+          roomSend(sid, { t: 'systemState', sid, view: systems.view(sid), error: reason instanceof Error ? reason.message : 'System removal failed' }, [me.id]);
+        }
+        return;
+      }
+      if (!it || isSystemControlledItem(it) || (it.kind === 'bike' && it.rider)) return;
+      timedCameras.remove(sid, it);
+      if (!sessItems.delete(msg.id)) return;
       sendItemRemove(sid, msg.id);
       event(sid, `${me.name} が ${ITEM_INFO[it.kind].name} をしまいました`);
       return;
     }
     case 'itemMove': {
       const it = sessItems.get(msg.id);
-      if (!it || (it.kind === 'hammer' && it.holder) || (it.kind === 'bike' && it.rider)) return;
-      const p = placeIn(sid, msg.x, msg.z, itemRadius(it) * 0.6);
+      if (!it || isSystemControlledItem(it) || (it.kind === 'hammer' && it.holder) || (it.kind === 'bike' && it.rider)) return;
+      const media = it.kind === 'image' || it.kind === 'video';
+      const half = (worldOf.get(sid) === 'city' ? CITY_HALF : ROOM_HALF) - 0.5;
+      const p = media ? { x: Math.max(-half, Math.min(half, finNum(msg.x))), z: Math.max(-half, Math.min(half, finNum(msg.z))) }
+        : placeIn(sid, msg.x, msg.z, itemRadius(it) * 0.6);
       const ry = finNum(msg.ry);
+      const transform = media ? mediaTransform({ y: msg.y ?? it.y, scale: msg.scale ?? it.scale }) : null;
       // 位置が変わっていなければ送らない
-      if (p.x === it.x && p.z === it.z && ry === it.ry) return;
+      if (p.x === it.x && p.z === it.z && ry === it.ry && (!transform || (transform.y === it.y && transform.scale === it.scale))) return;
       it.x = p.x; it.z = p.z; it.ry = ry;
+      if (transform) Object.assign(it, transform);
       broadcastItemMove(sid, it);
       return;
     }
     case 'itemAction': {
       const it = sessItems.get(msg.id);
-      if (!it) return;
+      if (!it || isSystemControlledItem(it)) return;
+      if (msg.action?.a === 'timedCameraRequest') {
+        if (me.mode === '3d' && timedCameras.request(sid, me.id, it, msg.action.token, inSession(sid).map(user => user.id))) {
+          it.updatedBy = me.id;
+          sendItem(sid, it);
+        }
+        return;
+      }
+      if (it.kind === 'camera' && it.variant === 'camera-timer') return;
       if (it.kind === 'telephone') {
         if (!msg.action || typeof msg.action.a !== 'string' || !msg.action.a.startsWith('telephone')) return;
         const present = new Set(inSession(sid).map(u => u.id));
@@ -1163,7 +1362,8 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
       const target = users.get(msg.to);
       if (!holding || !target || target.session !== sid || target.id === me.id) return;
       roomSend(sid, { t: 'hit', sid, from: me.id, to: target.id });
-      event(sid, `${me.name} がピコピコハンマーで ${target.name} を叩きました`, target.id);
+      const list = chats.get(sid);
+      if (list) roomSend(sid, { t: 'chat', sid, m: logHammerHit(list, me, target, Date.now()) });
       return;
     }
     case 'mode': {
@@ -1233,7 +1433,8 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
     }
     case 'avatar': {
       // 2D の人の分も覚えるが、使う側はみな mode を見て 3D の人の分だけ使う（mode より先に届くことがある）
-      const s = clampAvatar(worldOf.get(sid) ?? 'room', msg.s);
+      const seat = systemSeat(systems.view(sid), me.id);
+      const s = seat ? { ...clampAvatar(worldOf.get(sid) ?? 'room', msg.s), x: seat.x, y: seat.y, z: seat.z, walking: false } : clampAvatar(worldOf.get(sid) ?? 'room', msg.s);
       avatars.get(sid)!.set(me.id, s);
       roomSend(sid, { t: 'avatar', sid, id: me.id, s }, inSession(sid).filter((u) => u.id !== me.id).map((u) => u.id), peerPositions);
       // 2D から 3D に入ったときは、入った場所の前に立てる
@@ -1275,7 +1476,9 @@ function destroyUserSession(sessionId: string) {
   worldOf.delete(def.id);
   chats.delete(def.id);
   avatars.delete(def.id);
+  for (const item of items.get(def.id)?.values() ?? []) timedCameras.remove(def.id, item);
   items.delete(def.id);
+  systemItemRooms.delete(def.id);
   markItemsDirty(def.id);
   broadcastMode.delete(def.id);
   worldPending.delete(def.id);
@@ -1550,8 +1753,42 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   // 絶対形式の壊れたリクエストターゲット（例: http://[::1）でも new URL が例外になるため、ここで 400 にする
   let url: URL;
   try { url = new URL(req.url ?? '/', 'http://x'); } catch { res.statusCode = 400; res.end('bad path'); return; }
+  if (url.pathname === '/api/content-translations') {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    if (req.method !== 'GET' && req.method !== 'HEAD') { res.statusCode = 405; res.setHeader('Allow', 'GET, HEAD'); res.end('{}'); return; }
+    res.end(req.method === 'HEAD' ? undefined : JSON.stringify(contentTranslations.catalog()));
+    return;
+  }
+  if (sharedAssets.http(req, res, url.pathname)) return;
+  if (systems.http(req, res, url.pathname)) return;
   if (url.pathname === '/api/translate') { await handleTranslation(req, res); return; }
   if (url.pathname === '/sync/offer') { await handleSyncOffer(req, res); return; }
+  if (url.pathname === '/timeline-image') {
+    if (req.method !== 'POST') { res.statusCode = 405; res.end(); return; }
+    // 名前だけの本人確認は /icon と同じ。少なくともいまつないでいる人からしか受けない
+    const uploader = normalizeName(url.searchParams.get('name') ?? '');
+    if (!isOnline(uploader)) { res.statusCode = 403; res.end(); return; }
+    if (!timeline.allow(`upload:${uploader}`, UPLOAD_RATE)) { res.statusCode = 429; res.end(); return; }
+    const body = await readBody(req, POST_IMAGE_MAX_BYTES);
+    if (!body) { res.statusCode = 413; res.end(); return; }
+    if (!isJpeg(body)) { res.statusCode = 400; res.end(); return; }
+    const id = timeline.newImageId();
+    fs.writeFileSync(timeline.imageFile(id), body);
+    timeline.registerUpload(id, uploader);
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ id }));
+    return;
+  }
+  if (url.pathname.startsWith('/timeline-image/')) {
+    const id = url.pathname.slice('/timeline-image/'.length);
+    if (req.method !== 'GET') { res.statusCode = 405; res.end(); return; }
+    if (!isImageId(id) || !fs.existsSync(timeline.imageFile(id))) { res.statusCode = 404; res.end(); return; }
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    pipeFile(res, timeline.imageFile(id));
+    return;
+  }
   if (url.pathname.startsWith('/group-image/')) {
     const g = home.groups.find((x) => x.id === url.pathname.slice('/group-image/'.length));
     if (req.method === 'POST') {
@@ -1841,12 +2078,31 @@ setInterval(() => {
   }
 }, 200);
 
+const systemTick = setInterval(() => {
+  const rooms = new Map<string, string[]>();
+  for (const user of users.values()) if (user.session) { const ids = rooms.get(user.session) ?? []; ids.push(user.id); rooms.set(user.session, ids); }
+  for (const [sid, participants] of rooms) {
+    try {
+      const changed = systems.tick(sid, participants);
+      syncSystemItems(sid, false);
+      for (const item of timedCameras.tick(sid, items.get(sid)?.values() ?? [], participants)) sendItem(sid, item);
+      if (changed) roomSend(sid, { t: 'systemState', sid, view: systems.view(sid) });
+    }
+    catch (error) { console.error('system tick', sid, error); }
+  }
+}, 100);
+systemTick.unref();
+
 for (const sig of ['SIGINT', 'SIGTERM'] as const) process.on(sig, () => {
+  clearInterval(systemTick);
+  systems.dispose();
   // 遅延保存の保留分は落とす前に書き出す。broadcast の later は保存ではないので対象外
   saveMarketLikes.flush();
   saveSurvivorProfiles.flush();
   flushItems();
   saveHome.flush();
+  saveFollows.flush();
+  saveTimeline.flush();
   savePeople.flush();
   saveInbox.flush();
   shutdownRooms().finally(() => process.exit(0));

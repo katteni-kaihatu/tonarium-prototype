@@ -29,6 +29,18 @@ export const msg = (key: string, ...values: UiValue[]): UiMessage => ({ key, val
 const sourceKeys = new Map(Object.entries(resources.ja).map(([key, value]) => [value, key]));
 updateDocument();
 
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  const receiveLanguage = (event: StorageEvent) => {
+    if (event.key !== LANGUAGE_STORAGE_KEY || (event.storageArea && event.storageArea !== storage)) return;
+    const next = languageOf(event.newValue);
+    if (!next || next === language) return;
+    // 別タブの設定を保存し直すと通知が往復するため、表示だけ更新する。
+    language = next; updateDocument(); listeners.forEach(listener => listener());
+  };
+  window.addEventListener('storage', receiveLanguage);
+  if (import.meta.hot) import.meta.hot.dispose(() => window.removeEventListener('storage', receiveLanguage));
+}
+
 export function formatDate(value: Date | number, options: Intl.DateTimeFormatOptions): string {
   return new Intl.DateTimeFormat(language, options).format(value);
 }

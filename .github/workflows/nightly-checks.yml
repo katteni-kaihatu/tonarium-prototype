@@ -2,7 +2,7 @@ name: Nightly configuration checks
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - '.github/workflows/electron-nightly.yml'
       - '.github/workflows/nightly-checks.yml'

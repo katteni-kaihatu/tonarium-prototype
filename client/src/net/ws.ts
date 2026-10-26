@@ -1,5 +1,10 @@
 import { arrivalPatch } from '../newArrival.ts';
 import { sourceText as uiSource } from '../i18n/core.ts';
+import { receiveShared } from '../shared-assets/state.ts';
+import { useSharedAssets } from '../shared-assets/state.ts';
+import { applyAssetDelta } from '../../../shared/shared-sync.ts';
+import { receiveSystems } from '../systems/state.ts';
+import { receiveSystemCommandResult, resetSystemCommands } from '../systems/api.ts';
 import { COMPAT_VERSION, isRoomClientMsg, type ClientMsg, type ServerMsg, type SessionInfo, type SessionSnapshot } from '../../../shared/protocol.ts';
 import type { SurvivorState } from '../../../shared/survivor.ts';
 import { applyAvatars } from '../sessionView.ts';
@@ -49,7 +54,7 @@ export function connectWs() {
   ws.onopen = () => {
     openedAt = performance.now();
     retry = 0;
-    set({ wsConnected: true });
+    set({ wsConnected: true, wsReady: false });
     const s = get();
     send({ t: 'hello', id: s.selfId, name: s.selfName, compat: COMPAT_VERSION });
     if (s.session) {
@@ -64,7 +69,7 @@ export function connectWs() {
     console.warn('[home-ws] closed', { code: event.code, reason: event.reason, wasClean: event.wasClean,
       connectedSeconds: openedAt ? Math.round((performance.now() - openedAt) / 1000) : 0 });
     stopSessionSync(true);
-    set({ wsConnected: false });
+    set({ wsConnected: false, wsReady: false });
     if (get().session) set({ sync: 'unavailable', syncError: uiSource('ui472') });
     // 互換性バージョン違いで断たれた場合はつなぎ直しても結果が同じなので、再接続しない
     if (!get().incompatible) setTimeout(connectWs, Math.min(5000, 500 * 2 ** retry++));
@@ -115,6 +120,9 @@ function playSurvivorTransitions(sid: string, next: SurvivorState) {
 export function applySessionSnapshot(snap: SessionSnapshot) {
   const sid = snap.sid;
   if (sid !== get().session) return;
+  resetSystemCommands();
+  if (snap.sharedAssets) receiveShared(sid, snap.sharedAssets, undefined, true);
+  if (snap.systems) receiveSystems(sid, snap.systems, undefined, true);
   const previousSelf = get().survivors[sid]?.players[get().selfId];
   const nextSelf = snap.survivor?.players[get().selfId];
   if (nextSelf?.alive && nextSelf.choiceQueue.length > 0 && !(previousSelf?.choiceQueue.length ?? 0)) playSurvivorSound('choice');
@@ -135,6 +143,23 @@ export function applySessionSnapshot(snap: SessionSnapshot) {
 
 export function onMessage(msg: ServerMsg) {
   switch (msg.t) {
+    case 'systemState':
+      if (msg.sid === get().session) {
+        receiveSystems(msg.sid, msg.view, msg.error);
+        receiveSystemCommandResult(msg.sid, msg.view, msg.commandResult, msg.error);
+      }
+      return;
+    case 'sharedDelta': {
+      if (msg.sid !== get().session) return;
+      const current = useSharedAssets.getState();
+      const result = applyAssetDelta(current.sid === msg.sid ? current.view : undefined, msg.delta);
+      if (result === 'resync') send({ t: 'sharedResync' });
+      else if (result !== 'stale') receiveShared(msg.sid, result);
+      return;
+    }
+    case 'sharedState':
+      if (msg.sid === get().session) receiveShared(msg.sid, msg.view, msg.error);
+      return;
     case 'sessionCreated':
     case 'sessionResult': {
       const request = msg.requestId ? sessionRequests.get(msg.requestId) : undefined;
@@ -158,6 +183,7 @@ export function onMessage(msg: ServerMsg) {
     case 'syncError': syncError(msg.requestId, msg.error); return;
     case 'syncReset': resetSessionSync(msg.sid); return;
     case 'snapshot': {
+      set({ wsReady: true });
       const { guild, users, friends, groups, events, sessions, now, version } = msg.s;
       if (version && PAGE_VERSION && version !== PAGE_VERSION) set({ updateVersion: version });
       set((s) => ({ groups, events, serverOffset: now - Date.now(), guild, users, friends, sessionInfo: sessions, worldBy: { ...s.worldBy, ...worldsOf(sessions) } }));
@@ -177,7 +203,9 @@ export function onMessage(msg: ServerMsg) {
       set((s) => ({
         ...(msg.sid === s.session && msg.m.from && msg.m.from !== s.selfId && !s.blocked.includes(msg.m.fromName)
           && !(s.chats[msg.sid] ?? []).some((m) => m.id === msg.m.id) ? arrivalPatch('chat', s) : {}),
-        chats: { ...s.chats, [msg.sid]: [...(s.chats[msg.sid] ?? []), msg.m].slice(-500) },
+        chats: { ...s.chats, [msg.sid]: (s.chats[msg.sid] ?? []).some((m) => m.id === msg.m.id)
+          ? s.chats[msg.sid].map((m) => m.id === msg.m.id ? msg.m : m)
+          : [...(s.chats[msg.sid] ?? []), msg.m].slice(-500) },
       }));
       return;
     case 'avatar':
@@ -199,7 +227,8 @@ export function onMessage(msg: ServerMsg) {
     case 'itemMove':
       set((s) => {
         const cur = s.itemsBy[msg.sid]?.[msg.id];
-        return cur ? { itemsBy: { ...s.itemsBy, [msg.sid]: { ...s.itemsBy[msg.sid], [msg.id]: { ...cur, x: msg.x, z: msg.z, ry: msg.ry } } } } : {};
+        const transform = cur && (cur.kind === 'image' || cur.kind === 'video') ? { y: msg.y ?? cur.y, scale: msg.scale ?? cur.scale } : {};
+        return cur ? { itemsBy: { ...s.itemsBy, [msg.sid]: { ...s.itemsBy[msg.sid], [msg.id]: { ...cur, x: msg.x, z: msg.z, ry: msg.ry, ...transform } } } } : {};
       });
       break;
     case 'itemRemove':
@@ -281,9 +310,30 @@ export function onMessage(msg: ServerMsg) {
     case 'liveRequest':
       if (msg.sid === get().session) pushNotice('live', msg.from);
       return;
-    case 'friendRequest':
-      pushNotice('friend', msg.from, msg.fromName);
+    case 'followed':
+      pushNotice('follow', msg.from, msg.fromName);
       return;
+    case 'follows':
+      set({ following: msg.following, followers: msg.followers, fof: msg.fof });
+      return;
+    case 'posts':
+      set({ posts: msg.list });
+      return;
+    case 'post':
+      set((s) => {
+        const i = s.posts.findIndex((p) => p.id === msg.p.id);
+        return { posts: i < 0 ? [...s.posts, msg.p] : s.posts.map((p, j) => (j === i ? msg.p : p)) };
+      });
+      return;
+    case 'postsRemoved': {
+      const gone = new Set(msg.ids);
+      set((s) => ({
+        posts: s.posts.filter((p) => !gone.has(p.id)),
+        timelineSide: s.timelineSide?.startsWith('post:') && gone.has(s.timelineSide.slice(5)) ? null : s.timelineSide,
+        composeQuote: s.composeQuote && gone.has(s.composeQuote) ? null : s.composeQuote,
+      }));
+      return;
+    }
     case 'friends':
       set({ friends: msg.names });
       return;

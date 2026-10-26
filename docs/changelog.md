@@ -27,7 +27,7 @@
 
 ## 集約のタイミング
 
-Web は Vite が `shared/changelog.ts` を取り込む際に、共通履歴と作業別 JSON をメモリ上で集約する。`npm run build`、Dockerfile の `npx vite build`、開発サーバーに共通の Vite プラグインを使う。Electron 版も接続先の Web 版で集約された履歴を表示する。生成結果を入力ファイルへ書き戻さず、デプロイ先の永続データにも追記しないため、同じ入力で再ビルド・再デプロイしても項目は増えない。履歴ファイルは集約後もリポジトリに残す。
+Web は Vite が `shared/changelog.ts` を取り込む際に、共通履歴と作業別 JSON をメモリ上で集約する。`npm run build`、Dockerfile の `npx vite build`、開発サーバーに共通の Vite プラグインを使う。開発サーバーでは `changelog/` の追加・変更・削除を監視し、集約したモジュールを読み直して画面を再読み込みする（ディレクトリを `addWatchFile` に渡すと Windows の開発サーバーが import として解決しようとして画面が開かなくなるため、監視は開発サーバー側で行う）。Electron 版も接続先の Web 版で集約された履歴を表示する。生成結果を入力ファイルへ書き戻さず、デプロイ先の永続データにも追記しないため、同じ入力で再ビルド・再デプロイしても項目は増えない。履歴ファイルは集約後もリポジトリに残す。
 
 検索・日付単位の既読管理は従来どおり。同日に追加した履歴は、その日を既読にした利用者には未読の赤い点を出さない。
 
@@ -35,4 +35,4 @@ Web は Vite が `shared/changelog.ts` を取り込む際に、共通履歴と�
 
 タスク完了前に `npm run check:completion` を実行する。`npm run check:changelog` は比較元に存在しない作業別ファイルが一つ以上あること、全作業別ファイルの形式・内容重複、既存履歴の保持を確認する。コミット済み・ステージ済み・未ステージ・未追跡の現在のファイルを対象とする。共通履歴の追記だけでは通過しない。記載内容と実際の差分の一致はレビューで確認する。
 
-比較元は既定で `git merge-base HEAD origin/main`。タスク開始時のコミットを明示する場合は `CHANGELOG_BASE` を設定するか、`npm run check:changelog -- --base <比較元コミット>` を使う。比較元を取得できない場合も失敗する。PR の Web checks も同じ検証を使う。回帰テストは `npm run test:changelog`。
+比較元は既定で `git merge-base HEAD origin/develop`（`origin/develop` が無ければ `origin/main`）。タスク開始時のコミットを明示する場合は `CHANGELOG_BASE` を設定するか、`npm run check:changelog -- --base <比較元コミット>` を使う。比較元を取得できない場合も失敗する。PR の Web checks も同じ検証を使う。回帰テストは `npm run test:changelog`。

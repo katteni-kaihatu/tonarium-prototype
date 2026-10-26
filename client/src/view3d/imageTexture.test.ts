@@ -113,3 +113,15 @@ test('GIF decoding failure falls back to a native image and cleans it up', async
   media.dispose();
   assert.equal(images[0].src, '');
 });
+
+test('oversized GIF falls back to a native image without decoding frames', async t => {
+  const { images, painted } = browser(t);
+  const huge = new Uint8Array(gif);
+  huge[6] = 208; huge[7] = 7; huge[8] = 208; huge[9] = 7;
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, arrayBuffer: async () => huge.buffer }));
+  const media = createImageTexture('/media/test.gif');
+  await settle();
+  assert.equal(painted.length, 0);
+  assert.equal(images[0].src, '/media/test.gif');
+  media.dispose();
+});

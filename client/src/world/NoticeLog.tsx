@@ -1,3 +1,4 @@
+import { useUpdateDraft } from '../updateDraft.ts';
 import { sourceText as uiSource } from '../i18n/core.ts';
 import { TranslatedText } from '../TranslatedText.tsx';
 import { localized, t as tr, systemText } from '../i18n/index.ts';
@@ -6,7 +7,7 @@ import type { ChatMessage, ChatScope } from '../../../shared/protocol.ts';
 import { VOICE_RANGE } from '../../../shared/places.ts';
 import { DICE_COLORS, diceLabel, type DiceRoll } from '../../../shared/dice.ts';
 import { useStore, set, save, colorOf, isBroadcast, type Notice } from '../store.ts';
-import { friendAccept, goNear, invite, joinGroup, joinSession, markNoticesRead, poke, removeNotice, sendChat, setViewLive } from '../actions.ts';
+import { followUser, goNear, invite, joinGroup, joinSession, markNoticesRead, poke, removeNotice, sendChat, setViewLive } from '../actions.ts';
 import { dmKey } from '../../../shared/protocol.ts';
 import { SessionMessages, useMessageUnread } from './SessionMessages.tsx';
 import { Icon } from './Icon.tsx';
@@ -33,7 +34,7 @@ function useVisibleChat() {
 const NOTICE_TEXT: Record<Notice['kind'], string> = localized({
   poke: uiSource('ui637'),
   hit: uiSource('ui638'),
-  friend: uiSource('ui639'),
+  follow: uiSource('followNotice'),
   live: uiSource('ui640'),
   attention: uiSource('ui641'),
   invite: uiSource('ui642'),
@@ -57,6 +58,7 @@ function NoticeRow({ n, onMessage }: { n: Notice; onMessage: (conv: string) => v
   const selfName = useStore((s) => s.selfName);
   const target = useStore((s) => (n.key ? s.items[n.key.slice(n.key.indexOf(':') + 1)] : undefined));
   const inviteTo = useStore((s) => inviteTarget(s, n));
+  const followingBack = useStore((s) => s.following.includes(n.fromName));
   const text = n.kind === 'attention' ? (target ? tr("ui644", itemLabel(target)) : tr("ui645"))
     : n.kind === 'invite' ? tr("ui177", inviteTo ? `「${inviteTo.name}」` : tr("ui178")) : NOTICE_TEXT[n.kind];
   const reply = n.kind === 'askJoin'
@@ -73,7 +75,7 @@ function NoticeRow({ n, onMessage }: { n: Notice; onMessage: (conv: string) => v
       ? <button className="ib reply" onClick={() => goNear(n.from)}>{tr("ui611")}</button>
       : n.kind === 'live'
         ? <button className="ib reply" onClick={() => setViewLive(true, n.id)}>{tr("ui648")}</button>
-        : <button className="ib reply" onClick={() => friendAccept(n.from, n.id)}>{tr("ui277")}</button>;
+        : followingBack ? null : <button className="ib reply" onClick={() => { followUser(n.fromName, true); removeNotice(n.id); }}>{tr('followBack')}</button>;
   return (
     <div className={`notice ${n.unread ? 'unread' : ''}`}>
       <Face id={n.from} name={n.fromName} size={28} />
@@ -88,8 +90,9 @@ function NoticeRow({ n, onMessage }: { n: Notice; onMessage: (conv: string) => v
 }
 
 function Composer() {
-  const [text, setText] = useState('');
-  const [scope, setScope] = useState<ChatScope>('near');
+  const session = useStore(s => s.session);
+  const [text, setText] = useUpdateDraft(`chat.${session}`, '');
+  const [scope, setScope] = useUpdateDraft<ChatScope>(`chatScope.${session}`, 'near');
   const fileRef = useRef<HTMLInputElement>(null);
   const cur = SCOPES.find((x) => x.scope === scope)!;
   const submit = (e?: React.FormEvent) => {

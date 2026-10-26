@@ -1,4 +1,5 @@
 import type { AvatarState } from './protocol.ts';
+import { validAvatarXR } from './xr-pose.ts';
 import type { KokosyncClient, Frame, RouteEntry, Value } from '../vendor/kokosync/index.js';
 import { importKey, open, seal, type PositionPeer, type SyncConfig } from './session-wire.ts';
 
@@ -57,8 +58,10 @@ export class SessionPositions {
     if (this.closed || this.members.get(frame.peer) !== member || result.seq <= member.seq || BigInt(result.seq) !== frame.seq) return;
     const s = result.value?.s;
     if (result.value?.t !== 'avatar' || !s || ![s.x, s.z, s.ry].every(Number.isFinite) ||
+      (s.xr !== undefined && !validAvatarXR(s.xr)) ||
       (s.y !== undefined && !Number.isFinite(s.y)) || (s.pitch !== undefined && !Number.isFinite(s.pitch)) ||
       (s.lean !== undefined && !Number.isFinite(s.lean)) ||
+      (s.crouching !== undefined && typeof s.crouching !== 'boolean') ||
       (s.jump !== undefined && (!Number.isSafeInteger(s.jump) || s.jump < 0)) ||
       (s.walking !== undefined && typeof s.walking !== 'boolean')) return;
     member.seq = result.seq;

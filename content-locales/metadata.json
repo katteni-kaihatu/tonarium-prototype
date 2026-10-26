@@ -1,0 +1,1193 @@
+{
+  "schema": 1,
+  "glossary": {
+    "Tonarium": {
+      "ja": "Tonarium",
+      "en": "Tonarium",
+      "ko": "Tonarium"
+    },
+    "共有システム": {
+      "ja": "共有システム",
+      "en": "shared system",
+      "ko": "공유 시스템"
+    },
+    "공유 시스템": {
+      "ja": "共有システム",
+      "en": "shared system",
+      "ko": "공유 시스템"
+    },
+    "ワールド": {
+      "ja": "ワールド",
+      "en": "world",
+      "ko": "월드"
+    },
+    "월드": {
+      "ja": "ワールド",
+      "en": "world",
+      "ko": "월드"
+    },
+    "オブジェクト": {
+      "ja": "オブジェクト",
+      "en": "object",
+      "ko": "오브젝트"
+    },
+    "오브젝트": {
+      "ja": "オブジェクト",
+      "en": "object",
+      "ko": "오브젝트"
+    }
+  },
+  "entries": {
+    "item/telephone": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "お絵描き伝言",
+          "translations": {
+            "ja": "お絵描き伝言",
+            "en": "Drawing relay",
+            "ko": "그림 전달 게임"
+          }
+        },
+        "desc": {
+          "source": "2〜30人で文章と絵を交互につなぐ伝言ゲーム。参加登録して開始し、最後はホストと一緒に結果を鑑賞。"
+        },
+        "genre": {
+          "source": "ゲーム",
+          "translations": {
+            "ja": "ゲーム",
+            "en": "Games",
+            "ko": "게임"
+          }
+        }
+      }
+    },
+    "item/jumpPad": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "ジャンプ台",
+          "translations": {
+            "ja": "ジャンプ台",
+            "en": "Jump pad",
+            "ko": "점프대"
+          }
+        },
+        "desc": {
+          "source": "上面に着地すると自動で跳ねる3D専用の台。右クリックで運び、Xで片付ける。"
+        },
+        "genre": {
+          "source": "あそび",
+          "translations": {
+            "ja": "あそび",
+            "en": "Play",
+            "ko": "놀이"
+          }
+        }
+      }
+    },
+    "item/mirror": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "鏡",
+          "translations": {
+            "ja": "鏡",
+            "en": "Mirror",
+            "ko": "거울"
+          }
+        },
+        "desc": {
+          "source": "3D 空間に置く平面鏡。正面に自分や周囲の参加者、景色が映り、視点や動きに追従する。右クリックで運び、X で片付ける。"
+        },
+        "genre": {
+          "source": "ツール",
+          "translations": {
+            "ja": "ツール",
+            "en": "Tools",
+            "ko": "도구"
+          }
+        }
+      }
+    },
+    "item/bike": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "バイク"
+        },
+        "desc": {
+          "source": "3D 専用の一人乗りバイク。照準を合わせ E またはクリックで乗車、E で降車。W/↑: アクセル、S/↓: ブレーキ、A/D・←/→: ハンドル。急旋回すると滑ります。"
+        },
+        "genre": {
+          "source": "のりもの"
+        }
+      }
+    },
+    "item/note": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "付箋",
+          "translations": {
+            "ja": "付箋",
+            "en": "Sticky note",
+            "ko": "메모"
+          }
+        },
+        "desc": {
+          "source": "文字を書いて置いておける付箋。2D ではウィンドウで、3D では空間の板として読み書きできる。",
+          "translations": {
+            "ja": "文字を書いて置いておける付箋。2D ではウィンドウで、3D では空間の板として読み書きできる。",
+            "en": "A note you can write and leave in the world. Edit in a 2D window or on a board in 3D.",
+            "ko": "글을 써서 놓는 메모입니다. 2D에서는 창으로, 3D에서는 공간의 판으로 읽고 씁니다."
+          }
+        },
+        "genre": {
+          "source": "ツール",
+          "translations": {
+            "ja": "ツール",
+            "en": "Tools",
+            "ko": "도구"
+          }
+        },
+        "usage": {
+          "source": "セッションで「目の前に出す」を選び、付箋を押して文字や色を編集します。3D では空間の板に表示されます。",
+          "translations": {
+            "ja": "セッションで「目の前に出す」を選び、付箋を押して文字や色を編集します。3D では空間の板に表示されます。",
+            "en": "Choose Place in front of you in a session, then click the note to edit its text and color. In 3D, it appears as a board in the world.",
+            "ko": "세션에서 ‘눈앞에 꺼내기’를 선택하고 메모를 눌러 글과 색을 편집하세요. 3D에서는 공간의 판에 표시됩니다."
+          }
+        }
+      }
+    },
+    "item/hammer": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "ピコピコハンマー",
+          "translations": {
+            "ja": "ピコピコハンマー",
+            "en": "Toy hammer",
+            "ko": "장난감 망치"
+          }
+        },
+        "desc": {
+          "source": "手に持って誰かを叩ける。叩くと相手の前に移動する。",
+          "translations": {
+            "ja": "手に持って誰かを叩ける。叩くと相手の前に移動する。",
+            "en": "Hold it and hit someone to move in front of them.",
+            "ko": "들고 누군가를 두드릴 수 있습니다. 두드리면 그 사람 앞으로 이동합니다."
+          }
+        },
+        "genre": {
+          "source": "あそび",
+          "translations": {
+            "ja": "あそび",
+            "en": "Play",
+            "ko": "놀이"
+          }
+        },
+        "usage": {
+          "source": "セッションで「目の前に出す」を選び、ハンマーを拾って使います。相手を叩くと、その人の前に移動できます。",
+          "translations": {
+            "ja": "セッションで「目の前に出す」を選び、ハンマーを拾って使います。相手を叩くと、その人の前に移動できます。",
+            "en": "Place the hammer in a session and pick it up. Hitting someone moves you in front of them.",
+            "ko": "세션에서 망치를 꺼내 주워 사용하세요. 상대를 두드리면 그 사람 앞으로 이동합니다."
+          }
+        }
+      }
+    },
+    "item/chess": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "チェス",
+          "translations": {
+            "ja": "チェス",
+            "en": "Chess",
+            "ko": "체스"
+          }
+        },
+        "desc": {
+          "source": "3D では立体のチェス盤、2D ではパネルの UI で遊べる。",
+          "translations": {
+            "ja": "3D では立体のチェス盤、2D ではパネルの UI で遊べる。",
+            "en": "Play on a 3D board or with the 2D panel UI.",
+            "ko": "3D에서는 입체 체스판으로, 2D에서는 패널 UI로 즐깁니다."
+          }
+        },
+        "genre": {
+          "source": "ゲーム",
+          "translations": {
+            "ja": "ゲーム",
+            "en": "Games",
+            "ko": "게임"
+          }
+        },
+        "usage": {
+          "source": "セッションに出した盤面の駒と移動先を順に選びます。手番の駒は誰でも動かせます。「新しい対局」で最初から遊べます。",
+          "translations": {
+            "ja": "セッションに出した盤面の駒と移動先を順に選びます。手番の駒は誰でも動かせます。「新しい対局」で最初から遊べます。",
+            "en": "Choose a piece and destination on the board. Anyone can move the active side. Choose New game to start over.",
+            "ko": "판의 말과 이동할 칸을 차례로 선택하세요. 차례인 색의 말은 누구나 움직일 수 있습니다. ‘새 대국’으로 다시 시작합니다."
+          }
+        }
+      }
+    },
+    "item/chessAi": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "チェスAI",
+          "translations": {
+            "ja": "チェスAI",
+            "en": "Chess AI",
+            "ko": "체스 AI"
+          }
+        },
+        "desc": {
+          "source": "白はあなた、黒はAI。みんなで白の駒を動かしてAIと対戦できる。",
+          "translations": {
+            "ja": "白はあなた、黒はAI。みんなで白の駒を動かしてAIと対戦できる。",
+            "en": "You play white, AI plays black. Move white pieces together to challenge AI.",
+            "ko": "백은 여러분, 흑은 AI입니다. 함께 백의 말을 움직여 AI와 대결합니다."
+          }
+        },
+        "genre": {
+          "source": "ゲーム",
+          "translations": {
+            "ja": "ゲーム",
+            "en": "Games",
+            "ko": "게임"
+          }
+        },
+        "usage": {
+          "source": "セッションに出して、白の駒と移動先を選びます。黒の駒は AI が動かします。みんなで白の手を相談して遊べます。",
+          "translations": {
+            "ja": "セッションに出して、白の駒と移動先を選びます。黒の駒は AI が動かします。みんなで白の手を相談して遊べます。",
+            "en": "Place it in a session and choose a white piece and destination. AI plays black. Discuss white's moves together.",
+            "ko": "세션에 꺼내 백의 말과 이동할 칸을 선택하세요. 흑은 AI가 움직입니다. 함께 백의 수를 의논해 보세요."
+          }
+        }
+      }
+    },
+    "item/g2048": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "2048"
+        },
+        "desc": {
+          "source": "みんなで操作するパズル。3D では互換表示のパネルになる。",
+          "translations": {
+            "ja": "みんなで操作するパズル。3D では互換表示のパネルになる。",
+            "en": "A collaborative puzzle. In 3D, it uses a compatibility panel.",
+            "ko": "모두 함께 조작하는 퍼즐입니다. 3D에서는 호환 패널로 표시됩니다."
+          }
+        },
+        "genre": {
+          "source": "ゲーム",
+          "translations": {
+            "ja": "ゲーム",
+            "en": "Games",
+            "ko": "게임"
+          }
+        },
+        "usage": {
+          "source": "セッションに出し、2D のパネルで上下左右にタイルを動かします。同じ数のタイルを合わせて大きな数を目指します。",
+          "translations": {
+            "ja": "セッションに出し、2D のパネルで上下左右にタイルを動かします。同じ数のタイルを合わせて大きな数を目指します。",
+            "en": "Place it in a session and move tiles on the 2D panel. Merge matching numbers to reach a higher score.",
+            "ko": "세션에 꺼내 2D 패널에서 타일을 상하좌우로 움직이세요. 같은 수를 합쳐 큰 수를 만듭니다."
+          }
+        }
+      }
+    },
+    "item/canvas": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "キャンバス",
+          "translations": {
+            "ja": "キャンバス",
+            "en": "Canvas",
+            "ko": "캔버스"
+          }
+        },
+        "desc": {
+          "source": "みんなで絵を描ける。ペンと消しゴム付き。",
+          "translations": {
+            "ja": "みんなで絵を描ける。ペンと消しゴム付き。",
+            "en": "Draw together, with pen and eraser.",
+            "ko": "펜과 지우개로 함께 그림을 그립니다."
+          }
+        },
+        "genre": {
+          "source": "ツール",
+          "translations": {
+            "ja": "ツール",
+            "en": "Tools",
+            "ko": "도구"
+          }
+        },
+        "usage": {
+          "source": "セッションに出したキャンバスで、ペンの色と太さを選んで描きます。消しゴムや保存も使えます。",
+          "translations": {
+            "ja": "セッションに出したキャンバスで、ペンの色と太さを選んで描きます。消しゴムや保存も使えます。",
+            "en": "Choose pen color and thickness on the shared canvas. Erasing and saving are also available.",
+            "ko": "공유 캔버스에서 펜 색과 굵기를 골라 그리세요. 지우개와 저장도 사용할 수 있습니다."
+          }
+        }
+      }
+    },
+    "item/camera": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "カメラ",
+          "translations": {
+            "ja": "カメラ",
+            "en": "Camera",
+            "ko": "카메라"
+          }
+        },
+        "desc": {
+          "source": "3D 空間で写真を撮ったりライブ配信したりできる。ライブは 2D からも見られる。",
+          "translations": {
+            "ja": "3D 空間で写真を撮ったりライブ配信したりできる。ライブは 2D からも見られる。",
+            "en": "Take photos or stream live in 3D. Live streams can also be viewed from 2D.",
+            "ko": "3D 공간에서 촬영하거나 라이브 방송을 합니다. 라이브는 2D에서도 볼 수 있습니다."
+          }
+        },
+        "genre": {
+          "source": "ツール",
+          "translations": {
+            "ja": "ツール",
+            "en": "Tools",
+            "ko": "도구"
+          }
+        },
+        "usage": {
+          "source": "3D のセッションに出して拾います。持っている間はクリックで撮影、L キーでライブ配信、Q キーで三脚に戻せます。三脚に置いたカメラは、照準を合わせて C キーで撮影できます。",
+          "translations": {
+            "ja": "3D のセッションに出して拾います。持っている間はクリックで撮影、L キーでライブ配信、Q キーで三脚に戻せます。三脚に置いたカメラは、照準を合わせて C キーで撮影できます。",
+            "en": "Place and pick up in 3D. Click to shoot, L to stream live, Q to return to tripod. Aim at a tripod camera and press C to shoot.",
+            "ko": "3D 세션에서 꺼내 주우세요. 들고 클릭하면 촬영, L은 라이브, Q는 삼각대로 돌려놓기입니다. 삼각대 카메라는 조준 후 C로 촬영합니다."
+          }
+        }
+      }
+    },
+    "item/image": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "画像",
+          "translations": {
+            "ja": "画像",
+            "en": "Image",
+            "ko": "이미지"
+          }
+        },
+        "desc": {
+          "source": "貼り付けた画像。",
+          "translations": {
+            "ja": "貼り付けた画像。",
+            "en": "A pasted image.",
+            "ko": "붙여넣은 이미지."
+          }
+        },
+        "genre": {
+          "source": "メディア",
+          "translations": {
+            "ja": "メディア",
+            "en": "Media",
+            "ko": "미디어"
+          }
+        }
+      }
+    },
+    "item/video": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "動画",
+          "translations": {
+            "ja": "動画",
+            "en": "Video",
+            "ko": "동영상"
+          }
+        },
+        "desc": {
+          "source": "貼り付けた動画。みんなで同じところを再生する。",
+          "translations": {
+            "ja": "貼り付けた動画。みんなで同じところを再生する。",
+            "en": "A pasted video. Everyone watches in sync.",
+            "ko": "붙여넣은 동영상. 모두 같은 장면을 재생합니다."
+          }
+        },
+        "genre": {
+          "source": "メディア",
+          "translations": {
+            "ja": "メディア",
+            "en": "Media",
+            "ko": "미디어"
+          }
+        }
+      }
+    },
+    "item/dice": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "サイコロ",
+          "translations": {
+            "ja": "サイコロ",
+            "en": "Dice",
+            "ko": "주사위"
+          }
+        },
+        "desc": {
+          "source": "TRPG 用のサイコロ（d4〜d100、最大10個）。3D では木の器の中を転がり、結果はチャットに残る。シークレットで振ると結果は自分だけに見える。",
+          "translations": {
+            "ja": "TRPG 用のサイコロ（d4〜d100、最大10個）。3D では木の器の中を転がり、結果はチャットに残る。シークレットで振ると結果は自分だけに見える。",
+            "en": "TRPG dice (d4–d100, up to 10). Rolls in a wooden bowl in 3D and logs results in chat. Secret results are visible only to you.",
+            "ko": "TRPG 주사위(d4~d100, 최대 10개). 3D에서 나무 그릇 안에 굴리며 결과는 채팅에 남습니다. 비밀 결과는 나에게만 보입니다."
+          }
+        },
+        "genre": {
+          "source": "あそび",
+          "translations": {
+            "ja": "あそび",
+            "en": "Play",
+            "ko": "놀이"
+          }
+        },
+        "usage": {
+          "source": "セッションに出し、ウィンドウで種類・個数・シークレットを選んで振ります。3D では木の器を押しても振れます。結果はチャットに残ります。",
+          "translations": {
+            "ja": "セッションに出し、ウィンドウで種類・個数・シークレットを選んで振ります。3D では木の器を押しても振れます。結果はチャットに残ります。",
+            "en": "Place in a session, choose dice type, count and secrecy, then roll. In 3D you can click the wooden bowl. Results appear in chat.",
+            "ko": "세션에 꺼낸 뒤 종류·개수·비밀 여부를 골라 굴리세요. 3D에서는 나무 그릇을 눌러도 됩니다. 결과는 채팅에 남습니다."
+          }
+        }
+      }
+    },
+    "item/youtube": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "YouTube"
+        },
+        "desc": {
+          "source": "YouTube の動画。みんなで同じところを再生する。",
+          "translations": {
+            "ja": "YouTube の動画。みんなで同じところを再生する。",
+            "en": "YouTube video. Everyone watches in sync.",
+            "ko": "YouTube 동영상. 모두 같은 장면을 재생합니다."
+          }
+        },
+        "genre": {
+          "source": "メディア",
+          "translations": {
+            "ja": "メディア",
+            "en": "Media",
+            "ko": "미디어"
+          }
+        }
+      }
+    },
+    "item/antimatter": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "AD ポータル",
+          "translations": {
+            "ja": "AD ポータル",
+            "en": "AD portal",
+            "ko": "AD 포털"
+          }
+        },
+        "desc": {
+          "source": "反物質次元への入口。開くと自分の AD 研究所パネルが開く。進行・セーブはプレイヤーごとに残り、アイテムを片付けたりワールドを切り替えたりしても消えない。"
+        },
+        "genre": {
+          "source": "ゲーム",
+          "translations": {
+            "ja": "ゲーム",
+            "en": "Games",
+            "ko": "게임"
+          }
+        }
+      }
+    },
+    "world/starlounge": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "星あかりのラウンジ",
+          "translations": {
+            "ja": "星あかりのラウンジ",
+            "en": "Starlight Lounge",
+            "ko": "별빛 라운지"
+          }
+        },
+        "desc": {
+          "source": "星の灯りに包まれる青いラウンジ",
+          "translations": {
+            "ja": "星の灯りに包まれる青いラウンジ",
+            "en": "A blue lounge wrapped in starlight",
+            "ko": "별빛에 둘러싸인 푸른 라운지"
+          }
+        }
+      }
+    },
+    "world/room": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "ホール",
+          "translations": {
+            "ja": "ホール",
+            "en": "Hall",
+            "ko": "홀"
+          }
+        },
+        "desc": {
+          "source": "何も置いていない広い部屋",
+          "translations": {
+            "ja": "何も置いていない広い部屋",
+            "en": "A spacious empty room",
+            "ko": "아무것도 놓이지 않은 넓은 방"
+          }
+        }
+      }
+    },
+    "world/cafe": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "カフェ",
+          "translations": {
+            "ja": "カフェ",
+            "en": "Café",
+            "ko": "카페"
+          }
+        },
+        "desc": {
+          "source": "カウンターとテーブル席のある落ち着いたカフェ",
+          "translations": {
+            "ja": "カウンターとテーブル席のある落ち着いたカフェ",
+            "en": "A calm café with counter and table seating",
+            "ko": "카운터와 테이블석이 있는 편안한 카페"
+          }
+        }
+      }
+    },
+    "world/garden": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "ガーデン",
+          "translations": {
+            "ja": "ガーデン",
+            "en": "Garden",
+            "ko": "가든"
+          }
+        },
+        "desc": {
+          "source": "木陰のベンチと花壇を散歩できる、空の見える庭",
+          "translations": {
+            "ja": "木陰のベンチと花壇を散歩できる、空の見える庭",
+            "en": "An open-sky garden with shaded benches and flower beds",
+            "ko": "나무 그늘 벤치와 화단을 산책하는 하늘이 보이는 정원"
+          }
+        }
+      }
+    },
+    "world/game": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "ゲーム",
+          "translations": {
+            "ja": "ゲーム",
+            "en": "Games",
+            "ko": "게임"
+          }
+        },
+        "desc": {
+          "source": "板わたりサバイバル。ガラスの向こうの 5 層の塔で、最後まで落ちずに残った人が勝ち",
+          "translations": {
+            "ja": "板わたりサバイバル。ガラスの向こうの 5 層の塔で、最後まで落ちずに残った人が勝ち",
+            "en": "Tile survival in a five-level tower beyond the glass. Last one standing wins.",
+            "ko": "유리 너머 5층 탑의 발판 서바이벌. 끝까지 떨어지지 않고 남은 사람이 승리"
+          }
+        }
+      }
+    },
+    "world/survivors": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "宵闇サバイバーズ：夜明けまで10分",
+          "translations": {
+            "ja": "宵闇サバイバーズ：夜明けまで10分",
+            "en": "Twilight Survivors: Ten Minutes to Dawn",
+            "ko": "황혼 서바이버즈: 새벽까지 10분"
+          }
+        },
+        "desc": {
+          "source": "夜明けまで10分。仲間と装備を重ね、押し寄せる夜の眷属を生き延びる",
+          "translations": {
+            "ja": "夜明けまで10分。仲間と装備を重ね、押し寄せる夜の眷属を生き延びる",
+            "en": "Ten minutes until dawn. Build gear with allies and survive the night creatures.",
+            "ko": "새벽까지 10분. 동료와 장비를 쌓아 밀려오는 밤의 권속에서 살아남기"
+          }
+        }
+      }
+    },
+    "world/city": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "街",
+          "translations": {
+            "ja": "街",
+            "en": "City",
+            "ko": "도시"
+          }
+        },
+        "desc": {
+          "source": "10 階建てのマンションと、駅が 3 つある高架の環状線が走る広い街",
+          "translations": {
+            "ja": "10 階建てのマンションと、駅が 3 つある高架の環状線が走る広い街",
+            "en": "A large city with a ten-story apartment and an elevated loop line with three stations",
+            "ko": "10층 아파트와 세 역이 있는 고가 순환선이 달리는 넓은 도시"
+          }
+        }
+      }
+    },
+    "world/antimatter": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "AD 研究所",
+          "translations": {
+            "ja": "AD 研究所",
+            "en": "AD Laboratory",
+            "ko": "AD 연구소"
+          }
+        },
+        "desc": {
+          "source": "反物質次元の研究所。塔・コア・展示ウィングがある。進行はプレイヤーごとで、ワールド切替でも消えない"
+        }
+      }
+    },
+    "product/bike": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "バイク",
+          "translations": {
+            "ja": "バイク",
+            "en": "Motorcycle",
+            "ko": "오토바이"
+          }
+        },
+        "description": {
+          "source": "街や庭を走れる一人乗りバイク。3D 専用。アクセルとブレーキ、ハンドルで運転し、急旋回では車体が傾いて滑ります。",
+          "translations": {
+            "ja": "街や庭を走れる一人乗りバイク。3D 専用。アクセルとブレーキ、ハンドルで運転し、急旋回では車体が傾いて滑ります。",
+            "en": "A single-rider motorcycle for exploring the city and garden. Available in 3D only. Drive with the throttle, brakes, and handlebars; sharp turns make it lean and skid.",
+            "ko": "도시와 정원을 달릴 수 있는 1인승 오토바이입니다. 3D 전용이며 가속·브레이크·핸들로 운전합니다. 급하게 회전하면 차체가 기울며 미끄러집니다."
+          }
+        },
+        "text": {
+          "source": "E: 乗降 / W: アクセル / S: ブレーキ / A・D: ハンドル",
+          "translations": {
+            "ja": "E: 乗降 / W: アクセル / S: ブレーキ / A・D: ハンドル",
+            "en": "E: Mount/dismount / W: Accelerate / S: Brake / A・D: Steer",
+            "ko": "E: 타기/내리기 / W: 가속 / S: 브레이크 / A・D: 조향"
+          }
+        }
+      }
+    },
+    "product/star-lounge": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "星あかりのラウンジ",
+          "translations": {
+            "ja": "星あかりのラウンジ",
+            "en": "Starlight Lounge",
+            "ko": "별빛 라운지"
+          }
+        },
+        "description": {
+          "source": "星の灯りに包まれる、夜の小さな集会所。青い床と光る星を眺めながら、いつもの仲間とゆっくり話そう。",
+          "translations": {
+            "ja": "星の灯りに包まれる、夜の小さな集会所。青い床と光る星を眺めながら、いつもの仲間とゆっくり話そう。",
+            "en": "A small meeting place under starlight. Relax with friends on blue floors beneath glowing stars.",
+            "ko": "별빛에 둘러싸인 작은 밤의 모임터. 푸른 바닥과 빛나는 별을 보며 친구와 느긋하게 대화해 보세요."
+          }
+        }
+      }
+    },
+    "product/talk-card": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "おしゃべりカード",
+          "translations": {
+            "ja": "おしゃべりカード",
+            "en": "Conversation cards",
+            "ko": "대화 카드"
+          }
+        },
+        "description": {
+          "source": "初めましての会話に、小さなきっかけを。質問入りの付箋を置いて、みんなで書き換えながら使えるカード。",
+          "translations": {
+            "ja": "初めましての会話に、小さなきっかけを。質問入りの付箋を置いて、みんなで書き換えながら使えるカード。",
+            "en": "Break the ice with editable question notes for everyone.",
+            "ko": "처음 만난 대화의 작은 계기. 질문이 담긴 메모를 놓고 함께 고쳐 쓰는 카드."
+          }
+        },
+        "text": {
+          "source": "おしゃべりカード\n最近、ちょっとうれしかったことは？\n次の人への質問も書いてみよう。",
+          "translations": {
+            "ja": "おしゃべりカード\n最近、ちょっとうれしかったことは？\n次の人への質問も書いてみよう。",
+            "en": "Conversation cards\nWhat is something that made you a little happy recently?\nWrite a question for the next person, too.",
+            "ko": "대화 카드\n최근에 조금이라도 기뻤던 일은 무엇인가요?\n다음 사람에게 할 질문도 적어 보세요."
+          }
+        }
+      }
+    },
+    "product/welcome-note": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "ようこそのメッセージ",
+          "translations": {
+            "ja": "ようこそのメッセージ",
+            "en": "Welcome message",
+            "ko": "환영 메시지"
+          }
+        },
+        "description": {
+          "source": "部屋に来た人を迎える、編集できるメッセージ付箋。挨拶や今日の予定を自由に書き込めます。",
+          "translations": {
+            "ja": "部屋に来た人を迎える、編集できるメッセージ付箋。挨拶や今日の予定を自由に書き込めます。",
+            "en": "An editable welcome note. Write greetings or today's plans.",
+            "ko": "방문자를 맞는 편집 가능한 메모. 인사와 오늘 일정을 자유롭게 적을 수 있습니다."
+          }
+        },
+        "text": {
+          "source": "ようこそ！\nここではのんびりお話ししています。\n初めての方も、気軽にどうぞ。",
+          "translations": {
+            "ja": "ようこそ！\nここではのんびりお話ししています。\n初めての方も、気軽にどうぞ。",
+            "en": "Welcome!\nWe're chatting and relaxing here.\nNew here? Feel free to join us.",
+            "ko": "환영합니다!\n이곳에서는 느긋하게 이야기하고 있어요.\n처음 오신 분도 편하게 함께해 주세요."
+          }
+        }
+      }
+    },
+    "product/sparkle-sound": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "きらめきチャイム",
+          "translations": {
+            "ja": "きらめきチャイム",
+            "en": "Sparkle Chime",
+            "ko": "반짝이는 차임"
+          }
+        },
+        "description": {
+          "source": "いいことがあった瞬間に、きらきらと上がる短いチャイム。近くにいる人にも聞こえます。",
+          "translations": {
+            "ja": "いいことがあった瞬間に、きらきらと上がる短いチャイム。近くにいる人にも聞こえます。",
+            "en": "A short, sparkling chime that rises to celebrate a happy moment. People nearby can hear it too.",
+            "ko": "기쁜 순간에 반짝이며 음이 올라가는 짧은 차임입니다. 가까이 있는 사람에게도 들립니다."
+          }
+        }
+      }
+    },
+    "product/fanfare-sound": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "小さなファンファーレ",
+          "translations": {
+            "ja": "小さなファンファーレ",
+            "en": "Little Fanfare",
+            "ko": "작은 팡파르"
+          }
+        },
+        "description": {
+          "source": "ゲームの勝利や友達のお祝いに。軽やかな電子音で、ひと区切りをにぎやかに。",
+          "translations": {
+            "ja": "ゲームの勝利や友達のお祝いに。軽やかな電子音で、ひと区切りをにぎやかに。",
+            "en": "Celebrate a game victory or a friend with cheerful electronic notes that mark the occasion.",
+            "ko": "게임에서 이겼을 때나 친구를 축하할 때 사용하세요. 경쾌한 전자음으로 특별한 순간을 신나게 기념합니다."
+          }
+        }
+      }
+    },
+    "product/cheer-emote": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "ばんざい！",
+          "translations": {
+            "ja": "ばんざい！",
+            "en": "Hooray!",
+            "ko": "만세!"
+          }
+        },
+        "description": {
+          "source": "両手を上げて、うれしい気持ちを伝えるエモート。2D のアイコンでも 3D のアバターでも使えます。",
+          "translations": {
+            "ja": "両手を上げて、うれしい気持ちを伝えるエモート。2D のアイコンでも 3D のアバターでも使えます。",
+            "en": "Raise both hands to express your joy. This emote works with both 2D icons and 3D avatars.",
+            "ko": "두 팔을 들어 기쁜 마음을 전하는 이모트입니다. 2D 아이콘과 3D 아바타에서 모두 사용할 수 있습니다."
+          }
+        }
+      }
+    },
+    "product/bow-emote": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "ぺこり",
+          "translations": {
+            "ja": "ぺこり",
+            "en": "Gentle Bow",
+            "ko": "꾸벅"
+          }
+        },
+        "description": {
+          "source": "「ありがとう」も「よろしく」も、やさしくおじぎで。会話を邪魔しない、短いご挨拶。",
+          "translations": {
+            "ja": "「ありがとう」も「よろしく」も、やさしくおじぎで。会話を邪魔しない、短いご挨拶。",
+            "en": "A gentle bow to say “thank you” or “nice to meet you.” A brief greeting that keeps the conversation flowing.",
+            "ko": "가볍게 고개를 숙여 “고마워요”나 “잘 부탁해요”를 전합니다. 대화를 방해하지 않는 짧은 인사입니다."
+          }
+        }
+      }
+    },
+    "system/button/1.0.0": {
+      "sourceLanguage": "ko",
+      "fields": {
+        "title": {
+          "source": "버튼",
+          "translations": {
+            "ja": "ボタン",
+            "en": "Button",
+            "ko": "버튼"
+          }
+        },
+        "description": {
+          "source": "맵에서 만든 오브젝트를 누르면 클릭한 사용자를 pressed 이벤트로 전달합니다. target에 상호작용할 오브젝트를 연결하세요.",
+          "translations": {
+            "ja": "マップで作ったオブジェクトを押すと、押した利用者を pressed イベントで送ります。target に操作するオブジェクトを接続してください。",
+            "en": "Pressing an object created by the map sends the user who clicked it through the pressed event. Connect the interactive object to target.",
+            "ko": "맵에서 만든 오브젝트를 누르면 클릭한 사용자를 pressed 이벤트로 전달합니다. target에 상호작용할 오브젝트를 연결하세요."
+          }
+        },
+        "usage": {
+          "source": "버튼으로 쓸 오브젝트를 `target`에 연결하고 `pressed` 출력을 다른 시스템의 입력에 연결합니다.",
+          "translations": {
+            "ko": "버튼으로 쓸 오브젝트를 `target`에 연결하고 `pressed` 출력을 다른 시스템의 입력에 연결합니다.",
+            "en": "Bind the button object to `target`, then connect the `pressed` output to another system input.",
+            "ja": "ボタンとして使うオブジェクトを `target` に割り当て、`pressed` 出力を別のシステムの入力に接続します。"
+          }
+        },
+        "targets.target.label": {
+          "source": "버튼 오브젝트",
+          "translations": {
+            "ko": "버튼 오브젝트",
+            "en": "Button object",
+            "ja": "ボタンのオブジェクト"
+          }
+        },
+        "inputs.press.description": {
+          "source": "버튼을 누른 것과 같은 이벤트를 발생시킵니다.",
+          "translations": {
+            "ko": "버튼을 누른 것과 같은 이벤트를 발생시킵니다.",
+            "en": "Trigger the same event as pressing the button.",
+            "ja": "ボタンを押したときと同じイベントを発生させます。"
+          }
+        },
+        "outputs.pressed.description": {
+          "source": "버튼을 누른 참가자의 `user` ID를 전달합니다.",
+          "translations": {
+            "ko": "버튼을 누른 참가자의 `user` ID를 전달합니다.",
+            "en": "Send the `user` ID of the participant who pressed the button.",
+            "ja": "ボタンを押した参加者の `user` IDを渡します。"
+          }
+        }
+      }
+    },
+    "system/timer/1.0.0": {
+      "sourceLanguage": "ko",
+      "fields": {
+        "title": {
+          "source": "타이머",
+          "translations": {
+            "ja": "タイマー",
+            "en": "Timer",
+            "ko": "타이머"
+          }
+        },
+        "description": {
+          "source": "서버 시간을 기준으로 초 단위 카운트다운을 실행합니다. duration에 시간을 설정하고 display에 표시할 텍스트를 연결하세요. start·pause·reset 입력으로 제어하며 완료 시 finished 이벤트를 전달합니다.",
+          "translations": {
+            "ja": "サーバー時刻を基準に秒単位のカウントダウンを実行します。duration に時間、display に表示する文字オブジェクトを接続してください。start・pause・reset 入力で操作し、完了時に finished イベントを送ります。",
+            "en": "Runs a countdown in seconds using server time. Set the time in duration and connect a text object to display. Control it with start, pause, and reset inputs; it sends finished when the countdown ends.",
+            "ko": "서버 시간을 기준으로 초 단위 카운트다운을 실행합니다. duration에 시간을 설정하고 display에 표시할 텍스트를 연결하세요. start·pause·reset 입력으로 제어하며 완료 시 finished 이벤트를 전달합니다."
+          }
+        },
+        "usage": {
+          "source": "시작 버튼의 `pressed` 출력을 `start` 입력에 연결합니다. 중지와 초기화는 `pause`와 `reset` 입력에 연결합니다.",
+          "translations": {
+            "ko": "시작 버튼의 `pressed` 출력을 `start` 입력에 연결합니다. 중지와 초기화는 `pause`와 `reset` 입력에 연결합니다.",
+            "en": "Connect the start button output `pressed` to the `start` input. Use the `pause` and `reset` inputs to pause or reset.",
+            "ja": "開始ボタンの `pressed` 出力を `start` 入力に接続します。一時停止と初期化には `pause` と `reset` 入力を使います。"
+          }
+        },
+        "targets.display.label": {
+          "source": "시간 표시 대상",
+          "translations": {
+            "ko": "시간 표시 대상",
+            "en": "Time display",
+            "ja": "時間の表示先"
+          }
+        },
+        "config.duration.label": {
+          "source": "지속 시간",
+          "translations": {
+            "ko": "지속 시간",
+            "en": "Duration",
+            "ja": "設定時間"
+          }
+        },
+        "config.duration.description": {
+          "source": "초 단위 시간입니다. 아래에 표시된 설정 범위를 따릅니다.",
+          "translations": {
+            "ko": "초 단위 시간입니다. 아래에 표시된 설정 범위를 따릅니다.",
+            "en": "Time in seconds. Use a value within the range shown below.",
+            "ja": "秒単位の時間です。下に表示される設定範囲内の値を使います。"
+          }
+        },
+        "inputs.start.description": {
+          "source": "남은 시간부터 카운트다운을 시작합니다.",
+          "translations": {
+            "ko": "남은 시간부터 카운트다운을 시작합니다.",
+            "en": "Start counting down from the remaining time.",
+            "ja": "残り時間からカウントダウンを開始します。"
+          }
+        },
+        "inputs.pause.description": {
+          "source": "남은 시간을 유지한 채 일시정지합니다.",
+          "translations": {
+            "ko": "남은 시간을 유지한 채 일시정지합니다.",
+            "en": "Pause while keeping the remaining time.",
+            "ja": "残り時間を保って一時停止します。"
+          }
+        },
+        "inputs.reset.description": {
+          "source": "설정한 전체 시간으로 초기화합니다.",
+          "translations": {
+            "ko": "설정한 전체 시간으로 초기화합니다.",
+            "en": "Reset to the full configured duration.",
+            "ja": "設定した全体の時間に戻します。"
+          }
+        },
+        "outputs.finished.description": {
+          "source": "남은 시간이 0이 되면 발생합니다.",
+          "translations": {
+            "ko": "남은 시간이 0이 되면 발생합니다.",
+            "en": "Emitted when the remaining time reaches zero.",
+            "ja": "残り時間が0になると発生します。"
+          }
+        }
+      }
+    },
+    "system/timer/1.0.1": {
+      "sourceLanguage": "ko",
+      "fields": {
+        "title": {
+          "source": "타이머",
+          "translations": {
+            "ja": "タイマー",
+            "en": "Timer",
+            "ko": "타이머"
+          }
+        },
+        "description": {
+          "source": "서버 시간을 기준으로 초 단위 카운트다운을 실행합니다. duration에 시간을 설정하고 display에 표시할 텍스트를 연결하세요. start·pause·reset 입력으로 제어하며 완료 시 finished 이벤트를 전달합니다.",
+          "translations": {
+            "ja": "サーバー時刻を基準に秒単位のカウントダウンを実行します。duration に時間、display に表示する文字オブジェクトを接続してください。start・pause・reset 入力で操作し、完了時に finished イベントを送ります。",
+            "en": "Runs a countdown in seconds using server time. Set the time in duration and connect a text object to display. Control it with start, pause, and reset inputs; it sends finished when the countdown ends.",
+            "ko": "서버 시간을 기준으로 초 단위 카운트다운을 실행합니다. duration에 시간을 설정하고 display에 표시할 텍스트를 연결하세요. start·pause·reset 입력으로 제어하며 완료 시 finished 이벤트를 전달합니다."
+          }
+        },
+        "usage": {
+          "source": "시작 버튼의 `pressed` 출력을 `start` 입력에 연결합니다. 중지와 초기화는 `pause`와 `reset` 입력에 연결합니다.",
+          "translations": {
+            "ko": "시작 버튼의 `pressed` 출력을 `start` 입력에 연결합니다. 중지와 초기화는 `pause`와 `reset` 입력에 연결합니다.",
+            "en": "Connect the start button output `pressed` to the `start` input. Use the `pause` and `reset` inputs to pause or reset.",
+            "ja": "開始ボタンの `pressed` 出力を `start` 入力に接続します。一時停止と初期化には `pause` と `reset` 入力を使います。"
+          }
+        },
+        "targets.display.label": {
+          "source": "시간 표시 대상",
+          "translations": {
+            "ko": "시간 표시 대상",
+            "en": "Time display",
+            "ja": "時間の表示先"
+          }
+        },
+        "config.duration.label": {
+          "source": "지속 시간",
+          "translations": {
+            "ko": "지속 시간",
+            "en": "Duration",
+            "ja": "設定時間"
+          }
+        },
+        "config.duration.description": {
+          "source": "초 단위 시간입니다. 아래에 표시된 설정 범위를 따릅니다.",
+          "translations": {
+            "ko": "초 단위 시간입니다. 아래에 표시된 설정 범위를 따릅니다.",
+            "en": "Time in seconds. Use a value within the range shown below.",
+            "ja": "秒単位の時間です。下に表示される設定範囲内の値を使います。"
+          }
+        },
+        "inputs.start.description": {
+          "source": "남은 시간부터 카운트다운을 시작합니다.",
+          "translations": {
+            "ko": "남은 시간부터 카운트다운을 시작합니다.",
+            "en": "Start counting down from the remaining time.",
+            "ja": "残り時間からカウントダウンを開始します。"
+          }
+        },
+        "inputs.pause.description": {
+          "source": "남은 시간을 유지한 채 일시정지합니다.",
+          "translations": {
+            "ko": "남은 시간을 유지한 채 일시정지합니다.",
+            "en": "Pause while keeping the remaining time.",
+            "ja": "残り時間を保って一時停止します。"
+          }
+        },
+        "inputs.reset.description": {
+          "source": "설정한 전체 시간으로 초기화합니다.",
+          "translations": {
+            "ko": "설정한 전체 시간으로 초기화합니다.",
+            "en": "Reset to the full configured duration.",
+            "ja": "設定した全体の時間に戻します。"
+          }
+        },
+        "outputs.finished.description": {
+          "source": "남은 시간이 0이 되면 발생합니다.",
+          "translations": {
+            "ko": "남은 시간이 0이 되면 발생합니다.",
+            "en": "Emitted when the remaining time reaches zero.",
+            "ja": "残り時間が0になると発生します。"
+          }
+        }
+      }
+    },
+    "system/chair/1.0.0": {
+      "sourceLanguage": "ko",
+      "fields": {
+        "title": {
+          "source": "의자",
+          "translations": {
+            "ja": "椅子",
+            "en": "Chair",
+            "ko": "의자"
+          }
+        },
+        "description": {
+          "source": "선택한 참가자를 맵 오브젝트의 착석 기준점에 앉힙니다. seat에 대상 오브젝트를 연결하고 sit·stand 입력에 접속자의 user를 전달하세요. 버튼의 pressed 이벤트와도 연결할 수 있습니다.",
+          "translations": {
+            "ja": "選んだ参加者をマップオブジェクトの着席基準点に座らせます。seat に対象を接続し、sit・stand 入力に接続中の参加者の user を渡してください。ボタンの pressed イベントにも接続できます。",
+            "en": "Seats a selected participant at the map object’s seat anchor. Connect the object to seat and pass a connected participant’s user to sit and stand. It can also connect to a button’s pressed event.",
+            "ko": "선택한 참가자를 맵 오브젝트의 착석 기준점에 앉힙니다. seat에 대상 오브젝트를 연결하고 sit·stand 입력에 접속자의 user를 전달하세요. 버튼의 pressed 이벤트와도 연결할 수 있습니다."
+          }
+        },
+        "usage": {
+          "source": "앉을 오브젝트를 `seat`에 연결하고 `sit` 입력에 `user`를 전달합니다. 스페이스바로 일어날 수 있습니다.",
+          "translations": {
+            "ko": "앉을 오브젝트를 `seat`에 연결하고 `sit` 입력에 `user`를 전달합니다. 스페이스바로 일어날 수 있습니다.",
+            "en": "Bind the seat object to `seat` and pass `user` to the `sit` input. Press Space to stand up.",
+            "ja": "座るオブジェクトを `seat` に割り当て、`sit` 入力に `user` を渡します。スペースキーで立ち上がれます。"
+          }
+        },
+        "targets.seat.label": {
+          "source": "착석 오브젝트",
+          "translations": {
+            "ko": "착석 오브젝트",
+            "en": "Seat object",
+            "ja": "着席先のオブジェクト"
+          }
+        },
+        "inputs.sit.description": {
+          "source": "선택한 참가자를 앉힙니다.",
+          "translations": {
+            "ko": "선택한 참가자를 앉힙니다.",
+            "en": "Seat the selected participant.",
+            "ja": "選択した参加者を座らせます。"
+          }
+        },
+        "inputs.stand.description": {
+          "source": "선택한 참가자를 일으킵니다.",
+          "translations": {
+            "ko": "선택한 참가자를 일으킵니다.",
+            "en": "Make the selected participant stand up.",
+            "ja": "選択した参加者を立たせます。"
+          }
+        }
+      }
+    },
+    "item/camera-timer": {
+      "sourceLanguage": "ja",
+      "fields": {
+        "name": {
+          "source": "5秒タイマーカメラ",
+          "translations": {
+            "ja": "5秒タイマーカメラ",
+            "en": "5-second timer camera",
+            "ko": "5초 딜레이 카메라"
+          }
+        },
+        "desc": {
+          "source": "カメラを押すと5秒のカウントダウン後、押した人の画面から一度撮影します。残り秒はカメラの上に表示され、複数台を置いたり、移動・片付けたりできます。",
+          "translations": {
+            "ja": "カメラを押すと5秒のカウントダウン後、押した人の画面から一度撮影します。残り秒はカメラの上に表示され、複数台を置いたり、移動・片付けたりできます。",
+            "en": "Interact with the camera to count down for 5 seconds and take one photo from the initiating tab. Remaining seconds appear above the camera. Place multiple cameras, move them, or put them away independently.",
+            "ko": "카메라를 누르면 5초를 센 뒤 조작한 탭에서 한 번 촬영합니다. 남은 초는 카메라 위에 표시됩니다. 여러 대를 각각 배치하고 이동하거나 삭제할 수 있습니다."
+          }
+        },
+        "genre": {
+          "source": "ツール",
+          "translations": {
+            "ja": "ツール",
+            "en": "Tools",
+            "ko": "도구"
+          }
+        },
+        "usage": {
+          "source": "アイテムメニューから出し、カメラをクリックまたはCで操作すると5秒後に撮影します。残り秒はカメラの上に表示されます。右クリックで移動、Xまたはメニューで片付けできます。",
+          "translations": {
+            "ja": "アイテムメニューから出し、カメラをクリックまたはCで操作すると5秒後に撮影します。残り秒はカメラの上に表示されます。右クリックで移動、Xまたはメニューで片付けできます。",
+            "en": "Place it from the item menu, then click the camera or press C to take a photo after 5 seconds. Remaining seconds appear above the camera. Right-click to move it; press X or use the menu to put it away.",
+            "ko": "아이템 메뉴에서 꺼낸 뒤 카메라를 클릭하거나 C 키로 조작하면 5초 후 촬영합니다. 남은 초는 카메라 위에 표시됩니다. 오른쪽 클릭으로 옮기고 X 키나 메뉴에서 삭제할 수 있습니다."
+          }
+        }
+      }
+    }
+  }
+}

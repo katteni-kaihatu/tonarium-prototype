@@ -1,6 +1,6 @@
 import { t as tr } from '../i18n/index.ts';
 import { Icon } from '../world/Icon.tsx';
-import { MARKET_PRODUCTS } from '../../../shared/market.ts';
+import { MARKET_PRODUCTS } from '../i18n/static.ts';
 import { openMarketProduct } from './navigation.ts';
 
 export function OriginBadge({ productId, onOpen }: { productId?: string; onOpen?: () => void }) {

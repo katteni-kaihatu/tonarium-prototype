@@ -1,7 +1,7 @@
 import { t as tr } from '../i18n/index.ts';
 import { openMarketLink } from '../market/navigation.ts';
 import { marketProductFromUrl } from '../../../shared/market-links.ts';
-import { MARKET_PRODUCTS } from '../../../shared/market.ts';
+import { MARKET_PRODUCTS } from '../i18n/static.ts';
 import { useEffect, useState } from 'react';
 import { useStore, set } from '../store.ts';
 

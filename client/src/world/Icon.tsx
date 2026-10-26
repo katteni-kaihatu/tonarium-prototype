@@ -52,6 +52,12 @@ const PATHS = {
   lock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
   link: <><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></>,
   heart: <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" />,
+  reply: <path d="M10 8L5 12l5 4M5 12h9a5 5 0 0 1 5 5v1" />,
+  repost: <path d="M7 7h11l-3-3M17 17H6l3 3" />,
+  pen: <path d="M4 20h4l10-10-4-4L4 16zM13.5 6.5l4 4" />,
+  camera: <><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></>,
+  door: <><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M14 12h.01" /></>,
+  timeline: <path d="M20 11.5a7.5 7.5 0 0 1-10.9 6.7L4 19.5l1.3-4.6A7.5 7.5 0 1 1 20 11.5zM9 10h6M9 13.5h4" />,
   more: null,
 } as const;
 

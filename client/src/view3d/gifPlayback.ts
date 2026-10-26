@@ -1,6 +1,27 @@
-import type { ParsedFrame } from 'gifuct-js';
+import type { ParsedFrame, ParsedGif } from 'gifuct-js';
 
 export type GifFrame = Pick<ParsedFrame, 'dims' | 'delay' | 'disposalType' | 'patch'>;
+
+// 全フレームを展開して保持し続けるため、展開前に論理画面・フレーム数・全フレームのピクセル数合計へ上限を設ける
+export const GIF_MAX_PIXELS = 1024 * 1024;
+export const GIF_MAX_FRAMES = 600;
+export const GIF_MAX_TOTAL_PIXELS = 64 * 1024 * 1024;
+
+export function gifWithinLimits(gif: ParsedGif): boolean {
+  const { width, height } = gif.lsd;
+  if (width < 1 || height < 1 || width * height > GIF_MAX_PIXELS) return false;
+  let frames = 0;
+  let totalPixels = 0;
+  for (const frame of gif.frames) {
+    if (!('image' in frame)) continue;
+    const { width: w, height: h } = frame.image.descriptor;
+    if (w < 1 || h < 1) return false;
+    frames++;
+    totalPixels += w * h;
+    if (frames > GIF_MAX_FRAMES || totalPixels > GIF_MAX_TOTAL_PIXELS) return false;
+  }
+  return frames > 0;
+}
 
 export class GifPlayback {
   pixels: Uint8ClampedArray;

@@ -8,9 +8,12 @@
 <form id="updates">
 <label class="toggle"><input id="check-on-startup" type="checkbox">起動時に更新を確認する</label>
 <label class="toggle nested"><input id="auto-install" type="checkbox">更新を自動でダウンロードし、アプリ終了時に適用する</label>
-<p class="hint">自動更新をオフにすると、更新の有無だけを表示します。通話や作業中に自動で再起動することはありません。</p>
+<label class="toggle"><input id="auto-restart" type="checkbox">取得後に自動で再起動して更新する</label>
+<label>自動更新までの秒数（1～300秒）<input id="restart-seconds" type="number" min="1" max="300" step="1" value="5" required></label>
+<p class="hint">更新前の状態を保存して再接続します。画面共有は終了します。進行中のカウントダウンは設定変更では変わりません。</p>
 <div class="actions"><button id="save" type="submit">設定を保存</button><button id="check" type="button">今すぐ確認</button></div>
 </form>
 <p id="version" class="hint"></p><p id="status" role="status" aria-live="polite"></p><p id="error" role="alert"></p>
-<div class="actions"><button id="install" type="button" hidden>再起動して更新</button><button id="release" type="button">Releasesを開く</button></div>
+<p id="countdown" role="status"></p>
+<div class="actions"><button id="install" type="button" hidden>今すぐ更新</button><button id="cancel" type="button" hidden>自動更新をキャンセル</button><button id="release" type="button">Releasesを開く</button></div>
 </main><script src="updates.js"></script></body></html>

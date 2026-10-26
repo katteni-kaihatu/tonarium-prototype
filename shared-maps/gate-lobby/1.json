@@ -1,0 +1,69 @@
+{
+    "revision":  1,
+    "placements":  [
+                       {
+                           "transform":  {
+                                             "y":  0,
+                                             "scale":  1,
+                                             "ry":  0,
+                                             "z":  0,
+                                             "x":  3
+                                         },
+                           "config":  {
+
+                                      },
+                           "asset":  {
+                                         "integrity":  "sha256-eaf0ee777e52023c7f883f969966fa4d246902487f53fe7ef3cfa7ee2b90a977",
+                                         "id":  "pulse-gate",
+                                         "version":  "1.0.0"
+                                     },
+                           "instanceId":  "gate-1"
+                       },
+                       {
+                           "transform":  {
+                                             "y":  0,
+                                             "scale":  1,
+                                             "ry":  0,
+                                             "z":  0,
+                                             "x":  6
+                                         },
+                           "config":  {
+
+                                      },
+                           "asset":  {
+                                         "integrity":  "sha256-eaf0ee777e52023c7f883f969966fa4d246902487f53fe7ef3cfa7ee2b90a977",
+                                         "id":  "pulse-gate",
+                                         "version":  "1.0.0"
+                                     },
+                           "instanceId":  "gate-2"
+                       },
+                       {
+                           "transform":  {
+                                             "y":  0,
+                                             "scale":  1,
+                                             "ry":  0,
+                                             "z":  0,
+                                             "x":  0
+                                         },
+                           "config":  {
+
+                                      },
+                           "asset":  {
+                                         "integrity":  "sha256-83d37ddbc0ff3a2f40e0300b4d2b4435561759ed9adea509265d41fc898d9e8a",
+                                         "id":  "score-board",
+                                         "version":  "1.0.0"
+                                     },
+                           "instanceId":  "score"
+                       }
+                   ],
+    "schema":  2,
+    "id":  "gate-lobby",
+    "connections":  [
+                        {
+                            "output":  "advance",
+                            "from":  "gate-1",
+                            "to":  "score",
+                            "input":  "point"
+                        }
+                    ]
+}

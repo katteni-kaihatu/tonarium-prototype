@@ -37,8 +37,13 @@ export function Label({ text, position, bg = 'rgba(0,0,0,0.75)', fg = '#ffffff',
     return { tex: t, aspect: w / h };
   }, [text, bg, fg]);
   useEffect(() => () => tex.dispose(), [tex]);
+  const roll = useMemo(() => ({ q: new THREE.Quaternion(), e: new THREE.Euler(0, 0, 0, 'YXZ') }), []);
   return (
-    <sprite position={position} scale={[height * aspect, height, 1]} userData={{ noRay: true }} renderOrder={10}>
+    <sprite position={position} scale={[height * aspect, height, 1]} userData={{ noRay: true }} renderOrder={10}
+      onBeforeRender={(_renderer, _scene, camera, _geometry, material) => {
+        roll.e.setFromQuaternion(camera.getWorldQuaternion(roll.q), 'YXZ');
+        (material as THREE.SpriteMaterial).rotation = -roll.e.z;
+      }}>
       <spriteMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
     </sprite>
   );

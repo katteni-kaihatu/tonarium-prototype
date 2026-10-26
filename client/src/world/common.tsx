@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import type { ChatMessage } from '../../../shared/protocol.ts';
 import { ITEM_INFO } from '../i18n/static.ts';
 import { type Item } from '../../../shared/items.ts';
+import { localizedVariantInfo } from '../items/metadata.ts';
 import { NEAR_RANGE, VOICE_RANGE } from '../../../shared/places.ts';
 import { bandOf, type Band, type ListedPlayer } from '../nearby.ts';
 import { useStore, set, colorOf, heldHammer } from '../store.ts';
@@ -22,7 +23,7 @@ export function Face({ id, name, size = 32, ring }: { id: string; name: string; 
 }
 
 export function ItemMark({ item, size = 32, by }: { item: Item; size?: number; by?: { id: string; name: string } }) {
-  const info = ITEM_INFO[item.kind];
+  const info = itemInfo(item);
   return (
     <span
       className="itemmark"
@@ -76,15 +77,21 @@ export function useItemsNear() {
 
 /** そのアイテムを開くウィンドウ。無ければ null */
 export function windowKeyOf(item: Item, camFeeds: Record<string, number>) {
+  if (item.mapPlacement?.mode === 'system') return `item:${item.id}`;
   if (item.kind === 'hammer') return null;
   if (item.kind === 'camera') return item.live && camFeeds[item.id] ? `cam:${item.id}` : null;
   return `item:${item.id}`;
 }
 
-export const itemLabel = (item: Item) =>
-  item.kind === 'note' ? (item.text.split('\n')[0].slice(0, 16) || tr("ui559"))
+export function itemInfo(item: Item) {
+  return localizedVariantInfo(item.kind === 'camera' ? item.variant : undefined) ?? ITEM_INFO[item.kind];
+}
+
+export const itemLabel = (item: Item, imageCreatorName?: string) =>
+  item.kind === 'image' && imageCreatorName?.trim() ? tr('imageItemBy', imageCreatorName.trim())
+    : item.kind === 'note' ? (item.text.split('\n')[0].slice(0, 16) || tr("ui559"))
     : item.kind === 'youtube' && item.title ? item.title.slice(0, 24)
-    : ITEM_INFO[item.kind].name;
+    : itemInfo(item).name;
 
 /** 直近 30 秒の発言。上部の顔と 3D の頭の上の吹き出しに出す */
 const BUBBLE_MS = 30_000;

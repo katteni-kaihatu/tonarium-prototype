@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('tonariumShell', Object.freeze({
   updateState: () => ipcRenderer.invoke('shell:update-state'),
   updateConfigure: value => ipcRenderer.invoke('shell:update-configure', value),
   updateCheck: () => ipcRenderer.invoke('shell:update-check'),
+  updateCancel: () => ipcRenderer.invoke('shell:update-cancel'),
   updateInstall: () => ipcRenderer.invoke('shell:update-install'),
   updateRelease: () => ipcRenderer.invoke('shell:update-release'),
   onUpdateState: callback => {

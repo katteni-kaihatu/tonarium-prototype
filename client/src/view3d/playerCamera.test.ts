@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { CAMERA_DISTANCE, LEAN_OFFSET, PlayerCamera } from './playerCamera.ts';
-import { aimAt } from './interact.ts';
+import { aimAt, carrying } from './interact.ts';
 import { LEAN_ANGLE } from './movementAbilities.ts';
 
 const close = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`);
@@ -20,6 +20,25 @@ function wall(scene: THREE.Scene, z: number) {
   scene.add(mesh);
   return mesh;
 }
+
+test('media placement preview does not push the third-person camera', () => {
+  const { rig, camera, scene, anchor } = setup();
+  rig.thirdPerson = true;
+  const board = wall(scene, 1);
+  board.userData.mediaItemId = 'image';
+  carrying.current = { id: 'image', x: 0, z: 1, ry: 0, last: 0, distance: 2.2, scale: 1 };
+  try {
+    rig.place(camera, scene, anchor);
+    close(rig.actualDistance, CAMERA_DISTANCE.initial);
+    carrying.current = null;
+    rig.place(camera, scene, anchor);
+    assert.ok(rig.actualDistance < 1);
+  } finally {
+    carrying.current = null;
+    board.geometry.dispose();
+    (board.material as THREE.Material).dispose();
+  }
+});
 
 test('lean offsets the view sideways and returns to neutral without moving the player in both views', () => {
   const { rig, camera, scene, anchor } = setup();

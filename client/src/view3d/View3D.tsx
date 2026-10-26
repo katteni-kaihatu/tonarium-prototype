@@ -1,8 +1,10 @@
 import { t as tr } from '../i18n/index.ts';
+import { SharedAssets3D } from '../shared-assets/SharedAssets3D.tsx';
+import { SystemObjects3D } from '../systems/SystemObjects3D.tsx';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { jumpHeight, spawnSlot, type Participant } from '../../../shared/protocol.ts';
+import { jumpHeight, spawnSlot, type Participant, type AvatarState } from '../../../shared/protocol.ts';
 import { NOTE_COLORS } from '../../../shared/items.ts';
 import { useStore, get, colorOf, nameOf, heldCamera, worldKindOf, serverNow } from '../store.ts';
 import { carPose, fromCarLocal } from '../../../shared/city.ts';
@@ -25,6 +27,16 @@ import { WORLD_BG, WorldMesh } from './worlds3d.tsx';
 import { useLastSaid } from '../world/common.tsx';
 import { ShareDisplay } from './shareDisplay.tsx';
 import { XRScene } from '../xr/XRScene.tsx';
+import { xr, xrState } from '../xr/runtime.ts';
+import { useSystems } from '../systems/state.ts';
+import { systemSeat } from '../../../shared/system-presentation.ts';
+import { avatarHipHeight, seatedBodyOffset } from './seatedPose.ts';
+import { DEFAULT_PARAMS } from '../../../shared/avatar.ts';
+
+function seatOf(id: string) {
+  const systems = useSystems.getState();
+  return systems.sid === get().session ? systemSeat(systems.view, id) : undefined;
+}
 
 /** 頭の上のチャットの吹き出し（上部の顔と同じく直近 30 秒） */
 function ChatBubble({ id, y }: { id: string; y: number }) {
@@ -36,7 +48,10 @@ function ChatBubble({ id, y }: { id: string; y: number }) {
 
 /** 2D で参加している人。3D の人と同じアバターで、スポーンエリア・置かれた場所・ついていく相手の後ろに立つ */
 function Standee({ user }: { user: Participant }) {
-  const [height, setHeight] = useState(DEFAULT_EYE_HEIGHT);
+  const [standingHeight, setHeight] = useState(DEFAULT_EYE_HEIGHT);
+  const [seatOffset, setSeatOffset] = useState(seatedBodyOffset(avatarHipHeight(DEFAULT_PARAMS)));
+  const isSeated = useSystems(s => s.sid === get().session && Object.values(s.view?.seats ?? {}).includes(user.id));
+  const height = Math.max(0.3, standingHeight - (isSeated ? seatOffset : 0));
   const speaking = useStore((s) => !!s.speaking[user.id]);
   const micOff = useStore((s) => s.voice === 'connected' && s.micOn[user.id] === false);
   const ref = useRef<THREE.Group>(null);
@@ -45,12 +60,15 @@ function Standee({ user }: { user: Participant }) {
   useFrame((_, dt) => {
     const g = ref.current;
     const s = get();
-    const carried = carrying.current?.id === `user:${user.id}` ? carrying.current : null;
-    const pos = carried ? { x: carried.x, z: carried.z, ry: carried.ry + Math.PI, small: false } : placesOf(s).get(user.id);
+    const seat = seatOf(user.id);
+    const carried = !seat && carrying.current?.id === `user:${user.id}` ? carrying.current : null;
+    const standing = placesOf(s).get(user.id);
+    const pos = seat ? { ...seat, ry: standing?.ry ?? g?.rotation.y ?? 0, small: false } : carried ? { x: carried.x, z: carried.z, ry: carried.ry + Math.PI, small: false } : standing;
     if (g && pos) {
       const k = carried ? 1 : Math.min(1, dt * 8);
       g.position.x += (pos.x - g.position.x) * k;
       g.position.z += (pos.z - g.position.z) * k;
+      g.position.y += ((seat?.y ?? 0) - g.position.y) * k;
       let r = pos.ry - g.rotation.y;
       r = Math.atan2(Math.sin(r), Math.cos(r));
       g.rotation.y += r * k;
@@ -61,10 +79,10 @@ function Standee({ user }: { user: Participant }) {
     card.current?.scale.set(1 + 0.3 * b, 1 - 0.45 * b, 1 + 0.3 * b);
   });
   return (
-    <group ref={ref} position={[pos0.x, 0, pos0.z]} userData={{ hitTarget: user.id, carry: `user:${user.id}`, hint: tr("ui536", user.name) } satisfies Interactable}>
+    <group ref={ref} position={[pos0.x, 0, pos0.z]} userData={{ hitTarget: user.id, ...(!isSeated ? { carry: `user:${user.id}` } : {}), hint: tr("ui536", user.name) } satisfies Interactable}>
       <group ref={card}>
         <Suspense fallback={null}>
-          <OekakiAvatar userId={user.id} name={user.name} version={user.avatar} speaking={speaking} onEyeHeight={setHeight} />
+          <OekakiAvatar userId={user.id} name={user.name} version={user.avatar} speaking={speaking} seated={() => !!seatOf(user.id)} onEyeHeight={setHeight} onSeatOffset={setSeatOffset} />
         </Suspense>
       </group>
       <mesh position-y={Math.max(.7, height) / 2}>
@@ -98,11 +116,15 @@ export function Entrance() {
 /** 自分の体は三人称と外部カメラで表示する。 */
 export function Avatar3D({ id, self = false, rig }: { id: string; self?: boolean; rig?: PlayerCamera }) {
   const eye = useEyeHeight();
-  const [height, setHeight] = useState(DEFAULT_EYE_HEIGHT);
+  const [standingHeight, setHeight] = useState(DEFAULT_EYE_HEIGHT);
+  const [seatOffset, setSeatOffset] = useState(seatedBodyOffset(avatarHipHeight(DEFAULT_PARAMS)));
+  const isSeated = useSystems(s => s.sid === get().session && Object.values(s.view?.seats ?? {}).includes(id));
+  const height = Math.max(0.3, standingHeight - (isSeated ? seatOffset : 0));
   const onEyeHeight = useCallback((value: number) => {
     setHeight(value);
     if (self) eye.current.target = value;
   }, [self, eye]);
+  const onSeatOffset = useCallback((value: number) => { setSeatOffset(value); if (self) eye.current.seatOffset = value; }, [self, eye]);
   const name = useStore((s) => s.participants.find((p) => p.id === id)?.name);
   const speaking = useStore((s) => !!s.speaking[id]);
   const micOff = useStore((s) => s.voice === 'connected' && s.micOn[id] === false);
@@ -122,12 +144,17 @@ export function Avatar3D({ id, self = false, rig }: { id: string; self?: boolean
   useFrame((_, dt) => {
     const g = ref.current;
     if (!g) return;
-    const state = self ? get().selfAvatar : get().avatars[id];
+    const seat = seatOf(id);
+    const state: AvatarState | undefined = (self ? get().selfAvatar : get().avatars[id]) ?? seat;
     if (!state) return;
     const r = state.ride;
-    const bike = Object.values(get().items).find(i => i.kind === 'bike' && i.rider === id);
-    const k = bike ? 1 - Math.exp(-12 * dt) : Math.min(1, dt * 10);
-    if (bike) {
+    const bike = !seat && Object.values(get().items).find(i => i.kind === 'bike' && i.rider === id);
+    const k = state.xr ? 1 : bike ? 1 - Math.exp(-12 * dt) : Math.min(1, dt * 10);
+    if (seat) {
+      ride.current = null;
+      g.position.x += (seat.x - g.position.x) * k;
+      g.position.z += (seat.z - g.position.z) * k;
+    } else if (bike) {
       ride.current = null;
       g.position.x += (bike.x - g.position.x) * k;
       g.position.z += (bike.z - g.position.z) * k;
@@ -150,7 +177,8 @@ export function Avatar3D({ id, self = false, rig }: { id: string; self?: boolean
     }
     const j = jump.current;
     if ((state.jump ?? 0) !== j.n) { j.n = state.jump ?? 0; j.at = performance.now(); }
-    if (bike) g.position.y = 0;
+    if (seat) g.position.y += (seat.y - g.position.y) * k;
+    else if (bike) g.position.y = 0;
     else if (state.y !== undefined) g.position.y += (state.y - g.position.y) * Math.min(1, dt * 15);
     else g.position.y = jumpHeight(performance.now() - j.at);
     const targetRy = bike ? bike.ry : ride.current && r ? carPose(serverNow(), r.car).ry + ride.current.ry : state.ry;
@@ -161,15 +189,15 @@ export function Avatar3D({ id, self = false, rig }: { id: string; self?: boolean
     g.rotation.z = bike ? 0 : state.lean ?? 0;
     const s = get();
     if (self && rig) {
-      g.visible = rig.thirdPerson;
+      g.visible = rig.thirdPerson || xrState().active;
       g.position.copy(rig.avatarPosition);
       g.rotation.order = 'YXZ';
-      g.rotation.set(0, rig.yaw, rig.lean);
+      g.rotation.set(0, rig.yaw + (xrState().active ? xr.headYaw : 0), rig.lean);
     }
     const b = bump(s.hits[id]);
     body.current?.scale.set(1 + 0.3 * b, 1 - 0.45 * b, 1 + 0.3 * b);
     if (hand.current) hand.current.rotation.x = -0.4 - bump(s.swings[id], performance.now(), 350) * 1.6;
-  });
+  }, -.1);
   if (!name) return null;
   return (
     <group
@@ -179,6 +207,9 @@ export function Avatar3D({ id, self = false, rig }: { id: string; self?: boolean
       <group ref={body}>
         <Suspense fallback={null}>
           <OekakiAvatar userId={id} name={name} version={avatarV} speaking={speaking} look={() => pitchOf(id)}
+            tracked={() => self && xrState().active ? xr.pose : get().avatars[id]?.xr} handsOnly={() => self && xrState().active}
+            seated={() => !!seatOf(id)} onSeatOffset={onSeatOffset}
+            crouching={() => (self ? get().selfAvatar : get().avatars[id])?.crouching === true}
             walking={() => {
               const s = get();
               const a = self ? s.selfAvatar : s.avatars[id];
@@ -219,13 +250,13 @@ export function Avatar3D({ id, self = false, rig }: { id: string; self?: boolean
 function NoteEditor() {
   const id = useStore((s) => s.selectedNote);
   const note = useStore((s) => (id ? s.items[id] : undefined));
-  if (note?.kind !== 'note') return null;
+  if (note?.kind !== 'note' || note.mapPlacement?.mode === 'system') return null;
   const faceMe = () => {
     const a = get().selfAvatar;
     moveItem(note.id, note.x, note.z, Math.atan2(a.x - note.x, a.z - note.z));
   };
   return (
-    <div className="noteeditor">
+    <div className="noteeditor" data-xr-surface="note-editor" data-xr-title="付箋の編集">
       <textarea
         autoFocus value={note.text} placeholder={tr("ui537")}
         style={{ background: note.color }}
@@ -307,6 +338,8 @@ export function View3D() {
       {/* 街は端から端まで 170m ほどあるので遠くまで描く */}
       <EyeHeightContext.Provider value={eyeHeight}>
         <Canvas camera={{ fov: 70, near: 0.05, far: 300, position: [a0.x, eyeHeight.current.current, a0.z] }}>
+          <SharedAssets3D />
+          <SystemObjects3D />
           <color attach="background" args={[WORLD_BG[world]]} />
           <WorldMesh kind={world} />
           <ShareDisplay />

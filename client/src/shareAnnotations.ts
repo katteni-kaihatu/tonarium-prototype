@@ -71,9 +71,19 @@ export class ShareAnnotations {
   constructor(private transmit: (packet: Packet, to?: string) => void) {}
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   snapshot = () => this.state;
-  private notify() {
+  private emit() { this.listeners.forEach((listener) => listener()); }
+  // セグメントとカーソルは別々に差し替える。カーソル移動だけでセグメント配列の同一性まで変わると、購読側が線全体を描き直してしまうため
+  private notifySegments() {
+    this.state = { share: this.share, segments: [...this.segments.values()].sort((a, b) => a.order - b.order), cursors: this.state.cursors };
+    this.emit();
+  }
+  private notifyCursors() {
+    this.state = { share: this.share, segments: this.state.segments, cursors: new Map(this.cursors) };
+    this.emit();
+  }
+  private notifyAll() {
     this.state = { share: this.share, segments: [...this.segments.values()].sort((a, b) => a.order - b.order), cursors: new Map(this.cursors) };
-    this.listeners.forEach((listener) => listener());
+    this.emit();
   }
   setShare(share: string | null, authority: string, self: string) {
     if (share === this.share && self === this.self && authority === this.authority) return;
@@ -85,30 +95,32 @@ export class ShareAnnotations {
     this.cleared = 0;
     this.segments.clear();
     this.cursors.clear();
-    this.notify();
+    this.notifyAll();
     this.requestHistory();
   }
   requestHistory() {
     if (this.share && !this.hydrated && this.self !== this.authority) this.transmit({ share: this.share, kind: 'request' }, this.authority);
   }
   removeParticipant(id: string) {
-    if (this.cursors.delete(id)) this.notify();
+    if (this.cursors.delete(id)) this.notifyCursors();
   }
   cursor(point: Point | null) {
     if (!this.share) return;
     if (point) this.cursors.set(this.self, point); else this.cursors.delete(this.self);
-    this.notify();
+    this.notifyCursors();
     this.transmit({ share: this.share, kind: 'cursor', point });
   }
   clear() {
     if (!this.share) return;
-    if (this.self === this.authority) this.applyClear(++this.order);
+    if (this.self === this.authority) {
+      this.applyClear(++this.order);
+      this.notifySegments();
+    }
     this.transmit({ share: this.share, kind: 'clear', cleared: this.cleared }, this.self === this.authority ? undefined : this.authority);
   }
   private applyClear(order: number) {
     this.cleared = Math.max(this.cleared, order);
     for (const [id, segment] of this.segments) if (segment.order <= this.cleared) this.segments.delete(id);
-    this.notify();
   }
   draw(a: Point, b: Point, color = DRAWING_COLORS[0]) {
     if (!this.share || !validPoint(a) || !validPoint(b) || !validColor(color)) return;
@@ -116,7 +128,7 @@ export class ShareAnnotations {
     if (this.self === this.authority) {
       segment.order = ++this.order;
       this.segments.set(segment.id, segment);
-      this.notify();
+      this.notifySegments();
     }
     this.transmit({ share: this.share, kind: 'segment', segments: [segment] }, this.self === this.authority ? undefined : this.authority);
   }
@@ -134,13 +146,17 @@ export class ShareAnnotations {
     if (packet.kind === 'clear') {
       if (this.self === this.authority) {
         this.applyClear(++this.order);
+        this.notifySegments();
         this.transmit({ share: this.share, kind: 'clear', cleared: this.cleared });
-      } else if (sender === this.authority && Number.isSafeInteger(packet.cleared) && packet.cleared! > 0) this.applyClear(packet.cleared!);
+      } else if (sender === this.authority && Number.isSafeInteger(packet.cleared) && packet.cleared! > 0) {
+        this.applyClear(packet.cleared!);
+        this.notifySegments();
+      }
     } else if (packet.kind === 'cursor') {
       if (packet.point === null) this.cursors.delete(sender);
       else if (validPoint(packet.point)) this.cursors.set(sender, packet.point);
       else return;
-      this.notify();
+      this.notifyCursors();
     } else if (packet.kind === 'segment' || (packet.kind === 'history' && sender === this.authority)) {
       if (!Array.isArray(packet.segments) || packet.segments.length > 40) return;
       if (packet.kind === 'segment' && sender !== this.authority && this.self !== this.authority) return;
@@ -158,7 +174,7 @@ export class ShareAnnotations {
         }
       }
       if (packet.kind === 'segment' && this.self === this.authority && added.length) this.transmit({ share: this.share, kind: 'segment', segments: added });
-      this.notify();
+      this.notifySegments();
     }
   }
 }

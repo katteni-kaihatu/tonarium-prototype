@@ -1,0 +1,262 @@
+{
+  "schema": 1,
+  "sdk": "tonarium-systems/1",
+  "id": "camera-trigger",
+  "version": "1.0.0",
+  "title": "카메라 촬영 트리거",
+  "description": "기존 카메라와 5초 타이머를 연결하는 시험용 시스템입니다. 클라이언트에서 request에 고유한 token을 전달하면 reset·start 출력을 순서대로 보냅니다. 타이머의 finished를 complete에 연결하세요. 완료 시 completed-token과 completed-by가 갱신되며, 사진 생성은 요청한 클라이언트가 담당합니다. 동작 중인 요청은 덮어쓰지 않고 요청자 퇴장 시 취소합니다.",
+  "license": "MIT",
+  "credits": [
+    "Tonarium contributors"
+  ],
+  "targets": {
+    "camera": {
+      "capabilities": [
+        "interact"
+      ],
+      "required": true
+    }
+  },
+  "config": {},
+  "state": {
+    "busy": {
+      "type": "boolean",
+      "default": false
+    },
+    "requester": {
+      "type": "user",
+      "default": null
+    },
+    "token": {
+      "type": "string",
+      "default": ""
+    },
+    "sequence": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 9007199254740991
+    },
+    "completed-token": {
+      "type": "string",
+      "default": ""
+    },
+    "completed-by": {
+      "type": "user",
+      "default": null
+    },
+    "deadline": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 9007199254740991
+    }
+  },
+  "inputs": {
+    "request": {
+      "payload": {
+        "token": "string"
+      }
+    },
+    "complete": {
+      "payload": {}
+    }
+  },
+  "outputs": {
+    "reset": {
+      "payload": {}
+    },
+    "start": {
+      "payload": {}
+    }
+  },
+  "handlers": {
+    "request": [
+      {
+        "op": "if",
+        "condition": {
+          "calc": "not",
+          "args": [
+            {
+              "state": "busy"
+            }
+          ]
+        },
+        "then": [
+          {
+            "op": "set",
+            "field": "requester",
+            "value": {
+              "actor": true
+            }
+          },
+          {
+            "op": "set",
+            "field": "token",
+            "value": {
+              "event": "token"
+            }
+          },
+          {
+            "op": "set",
+            "field": "sequence",
+            "value": {
+              "calc": "add",
+              "args": [
+                {
+                  "state": "sequence"
+                },
+                1
+              ]
+            }
+          },
+          {
+            "op": "set",
+            "field": "deadline",
+            "value": {
+              "calc": "add",
+              "args": [
+                {
+                  "now": true
+                },
+                5000
+              ]
+            }
+          },
+          {
+            "op": "set",
+            "field": "busy",
+            "value": true
+          },
+          {
+            "op": "emit",
+            "port": "reset",
+            "payload": {}
+          },
+          {
+            "op": "emit",
+            "port": "start",
+            "payload": {}
+          }
+        ]
+      }
+    ],
+    "complete": [
+      {
+        "op": "if",
+        "condition": {
+          "state": "busy"
+        },
+        "then": [
+          {
+            "op": "if",
+            "condition": {
+              "calc": "eq",
+              "args": [
+                {
+                  "actor": true
+                },
+                {
+                  "state": "requester"
+                }
+              ]
+            },
+            "then": [
+              {
+                "op": "if",
+                "condition": {
+                  "calc": "not",
+                  "args": [
+                    {
+                      "calc": "gt",
+                      "args": [
+                        {
+                          "state": "deadline"
+                        },
+                        {
+                          "now": true
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "then": [
+                  {
+                    "op": "set",
+                    "field": "completed-token",
+                    "value": {
+                      "state": "token"
+                    }
+                  },
+                  {
+                    "op": "set",
+                    "field": "completed-by",
+                    "value": {
+                      "state": "requester"
+                    }
+                  },
+                  {
+                    "op": "set",
+                    "field": "busy",
+                    "value": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "$leave": [
+      {
+        "op": "if",
+        "condition": {
+          "state": "busy"
+        },
+        "then": [
+          {
+            "op": "if",
+            "condition": {
+              "calc": "eq",
+              "args": [
+                {
+                  "actor": true
+                },
+                {
+                  "state": "requester"
+                }
+              ]
+            },
+            "then": [
+              {
+                "op": "set",
+                "field": "busy",
+                "value": false
+              },
+              {
+                "op": "set",
+                "field": "requester",
+                "value": null
+              },
+              {
+                "op": "set",
+                "field": "token",
+                "value": ""
+              },
+              {
+                "op": "set",
+                "field": "deadline",
+                "value": 0
+              },
+              {
+                "op": "emit",
+                "port": "reset",
+                "payload": {}
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

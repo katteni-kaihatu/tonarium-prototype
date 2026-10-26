@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { GifPlayback, type GifFrame } from './gifPlayback.ts';
+import { GIF_MAX_FRAMES, GifPlayback, gifWithinLimits, type GifFrame } from './gifPlayback.ts';
+import type { ParsedGif } from 'gifuct-js';
 
 const red = [255, 0, 0, 255];
 const green = [0, 255, 0, 255];
@@ -65,4 +66,19 @@ test('a static GIF stays visible and disposal releases the pixels and stops play
   player.dispose();
   assert.equal(player.pixels.length, 0);
   assert.equal(player.update(10000), false);
+});
+
+test('GIF limits reject oversized logical screens, frame counts and total pixels before decoding', () => {
+  const frame = (width: number, height: number) => ({ image: { descriptor: { width, height } } });
+  const gif = (width: number, height: number, frames: unknown[]) => ({ lsd: { width, height }, frames }) as unknown as ParsedGif;
+  assert.equal(gifWithinLimits(gif(480, 480, [frame(480, 480)])), true);
+  assert.equal(gifWithinLimits(gif(1024, 1024, [frame(1024, 1024)])), true);
+  assert.equal(gifWithinLimits(gif(2000, 2000, [frame(1, 1)])), false);
+  assert.equal(gifWithinLimits(gif(100, 100, Array.from({ length: GIF_MAX_FRAMES }, () => frame(100, 100)))), true);
+  assert.equal(gifWithinLimits(gif(100, 100, Array.from({ length: GIF_MAX_FRAMES + 1 }, () => frame(100, 100)))), false);
+  assert.equal(gifWithinLimits(gif(1000, 1000, Array.from({ length: 100 }, () => frame(1000, 1000)))), false);
+  assert.equal(gifWithinLimits(gif(1000, 1000, Array.from({ length: 64 }, () => frame(1000, 1000)))), true);
+  // アプリケーションブロックはフレームとして数えない
+  assert.equal(gifWithinLimits(gif(10, 10, [{ application: {} }, frame(10, 10)])), true);
+  assert.equal(gifWithinLimits(gif(10, 10, [])), false);
 });

@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "sdk": "tonarium-systems/1",
+  "id": "chair",
+  "version": "1.0.0",
+  "title": "의자",
+  "description": "선택한 참가자를 맵 오브젝트의 착석 기준점에 앉힙니다. seat에 대상 오브젝트를 연결하고 sit·stand 입력에 접속자의 user를 전달하세요. 버튼의 pressed 이벤트와도 연결할 수 있습니다.",
+  "license": "MIT",
+  "credits": [
+    "Tonarium contributors"
+  ],
+  "targets": {
+    "seat": {
+      "capabilities": [
+        "seat"
+      ],
+      "required": true
+    }
+  },
+  "config": {},
+  "state": {},
+  "inputs": {
+    "sit": {
+      "payload": {
+        "user": "user"
+      }
+    },
+    "stand": {
+      "payload": {
+        "user": "user"
+      }
+    }
+  },
+  "outputs": {},
+  "handlers": {
+    "sit": [
+      {
+        "op": "seat",
+        "target": "seat",
+        "user": {
+          "event": "user"
+        }
+      }
+    ],
+    "stand": [
+      {
+        "op": "unseat",
+        "user": {
+          "event": "user"
+        }
+      }
+    ]
+  }
+}

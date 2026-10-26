@@ -1,5 +1,7 @@
 # Electron 版
 
+自動再起動の設定、カウントダウンとキャンセル、更新後のセッション・画面状態の復元は [updates.md](updates.md) を参照。
+
 Electron 版は接続先サーバーの Web クライアントを、そのまま専用ウィンドウで開く。2D は React、3D は React Three Fiber / Three.js で、サバイバーズを含む描画・操作・音・通信は Web 版と同じコードを実行する。Avalonia／Unity による Windows／Linux ネイティブ版は廃止し、デスクトップ向けの開発・配布は Electron 版に集約した。公開済みのネイティブ版配布物は保持する。
 
 初期接続先は `https://tonarium.rheni.work/`。サーバーに配信された Web 更新は、Electron 版でも再読み込み時に反映される。Web アセットやサーバーは配布物に同梱しないため、接続にはネットワークが必要。Electron 本体は GitHub Releases のコミット別 `nightly-<コミットSHA>` から更新できる。初回起動時に更新設定を選び、以後はメニューの「アプリの更新…」から変更する。
@@ -31,7 +33,7 @@ electron/artifacts/Tonarium-Electron-0.0.8-linux-x86_64.AppImage
 初回はどちらの設定もオフで表示する。保存するまで更新確認の通信は行わない。
 
 - 「起動時に更新を確認する」: 有効なら起動時と設定保存時に更新情報を取得し、新しい版を表示する。オフでも「今すぐ確認」で手動確認できる。
-- その下の「更新を自動でダウンロードし、アプリ終了時に適用する」: 起動時確認が有効な場合に選べる。ダウンロード済みの更新は通常終了時に適用する。「再起動して更新」から即時適用もできる。通話中の強制再起動はしない。
+- その下の「更新を自動でダウンロードし、アプリ終了時に適用する」: 起動時確認が有効な場合に選べる。ダウンロード済みの更新は通常終了時に適用する。「今すぐ更新」から即時適用もできる。取得後の自動再起動は別の設定で、既定はオフ。オンの場合は通話・録音中も状態を保存して更新する。
 
 Linux AppImage と Windows NSIS でインストールしたアプリが自動適用に対応する。AppImage はユーザーが書き換えられる場所に保存する。tar.gz／展開済みLinux版とWindows ZIP版は更新の確認・通知に対応し、適用は「Releasesを開く」から手動で行う。Windows ZIP利用者が自動更新を利用するにはNSIS版をインストールする。
 
@@ -96,6 +98,8 @@ Electronの「Tonarium Electron → マイク・スピーカー…」から、�
 音声設定の単体検証は `npm run electron:test`。`electron/verification/audio-settings.cjs` はローカル設定画面の選択・保存・ページ再読込後の復元を検証します。`audio-virtual-devices.cjs` は専用PulseAudio仮想機器2組で、選択した入力ID・取得元・出力sink IDの一致を確認します。後者は仮想入力をexact指定し、音声を保存・送信・可聴再生しません。PlaywrightのElectron起動は `--no-sandbox` が付くため、OSのsandbox確認は別途 `launch.cjs` で行います。
 
 ## Nightly配布
+
+配布ページは [GitHub Releases 一覧](https://github.com/katteni-kaihatu/tonarium-prototype/releases)。Web 版のログイン画面下部から、ログインせず別タブで開けます。現在の Electron 配布物は `nightly-<コミットSHA>` の各 Release にあります。固定 `nightly` は更新用情報と過去の配布物を保持するため、初回ダウンロードの案内には一覧を使います。
 
 main更新時はLinux／Windowsの独立したジョブでビルドし、成功したOSから `nightly-<コミットSHA>` Releaseへ公開します。固定 `nightly` には自動更新の参照情報だけを上書きします。各成果物のソースコミットは対応する `.build.json` を確認してください。構成は [.github/workflows/electron-nightly.yml](../.github/workflows/electron-nightly.yml)、公開処理は [.github/scripts/publish-nightly.py](../.github/scripts/publish-nightly.py) にあります。
 

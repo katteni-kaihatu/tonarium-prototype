@@ -1,7 +1,7 @@
 import type { Ref } from 'react';
 import type { ThreeElements } from '@react-three/fiber';
 import type { Group } from 'three';
-const CAM_Y = 1.5;
+import { cameraStandSegments, DEFAULT_CAMERA_Y } from './cameraPlacement.ts';
 /** レンズは -Z 向き */
 export function CameraModel({ live, ...props }: ThreeElements['group'] & { live: boolean }) {
   return (
@@ -21,18 +21,17 @@ export function CameraModel({ live, ...props }: ThreeElements['group'] & { live:
     </group>
   );
 }
-export function CameraStand({ pitch = 0, live = false, modelRef }: { pitch?: number; live?: boolean; modelRef?: Ref<Group> }) {
+export function CameraStand({ height = DEFAULT_CAMERA_Y, pitch = 0, live = false, modelRef }: { height?: number; pitch?: number; live?: boolean; modelRef?: Ref<Group> }) {
   return <group>
-      {[0, 1, 2].map((i) => {
-        const a = (i / 3) * Math.PI * 2;
+      {cameraStandSegments(height, pitch).map((segment, i) => {
         return (
-          <mesh key={i} position={[Math.sin(a) * 0.18, CAM_Y / 2 - 0.05, Math.cos(a) * 0.18]} rotation={[Math.cos(a) * 0.15, 0, -Math.sin(a) * 0.15]}>
-            <cylinderGeometry args={[0.015, 0.015, CAM_Y - 0.1]} />
+          <mesh key={i} position={segment.position} quaternion={segment.quaternion}>
+            <cylinderGeometry args={[0.015, 0.015, segment.length]} />
             <meshStandardMaterial color="#3f3f46" />
           </mesh>
         );
       })}
-      <group ref={modelRef} position-y={CAM_Y} rotation-x={pitch}>
+      <group ref={modelRef} position-y={height} rotation-x={pitch}>
         <CameraModel live={live} />
       </group>
   </group>;

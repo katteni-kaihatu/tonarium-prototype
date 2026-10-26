@@ -1,4 +1,4 @@
-// The remote page receives only ordinary Web API adapters, never Electron IPC.
+// 接続先には機器操作と状態保存の通知だけを渡し、更新適用の権限は渡さない。
 const { contextBridge, ipcRenderer } = require('electron');
 
 function installAudioAdapter(initial) {
@@ -156,6 +156,19 @@ function installAudioAdapter(initial) {
 }
 
 if (process.isMainFrame) {
+  contextBridge.exposeInMainWorld('tonariumUpdates', Object.freeze({
+    onPrepare: (callback, abort) => {
+      const handler = (_event, id) => Promise.resolve().then(callback)
+        .then(() => ipcRenderer.send('shell:prepared-update', id, null), error => ipcRenderer.send('shell:prepared-update', id, error?.message || '状態を保存できませんでした。'));
+      ipcRenderer.on('shell:prepare-update', handler);
+      const cancelled = () => abort();
+      ipcRenderer.on('shell:update-aborted', cancelled);
+      return () => {
+        ipcRenderer.removeListener('shell:prepare-update', handler);
+        ipcRenderer.removeListener('shell:update-aborted', cancelled);
+      };
+    },
+  }));
   const config = ipcRenderer.sendSync('shell:audio-config');
   if (config) contextBridge.executeInMainWorld({ func: installAudioAdapter, args: [config] });
 }

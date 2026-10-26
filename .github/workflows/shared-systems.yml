@@ -1,0 +1,60 @@
+name: Shared system submission checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['shared-systems/**', '.github/workflows/shared-systems.yml']
+  push:
+    branches: [main]
+    paths: ['shared-systems/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: trusted
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: submission
+          persist-credentials: false
+          lfs: false
+          sparse-checkout: shared-systems
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+          path: baseline
+          persist-credentials: false
+          sparse-checkout: shared-systems
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Install trusted validator dependencies
+        working-directory: trusted
+        run: npm ci --ignore-scripts
+      - name: Validate using trusted base code
+        env:
+          CANDIDATE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+        run: node --experimental-transform-types trusted/scripts/check-system-submission.ts submission "$CANDIDATE_COMMIT" baseline "$BASE_COMMIT"
+      - name: Prepare exact merged content
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: node --experimental-transform-types trusted/scripts/systems.ts prepare submission system-bundle "$RELEASE_COMMIT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: shared-systems-${{ github.sha }}
+          path: system-bundle
+          retention-days: 7

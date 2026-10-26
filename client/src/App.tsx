@@ -1,5 +1,7 @@
 import { t as tr, useLanguage } from './i18n/index.ts';
 import { LanguageSelect } from './i18n/LanguageSelect.tsx';
+import { UpdateRecoveryNotice } from './UpdateRecoveryNotice.tsx';
+import { useUpdateDraft } from './updateDraft.ts';
 import { useMarketNavigation } from './market/navigation.ts';
 import { useEffect, useRef, useState } from 'react';
 import { useStore, set } from './store.ts';
@@ -8,7 +10,8 @@ import { iconUrl } from './icon.ts';
 import { ProfileDialog } from './Profile.tsx';
 import { HammerCursor, Lightbox } from './world/common.tsx';
 import { Home } from './home/Home.tsx';
-import { WorldScreen } from './world/WorldScreen.tsx';
+import { Toast, WorldScreen } from './world/WorldScreen.tsx';
+import { SharedSession } from './home/SharedSession.tsx';
 import { PeekMascot, type MascotHandle } from './world/Mascot.tsx';
 import { FEEDBACK_URL } from './feedback.ts';
 import { CompatOverlay, MaintenanceOverlay, UpdateBanner } from './world/ServerNotices.tsx';
@@ -41,7 +44,7 @@ function JoinScreen() {
     }, 250);
     return () => { alive = false; clearTimeout(t); };
   }, [name]);
-  const [profile, setProfile] = useState(false);
+  const [profile, setProfile] = useUpdateDraft('profile.join', false);
   const closeProfile = () => {
     setProfile(false);
     const n = name.trim();
@@ -91,6 +94,7 @@ function JoinScreen() {
           <LanguageSelect />
           <button className="primary" onClick={join}>{tr("ui12")}</button>
           <small>{tr("ui13")}</small>
+          <a className="join-download" href="https://github.com/katteni-kaihatu/tonarium-prototype/releases" target="_blank" rel="noreferrer">{tr('desktopDownload')}</a>
         </div>
       </div>
       <aside className="joinnotice" aria-label={tr("ui14")}>
@@ -118,11 +122,12 @@ export function App() {
   const joined = useStore((s) => s.joined);
   const session = useStore((s) => s.session);
   const incompatible = useStore((s) => s.incompatible);
-  if (!joined) return <JoinScreen />;
-  if (incompatible) return <CompatOverlay />;
   return (
     <>
-      {session ? <WorldScreen /> : <Home />}
+      <UpdateRecoveryNotice />
+      {!joined ? <JoinScreen /> : incompatible ? <CompatOverlay /> : session ? <WorldScreen /> : <Home />}
+      <SharedSession />
+      {!session && <Toast />}
       <Lightbox />
       <HammerCursor />
       <UpdateBanner />

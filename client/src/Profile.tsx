@@ -1,6 +1,8 @@
 import { msg, systemText, t as tr, type UiMessage } from './i18n/index.ts';
 import { LanguageSelect } from './i18n/LanguageSelect.tsx';
 import { PopupPauseSettings } from './world/NewArrivals.tsx';
+import { UpdateSettings } from './UpdateSettings.tsx';
+import { useUpdateDraft } from './updateDraft.ts';
 import { useEffect, useState } from 'react';
 import { iconUrl, pickIcon } from './icon.ts';
 import { avatarTextureUrl, uploadAvatarImage, uploadAvatarManifest } from './avatar.ts';
@@ -18,14 +20,14 @@ export function ProfileDialog({ name, onClose }: { name: string; onClose: () => 
   const [icon, setIcon] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
   const [message, setMessage] = useState<string | UiMessage>('');
-  const [bio, setBio] = useState('');
+  const [bio, setBio] = useUpdateDraft<string | null>(`profile.bio.${n}`, null);
   const loadScale = useStore((s) => s.loadScale);
   const lightweight = useStore((s) => s.lightweight);
   const mapMode = useStore((s) => s.mapMode);
   const voiceHeat = useStore((s) => s.voiceHeat);
   useEffect(() => {
     let alive = true;
-    void fetch(`/profile?name=${encodeURIComponent(n)}`).then((r) => r.json()).then((p: { bio: string }) => { if (alive) setBio(p.bio); });
+    void fetch(`/profile?name=${encodeURIComponent(n)}`).then((r) => r.json()).then((p: { bio: string }) => { if (alive) setBio(current => current ?? p.bio); });
     void fetch(iconUrl(n)).then((r) => { if (alive && r.ok) setIcon(iconUrl(n)); });
     void fetch(`/avatar?name=${encodeURIComponent(n)}&t=${Date.now()}`).then((r) => {
       if (alive && r.ok) setAvatar(String(Date.now()));
@@ -48,10 +50,11 @@ export function ProfileDialog({ name, onClose }: { name: string; onClose: () => 
         <h2>{tr('ui584', n)}</h2>
         <section><LanguageSelect /></section>
         <PopupPauseSettings />
+        <UpdateSettings />
         <div className="sub">{tr("ui47")}</div>
         <section>
           <h3>{tr("ui48")}</h3>
-          <textarea className="biofield" value={bio} maxLength={300} onChange={(e) => setBio(e.target.value)} placeholder={tr("ui49")} aria-label={tr("ui48")} />
+          <textarea className="biofield" value={bio ?? ''} maxLength={300} onChange={(e) => setBio(e.target.value)} placeholder={tr("ui49")} aria-label={tr("ui48")} />
           <div className="row end"><button onClick={() => void saveBio()}>{tr("ui50")}</button></div>
         </section>
         <section>

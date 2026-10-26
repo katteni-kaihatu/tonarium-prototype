@@ -1,3 +1,5 @@
+import { useUpdateDraft } from '../updateDraft.ts';
+import { useVoiceRecorder } from '../updateRecording.ts';
 import { t as tr, systemText } from '../i18n/index.ts';
 import { TranslatedText } from '../TranslatedText.tsx';
 import { useEffect, useRef, useState } from 'react';
@@ -183,53 +185,12 @@ function defaultPlanAt() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-async function uploadVoice(blob: Blob) {
-  try {
-    const res = await fetch('/media', { method: 'POST', body: blob });
-    const j = await res.json() as { url?: string };
-    return res.ok && j.url ? j.url : null;
-  } catch { return null; }
-}
-
-/** 押して録り始め、もう一度押すと送る。最長 60 秒 */
-function useVoiceRecorder(onDone: (url: string, sec: number) => void) {
-  const rec = useRef<{ r: MediaRecorder; started: number; timer: ReturnType<typeof setInterval> } | null>(null);
-  const [sec, setSec] = useState<number | null>(null);
-  const stop = () => rec.current?.r.state === 'recording' && rec.current.r.stop();
-  const start = async () => {
-    let stream: MediaStream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return; }
-    const r = new MediaRecorder(stream, MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : undefined);
-    const chunks: Blob[] = [];
-    const started = Date.now();
-    const timer = setInterval(() => {
-      const s = Math.floor((Date.now() - started) / 1000);
-      setSec(s);
-      if (s >= VOICE_MAX_SEC) stop();
-    }, 250);
-    r.ondataavailable = (e) => chunks.push(e.data);
-    r.onstop = async () => {
-      clearInterval(timer);
-      for (const t of stream.getTracks()) t.stop();
-      rec.current = null;
-      setSec(null);
-      const total = Math.max(1, Math.round((Date.now() - started) / 1000));
-      const url = await uploadVoice(new Blob(chunks, { type: 'audio/webm' }));
-      if (url) onDone(url, total);
-    };
-    r.start();
-    rec.current = { r, started, timer };
-    setSec(0);
-  };
-  return { recording: sec !== null, sec: sec ?? 0, toggle: () => (rec.current ? stop() : void start()) };
-}
-
 export function Composer({ conv, placeholder, allowPlan, extra }: { conv: string; placeholder: string; allowPlan?: boolean; extra?: React.ReactNode }) {
   const sessions = useStore((s) => s.guild.sessions);
-  const [text, setText] = useState('');
-  const [plan, setPlan] = useState<{ at: string; session: string } | null>(null);
+  const [text, setText] = useUpdateDraft(`message.${conv}`, '');
+  const [plan, setPlan] = useUpdateDraft<{ at: string; session: string } | null>(`plan.${conv}`, null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const voice = useVoiceRecorder((url, sec) => sendMessage(conv, { text: '', voice: { url, sec } }));
+  const voice = useVoiceRecorder(conv);
   const planAt = plan ? new Date(plan.at).getTime() : NaN;
   const submit = (e?: React.FormEvent) => {
     e?.preventDefault();

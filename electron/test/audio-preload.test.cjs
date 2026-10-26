@@ -29,7 +29,7 @@ function harness(initial = {}) {
     require: name => {
       assert.equal(name, 'electron');
       return {
-        contextBridge: { executeInMainWorld: ({ func, args }) => func(...args) },
+        contextBridge: { executeInMainWorld: ({ func, args }) => func(...args), exposeInMainWorld: (name, value) => { sandbox[name] = value; } },
         ipcRenderer: { sendSync: name => { assert.equal(name, 'shell:audio-config'); return initial; } },
       };
     },

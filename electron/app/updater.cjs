@@ -11,7 +11,7 @@ function releaseUrl(value) {
 }
 const FEED_URL = 'https://github.com/katteni-kaihatu/tonarium-prototype/releases/download/nightly/';
 
-function createUpdateController({ app, autoUpdater, onChange = () => {}, onNeedsConfiguration = () => {}, platform = process.platform, env = process.env, fetch: fetchUpdate = globalThis.fetch, buildConfigPath = path.join(__dirname, 'update-build.json') }) {
+function createUpdateController({ app, autoUpdater, onChange = () => {}, onNeedsConfiguration = () => {}, beforeInstall = async () => {}, onInstallAborted = () => {}, now = Date.now, platform = process.platform, env = process.env, fetch: fetchUpdate = globalThis.fetch, buildConfigPath = path.join(__dirname, 'update-build.json') }) {
   let build = {};
   try { build = JSON.parse(fs.readFileSync(buildConfigPath, 'utf8')); } catch { /* 開発・旧配布版は更新を無効にする。 */ }
   const available = app.isPackaged === true && build.enabled === true && build.channel === 'nightly';
@@ -26,19 +26,28 @@ function createUpdateController({ app, autoUpdater, onChange = () => {}, onNeeds
       preferences = { checkOnStartup: saved.checkOnStartup, autoInstall: saved.checkOnStartup && saved.autoInstall };
     }
   } catch { /* 未設定や破損した設定では自動通信しない。 */ }
+  let restart = { autoRestart: false, restartSeconds: 5 };
+  try {
+    const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    restart = { autoRestart: supported && preferences.checkOnStartup === true && saved.autoRestart === true,
+      restartSeconds: Number.isInteger(saved.restartSeconds) && saved.restartSeconds >= 1 && saved.restartSeconds <= 300 ? saved.restartSeconds : 5 };
+  } catch { /* 初期値を使う。 */ }
+  let deadline = null;
+  let restartTimer;
+  let installing = false;
+  const seenVersions = new Set();
   const reason = !available ? 'このビルドでは自動更新を利用できません。' : !supported ? 'この配布形式は自動更新に対応していません。リリースページから更新してください。' : '';
   let current = { status: !available ? 'disabled' : !canCheck ? 'unsupported' : 'idle', version: app.getVersion(), updateVersion: null, downloadedVersion: null, progress: null, error: null, releaseUrl: RELEASE_URL };
   let updater;
   let checking;
   let cancellationToken;
   let downloading = false;
-  let rearmDownload = false;
   let started = false;
   let disposed = false;
   const listeners = [];
 
   function state() {
-    return { ...current, ...preferences, available, supported, canCheck, reason, needsConfiguration: preferences.checkOnStartup === null };
+    return { ...current, ...preferences, ...restart, deadline, installing, available, supported, canCheck, reason, needsConfiguration: preferences.checkOnStartup === null };
   }
   function publish(change = {}) {
     if (disposed) return;
@@ -50,8 +59,9 @@ function createUpdateController({ app, autoUpdater, onChange = () => {}, onNeeds
   }
   function applyPreferences() {
     if (!updater) return;
-    updater.autoDownload = supported && preferences.checkOnStartup === true && preferences.autoInstall;
-    updater.autoInstallOnAppQuit = updater.autoDownload;
+    updater.autoDownload = supported && (deadline !== null || (preferences.checkOnStartup === true && (preferences.autoInstall || restart.autoRestart)));
+    // 終了時も状態保存と適用ロックを通し、updater 自身の終了フックとの二重実行を防ぐ。
+    updater.autoInstallOnAppQuit = false;
   }
   function getUpdater() {
     if (updater) return updater;
@@ -65,13 +75,22 @@ function createUpdateController({ app, autoUpdater, onChange = () => {}, onNeeds
     applyPreferences();
     const listen = (event, handler) => { updater.on(event, handler); listeners.push([event, handler]); };
     listen('checking-for-update', () => publish({ status: 'checking', error: null, progress: null }));
-    listen('update-available', info => publish({ status: 'available', updateVersion: info.version, releaseUrl: releaseUrl(info.releaseUrl), error: null }));
+    listen('update-available', info => {
+      publish({ status: 'available', updateVersion: info.version, releaseUrl: releaseUrl(info.releaseUrl), error: null });
+    });
     listen('update-not-available', info => publish({ status: current.downloadedVersion ? 'downloaded' : 'not-available', releaseUrl: current.downloadedVersion ? current.releaseUrl : releaseUrl(info?.releaseUrl), error: null }));
     listen('download-progress', progress => publish({ status: 'downloading', progress: Math.max(0, Math.min(100, Number(progress.percent) || 0)) }));
     listen('update-downloaded', info => {
       cancellationToken = undefined;
       applyPreferences();
       publish({ status: 'downloaded', updateVersion: info.version, downloadedVersion: info.version, releaseUrl: releaseUrl(info.releaseUrl), progress: 100, error: null });
+      if (!seenVersions.has(info.version)) {
+        seenVersions.add(info.version);
+        if (deadline === null && restart.autoRestart) deadline = now() + restart.restartSeconds * 1000;
+      }
+      if (deadline !== null) armRestart();
+      applyPreferences();
+      publish();
     });
     listen('update-cancelled', () => { cancellationToken = undefined; publish({ status: current.downloadedVersion ? 'downloaded' : current.updateVersion ? 'available' : 'idle', progress: null }); });
     listen('error', failure);
@@ -86,19 +105,21 @@ function createUpdateController({ app, autoUpdater, onChange = () => {}, onNeeds
       throw new Error('自動適用には起動時の更新確認を有効にしてください。');
     }
     const next = { checkOnStartup: value.checkOnStartup, autoInstall: value.autoInstall };
+    const nextRestart = { autoRestart: Object.hasOwn(value, 'autoRestart') ? value.autoRestart : restart.autoRestart,
+      restartSeconds: Object.hasOwn(value, 'restartSeconds') ? value.restartSeconds : restart.restartSeconds };
+    if (typeof nextRestart.autoRestart !== 'boolean' || !Number.isInteger(nextRestart.restartSeconds) || nextRestart.restartSeconds < 1 || nextRestart.restartSeconds > 300) throw new Error('待機時間は1～300秒の整数で指定してください。');
+    if (nextRestart.autoRestart && (!supported || !next.checkOnStartup)) throw new Error('自動更新には対応形式と起動時の更新確認が必要です。');
     fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
     const temporary = `${settingsPath}.${process.pid}.tmp`;
     try {
-      fs.writeFileSync(temporary, JSON.stringify(next, null, 2), { mode: 0o600 });
+      fs.writeFileSync(temporary, JSON.stringify({ ...next, ...nextRestart }, null, 2), { mode: 0o600 });
       fs.chmodSync(temporary, 0o600);
       fs.renameSync(temporary, settingsPath);
     } finally { try { fs.unlinkSync(temporary); } catch { /* rename 後は存在しない。 */ } }
-    // A completion racing with OFF may not register the updater's quit hook.
-    // Re-check the cached download after re-enabling so its public completion path re-arms it.
-    if (next.autoInstall && !preferences.autoInstall && current.downloadedVersion) rearmDownload = true;
     preferences = next;
+    restart = nextRestart;
     applyPreferences();
-    if (!next.autoInstall) cancellationToken?.cancel();
+    if (!next.autoInstall && !restart.autoRestart && deadline === null) cancellationToken?.cancel();
     publish();
     return state();
   }
@@ -106,8 +127,8 @@ function createUpdateController({ app, autoUpdater, onChange = () => {}, onNeeds
   function check() {
     if (disposed || !canCheck) return Promise.resolve(state());
     if (checking) return checking;
-    // 完了済みの更新は保持し、重複ダウンロードを避ける。
-    if (downloading || current.status === 'downloading' || (current.downloadedVersion && !rearmDownload)) return Promise.resolve(state());
+    // 取得中の重複確認は止め、完了後はさらに新しい更新を確認できるようにする。
+    if (downloading || current.status === 'downloading') return Promise.resolve(state());
     checking = Promise.resolve().then(async () => {
       try {
         publish({ status: 'checking', error: null });
@@ -125,11 +146,10 @@ function createUpdateController({ app, autoUpdater, onChange = () => {}, onNeeds
           publish({ status: newer ? 'available' : 'not-available', updateVersion: newer ? info.version : null, releaseUrl: releaseUrl(info.releaseUrl), error: null });
           return state();
         }
-        rearmDownload = false;
         const result = await getUpdater().checkForUpdates();
         if (disposed) return state();
         cancellationToken = result?.cancellationToken;
-        if (!preferences.autoInstall) cancellationToken?.cancel();
+        if (!preferences.autoInstall && !restart.autoRestart && deadline === null) cancellationToken?.cancel();
         if (result?.downloadPromise) {
           downloading = true;
           // ダウンロードは更新確認の Promise と別に失敗する。
@@ -142,13 +162,42 @@ function createUpdateController({ app, autoUpdater, onChange = () => {}, onNeeds
     return checking;
   }
 
-  function install() {
-    if (disposed || !supported || !current.downloadedVersion) return false;
+  function install(restartAfter = true) {
+    if (disposed || installing || !supported || !current.downloadedVersion || current.updateVersion !== current.downloadedVersion) return false;
     try {
-      getUpdater().quitAndInstall(false, true);
+      installing = true;
+      clearTimeout(restartTimer); deadline = null;
+      getUpdater().autoInstallOnAppQuit = false;
+      publish();
+      getUpdater().quitAndInstall(false, restartAfter);
       return true;
-    } catch (error) { failure(error); return false; }
+    } catch (error) { installing = false; applyPreferences(); failure(error); return false; }
   }
+
+  let preparing = false;
+  let preparationEpoch = 0;
+  async function prepareAndInstall(restartAfter = true) {
+    if (preparing || installing || disposed) return false;
+    if (!supported || !current.downloadedVersion || current.updateVersion !== current.downloadedVersion) return false;
+    preparing = true;
+    const epoch = preparationEpoch;
+    try {
+      await beforeInstall();
+      const installed = epoch === preparationEpoch && install(restartAfter);
+      if (!installed) onInstallAborted();
+      return installed;
+    }
+    catch (error) { onInstallAborted(); cancelRestart(); failure(error); return false; }
+    finally { preparing = false; }
+  }
+  function armRestart() {
+    clearTimeout(restartTimer);
+    restartTimer = setTimeout(() => {
+      if (current.updateVersion === current.downloadedVersion) void prepareAndInstall();
+    }, Math.max(0, deadline - now()));
+    restartTimer.unref?.();
+  }
+  function cancelRestart() { preparationEpoch++; clearTimeout(restartTimer); deadline = null; applyPreferences(); publish(); }
 
   async function start() {
     if (started || disposed) return state();
@@ -166,6 +215,7 @@ function createUpdateController({ app, autoUpdater, onChange = () => {}, onNeeds
   function dispose() {
     if (disposed) return;
     disposed = true;
+    clearTimeout(restartTimer);
     if (updater) {
       updater.autoDownload = false;
       updater.autoInstallOnAppQuit = false;
@@ -174,7 +224,7 @@ function createUpdateController({ app, autoUpdater, onChange = () => {}, onNeeds
     }
   }
 
-  return { state, configure, check, install, start, dispose };
+  return { state, configure, check, install, prepareAndInstall, cancelRestart, start, dispose };
 }
 
 module.exports = { createUpdateController, RELEASE_URL, FEED_URL };

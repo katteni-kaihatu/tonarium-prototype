@@ -131,6 +131,27 @@ test('late subscription retries until the authority is ready, and rejects invali
   assert.equal(host.snapshot().cursors.size, 0);
 });
 
+test('cursor moves keep the segments snapshot identity; segment changes keep the cursors identity', () => {
+  const network = viewers();
+  const host = network.join('host');
+  const alice = network.join('alice');
+  network.flush();
+  alice.draw({ x: 0, y: 0 }, { x: 1, y: 1 });
+  alice.cursor({ x: 0.2, y: 0.8 });
+  network.flush();
+  const segments = host.snapshot().segments;
+  const cursors = host.snapshot().cursors;
+  alice.cursor({ x: 0.3, y: 0.7 });
+  network.flush();
+  assert.equal(host.snapshot().segments, segments);
+  assert.notEqual(host.snapshot().cursors, cursors);
+  const movedCursors = host.snapshot().cursors;
+  alice.draw({ x: 0.1, y: 0.1 }, { x: 0.2, y: 0.2 });
+  network.flush();
+  assert.equal(host.snapshot().cursors, movedCursors);
+  assert.notEqual(host.snapshot().segments, segments);
+});
+
 test('coordinates use the actual video area for landscape, portrait, square and resized hosts', () => {
   for (const [w, h, vw, vh] of [[800, 600, 1920, 1080], [300, 900, 1920, 1080], [900, 400, 1080, 1920], [500, 500, 500, 500]]) {
     const rect = videoRect(w, h, vw, vh);

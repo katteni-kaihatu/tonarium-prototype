@@ -16,9 +16,11 @@ export function run(cwd = process.cwd(), args = process.argv.slice(2)) {
     const { values } = parseArgs({ args, options: { base: { type: 'string' } }, allowPositionals: false });
     const git = (...argv) => execFileSync('git', argv, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
     const baseRef = values.base ?? process.env.CHANGELOG_BASE;
+    // 作業ブランチは develop から切るので、develop にだけある他人の履歴を自分の新規に数えないよう develop と比べる
+    const hasDevelop = () => { try { git('rev-parse', '--verify', '--quiet', 'refs/remotes/origin/develop'); return true; } catch { return false; } };
     const base = baseRef
       ? git('rev-parse', '--verify', '--end-of-options', `${baseRef}^{commit}`)
-      : git('merge-base', 'HEAD', 'origin/main');
+      : git('merge-base', 'HEAD', hasDevelop() ? 'origin/develop' : 'origin/main');
     const before = git('show', `${base}:${changelogPath}`);
     const after = readFileSync(resolve(cwd, changelogPath), 'utf8');
     if (JSON.stringify(parseChangelog(before)) !== JSON.stringify(parseChangelog(after))) checkChangelog(before, after);

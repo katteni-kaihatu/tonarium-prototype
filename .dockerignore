@@ -1,5 +1,7 @@
 node_modules
 client/dist
+system-bundle
+.local
 data
 .env
 .git
