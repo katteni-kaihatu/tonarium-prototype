@@ -3,6 +3,10 @@
 .hseg { display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(38, 38, 46, .08); }
 .hseg button { flex: 1; min-width: 0; height: 32px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 700; gap: 4px; }
 .hseg button.on { background: #fff; color: var(--accent); box-shadow: 0 1px 3px rgba(40, 30, 10, .18); }
+.hclient .hseg { flex-wrap: wrap; }
+.hclient .hseg button { flex: 0 0 calc((100% - 4px) / 3); min-width: min-content; }
+.hclient .hseg button:last-child { flex-grow: 1; }
+.hclient .hseg button > svg { flex-shrink: 0; }
 .hleave { color: var(--danger); margin-bottom: 4px; }
 .hfeedback { display: flex; align-items: center; text-decoration: none; color: var(--muted2); white-space: nowrap; }
 .hfeedback svg:last-child { margin-left: auto; opacity: .6; }
