@@ -1,0 +1,12 @@
+.fr-civic details { border-top: 1px solid var(--fr-line, #d8ddcc); margin-top: 12px; padding-top: 10px; }
+.fr-civic summary { cursor: pointer; color: var(--fr-ink, #3d5749); font-size: 13px; }
+.fr-civic p { font-size: 12px; line-height: 1.7; }
+.fr-civic .fr-btn { margin: 4px 3px 4px 0; white-space: normal; }
+.fr-civic-news p + p { border-top: 1px dashed var(--fr-line, #d8ddcc); padding-top: 8px; }
+.fr-civic-npc { padding: 9px 0; border-bottom: 1px solid var(--fr-line, #d8ddcc); }
+.fr-civic-npc b { display: block; font-size: 13px; }
+.fr-civic-npc small { display: block; opacity: .75; font-size: 11px; margin-top: 4px; }
+.fr-civic-factions { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; }
+.fr-civic label { display: grid; gap: 6px; font-size: 12px; margin: 8px 0; }
+.fr-civic select { min-width: 0; max-width: 100%; padding: 8px; background: transparent; color: inherit; border: 1px solid var(--fr-line, #d8ddcc); border-radius: 6px; }
+.fr-civic-confirm { border: 1px solid var(--fr-line, #d8ddcc); background: var(--fr-paper, #fbf9ef); padding: 12px; margin-top: 10px; border-radius: 8px; }

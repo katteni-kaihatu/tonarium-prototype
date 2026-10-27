@@ -35,7 +35,7 @@ test('live kokosync: initial canvas, deltas, private delivery, independent media
   await writeFile(path.join(data, 'sessions.json'), JSON.stringify({ name: 'test', sessions }));
   await writeFile(path.join(data, 'items.json'), JSON.stringify({ 'sync-test': [canvas] }));
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
-    env: { ...process.env, SERVER_PORT: String(port), DATA_DIR: data, SESSIONS_FILE: path.join(data, 'sessions.json'), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' }, stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: data, SESSIONS_FILE: path.join(data, 'sessions.json'), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = '';
   child.stdout.on('data', (chunk) => { logs += chunk; });
