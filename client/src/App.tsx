@@ -3,8 +3,8 @@ import { LanguageSelect } from './i18n/LanguageSelect.tsx';
 import { UpdateRecoveryNotice } from './UpdateRecoveryNotice.tsx';
 import { useUpdateDraft } from './updateDraft.ts';
 import { useMarketNavigation } from './market/navigation.ts';
-import { useEffect, useRef, useState } from 'react';
-import { useStore, set } from './store.ts';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { useStore, set, get } from './store.ts';
 import { connectWs } from './net/ws.ts';
 import { iconUrl } from './icon.ts';
 import { ProfileDialog } from './Profile.tsx';
@@ -16,6 +16,19 @@ import { PeekMascot, type MascotHandle } from './world/Mascot.tsx';
 import { FEEDBACK_URL } from './feedback.ts';
 import { CompatOverlay, MaintenanceOverlay, UpdateBanner } from './world/ServerNotices.tsx';
 import { XRControls } from './xr/XRControls.tsx';
+
+const NpcPrototype = lazy(() => import('./world/NpcChat.tsx').then((m) => ({ default: m.NpcPrototype })));
+const FantasyPlaytest = lazy(() => import('./world/FantasyPlaytest.tsx').then((m) => ({ default: m.FantasyPlaytest })));
+
+function startNpcPrototype() {
+  if (get().joined) return;
+  let name = 'Traveler';
+  try { name = localStorage.getItem('tonarium.name')?.trim() || name; } catch {}
+  const id = loadId();
+  set({ selfId: id, selfName: name, joined: true });
+  useStore.getState().adBindTonarium(id, name);
+  connectWs();
+}
 
 function loadId() {
   try {
@@ -122,10 +135,14 @@ export function App() {
   const joined = useStore((s) => s.joined);
   const session = useStore((s) => s.session);
   const incompatible = useStore((s) => s.incompatible);
+  const params = new URLSearchParams(location.search);
   return (
     <>
       <UpdateRecoveryNotice />
-      {!joined ? <JoinScreen /> : incompatible ? <CompatOverlay /> : session ? <WorldScreen /> : <Home />}
+      {params.get('npc') === '1' && !incompatible ? <Suspense fallback={null}><NpcPrototype onStart={startNpcPrototype} /></Suspense>
+        : !joined ? <JoinScreen /> : incompatible ? <CompatOverlay />
+        : params.get('rpg') === '1' ? <Suspense fallback={null}><FantasyPlaytest /></Suspense>
+        : session ? <WorldScreen /> : <Home />}
       <SharedSession />
       {!session && <Toast />}
       <Lightbox />

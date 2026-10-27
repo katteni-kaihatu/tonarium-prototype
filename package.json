@@ -44,7 +44,7 @@
     "test:content-translations": "tsx --test server/content-translations.test.ts server/content-translation-config.test.ts server/content-translation-sources.test.ts server/content-translations.integration.test.ts client/src/content-translations.test.tsx",
     "test:chess": "tsx --test shared/chess.test.ts server/chess-ai.test.ts",
     "test:sync": "tsx --test shared/session-wire.test.ts shared/session-position.test.ts shared/session-events.test.ts server/ws-heartbeat.test.ts server/thumbnails.test.ts",
-    "test:client": "tsx --test client/src/newArrival.test.ts client/src/world/popoverPosition.test.ts client/src/sessionView.test.ts client/src/nearby.test.ts client/src/voiceHeat.test.ts client/src/placesMemo.test.ts client/src/home/changelog.test.ts client/src/homePage.test.ts client/src/i18n/locale.test.ts client/src/i18n/core.test.ts",
+    "test:client": "tsx --test client/src/newArrival.test.ts client/src/world/popoverPosition.test.ts client/src/sessionView.test.ts client/src/nearby.test.ts client/src/voiceHeat.test.ts client/src/placesMemo.test.ts client/src/home/changelog.test.ts client/src/homePage.test.ts client/src/i18n/locale.test.ts client/src/i18n/core.test.ts client/src/world/chat-scroll.test.ts client/src/world/fantasy-gm-history.test.ts client/src/world/npc-request-tracker.test.ts client/src/world/fantasy-messenger-position.test.ts client/src/world/npc-portraits.test.ts client/src/world/fantasy-action-help.test.ts client/src/world/npc-illustrations.test.ts client/src/world/fantasy-account.test.ts client/src/world/fantasy-account-state.test.ts",
     "test:i18n": "tsx --test client/src/i18n/locale.test.ts client/src/i18n/core.test.ts client/src/systems/localization.test.tsx",
     "test:translation": "tsx --test server/translation.test.ts client/src/translation.test.ts client/src/TranslatedText.test.tsx server/translation.integration.test.ts",
     "test:session-actions": "node --experimental-test-module-mocks --test client/src/actions.test.mjs client/src/net/ws.test.mjs",
@@ -64,26 +64,35 @@
     "test:hammer": "tsx --test server/hammer.test.ts",
     "test:bike": "tsx --test shared/vehicle.test.ts client/src/view3d/bikePhysics.test.ts",
     "test:survivor": "tsx --test shared/survivor.test.ts server/survivors.test.ts",
-    "test:timeline": "tsx --test shared/timeline.test.ts server/follows.test.ts server/timeline.test.ts"
+    "test:timeline": "tsx --test shared/timeline.test.ts server/follows.test.ts server/timeline.test.ts",
+    "test:fantasy": "tsx --test shared/fantasy.test.ts shared/fantasy-life.test.ts shared/fantasy-town.test.ts shared/fantasy-gm.test.ts server/fantasy-store.test.ts server/fantasy-clock.test.ts shared/fantasy-access.test.ts shared/fantasy-gm-knowledge.test.ts shared/fantasy-gm-context.test.ts shared/fantasy-starting-kit.test.ts server/fantasy-gm-chat.test.ts shared/fantasy-effects.test.ts shared/fantasy-items-expansion.test.ts shared/fantasy-mana.test.ts shared/fantasy-reputation.test.ts server/fantasy-community.test.ts shared/fantasy-approved-content.test.ts shared/fantasy-approved-dialogue.test.ts shared/fantasy-profession-production.test.ts server/fantasy-priest-migration.test.ts shared/fantasy-progression.test.ts shared/fantasy-equipment.test.ts shared/fantasy-gathering.test.ts shared/fantasy-mortality.test.ts shared/fantasy-dice.test.ts shared/fantasy-domain-integration.test.ts shared/fantasy-birth.test.ts shared/fantasy-terrain.test.ts shared/fantasy-specializations.test.ts server/fantasy-contracts.test.ts server/fantasy-integration.test.ts shared/fantasy-world-ui.test.ts server/fantasy-bargaining.test.ts server/fantasy-conversation-actions.test.ts server/fantasy-conversation-ws.test.ts shared/fantasy-work.test.ts shared/fantasy-prayer.test.ts shared/fantasy-sales.test.ts server/fantasy-test-reset.test.ts server/fantasy-test-reset-ws.test.ts shared/fantasy-library-immersion.test.ts shared/fantasy-settlement-expansion.test.ts shared/fantasy-settlement-quests.test.ts shared/fantasy-main-trials.test.ts shared/fantasy-main-story.test.ts shared/fantasy-main-guidance.test.ts shared/fantasy-task-progress.test.ts shared/fantasy-encounters.test.ts shared/fantasy-camping.test.ts shared/fantasy-travel-contracts.test.ts server/fantasy-gate-migration.test.ts shared/fantasy-isle-access.test.ts shared/fantasy-voyage-ending.test.ts shared/fantasy-voyage-dialogue.test.ts shared/fantasy-voyage-scenes.test.ts shared/fantasy-voyage-decisions.test.ts shared/fantasy-voyage-immersion.test.ts shared/fantasy-party-balance.test.ts server/fantasy-party.test.ts shared/fantasy-combat.test.ts shared/fantasy-combat-catalog.test.ts shared/fantasy-combat-loot.test.ts shared/fantasy-combat-challenges.test.ts server/fantasy-combat-integration.test.ts shared/fantasy-property.test.ts server/fantasy-property-store.test.ts shared/fantasy-priest-growth.test.ts shared/fantasy-combat-tactics.test.ts shared/fantasy-party-vault.test.ts server/fantasy-party-expansion.test.ts shared/fantasy-job-paths.test.ts shared/fantasy-job-discovery.test.ts shared/fantasy-career-privacy.test.ts shared/fantasy-priest-combat.test.ts shared/fantasy-combat-branch.test.ts shared/fantasy-economy.test.ts shared/fantasy-civics.test.ts shared/fantasy-property-extensions.test.ts shared/fantasy-escort-battle.test.ts server/fantasy-realm-integration.test.ts server/fantasy-property-dialogue.test.ts server/fantasy-conversation-market.test.ts server/fantasy-escort-integration.test.ts server/fantasy-realm-ws.test.ts",
+    "test:npc": "tsx --test server/npc.test.ts server/local-inference.test.ts server/npc-facility.test.ts server/npc-settlement-expansion.test.ts server/dialogue-stream.test.ts server/npc-voice.test.ts server/dialogue-prewritten.test.ts server/dialogue-knowledge.test.ts server/dialogue-dynamic.test.ts shared/fantasy-npc-preferences.test.ts server/npc-info-speech.test.ts server/npc-persona-lines.test.ts server/npc-routing.test.ts server/dialogue-quality.test.ts",
+    "test:browser-ai": "tsx --test server/browser-ai.test.ts server/browser-ai-integration.test.ts server/browser-ai-resource-fallback.test.ts server/browser-ai-pool.test.ts server/browser-ai-peer-context.test.ts server/browser-ai-sharing-integration.test.ts client/src/ai/cache.test.ts client/src/ai/browser-ai.worker.test.ts client/src/ai/worker-client.test.ts client/src/ai/resource-policy.test.ts",
+    "test:career": "node scripts/test-fantasy-career.cjs",
+    "test:fantasy-accounts": "tsx --test server/fantasy-accounts.test.ts server/fantasy-account-ws.test.ts server/fantasy-backups.test.ts server/fantasy-legacy-owner.test.ts server/fantasy-world-switch-ws.test.ts",
+    "fantasy:backup": "tsx scripts/fantasy-backup.ts",
+    "fantasy:account-admin": "tsx scripts/fantasy-account-admin.ts",
+    "test:fantasy-diagnostics": "tsx --test server/fantasy-diagnostics.test.ts server/fantasy-play-observer.test.ts server/fantasy-dialogue-observer.test.ts server/static-files.test.ts",
+    "fantasy:diagnostics": "tsx scripts/fantasy-diagnostics.ts"
   },
   "dependencies": {
+    "@mlc-ai/web-llm": "0.2.86",
     "@msgpack/msgpack": "^3.1.3",
     "@noble/hashes": "^2.4.0",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "chess.js": "^1.4.0",
     "dotenv": "^18.0.8",
-    "gifuct-js": "^2.1.2",
     "livekit-client": "^2.23.0",
     "livekit-server-sdk": "^2.19.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "three": "^0.186.1",
     "ws": "^8.22.0",
-    "zustand": "^5.0.15"
+    "zustand": "^5.0.15",
+    "gifuct-js": "^2.1.2"
   },
   "devDependencies": {
-    "sharp": "0.35.5",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
@@ -93,6 +102,8 @@
     "concurrently": "^10.0.6",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vite": "^8.3.4"
+    "vite": "^8.3.4",
+    "esbuild": "0.28.2",
+    "sharp": "0.35.5"
   }
 }

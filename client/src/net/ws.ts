@@ -1,4 +1,5 @@
 import { arrivalPatch } from '../newArrival.ts';
+import { setAiSupportTransport, handleAiSupportMessage } from '../ai/support.ts';
 import { sourceText as uiSource } from '../i18n/core.ts';
 import { receiveShared } from '../shared-assets/state.ts';
 import { useSharedAssets } from '../shared-assets/state.ts';
@@ -9,6 +10,9 @@ import { COMPAT_VERSION, isRoomClientMsg, type ClientMsg, type ServerMsg, type S
 import type { SurvivorState } from '../../../shared/survivor.ts';
 import { applyAvatars } from '../sessionView.ts';
 import { get, recompute, set, spawnPoint } from '../store.ts';
+import { fantasyAccountDisconnected, fantasyAccountIdentityUpdate, fantasyPrivateMessagesAllowed, fantasyReconnectIdentity } from '../world/fantasy-account-state.ts';
+import { appendFantasyGmResponse, clearFantasyGmLife, fantasyGmRequestOwner } from '../world/fantasy-gm-history.ts';
+import { clearNpcRequests, consumeNpcRequest, npcRequestOwner } from '../world/npc-request-tracker.ts';
 
 const selfBusy = () => get().users.find((u) => u.id === get().selfId)?.status === 'busy';
 import { applyDelta } from '../items/actions.ts';
@@ -56,7 +60,8 @@ export function connectWs() {
     retry = 0;
     set({ wsConnected: true, wsReady: false });
     const s = get();
-    send({ t: 'hello', id: s.selfId, name: s.selfName, compat: COMPAT_VERSION });
+    send({ t: 'hello', id: fantasyReconnectIdentity(s), name: s.selfName, compat: COMPAT_VERSION });
+    setAiSupportTransport(send, true);
     if (s.session) {
       send({ t: 'join', sid: s.session });
       // ホームの再接続後は、参加資格と部屋の状態も取り直す。
@@ -68,8 +73,16 @@ export function connectWs() {
     for (const request of sessionRequests.values()) request.reject(new Error(uiSource('ui471')));
     console.warn('[home-ws] closed', { code: event.code, reason: event.reason, wasClean: event.wasClean,
       connectedSeconds: openedAt ? Math.round((performance.now() - openedAt) / 1000) : 0 });
+    setAiSupportTransport(send, false);
     stopSessionSync(true);
-    set({ wsConnected: false, wsReady: false });
+    const current = get();
+    const accountReset = current.fantasyAccount || current.fantasyHomeId || current.session && current.worldBy[current.session] === 'fantasy'
+      ? fantasyAccountDisconnected(current)
+      : { fantasyAccount: null, fantasyAccountReady: false, fantasyAccountError: null };
+    set({ wsConnected: false, wsReady: false, fantasyRealm: null, fantasyRealmPending: false, fantasyRealmError: null, dialogueProgress: {}, fantasyPending: false, fantasyTestResetAllowed: false, fantasyParty: null, fantasyPartyError: null, fantasyPartyPending: false, fantasyProperties: null, fantasyPropertyError: null, fantasyPropertyPending: false, fantasyCombat: null, fantasyCombatError: null, fantasyCombatPending: false, ...accountReset });
+    if (get().npcPending) set({ npcPending: false, npcRequestId: null, npcError: 'unavailable', npcErrorContext: null });
+    if (get().gmPending) set({ gmPending: false, gmRequestId: null, gmError: 'unavailable', gmErrorLocale: null });
+    if (get().communityPending) set({ communityPending: false, communityError: 'unavailable' });
     if (get().session) set({ sync: 'unavailable', syncError: uiSource('ui472') });
     // 互換性バージョン違いで断たれた場合はつなぎ直しても結果が同じなので、再接続しない
     if (!get().incompatible) setTimeout(connectWs, Math.min(5000, 500 * 2 ** retry++));
@@ -142,7 +155,26 @@ export function applySessionSnapshot(snap: SessionSnapshot) {
 }
 
 export function onMessage(msg: ServerMsg) {
+  if (msg.t === 'aiSupportJob' || msg.t === 'aiSupportCancel') { handleAiSupportMessage(msg); return; }
+  if (['fantasyProfile', 'fantasyLegacies', 'fantasyContractBoard', 'fantasyPartyState', 'fantasyRealmState', 'fantasyPropertyState', 'fantasyCombatState', 'communityState', 'fantasyDialogueChunk', 'fantasyGmReply'].includes(msg.t) && !fantasyPrivateMessagesAllowed(get())) return;
   switch (msg.t) {
+    case 'fantasyAccountState': {
+      const previous = get(), next = fantasyAccountIdentityUpdate(previous, msg);
+      if (next.changed) stopSessionSync();
+      set(next.patch);
+      recompute();
+      if (next.changed && get().session && get().wsConnected) {
+        startSessionSync();
+        if (get().voice !== 'off') {
+          const sid = get().session!, id = get().selfId;
+          void import('./livekit.ts').then(({ connectVoice }) => {
+            const current = get();
+            if (current.session === sid && current.selfId === id && current.wsConnected && current.voice !== 'off') return connectVoice(sid);
+          });
+        }
+      }
+      return;
+    }
     case 'systemState':
       if (msg.sid === get().session) {
         receiveSystems(msg.sid, msg.view, msg.error);
@@ -284,6 +316,64 @@ export function onMessage(msg: ServerMsg) {
       return;
     case 'survivorProfile':
       set({ survivorProfile: msg.profile });
+      return;
+    case 'fantasyProfile':
+      if (get().fantasyProfile && (get().fantasyProfile!.generation ?? 1) !== (msg.profile.generation ?? 1)) {
+        clearFantasyGmLife(get().selfId);
+        clearNpcRequests(get().selfId);
+        set({ fantasyRealm: null, fantasyRealmPending: false, fantasyRealmError: null, dialogueProgress: {}, fantasyProperties: null, fantasyPropertyError: null, fantasyPropertyPending: false, fantasyCombat: null, fantasyCombatError: null, fantasyCombatPending: false, gmReply: null, gmPending: false, gmRequestId: null, gmError: null, gmErrorLocale: null,
+          npcMessages: [], npcPending: false, npcRequestId: null, npcError: null, npcErrorContext: null, npcRelationships: {} });
+      }
+      set({ fantasyProfile: msg.profile, fantasyError: msg.error ?? null, fantasyPending: false });
+      return;
+    case 'fantasyTestMode':
+      set({ fantasyTestResetAllowed: msg.enabled === true });
+      return;
+    case 'fantasyLegacies':
+      set({ fantasyLegacies: msg.records });
+      return;
+    case 'fantasyContractBoard':
+      set({ fantasyContractBoard: msg.board, fantasyContractError: msg.error ?? null });
+      return;
+    case 'fantasyClock':
+      set({ fantasyClock: msg.clock });
+      return;
+    case 'fantasyPartyState':
+      set({ fantasyParty: msg.state, fantasyPartyError: msg.error ?? null, fantasyPartyPending: false });
+      return;
+    case 'fantasyRealmState':
+      set({ fantasyRealm: msg.state, fantasyRealmPending: false, fantasyRealmError: msg.error ?? null });
+      return;
+    case 'fantasyPropertyState':
+      set({ fantasyProperties: msg.state, fantasyPropertyError: msg.error ?? null, fantasyPropertyPending: false });
+      return;
+    case 'fantasyCombatState':
+      set({ fantasyCombat: msg.state ?? (get().fantasyCombat?.status !== 'active' ? get().fantasyCombat : null), fantasyCombatError: msg.error ?? null, fantasyCombatPending: false });
+      return;
+    case 'communityState':
+      set({ communityState: msg.state, communityError: msg.error ?? null, communityPending: false });
+      return;
+    case 'fantasyDialogueChunk': {
+      const owner = msg.kind === 'gm' ? fantasyGmRequestOwner(msg.requestId) : npcRequestOwner(msg.requestId);
+      if (!owner || owner.user !== get().selfId || owner.locale !== msg.locale || msg.kind === 'npc' && (!('npcId' in owner) || owner.npcId !== msg.npcId) || typeof msg.text !== 'string' || msg.text.length > 2400) return;
+      set(s => ({ dialogueProgress: { ...Object.fromEntries(Object.entries(s.dialogueProgress).slice(-7)), [msg.requestId]: { kind: msg.kind, locale: msg.locale, npcId: msg.npcId, text: msg.text } } }));
+      return;
+    }
+    case 'fantasyGmReply': {
+      const owner = fantasyGmRequestOwner(msg.requestId);
+      if (!owner) return;
+      appendFantasyGmResponse(msg);
+      if (owner.user !== get().selfId) return;
+      set({ gmReply: msg, gmError: msg.error ?? null, gmErrorLocale: msg.error ? msg.locale : null, ...(msg.requestId === get().gmRequestId ? { gmPending: false, gmRequestId: null } : {}) });
+      return;
+    }
+    case 'npcReply':
+      if (consumeNpcRequest(msg)?.user !== get().selfId) return;
+      set((s) => ({
+        ...(msg.requestId === s.npcRequestId ? { npcPending: false, npcRequestId: null } : {}), npcError: msg.error ?? null, npcErrorContext: msg.error ? { npcId: msg.npcId, locale: msg.locale } : null, npcModel: msg.model,
+        npcRelationships: { ...s.npcRelationships, [msg.npcId]: msg.relationship },
+        npcMessages: msg.error || !msg.text ? s.npcMessages : [...s.npcMessages, { id: `${msg.requestId}:assistant`, role: 'assistant' as const, text: msg.text, npcId: msg.npcId, locale: msg.locale, source: msg.source, actions: msg.actions }].slice(-72),
+      }));
       return;
     case 'elevator':
       set((s) => ({ elevators: { ...s.elevators, [msg.sid]: msg.elevator } }));

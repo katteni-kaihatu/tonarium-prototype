@@ -17,6 +17,7 @@ COPY shared ./shared
 COPY content-locales ./content-locales
 COPY vendor ./vendor
 COPY server ./server
+COPY scripts/fantasy-backup.ts scripts/fantasy-account-admin.ts scripts/fantasy-diagnostics.ts ./scripts/
 COPY scripts/systems.ts ./scripts/systems.ts
 COPY scripts/content-translations.ts ./scripts/content-translations.ts
 COPY --from=build /app/system-bundle ./system-bundle

@@ -1,6 +1,7 @@
 import { initialArrivalState, type Arrival, type ArrivalKind } from './newArrival.ts';
 import { t } from './i18n/core.ts';
 import { create } from 'zustand';
+import type { FantasyRealmState } from '../../shared/fantasy-realm.ts';
 import type { UiMessage } from './i18n/index.ts';
 import type { MovementMode } from './view3d/movement.ts';
 import type { AvatarState, ChatMessage, EventDef, Group, GuildConfig, Message, Mode, Participant, Person, Presence, SessionInfo, User } from '../../shared/protocol.ts';
@@ -13,6 +14,15 @@ import { newGame, type GameState } from '../../shared/game.ts';
 import { NEW_ELEVATOR, type ElevatorState } from '../../shared/city.ts';
 import type { PositionRoute } from '../../shared/session-position.ts';
 import { newSurvivorProfile, type SurvivorProfile, type SurvivorState } from '../../shared/survivor.ts';
+import type { FantasyProfile, FantasyWorldClock, FantasyLegacyRecord } from '../../shared/fantasy.ts';
+import type { NpcChatMessage, NpcId, NpcRelationship } from '../../shared/npc.ts';
+import type { FantasyGmChatResponse } from '../../shared/fantasy-gm.ts';
+import type { FantasyCommunityState } from '../../shared/fantasy-community.ts';
+import type { FantasyContractBoard, FantasyContractError } from '../../shared/fantasy-contracts.ts';
+import type { FantasyPartyState, FantasyPartyError } from '../../shared/fantasy-party.ts';
+import type { FantasyCombatState } from '../../shared/fantasy-combat.ts';
+import type { FantasyPropertyState } from '../../shared/fantasy-property.ts';
+import type { FantasyAccountPublic } from '../../shared/fantasy-account.ts';
 import { createAdSlice, type AdSlice } from './ad/slice.ts';
 import type { AdPanelTarget } from '../../shared/antimatterLayout.ts';
 import { deriveSession } from './sessionView.ts';
@@ -153,6 +163,46 @@ interface State extends AdSlice {
   survivors: Record<string, SurvivorState>;
   /** 仮IDに紐づくサーバー保存の個人進行 */
   survivorProfile: SurvivorProfile;
+  fantasyProfile: FantasyProfile | null;
+  fantasyAccount: FantasyAccountPublic | null;
+  fantasyHomeId: string | null;
+  fantasyAccountReady: boolean;
+  fantasyAccountError: string | null;
+  fantasyLegacies: FantasyLegacyRecord[];
+  fantasyContractBoard: FantasyContractBoard | null;
+  fantasyContractError: FantasyContractError | null;
+  fantasyParty: FantasyPartyState | null;
+  fantasyPartyError: FantasyPartyError | null;
+  fantasyPartyPending: boolean;
+  fantasyCombat: FantasyCombatState | null;
+  fantasyCombatError: string | null;
+  fantasyCombatPending: boolean;
+  fantasyRealm: FantasyRealmState | null;
+  fantasyRealmPending: boolean;
+  fantasyRealmError: string | null;
+  fantasyProperties: FantasyPropertyState | null;
+  fantasyPropertyPending: boolean;
+  fantasyPropertyError: string | null;
+  fantasyClock: FantasyWorldClock | null;
+  gmReply: FantasyGmChatResponse | null;
+  dialogueProgress: Record<string, { kind: 'npc' | 'gm'; locale: 'ko' | 'en' | 'ja'; npcId?: string; text: string }>;
+  gmPending: boolean;
+  gmRequestId: string | null;
+  gmError: string | null;
+  gmErrorLocale: 'ko' | 'en' | 'ja' | null;
+  communityState: FantasyCommunityState | null;
+  communityError: string | null;
+  communityPending: boolean;
+  fantasyError: string | null;
+  fantasyPending: boolean;
+  fantasyTestResetAllowed: boolean;
+  npcMessages: NpcChatMessage[];
+  npcPending: boolean;
+  npcError: string | null;
+  npcErrorContext: { npcId: string; locale: 'ko' | 'en' | 'ja' } | null;
+  npcModel: string;
+  npcRequestId: string | null;
+  npcRelationships: Partial<Record<NpcId, NpcRelationship>>;
   /** 街のマンションのエレベーター（セッションごと） */
   elevators: Record<string, ElevatorState>;
   /** 注目を集めているアイテム ID → 光らせる期限（performance.now） */
@@ -284,6 +334,44 @@ export const useStore = create<State>((set, get) => ({
   games: {},
   survivors: {},
   survivorProfile: newSurvivorProfile(),
+  fantasyProfile: null,
+  fantasyAccount: null,
+  fantasyHomeId: null,
+  fantasyAccountReady: false,
+  fantasyAccountError: null,
+  fantasyLegacies: [],
+  fantasyContractBoard: null,
+  fantasyContractError: null,
+  fantasyParty: null,
+  fantasyPartyError: null,
+  fantasyPartyPending: false,
+  fantasyCombat: null,
+  fantasyCombatError: null,
+  fantasyCombatPending: false,
+  fantasyRealm: null, fantasyRealmPending: false, fantasyRealmError: null,
+  fantasyProperties: null,
+  fantasyPropertyPending: false,
+  fantasyPropertyError: null,
+  fantasyClock: null,
+  gmReply: null,
+  dialogueProgress: {},
+  gmPending: false,
+  gmRequestId: null,
+  gmError: null,
+  gmErrorLocale: null,
+  communityState: null,
+  communityError: null,
+  communityPending: false,
+  fantasyError: null,
+  fantasyPending: false,
+  fantasyTestResetAllowed: false,
+  npcMessages: [],
+  npcPending: false,
+  npcError: null,
+  npcErrorContext: null,
+  npcModel: '',
+  npcRequestId: null,
+  npcRelationships: {},
   elevators: {},
   attention: {},
   ...initialArrivalState(),

@@ -55,9 +55,41 @@ import { Follows } from './follows.ts';
 import { POST_RATE, Timeline, UPLOAD_RATE } from './timeline.ts';
 import { POST_IMAGE_MAX_BYTES, isImageId, type Post } from '../shared/timeline.ts';
 import { createSyncGrant, handleSyncOffer, upgradeSync, revokeSync, revokeUserSync, leaveRoom, livekitRoom, roomSend, roomSendSnapshot, shutdownRooms, type RoomHandlers } from './rooms.ts';
+import { FantasyStore, handleFantasyAction, isFantasyAction } from './fantasy-store.ts';
+import { FantasyClock } from './fantasy-clock.ts';
+import { FantasyParty } from './fantasy-party.ts';
+import { NpcChat } from './npc.ts';
+import { FantasyGmChat } from './fantasy-gm-chat.ts';
+import { FantasyCommunity, type CommunityActor } from './fantasy-community.ts';
+import { FantasyContracts, type FantasyContractActor } from './fantasy-contracts.ts';
+import { fantasyPersonalQuest, fantasyContractErrorText } from '../shared/fantasy-contracts.ts';
+import { FANTASY_QUESTS } from '../shared/fantasy-data.ts';
+import { BrowserAiBroker } from './browser-ai.ts';
+import { BrowserAiPool } from './browser-ai-pool.ts';
+import { FantasyPropertyDialogue } from './fantasy-property-dialogue.ts';
+import { FantasyBargaining } from './fantasy-bargaining.ts';
+import { FantasyConversationActions } from './fantasy-conversation-actions.ts';
+import { NPC_PUBLIC } from '../shared/npc.ts';
+import { fantasyGmActivityName } from '../shared/fantasy-gm-locale.ts';
+import { fantasyTestToolsAllowed } from './fantasy-test-reset.ts';
+import { fantasyCombatHuntOptions } from '../shared/fantasy-combat-challenges.ts';
+import { fantasyHostileEncounter } from '../shared/fantasy-encounters.ts';
+import type { DialogueDynamicContext } from './dialogue-dynamic.ts';
+import { FantasyAccounts, type AccountBinding } from './fantasy-accounts.ts';
+import { FantasyBackups, fantasyBackupFiles, createFantasyBackupSave } from './fantasy-backups.ts';
+import { resolvePublicFile } from './static-files.ts';
+import { FantasyDiagnostics } from './fantasy-diagnostics.ts';
+import { FantasyPlayObserver } from './fantasy-play-observer.ts';
+import { FantasyDialogueObserver } from './fantasy-dialogue-observer.ts';
 
 const PORT = Number(process.env.SERVER_PORT ?? 3001);
 const DEV = process.argv.includes('--dev');
+const npcChat = new NpcChat();
+const fantasyGmChat = new FantasyGmChat();
+const fantasyPropertyDialogue = new FantasyPropertyDialogue();
+const fantasyBargaining = new FantasyBargaining();
+const fantasyConversationActions = new FantasyConversationActions();
+const browserAiPool = new BrowserAiPool();
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'client/dist');
 // index.html は読み込むファイル名にハッシュを含むので、画面が変わったときだけ版が変わる
@@ -66,6 +98,13 @@ const CLIENT_VERSION = (() => {
   try { return createHash('sha1').update(fs.readFileSync(path.join(DIST, 'index.html'))).digest('hex').slice(0, 12); } catch { return null; }
 })();
 const DATA_DIR = process.env.DATA_DIR ?? path.join(ROOT, 'data');
+const fantasyDiagnostics = new FantasyDiagnostics({directory:path.join(DATA_DIR,'fantasy-diagnostics'),
+  captureMode:process.env.FANTASY_DIAGNOSTICS_DIALOGUE_MODE==='off'?'off':process.env.FANTASY_DIAGNOSTICS_DIALOGUE_MODE==='issues'?'issues':'all',
+  maxTextChars:4000,retentionDays:Number(process.env.FANTASY_DIAGNOSTICS_RETENTION_DAYS),maxTotalBytes:Number(process.env.FANTASY_DIAGNOSTICS_MAX_TOTAL_BYTES),
+  maxFileBytes:Number(process.env.FANTASY_DIAGNOSTICS_MAX_FILE_BYTES),maxQueueSize:Number(process.env.FANTASY_DIAGNOSTICS_MAX_QUEUE)});
+const fantasyPlayObserver = new FantasyPlayObserver(fantasyDiagnostics);
+const fantasyDialogueObserver = new FantasyDialogueObserver(fantasyDiagnostics);
+const fantasyReplyErrors = new WeakMap<WebSocket,string>();
 const sharedAssets = new SharedService(DATA_DIR);
 const systems = new SystemService(DATA_DIR, ROOT);
 const timedCameras = new TimedCameraItems(systems);
@@ -97,6 +136,48 @@ const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
 const PEOPLE_FILE = path.join(DATA_DIR, 'people.json');
 const ITEMS_FILE = path.join(DATA_DIR, 'items.json');
 const SURVIVORS_FILE = path.join(DATA_DIR, 'survivors.json');
+const fantasyBackups = new FantasyBackups({ dataDirectory: DATA_DIR, files: fantasyBackupFiles(DATA_DIR) });
+fantasyBackups.acquireRuntime();
+const saveFantasyData = createFantasyBackupSave(fantasyBackups);
+let fantasyClock: FantasyClock;
+const fantasyStore = new FantasyStore(path.join(DATA_DIR, 'fantasy.json'), {
+  save: saveFantasyData,
+  combatEnabled: true,
+  worldHour: () => fantasyClock.snapshot().hour,
+  clockError: () => fantasyClock.error,
+});
+fantasyClock = new FantasyClock(path.join(DATA_DIR, 'fantasy-clock.json'), { save: saveFantasyData, initialHour: fantasyStore.maximumHour() });
+const fantasyCommunity = new FantasyCommunity(path.join(DATA_DIR, 'fantasy-community.json'), { save: saveFantasyData });
+const fantasyContracts = new FantasyContracts(path.join(DATA_DIR, 'fantasy-contracts.json'), { save: saveFantasyData, lookup: user => fantasyStore.loadError ? undefined : fantasyStore.profile(user) });
+const fantasyAccounts = new FantasyAccounts({ file:path.join(DATA_DIR,'fantasy-accounts.json'),save:saveFantasyData,
+  trustProxy:process.env.FANTASY_TRUST_PROXY==='1',
+  trustedProxyAddresses:(process.env.FANTASY_TRUSTED_PROXY_IPS??'').split(',').map(value=>value.trim()).filter(Boolean),
+  canClaimLegacy:(account,principal)=>{
+    const current=fantasyStore.profile(account.principal);
+    return !fantasyStore.loadError && principal.startsWith('fantasy:') && fantasyStore.hasProfile(principal)
+      && !current.character && !current.pastLives?.length && !current.activity && !current.combatId;
+  },
+});
+try { if(!fantasyStore.loadError&&!fantasyClock.error&&!fantasyAccounts.loadError)fantasyBackups.checkpoint('startup',true); }
+catch(error){console.error('[fantasy-backup] startup snapshot failed',error);}
+const fantasyParty = new FantasyParty({ lookup: id => {
+  const user = users.get(id);
+  return user && fantasyUserAuthorized(id) ? { id, name: user.name, session: user.session, world: user.session ? worldOf.get(user.session) : undefined, profile: fantasyStore.profile(id) } : undefined;
+}, start: plans => fantasyStore.startGroupInvestigation(plans), startCombat: plans => fantasyStore.startCombat(plans),
+  startTravel: plans => fantasyStore.startGroupTravel(plans),
+  battle: (user, session) => fantasyStore.combat(user, session),
+  joinCombat: (user, session, combat, confirm) => fantasyStore.joinCombat(user, session, combat, confirm),
+  vault: party => fantasyStore.partyVault(party), vaultRequest: (party, user, command) => fantasyStore.partyVaultRequest(party, user, command),
+  returnDeposits: (party, user) => {
+    const result = fantasyStore.returnPartyDeposits(party, user);
+    for (const update of result.updates) sendTo([update.user], { t: 'fantasyProfile', profile: update.profile });
+    return result;
+  },
+});
+function communityActor(user: User): CommunityActor {
+  const profile = fantasyStore.profile(user.id);
+  return { id: user.id, session: user.session, world: user.session ? worldOf.get(user.session) : undefined, character: profile.character ?? undefined, busy: !!profile.activity };
+}
 const AD_SAVES_FILE = path.join(DATA_DIR, 'ad-saves.json');
 const AD_LEADERBOARD_FILE = path.join(DATA_DIR, 'ad-leaderboard.json');
 /** 2 人以上がこの時間以上いたセッションだけ、グループのチャンネルにまとめを残す */
@@ -298,6 +379,24 @@ const followNoticeAt = new Map<string, number>();
 
 const users = new Map<string, Participant>();
 const sockets = new Map<string, Set<WebSocket>>(); // 同じIDで複数タブを開ける
+const homeConnections = new Map<WebSocket, HomeConnectionState>();
+function fantasyDiagnosticError(error:unknown):string|undefined {
+  return typeof error==='string'&&error?(/^[a-z][a-z0-9-]{0,63}$/u.test(error)?error:'game-rule'):undefined;
+}
+function observeFantasyOutgoing(ws:WebSocket,msg:ServerMsg,dialogueToken?:object):void {
+  try{
+    if(msg.t!=='npcReply'&&msg.t!=='fantasyGmReply'&&msg.t!=='fantasyProfile'&&msg.t!=='fantasyCombatState'&&!(msg.t.startsWith('fantasy')&&'error'in msg&&msg.error))return;
+    const state=homeConnections.get(ws),actor=state?.id?users.get(state.id):undefined;
+    if(!state)return;
+    if('error'in msg&&msg.error)fantasyReplyErrors.set(ws,fantasyDiagnosticError(msg.error)??'game-rule');
+    if(msg.t==='npcReply'||msg.t==='fantasyGmReply')fantasyDialogueObserver.reply(ws,{kind:msg.t==='npcReply'?'npc':'gm',requestId:msg.requestId,
+      text:msg.t==='npcReply'?msg.text:msg.reply.text,route:msg.source,model:msg.model,errorCode:fantasyDiagnosticError(msg.error),
+      currentActorId:ws.readyState===WebSocket.OPEN&&fantasySocketAuthorized(ws)?state.id:null,token:dialogueToken});
+    if(!actor?.session||worldOf.get(actor.session)!=='fantasy'||!fantasySocketAuthorized(ws))return;
+    if(msg.t==='fantasyProfile')fantasyPlayObserver.profile(actor.id,actor.session,msg.profile);
+    if(msg.t==='fantasyCombatState')fantasyPlayObserver.combat(actor.id,actor.session,msg.state);
+  }catch{/* 診断失敗で通信を止めない。 */}
+}
 const chats = new Map<string, ChatMessage[]>();
 const avatars = new Map<string, Map<string, AvatarState>>();
 const items = new Map<string, Map<string, Item>>();
@@ -384,35 +483,147 @@ for (const w of guild.sessions) {
 // 配信のたびにフレンド全走査と全ユーザー配列化を人数分繰り返さないよう、1 回の配信で使い回す写し
 interface UserSnapshot { all: Participant[]; friendsByName: Map<string, string[]>; onlineNames: Set<string> }
 function snapshotUsers(): UserSnapshot {
-  const all = [...users.values()];
+  const all = homeUsers();
   return { all, friendsByName: follows.friendMap(), onlineNames: new Set(all.map((u) => u.name)) };
 }
 // 写しが渡されたとき（配信の一括計算）だけそれを使い、単発呼び出しでは全体の写しを作らない。
 // friendsOf と friendsByName は同じ follows から求めるので、対象者の集合は写し経由と一致する
 const sessionsVisibleTo = (name: string, snap?: UserSnapshot) => {
   const friends = snap ? snap.friendsByName.get(name) ?? [] : friendsOf(name);
-  const all = snap ? snap.all : [...users.values()];
+  const all = snap ? snap.all : homeUsers();
   return guild.sessions.filter((d) => canSeeSession(d, name, friends, home.groups, all));
 };
-const broadcastSessions = () => { const snap = snapshotUsers(); for (const u of users.values()) sendTo([u.id], { t: 'sessions', list: sessionsVisibleTo(u.name, snap) }); };
+const broadcastSessions = () => { const snap = snapshotUsers(); for (const [ws, state] of homeConnections) { const user = homeUser(state); if (user) send(ws, { t: 'sessions', list: sessionsVisibleTo(user.name, snap) }); } };
 const broadcastGroups = () => broadcast({ t: 'groups', list: home.groups });
 const broadcastEvents = () => broadcast({ t: 'events', list: home.events });
 
-function send(ws: WebSocket, msg: ServerMsg) {
+function send(ws: WebSocket, msg: ServerMsg,dialogueToken?:object) {
+  observeFantasyOutgoing(ws,msg,dialogueToken);
+  if (fantasyPrivatePacket(msg) && !fantasySocketAuthorized(ws)) return;
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+}
+function fantasyPrivatePacket(msg:ServerMsg):boolean {
+  return msg.t==='communityState'||msg.t.startsWith('fantasy')&&!['fantasyClock','fantasyTestMode','fantasyAccountState'].includes(msg.t);
 }
 function broadcast(msg: ServerMsg, except?: WebSocket) {
   const data = JSON.stringify(msg);
   for (const set of sockets.values())
-    for (const ws of set) if (ws !== except && ws.readyState === WebSocket.OPEN) ws.send(data);
+    for (const ws of set) if (ws !== except && ws.readyState === WebSocket.OPEN && (!fantasyPrivatePacket(msg)||fantasySocketAuthorized(ws))) {observeFantasyOutgoing(ws,msg);ws.send(data);}
 }
 function sendTo(ids: Iterable<string>, msg: ServerMsg) {
-  const data = JSON.stringify(msg);
-  for (const id of ids)
-    for (const ws of sockets.get(id) ?? []) if (ws.readyState === WebSocket.OPEN) ws.send(data);
+  const data = JSON.stringify(msg), targets=new Set(ids), delivered=new Set<WebSocket>();
+  const deliver=(ws:WebSocket)=>{if(!delivered.has(ws)&&ws.readyState===WebSocket.OPEN&&(!fantasyPrivatePacket(msg)||fantasySocketAuthorized(ws))){delivered.add(ws);observeFantasyOutgoing(ws,msg);ws.send(data);}};
+  for(const id of targets)for(const ws of sockets.get(id)??[])deliver(ws);
+  if(!fantasyPrivatePacket(msg))for(const [ws,state]of homeConnections)if(state.homeId&&targets.has(state.homeId))deliver(ws);
 }
-const idsByName = (name: string) => [...users.values()].filter((u) => u.name === name).map((u) => u.id);
-const isOnline = (name: string) => [...users.values()].some((u) => u.name === name);
+
+const reportedFantasyHunts = new Map<string, string>();
+const fantasyWorldPublished = new Map<string, number>();
+function contractActor(user: User): FantasyContractActor {
+  return { id: user.id, session: user.session, world: user.session ? worldOf.get(user.session) : undefined, character: fantasyStore.profile(user.id).character ?? undefined };
+}
+function fantasyRealmContext(user: User) {
+  const session = user.session ?? '', def = guild.sessions.find(d => d.id === session);
+  return { session, publicSession: !!session && (!def?.visibility || def.visibility === 'public'), peers: [...users.values()].filter(peer => fantasyUserAuthorized(peer.id)&&peer.session === session && !!session && worldOf.get(session) === 'fantasy').map(peer => peer.id) };
+}
+function fantasyMarketQuote(user: User, action: import('../shared/fantasy.ts').FantasyAction, locale: 'ko'|'en'|'ja') {
+  if (action.type !== 'buy' && action.type !== 'sell') return undefined;
+  const economy = fantasyStore.realmState(user.id, fantasyRealmContext(user)).economy;
+  for (const shop of economy.shops) {
+    const lot = action.type === 'buy' ? shop.lots.find(lot => lot.item === action.item && lot.count > 0) : shop.sales.find(lot => lot.item === action.item && lot.canSell && (!action.instance || lot.instance === action.instance) && (!action.quality || lot.quality === action.quality));
+    if (lot) return { text: String(lot.unitPrice)+' G · '+({ko:'즉시',en:'Immediate',ja:'即時'}[locale]), key: JSON.stringify([shop.building, shop.revision, lot.unitPrice, 'id' in lot ? lot.id : lot.key]) };
+  }
+  return { text: {ko:'지금은 거래할 수 없는 물건입니다.',en:'This item cannot be traded now.',ja:'今は取引できない品物です。'}[locale], key: 'unavailable' };
+}
+function fantasyDialogueFacts(user: User, locale: 'ko'|'en'|'ja'): DialogueDynamicContext | undefined {
+  const profile = fantasyStore.profile(user.id), location = profile.character?.location;
+  if (!location) return undefined;
+  const realm = fantasyStore.realmState(user.id, fantasyRealmContext(user));
+  return { hour: realm.civic.hour, location, shops: realm.economy.shops,
+    rumors: realm.civic.notices.filter(note => note.location === location && Math.floor(note.hour / 24) === Math.floor(realm.civic.hour / 24) && note.hour <= realm.civic.hour).map(note => ({hour:note.hour,text:note.text[locale]})), activity: profile.activity };
+}
+function publishFantasyRealms() {
+  for (const user of users.values()) if (fantasyUserAuthorized(user.id)&&user.session && worldOf.get(user.session) === 'fantasy') sendTo([user.id], { t: 'fantasyRealmState', state: fantasyStore.realmState(user.id, fantasyRealmContext(user)) });
+}
+const fantasyPartyPublished = new Map<string, string>();
+const fantasyCombatPublished = new Map<string, string>();
+function publishFantasyCombats() {
+  for (const user of users.values()) {
+    if(!fantasyUserAuthorized(user.id))continue;
+    const state = user.session && worldOf.get(user.session) === 'fantasy' ? fantasyStore.combat(user.id, user.session) : null;
+    const signature = JSON.stringify(state);
+    if (!state && !fantasyCombatPublished.has(user.id) || fantasyCombatPublished.get(user.id) === signature) continue;
+    fantasyCombatPublished.set(user.id, signature); sendTo([user.id], { t: 'fantasyCombatState', state });
+  }
+}
+function publishFantasyParties() {
+  fantasyParty.sweep();
+  for (const user of users.values()) {
+    if(!fantasyUserAuthorized(user.id))continue;
+    const state = fantasyParty.state(user.id), signature = JSON.stringify(state);
+    if (fantasyPartyPublished.get(user.id) === signature) continue;
+    fantasyPartyPublished.set(user.id, signature); sendTo([user.id], { t: 'fantasyPartyState', state });
+  }
+}
+function applyFantasyUserAction(actor: FantasyContractActor, revision: unknown, action: unknown, options: Parameters<typeof handleFantasyAction>[4] = {}) {
+  const started=performance.now(),before=fantasyStore.profile(actor.id),result=applyFantasyUserActionCore(actor,revision,action,options);
+  if(actor.world==='fantasy')fantasyDiagnostics.record({type:'game.action',actorId:actor.id,sessionId:actor.session??undefined,action:isFantasyAction(action)?action.type:'invalid',
+    status:result.error?'rejected':'ok',errorCode:result.error?(before.revision!==revision?'stale':'game-rule'):undefined,revision:result.profile.revision,
+    expectedRevision:typeof revision==='number'?revision:undefined,generation:result.profile.generation??1,location:result.profile.character?.location,durationMs:performance.now()-started});
+  return result;
+}
+function applyFantasyUserActionCore(actor: FantasyContractActor, revision: unknown, action: unknown, options: Parameters<typeof handleFantasyAction>[4] = {}) {
+  const current = fantasyStore.profile(actor.id);
+  if (actor.session && actor.world === 'fantasy' && current.character?.combatStoryVersion === 1 && isFantasyAction(action)) {
+    const fight = action.type === 'hunt' ? { source: 'hunt' as const, target: action.monster ?? fantasyCombatHuntOptions(current.character)[0]?.id }
+      : action.type === 'event' && action.choice === 'fight' && current.event && fantasyHostileEncounter(current.event) ? { source: 'encounter' as const, target: current.event } : undefined;
+    if (fight?.target) {
+      if (current.revision !== revision) return fantasyStore.reject(actor.id, '別の画面で記録が更新されました。最新の状態で選び直してください。');
+      const combat = fantasyStore.startCombat([{ user: actor.id, session: actor.session, location: current.character.location, generation: current.generation ?? 1, source: fight.source, target: fight.target }]);
+      if (combat.updates.length) { fantasyParty.invalidate(actor.id); publishFantasyParties(); publishFantasyCombats(); }
+      return { profile: fantasyStore.profile(actor.id), changed: combat.updates.length > 0, ...(combat.error ? { error: combat.error } : {}) };
+    }
+  }
+  const result = handleFantasyAction(fantasyStore, actor, revision, action, options);
+  if (result.changed && (action as { type?: string })?.type !== 'sync') { fantasyParty.invalidate(actor.id); publishFantasyParties(); }
+  return result;
+}
+function publishFantasyWorld(user: User, periodic = false) {
+  if(!fantasyUserAuthorized(user.id))return;
+  const profile = fantasyStore.profile(user.id);
+  const hunt = profile.character?.lastHunt;
+  const receipt = hunt ? `${user.id}:${profile.generation ?? 1}:${hunt.hour}:${hunt.id}` : '';
+  const prior = reportedFantasyHunts.get(user.id);
+  reportedFantasyHunts.set(user.id, receipt);
+  if (prior !== receipt && hunt?.success) fantasyContracts.recordHunt({ ...contractActor(user), character: { ...profile.character!, location: hunt.location } }, 1, hunt.hour, receipt, hunt.id);
+  if (profile.death) for (const grant of Object.values(profile.character?.contracts ?? {})) fantasyContracts.release(user.id, grant.offerId);
+  const progress = fantasyStore.synchronizeContractProgress(user.id, offer => fantasyContracts.progress(user.id, offer));
+  if (progress.changed) sendTo([user.id], { t: 'fantasyProfile', profile: progress.profile });
+  if (periodic && !progress.changed && Date.now() - (fantasyWorldPublished.get(user.id) ?? 0) < 5000) return;
+  fantasyWorldPublished.set(user.id, Date.now());
+  sendTo([user.id], { t: 'fantasyLegacies', records: fantasyStore.legacies(user.id) });
+  sendTo([user.id], { t: 'fantasyContractBoard', board: fantasyContracts.state(contractActor(user), fantasyClock.snapshot().hour), error: fantasyContracts.error ? 'unavailable' : undefined });
+}
+
+setInterval(() => {
+  for(const [ws,state]of homeConnections)if(state.accountBinding&&!fantasyAccounts.bindingCurrent(state.accountBinding))unbindFantasyAccount(ws,state,'unauthenticated');
+  fantasyClock.checkpoint();
+  const online = new Set([...users.values()].filter(user => fantasyUserAuthorized(user.id)&&user.session && worldOf.get(user.session) === 'fantasy').map(user => user.id));
+  for (const update of fantasyStore.tick(online)) {
+    fantasyPlayObserver.profile(update.user,users.get(update.user)?.session??null,update.profile);
+    sendTo([update.user], { t: 'fantasyProfile', profile: update.profile, error: update.error });
+    const user = users.get(update.user);
+    if (user) sendTo([user.id], { t: 'communityState', state: fantasyCommunity.state(communityActor(user)) });
+  }
+  for (const user of users.values()) if (fantasyUserAuthorized(user.id)&&user.session && worldOf.get(user.session) === 'fantasy') publishFantasyWorld(user, true);
+  const clock = fantasyClock.snapshot();
+  sendTo(users.keys(), { t: 'fantasyClock', clock });
+  publishFantasyParties();
+  publishFantasyCombats();
+}, 1000);
+setInterval(()=>{try{fantasyBackups.checkpoint('periodic');}catch(error){console.error('[fantasy-backup] periodic snapshot failed',error);}},300_000).unref();
+const idsByName = (name: string) => homeUsers().filter((u) => u.name === name).map((u) => u.id);
+const isOnline = (name: string) => homeUsers().some((u) => u.name === name);
 
 /** 会話に入っている人の名前。会話として成り立たなければ null */
 function convMembers(conv: string): string[] | null {
@@ -426,7 +637,7 @@ function convMembers(conv: string): string[] | null {
 }
 function sendToNames(names: Iterable<string>, msg: ServerMsg) {
   const set = new Set(names);
-  sendTo([...users.values()].filter((u) => set.has(u.name)).map((u) => u.id), msg);
+  sendTo(homeUsers().filter((u) => set.has(u.name)).map((u) => u.id), msg);
 }
 function pushMessage(conv: string, m: Message) {
   const list = (inbox.convs[conv] ??= []);
@@ -467,7 +678,7 @@ function sendWatching(name: string) {
 }
 function broadcastPeople() {
   const snap = snapshotUsers();
-  for (const u of users.values()) sendTo([u.id], { t: 'people', list: knownPeopleOf(u.name, snap.friendsByName).map((n) => personOf(n, snap.onlineNames)) });
+  for (const [ws, state] of homeConnections) { const user = homeUser(state); if (user) send(ws, { t: 'people', list: knownPeopleOf(user.name, snap.friendsByName).map((n) => personOf(n, snap.onlineNames)) }); }
 }
 function followsMsg(name: string, friendMap?: Map<string, string[]>): ServerMsg {
   return { t: 'follows', following: follows.following(name), followers: follows.followers(name), fof: follows.friendsOfFriends(name, friendMap) };
@@ -475,7 +686,7 @@ function followsMsg(name: string, friendMap?: Map<string, string[]>): ServerMsg 
 // フレンドのフレンドはだれかのフォロー 1 つで遠くの人まで変わるので、全員に送り直す
 function broadcastFollows() {
   const map = follows.friendMap();
-  for (const name of new Set([...users.values()].map((u) => u.name))) sendToNames([name], followsMsg(name, map));
+  for (const name of new Set(homeUsers().map((u) => u.name))) sendToNames([name], followsMsg(name, map));
 }
 
 const saveTimeline = later(() => fs.writeFileSync(TIMELINE_FILE, timeline.serialize()));
@@ -498,7 +709,7 @@ function handleTimeline(me: User, msg: ClientMsg): boolean {
         place: msg.withPlace && here ? { sid: here.id, name: publicSessionName(here), mode: me.mode } : null,
         session: (id) => {
           const def = guild.sessions.find((d) => d.id === id);
-          return def && canSeeSession(def, me.name, friendsOf(me.name), home.groups, [...users.values()]) ? { name: publicSessionName(def) } : null;
+          return def && canSeeSession(def, me.name, friendsOf(me.name), home.groups, homeUsers()) ? { name: publicSessionName(def) } : null;
         },
       });
       if (!post) return true;
@@ -647,7 +858,7 @@ function presenceOf(u: Participant): Presence {
 const inSession = (sid: string) => [...users.values()].filter((u) => u.session === sid);
 const othersIn = (sid: string, me: string) => inSession(sid).filter((u) => u.id !== me).map((u) => u.id);
 function broadcastUsers() {
-  broadcast({ t: 'users', list: [...users.values()].map(publicUser) });
+  for (const [ws, state] of homeConnections) if (state.id) send(ws, { t: 'users', list: usersForConnection(state) });
 }
 /** セッションの中の人の状態を、その部屋の全員に配り直す */
 function sendPresence(sid: string) {
@@ -802,6 +1013,7 @@ const worldPending = new Set<string>();
 /** ワールドごとに広さや家具が違うので、全員をスポーンエリアに戻す（3D の人は各自の手元で戻る） */
 function switchWorld(sid: string, world: WorldKind, clear: boolean, byName: string) {
   worldPending.delete(sid);
+  const previousWorld = worldOf.get(sid);
   worldOf.set(sid, world);
   resetGame(sid, gameDeps);
   const sessItems = items.get(sid)!;
@@ -828,6 +1040,11 @@ function switchWorld(sid: string, world: WorldKind, clear: boolean, byName: stri
     u.display = null;
   }
   resetElevator(sid);
+  if (previousWorld === 'fantasy' || world === 'fantasy') {
+    synchronizeFantasyWorldConnections(sid);
+    broadcastUsers();
+    broadcastSessions();
+  }
   roomSend(sid, { t: 'world', sid, world });
   roomSend(sid, { t: 'elevator', sid, elevator: elevatorOf(sid) });
   broadcastSessionInfo();
@@ -855,6 +1072,8 @@ function leaveSession(u: Participant) {
   revokeUserSync(u.id);
   const sid = u.session;
   if (!sid) return;
+  browserAiPool.cancelOwner(u.id);
+  for (const connection of homeConnections.values()) if (connection.id === u.id) connection.browserAi.cancelPending();
   eliminate(sid, u.id, gameDeps);
   removeSurvivor(sid, u.id, survivorDeps);
   const av = avatars.get(sid)!.get(u.id);
@@ -873,6 +1092,7 @@ function leaveSession(u: Participant) {
   u.follow = null;
   u.pos = null;
   u.session = null;
+  fantasyParty.leave(u.id); publishFantasyParties();
   try {
     for (const item of timedCameras.leave(sid, u.id, items.get(sid)!.values())) sendItem(sid, item);
     const changed = systems.leave(sid, u.id);
@@ -897,8 +1117,152 @@ function leaveSession(u: Participant) {
   }
 }
 
-function handle(ws: WebSocket, state: { id: string | null; syncRequest?: string }, msg: ClientMsg) {
+interface HomeConnectionState {
+  id: string | null;
+  homeId?: string;
+  homeUser?: Participant;
+  accountBinding?: AccountBinding;
+  syncRequest?: string;
+  browserAi: BrowserAiBroker;
+  remoteAddress?: string;
+  testModeSent?: boolean;
+}
+function homeUser(state:HomeConnectionState):Participant|undefined {
+  const active=state.id?users.get(state.id):undefined,original=state.homeUser??active,id=state.homeId??state.id;
+  return original&&id?{...original,id,session:active?.session??null,mode:active?.mode??original.mode}:undefined;
+}
+function homeUsers():Participant[]{
+  const result=new Map<string,Participant>();
+  for(const [ws,state]of homeConnections){if(ws.readyState!==WebSocket.OPEN)continue;const user=homeUser(state);if(user)result.set(user.id,user);}
+  return[...result.values()];
+}
+function userForConnection(user: Participant, state: HomeConnectionState): User {
+  const own = user.id === state.id ? homeUser(state) : undefined;
+  return publicUser(own ? { ...user, name: own.name, icon: own.icon, avatar: own.avatar, bio: own.bio, status: own.status, statusText: own.statusText } : user);
+}
+function usersForConnection(state: HomeConnectionState): User[] {
+  const active = state.id ? users.get(state.id) : undefined;
+  const sid = active?.session && worldOf.get(active.session) === 'fantasy' ? active.session : undefined;
+  const actors = sid ? inSession(sid) : [], actorIds = new Set(actors.map(user => user.id));
+  // ホームの名前と招待先を残しつつ、同じ部屋の別名をアバターとして二重に数えない。
+  const visible = new Map(homeUsers().map(user => [user.id, publicUser(sid && user.session === sid && !actorIds.has(user.id) ? { ...user, session: null } : user)]));
+  for (const actor of actors) visible.set(actor.id, userForConnection(actor, state));
+  return [...visible.values()];
+}
+function homeUserById(id:string):Participant|undefined {
+  const visible=homeUsers(),direct=visible.find(user=>user.id===id);if(direct)return direct;
+  const actor=users.get(id);if(!actor)return undefined;
+  for(const [ws,state]of homeConnections)if(ws.readyState===WebSocket.OPEN&&state.id===id){const user=homeUser(state);if(user?.name===actor.name)return user;}
+  return undefined;
+}
+function updateHomeUser(name:string,fields:Partial<Participant>):void {
+  for(const state of homeConnections.values())if(state.homeUser?.name===name)Object.assign(state.homeUser,fields);
+  for(const user of users.values())if(user.name===name)Object.assign(user,fields);
+}
+function markHomeOffline(user:Participant|undefined):void {
+  if(user&&!isOnline(user.name)){personRec(user.name).lastSeen=Date.now();savePeople();broadcastPeople();}
+}
+
+function fantasyAccountTestBypass(state:HomeConnectionState):boolean {
+  return process.env.NODE_ENV==='test'&&process.env.FANTASY_ACCOUNT_TEST_BYPASS==='1'
+    && /^(?:::1|127\.\d+\.\d+\.\d+|::ffff:127\.\d+\.\d+\.\d+)$/u.test(state.remoteAddress??'');
+}
+function fantasySocketAuthorized(ws:WebSocket):boolean {
+  const state=homeConnections.get(ws);
+  return !!state && (fantasyAccountTestBypass(state)||!!state.accountBinding&&fantasyAccounts.bindingCurrent(state.accountBinding)
+    &&state.id===state.accountBinding.account.principal&&!!users.get(state.id)?.session&&worldOf.get(users.get(state.id)!.session!)==='fantasy');
+}
+function fantasyUserAuthorized(id:string):boolean { return [...sockets.get(id)??[]].some(fantasySocketAuthorized); }
+function fantasyAccountSessionConflict(state: HomeConnectionState, sid: string): boolean {
+  const binding = state.accountBinding;
+  if (!binding || !fantasyAccounts.bindingCurrent(binding) || state.id === binding.account.principal) return false;
+  const occupied = users.get(binding.account.principal)?.session;
+  return !!occupied && occupied !== sid;
+}
+function fantasyAccountState(ws:WebSocket,state:HomeConnectionState,error?:string):void {
+  const user=state.id?users.get(state.id):undefined;
+  send(ws,{t:'fantasyAccountState',account:fantasySocketAuthorized(ws)?state.accountBinding?.account??null:null,homeId:state.homeId??state.id??'',activeId:state.id??'',...(user?{user:userForConnection(user,state)}:{}),...(error?{error}:{})});
+}
+function switchFantasyIdentity(ws:WebSocket,state:HomeConnectionState,target:string):Participant|undefined {
+  const old=state.id&&users.get(state.id);if(!old)return undefined;
+  if(old.id===target)return old;
+  let next=users.get(target);
+  if(!next){const source=target===state.homeId?state.homeUser??old:old;next={...source,id:target,session:null,mode:'2d',follow:null,pos:null,micOn:false,sharing:false,viewing:[],viewLive:false,display:null};users.set(target,next);}
+  else if(target.startsWith('fantasy:')&&![...sockets.get(target)??[]].some(fantasySocketAuthorized)){
+    const source=state.homeUser??old;Object.assign(next,{name:source.name,icon:source.icon,avatar:source.avatar,bio:source.bio,status:source.status,statusText:source.statusText});
+  }
+  fantasyDialogueObserver.cancel(ws,'identity-changed');
+  state.syncRequest=undefined;state.browserAi.cancelPending();browserAiPool.cancelOwner(old.id);
+  onClose(ws,old.id,true);state.id=target;
+  if(!sockets.has(target))sockets.set(target,new Set());sockets.get(target)!.add(ws);
+  return next;
+}
+function publishFantasyInitial(ws:WebSocket,state:HomeConnectionState,user:User):void {
+  if(!fantasySocketAuthorized(ws))return;
+  const synchronized=fantasyStore.synchronize(user.id);
+  send(ws,{t:'fantasyProfile',profile:synchronized.profile,error:synchronized.error??fantasyStore.loadError??fantasyClock.error});
+  send(ws,{t:'fantasyClock',clock:fantasyClock.snapshot()});
+  send(ws,{t:'fantasyPartyState',state:fantasyParty.state(user.id)});
+  send(ws,{t:'communityState',state:fantasyCommunity.state(communityActor(user))});
+  publishFantasyWorld(user);publishFantasyRealms();
+}
+function synchronizeFantasyWorldConnections(sid: string): void {
+  const connections = [...homeConnections].filter(([, state]) => !!state.id && users.get(state.id)?.session === sid);
+  const enteringFantasy = worldOf.get(sid) === 'fantasy';
+  const unavailable = new Set<WebSocket>();
+  for (const [ws, state] of connections) {
+    const current = state.id ? users.get(state.id) : undefined;
+    if (!current || current.session !== sid) continue;
+    const conflict = enteringFantasy && fantasyAccountSessionConflict(state, sid);
+    if (conflict) unavailable.add(ws);
+    const target = enteringFantasy && !conflict && !fantasyAccountTestBypass(state) && state.accountBinding && fantasyAccounts.bindingCurrent(state.accountBinding)
+      ? state.accountBinding.account.principal : state.homeId ?? current.id;
+    const user = current.id === target ? current : switchFantasyIdentity(ws, state, target);
+    if (!user) continue;
+    if (user.session && user.session !== sid) leaveSession(user);
+    user.session = sid;
+  }
+  cancelEmptyCheck(sid);
+  thumbnails.update(sid, inSession(sid));
+  publishFantasyParties();
+  for (const [ws, state] of connections) {
+    const user = state.id ? users.get(state.id) : undefined;
+    if (!user || user.session !== sid) continue;
+    fantasyAccountState(ws, state, unavailable.has(ws) ? 'unavailable' : undefined);
+    if (enteringFantasy) publishFantasyInitial(ws, state, user);
+  }
+}
+function unbindFantasyAccount(ws:WebSocket,state:HomeConnectionState,error?:string):void {
+  const current=state.id?users.get(state.id):undefined,sid=current?.session;
+  state.accountBinding=undefined;
+  if(state.homeId)switchFantasyIdentity(ws,state,state.homeId);
+  const home=state.id?users.get(state.id):undefined;
+  if(home&&sid&&worldOf.get(sid)==='fantasy'&&home.session!==sid){leaveSession(home);home.session=sid;}
+  fantasyAccountState(ws,state,error);broadcastUsers();broadcastSessions();
+}
+
+const fantasyDiagnosticCommands=new Set(['fantasyAction','fantasyTestReset','fantasyRealmRequest','fantasyPropertyRequest','fantasyPartyRequest','fantasyCombatRequest','communityContribute','fantasyAccountBind','fantasyAccountUnbind','join','leave']);
+function handle(ws:WebSocket,state:HomeConnectionState,msg:ClientMsg){
+  const started=performance.now(),beforeId=state.id,beforeSession=beforeId?users.get(beforeId)?.session:null;
+  const beforeWorld=beforeSession?worldOf.get(beforeSession):undefined;
+  fantasyReplyErrors.delete(ws);let threw=false;
+  try{return handleMessage(ws,state,msg);}catch(error){threw=true;throw error;}
+  finally{
+    try{if(msg&&fantasyDiagnosticCommands.has(msg.t)){
+      const actor=state.id?users.get(state.id):undefined,afterWorld=actor?.session?worldOf.get(actor.session):undefined;
+      if(beforeWorld==='fantasy'||afterWorld==='fantasy'){
+        const owner=beforeWorld==='fantasy'?beforeId:state.id,errorCode=threw?'handler-failure':fantasyReplyErrors.get(ws);
+        const profile=owner&&fantasyUserAuthorized(owner)?fantasyStore.profile(owner):undefined;
+        fantasyDiagnostics.record({type:msg.t==='join'||msg.t==='leave'||msg.t.startsWith('fantasyAccount')?'connection':'game.command',actorId:owner??undefined,sessionId:beforeSession??actor?.session??undefined,
+          operation:msg.t,action:msg.t==='fantasyAction'&&isFantasyAction(msg.action)?msg.action.type:undefined,status:errorCode?'rejected':'ok',errorCode,
+          generation:profile?.generation,location:profile?.character?.location,revision:profile?.revision,worldHour:profile?.character?.hour,durationMs:performance.now()-started});
+      }
+    }}catch{/* 診断失敗で処理結果を変えない。 */}
+  }
+}
+function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg) {
   if (msg.t === 'hello') {
+    if (typeof msg.id !== 'string' || !msg.id || msg.id.length > 128 || msg.id.startsWith('fantasy:') || typeof msg.name !== 'string' || (state.id && state.id !== msg.id)) return;
     // 互換性バージョンが違う（申告が無い旧クライアントを含む）と通信の約束事が食い違うので、状態を渡さず接続を断つ
     if (msg.compat !== COMPAT_VERSION) {
       send(ws, { t: 'incompatible', compat: COMPAT_VERSION });
@@ -908,6 +1272,11 @@ function handle(ws: WebSocket, state: { id: string | null; syncRequest?: string 
     // __proto__ は ID として受け付けない。レコードのキーや msgpack のマップキーに流れると壊れるため（正規クライアントの ID は UUID で、該当しない）
     if (msg.id === '__proto__') return;
     state.id = msg.id;
+    state.homeId=msg.id;
+    if (!state.testModeSent) {
+      send(ws, { t: 'fantasyTestMode', enabled: fantasyTestToolsAllowed(process.env.FANTASY_TEST_TOOLS, state.remoteAddress) });
+      state.testModeSent = true;
+    }
     const name = normalizeName(msg.name);
     const rec = personRec(name);
     const cameOnline = !isOnline(name);
@@ -921,11 +1290,12 @@ function handle(ws: WebSocket, state: { id: string | null; syncRequest?: string 
       });
     if (!sockets.has(msg.id)) sockets.set(msg.id, new Set());
     sockets.get(msg.id)!.add(ws);
+    state.homeUser={...users.get(msg.id)!,viewing:[...users.get(msg.id)!.viewing]};
     send(ws, {
       t: 'snapshot',
       s: {
         guild: { ...guild, sessions: sessionsVisibleTo(normalizeName(msg.name)) },
-        users: [...users.values()].map(publicUser),
+        users: usersForConnection(state),
         friends: friendsOf(normalizeName(msg.name)),
         groups: home.groups,
         events: home.events,
@@ -939,6 +1309,15 @@ function handle(ws: WebSocket, state: { id: string | null; syncRequest?: string 
       watching: watchingOf(name), lastSeen, recentStatus: rec.recent,
     });
     send(ws, { t: 'survivorProfile', profile: survivorProfile(msg.id) });
+    if(fantasyAccountTestBypass(state)){
+      const fantasy = fantasyStore.synchronize(msg.id);
+      if (fantasy.changed) sendTo([msg.id], { t: 'fantasyProfile', profile: fantasy.profile });
+      else send(ws, { t: 'fantasyProfile', profile: fantasy.profile, error: fantasy.error ?? fantasyStore.loadError ?? fantasyClock.error });
+      send(ws, { t: 'fantasyPartyState', state: fantasyParty.state(msg.id) });
+      send(ws, { t: 'communityState', state: fantasyCommunity.state(communityActor(users.get(msg.id)!)) });
+      publishFantasyWorld(users.get(msg.id)!);
+    } else fantasyAccountState(ws,state);
+    send(ws, { t: 'fantasyClock', clock: fantasyClock.snapshot() });
     send(ws, { t: 'marketLikes', ...marketLikes.snapshot(msg.id) });
     send(ws, followsMsg(name));
     send(ws, { t: 'posts', list: timeline.posts });
@@ -955,41 +1334,262 @@ function handle(ws: WebSocket, state: { id: string | null; syncRequest?: string 
   }
   const me = state.id ? users.get(state.id) : undefined;
   if (!me) return;
+  if(msg.t==='fantasyAccountBind'){
+    const binding=typeof msg.ticket==='string'?fantasyAccounts.consumeTicket(msg.ticket):undefined;
+    if(!binding||!binding.account.principal.startsWith('fantasy:')){if(state.id?.startsWith('fantasy:'))unbindFantasyAccount(ws,state,'unauthenticated');else fantasyAccountState(ws,state,'unauthenticated');return;}
+    const sid=me.session;state.accountBinding=binding;
+    if(sid&&worldOf.get(sid)==='fantasy'){
+      if(fantasyAccountSessionConflict(state,sid)){fantasyAccountState(ws,state,'unavailable');return;}
+      const user=switchFantasyIdentity(ws,state,binding.account.principal);
+      if(user){handle(ws,state,{t:'join',sid});if(!fantasySocketAuthorized(ws))unbindFantasyAccount(ws,state,'unauthenticated');else{broadcastUsers();broadcastSessions();}}
+    }else fantasyAccountState(ws,state);
+    return;
+  }
+  if(msg.t==='fantasyAccountUnbind'){unbindFantasyAccount(ws,state);return;}
+  const worldRequest=msg.t.startsWith('fantasy')||msg.t==='communityContribute'||msg.t==='npcChat'&&!!me.session&&worldOf.get(me.session)==='fantasy';
+  if(worldRequest&&!fantasySocketAuthorized(ws)){if(state.id?.startsWith('fantasy:'))unbindFantasyAccount(ws,state,'unauthenticated');else fantasyAccountState(ws,state,'unauthenticated');return;}
+  if(msg.t==='aiSupport'){
+    const receiving=state.browserAi.allowsRemote;
+    const accepted=state.browserAi.setReady(msg.ready===true&&(!me.session||worldOf.get(me.session)!=='fantasy'||!fantasySocketAuthorized(ws))?{...msg,ready:false}:msg);
+    if(accepted&&receiving&&!state.browserAi.allowsRemote)browserAiPool.cancelOwner(me.id);
+    return;
+  }
+  if(msg.t==='aiSupportResult'||msg.t==='aiSupportChunk'){state.browserAi.result(msg);return;}
+  if (msg.t === 'fantasyTestReset') {
+    let result;
+    const prior = fantasyStore.profile(me.id);
+    if (!fantasyTestToolsAllowed(process.env.FANTASY_TEST_TOOLS, state.remoteAddress)) result = fantasyStore.reject(me.id, 'この接続では試験用の初期化を利用できません。');
+    else if (!me.session || worldOf.get(me.session) !== 'fantasy') result = fantasyStore.reject(me.id, 'ファンタジー世界に参加してから初期化してください。');
+    else if (msg.confirm !== 'RESET_LIFE' || Object.keys(msg).length !== 3) result = fantasyStore.reject(me.id, '初期化の確認が必要です。');
+    else result = fantasyStore.testReset(me.id, msg.revision);
+    if (result.changed) {
+      fantasyParty.leave(me.id); publishFantasyParties();
+      for (const grant of Object.values(prior.character?.contracts ?? {})) fantasyContracts.release(me.id, grant.offerId);
+      fantasyConversationActions.clear(me.id);
+      fantasyBargaining.clear(me.id);
+      browserAiPool.cancelOwner(me.id);
+      for (const connection of homeConnections.values()) if (connection.id === me.id) connection.browserAi.cancelPending();
+      reportedFantasyHunts.delete(me.id);
+      sendTo([me.id], { t: 'fantasyProfile', profile: result.profile });
+      sendTo([me.id], { t: 'communityState', state: fantasyCommunity.state(communityActor(me)) });
+      for (const user of users.values()) if (user.session && worldOf.get(user.session) === 'fantasy') publishFantasyWorld(user);
+    } else send(ws, { t: 'fantasyProfile', profile: result.profile, error: result.error });
+    return;
+  }
+  if (msg.t === 'npcChat') {
+    const inFantasy=!!me.session&&worldOf.get(me.session)==='fantasy';
+    if(inFantasy){const sync=fantasyStore.synchronize(me.id);if(sync.changed)sendTo([me.id],{t:'fantasyProfile',profile:sync.profile});}
+    const profile=fantasyStore.profile(me.id),character=inFantasy?profile.character??undefined:undefined;
+    const npcDynamicFacts=inFantasy&&['ko','en','ja'].includes(msg.locale)?fantasyDialogueFacts(me,msg.locale):undefined;
+    const npcDiagnosticToken=inFantasy&&typeof msg.text==='string'&&typeof msg.requestId==='string'&&/^[a-zA-Z0-9_-]{1,80}$/u.test(msg.requestId)&&['ko','en','ja'].includes(msg.locale)&&NPC_PUBLIC.some(npc=>npc.id===msg.npcId)
+      ?fantasyDialogueObserver.begin(ws,{actorId:me.id,sessionId:me.session,kind:'npc',requestId:msg.requestId,locale:msg.locale,npcId:msg.npcId,query:msg.text,
+        generation:profile.generation??1,location:character?.location,profile,dynamicFacts:npcDynamicFacts}):undefined;
+    const validDialogue=typeof msg.requestId==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(msg.requestId)&&['ko','en','ja'].includes(msg.locale)&&typeof msg.text==='string'&&msg.text.length<=800&&NPC_PUBLIC.some(npc=>npc.id===msg.npcId&&npc.homeLocation===character?.location);
+    const releaseConversation=inFantasy&&validDialogue?browserAiPool.beginConversation(me.id):()=>{};
+    if(inFantasy&&validDialogue&&(profile.activity||profile.combatId||fantasyStore.civicBlocked(me.id))){
+      releaseConversation();
+      send(ws,{t:'npcReply',requestId:msg.requestId,npcId:msg.npcId,locale:msg.locale,text:{ko:'하던 일을 마친 뒤에 다시 이야기하자.',en:'Let us talk after you have finished what you are doing.',ja:'今の用事が終わってから、また話しましょう。'}[msg.locale],model:'',source:'canon',relationship:'familiar',error:'busy'},npcDiagnosticToken);return;
+    }
+    if(inFantasy&&validDialogue){
+      const apply=(revision:number,action:import('../shared/fantasy.ts').FantasyAction)=>applyFantasyUserAction(contractActor(me),revision,action);
+      const context={user:me.id,speaker:msg.npcId,locale:msg.locale,profile,marketQuote:(action:import('../shared/fantasy.ts').FantasyAction)=>fantasyMarketQuote(me,action,msg.locale),text:msg.text};
+      const land = fantasyPropertyDialogue.chat({user:me.id,npc:msg.npcId,text:msg.text,locale:msg.locale,profile,state:fantasyStore.propertyState(me.id),requestId:msg.requestId},command=>{
+        const result=fantasyStore.propertyRequest(me.id,command);for(const update of result.updates)sendTo([update.user],{t:'fantasyProfile',profile:update.profile});return result;
+      },()=>fantasyStore.propertyState(me.id));
+      if(land.handled){releaseConversation();send(ws,{t:'npcReply',requestId:msg.requestId,npcId:msg.npcId,locale:msg.locale,text:land.text??'',model:'',source:'canon',relationship:'familiar'},npcDiagnosticToken);send(ws,{t:'fantasyPropertyState',state:fantasyStore.propertyState(me.id)});publishFantasyRealms();return;}
+      const bargain=fantasyBargaining.chat({...context,npcId:msg.npcId},apply);
+      const conversation=bargain.handled?bargain:fantasyConversationActions.confirm(context,apply);
+      if(conversation.handled){
+        releaseConversation();
+        if(conversation.result)sendTo([me.id],{t:'fantasyProfile',profile:conversation.result.profile,error:conversation.result.error});
+        send(ws,{t:'npcReply',requestId:msg.requestId,npcId:msg.npcId,locale:msg.locale,text:conversation.result?.error?{ko:'지금은 그렇게 도와주기 어렵겠어. 준비가 되면 다시 이야기하자.',en:'I cannot arrange that just now. Let us talk again when you are ready.',ja:'今はそうするのは難しそうです。準備が整ってから話しましょう。'}[msg.locale]:conversation.text??'',model:'',source:'canon',relationship:'familiar'},npcDiagnosticToken);
+        publishFantasyWorld(me);return;
+      }
+    }
+    const npcConversationSession=me.session,npcConversationWorld=me.session?worldOf.get(me.session):undefined;
+    const conversationCurrent=()=>{
+      const current=fantasyStore.profile(me.id);
+      return ws.readyState===WebSocket.OPEN&&(!inFantasy||fantasySocketAuthorized(ws))&&state.id===me.id&&current.revision===profile.revision&&(current.generation??1)===(profile.generation??1)&&current.character?.lifeStartedAt===profile.character?.lifeStartedAt&&current.character?.location===profile.character?.location&&users.get(me.id)?.session===npcConversationSession&&(npcConversationSession?worldOf.get(npcConversationSession):undefined)===npcConversationWorld;
+    };
+    void npcChat.chat(character?me.id+':life-'+(profile.generation??1):me.id, { requestId: msg.requestId, text: msg.text, reset: msg.reset, locale: msg.locale, npcId: msg.npcId }, {
+      browserGenerate:inFantasy?(personal,signal,shared,progress)=>browserAiPool.generateFor(me.id,npcConversationSession!,state.browserAi,personal,signal,shared,progress):undefined,onProgress:inFantasy?text=>{if(conversationCurrent())send(ws,{t:'fantasyDialogueChunk',kind:'npc',requestId:msg.requestId,locale:msg.locale,npcId:msg.npcId,text});}:undefined,isCurrent:conversationCurrent,completedQuests: character?.completed ?? [], character,
+      contractBoard:character&&NPC_PUBLIC.some(npc=>npc.id===msg.npcId&&npc.building==='guild')?fantasyContracts.state(contractActor(me),fantasyClock.snapshot().hour)??undefined:undefined,
+      dynamicFacts:npcDynamicFacts,
+      communityFacts: character ? [...fantasyCommunity.facts(communityActor(me), msg.locale), ...fantasyStore.legacyFacts(me.id, msg.locale), ...fantasyStore.realmFacts(me.id,msg.locale,msg.npcId)] : [],
+    }).then(reply=>{
+      let text=reply.text;
+      const current=fantasyStore.profile(me.id);
+      if(inFantasy&&validDialogue&&reply.source==='canon'&&reply.actions?.length&&current.revision===profile.revision&&(current.generation??1)===(profile.generation??1)){
+        const proposal=fantasyConversationActions.propose({user:me.id,speaker:msg.npcId,locale:msg.locale,profile:current,marketQuote:action=>fantasyMarketQuote(me,action,msg.locale),query:msg.text},reply.actions.map(action=>({action,label:fantasyGmActivityName({...current,activity:{action,startedAt:character?.hour??0,endsAt:(character?.hour??0)+1,seed:0}},msg.locale)})));
+        text=proposal.text;
+      }
+      send(ws,{t:'npcReply',...reply,text,actions:undefined},npcDiagnosticToken);
+    },error=>{console.error('[npc] request failed',error);send(ws,{t:'npcReply',requestId:msg.requestId,text:'',model:'',npcId:'rin',locale:'en',relationship:'stranger',error:'unavailable'},npcDiagnosticToken);}).finally(releaseConversation);
+    return;
+  }
+  if (msg.t === 'communityContribute') {
+    if (me.session && worldOf.get(me.session) === 'fantasy') {
+      const synchronized = fantasyStore.synchronize(me.id);
+      if (synchronized.changed) sendTo([me.id], { t: 'fantasyProfile', profile: synchronized.profile });
+    }
+    const result = fantasyCommunity.contribute(communityActor(me), { requestId: msg.requestId, revision: msg.revision, npcId: msg.npcId });
+    if (result.error) send(ws, { t: 'communityState', ...result });
+    else for (const user of users.values()) if (user.session && worldOf.get(user.session) === 'fantasy') sendTo([user.id], { t: 'communityState', state: fantasyCommunity.state(communityActor(user)) });
+    return;
+  }
+  if (msg.t === 'fantasyContracts') { publishFantasyWorld(me); return; }
+  if (msg.t === 'fantasyRealmRequest') {
+    if (!me.session || worldOf.get(me.session) !== 'fantasy') { send(ws, { t: 'fantasyRealmState', state: null, error: 'unavailable' }); return; }
+    const result = Object.keys(msg).length === 3 ? fantasyStore.realmRequest(me.id, { domain: msg.domain, command: msg.command }, fantasyRealmContext(me)) : { updates: [], error: 'invalid' };
+    for (const update of result.updates) { sendTo([update.user], { t: 'fantasyProfile', profile: update.profile }); fantasyParty.invalidate(update.user); }
+    publishFantasyRealms(); send(ws, { t: 'fantasyRealmState', state: fantasyStore.realmState(me.id, fantasyRealmContext(me)), ...(result.error ? { error: result.error } : {}) });
+    publishFantasyParties(); publishFantasyRealms(); return;
+  }
+  if (msg.t === 'fantasyPropertyRequest') {
+    if (!me.session || worldOf.get(me.session) !== 'fantasy') { send(ws, { t: 'fantasyPropertyState', state: null, error: 'unavailable' }); return; }
+    const targetName = msg.command && typeof msg.command === 'object' && 'target' in msg.command ? String(msg.command.target) : undefined;
+    const propertyTarget = targetName ? [...users.values()].find(peer => peer.session === me.session && (peer.id === targetName || fantasyStore.profile(peer.id).character?.name === targetName)) : undefined;
+    if (targetName && (!propertyTarget || propertyTarget.session !== me.session)) { send(ws, { t: 'fantasyPropertyState', state: fantasyStore.propertyState(me.id), error: 'invalid' }); return; }
+    const result = Object.keys(msg).length === 2 ? fantasyStore.propertyRequest(me.id, msg.command) : { updates: [], error: 'invalid' as const };
+    for (const update of result.updates) {
+      sendTo([update.user], { t: 'fantasyProfile', profile: update.profile }); fantasyParty.invalidate(update.user);
+    }
+    send(ws, { t: 'fantasyPropertyState', state: fantasyStore.propertyState(me.id), ...(result.error ? { error: result.error } : {}) });
+    publishFantasyParties(); return;
+  }
+  if (msg.t === 'fantasyPartyRequest') {
+    const result = Object.keys(msg).length === 2 ? fantasyParty.request(me.id, msg.command) : { error: 'invalid' as const };
+    for (const update of result.updates ?? []) sendTo([update.user], { t: 'fantasyProfile', profile: update.profile });
+    send(ws, { t: 'fantasyPartyState', state: fantasyParty.state(me.id), ...(result.error ? { error: result.error } : {}) });
+    publishFantasyParties(); publishFantasyCombats(); return;
+  }
+  if (msg.t === 'fantasyCombatRequest') {
+    if (!me.session || worldOf.get(me.session) !== 'fantasy') { send(ws, { t: 'fantasyCombatState', state: null, error: 'not-in-world' }); return; }
+    const command: unknown = msg.command;
+    const value = command && typeof command === 'object' && !Array.isArray(command) ? command as Record<string, unknown> : undefined;
+    const keys = (...fields: string[]) => !!value && Object.keys(value).length === fields.length + 1 && fields.every(field => Object.hasOwn(value, field));
+    const text = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 160 && !/[\u0000-\u001f\u007f]/.test(value);
+    let result: ReturnType<FantasyStore['startCombat']> = { updates: [], error: 'invalid' };
+    if (Object.keys(msg).length === 2 && value?.type === 'sync' && keys()) result = { updates: [] };
+    else if (Object.keys(msg).length === 2 && value?.type === 'inspect' && keys('target') && text(value.target)) result = fantasyStore.inspectCombat(me.id, value.target);
+    else if (Object.keys(msg).length === 2 && value?.type === 'start' && (keys('source', 'target') || keys('source', 'target', 'confirm') && typeof value.confirm === 'boolean')
+      && text(value.target) && ['hunt', 'story', 'encounter', 'apex', 'challenge', 'escort'].includes(String(value.source))) {
+      const p = fantasyStore.profile(me.id);
+      result = value.source === 'escort' ? fantasyStore.startEscortCombat(me.id,me.session,value.target) : p.character ? fantasyStore.startCombat([{ user: me.id, session: me.session, location: p.character.location, generation: p.generation ?? 1,
+        source: value.source as 'hunt' | 'story' | 'encounter' | 'apex' | 'challenge', target: value.target, ...(value.confirm !== undefined ? { confirm: value.confirm as boolean } : {}) }]) : { updates: [], error: 'not-alive' };
+    } else if (Object.keys(msg).length === 2 && value?.type === 'order' && keys('combatId', 'revision', 'order') && text(value.combatId) && Number.isSafeInteger(value.revision)) result = fantasyStore.combatOrder(me.id, me.session, value.combatId, value.revision, value.order as never);
+    for (const update of result.updates) { sendTo([update.user], { t: 'fantasyProfile', profile: update.profile }); const actor = users.get(update.user); if (actor) publishFantasyWorld(actor); }
+    if (result.updates.length) fantasyParty.invalidate(me.id);
+    send(ws, { t: 'fantasyCombatState', state: fantasyStore.combat(me.id, me.session), ...(result.error ? { error: result.error } : {}) });
+    publishFantasyParties(); publishFantasyCombats(); return;
+  }
+  if (msg.t === 'fantasyAction') {
+    const previousRevision = fantasyStore.profile(me.id).revision;
+    const actor = contractActor(me);
+    let result;
+    const questId = msg.action.type === 'accept' ? msg.action.quest : undefined;
+    const quest = FANTASY_QUESTS.find(quest => quest.id === questId);
+    if(msg.action.type==='haggle')result=fantasyStore.reject(me.id,'値段交渉は取引相手との会話で依頼してください。');
+    else if (msg.action.type === 'accept' && quest && !fantasyPersonalQuest(quest)) {
+      const claim = fantasyContracts.claim(actor, { quest: quest.id, offer: msg.action.offer ?? '' }, fantasyClock.snapshot().hour,
+        grant => applyFantasyUserAction(actor, msg.revision, msg.action, { contract: grant }));
+      result = claim.result ?? fantasyStore.reject(me.id, fantasyContractErrorText(claim.error ?? 'unavailable', 'ja'));
+    } else {
+      const prior = fantasyStore.profile(me.id);
+      result = applyFantasyUserAction(actor, msg.revision, msg.action);
+      if (result.changed && (msg.action.type === 'abandon' || msg.action.type === 'rebirth')) {
+        for (const [id, grant] of Object.entries(prior.character?.contracts ?? {})) if (msg.action.type === 'rebirth' || id === msg.action.quest) fantasyContracts.release(me.id, grant.offerId);
+      }
+    }
+    if (result.changed || result.profile.revision !== previousRevision) sendTo([me.id], { t: 'fantasyProfile', profile: result.profile });
+    if (!result.changed) send(ws, { t: 'fantasyProfile', profile: result.profile, error: result.error });
+    send(ws, { t: 'fantasyClock', clock: fantasyClock.snapshot() });
+    sendTo([me.id], { t: 'communityState', state: fantasyCommunity.state(communityActor(me)) });
+    for (const user of users.values()) if (user.session && worldOf.get(user.session) === 'fantasy') publishFantasyWorld(user);
+    return;
+  }
+  if (msg.t === 'fantasyGmChat') {
+    const world = me.session ? worldOf.get(me.session) : undefined;
+    if (me.session && world === 'fantasy') {
+      const synchronized = fantasyStore.synchronize(me.id);
+      if (synchronized.changed) sendTo([me.id], { t: 'fantasyProfile', profile: synchronized.profile });
+    }
+    const profile=fantasyStore.profile(me.id);
+    const gmDynamicFacts=me.session&&world==='fantasy'&&['ko','en','ja'].includes(msg.locale)?fantasyDialogueFacts(me,msg.locale):undefined;
+    const gmDiagnosticToken=me.session&&world==='fantasy'&&typeof msg.text==='string'&&typeof msg.requestId==='string'&&/^[a-zA-Z0-9_-]{1,80}$/u.test(msg.requestId)&&['ko','en','ja'].includes(msg.locale)
+      ?fantasyDialogueObserver.begin(ws,{actorId:me.id,sessionId:me.session,kind:'gm',requestId:msg.requestId,locale:msg.locale,query:msg.text,
+        generation:profile.generation??1,location:profile.character?.location,profile,dynamicFacts:gmDynamicFacts}):undefined;
+    const validDialogue=typeof msg.requestId==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(msg.requestId)&&['ko','en','ja'].includes(msg.locale)&&typeof msg.text==='string'&&msg.text.length<=500;
+    const releaseConversation=me.session&&world==='fantasy'&&validDialogue?browserAiPool.beginConversation(me.id):()=>{};
+    if(me.session&&world==='fantasy'&&validDialogue){
+      const confirmed=fantasyConversationActions.confirm({user:me.id,speaker:'gm',locale:msg.locale,profile,marketQuote:action=>fantasyMarketQuote(me,action,msg.locale),text:msg.text},(revision,action)=>applyFantasyUserAction(contractActor(me),revision,action));
+      if(confirmed.handled){
+        releaseConversation();
+        if(confirmed.result)sendTo([me.id],{t:'fantasyProfile',profile:confirmed.result.profile,error:confirmed.result.error});
+        send(ws,{t:'fantasyGmReply',requestId:msg.requestId,locale:msg.locale,source:'rules',reply:{text:confirmed.result?.error?{ko:'지금은 진행할 수 없습니다. 현재 상태를 확인해 주세요.',en:'This cannot be started now. Please check your current state.',ja:'今は開始できません。現在の状態を確認してください。'}[msg.locale]:confirmed.text??'',suggestions:[]}},gmDiagnosticToken);publishFantasyWorld(me);return;
+      }
+    }
+    const conversationSession=me.session;
+    const conversationCurrent=()=>{
+      const current=fantasyStore.profile(me.id);
+      return ws.readyState===WebSocket.OPEN&&fantasySocketAuthorized(ws)&&state.id===me.id&&current.revision===profile.revision&&(current.generation??1)===(profile.generation??1)&&current.character?.lifeStartedAt===profile.character?.lifeStartedAt&&current.character?.location===profile.character?.location&&users.get(me.id)?.session===conversationSession&&worldOf.get(conversationSession??'')===world;
+    };
+    void fantasyGmChat.chat(me.id+':life-'+(profile.generation??1), { requestId: msg.requestId, text: msg.text, locale: msg.locale }, { browserGenerate:me.session&&world==='fantasy'?(personal,signal,shared,progress)=>browserAiPool.generateFor(me.id,conversationSession!,state.browserAi,personal,signal,shared,progress):undefined,onProgress:text=>{if(conversationCurrent())send(ws,{t:'fantasyDialogueChunk',kind:'gm',requestId:msg.requestId,locale:msg.locale,text});},isCurrent:conversationCurrent,session: me.session, world, profile, dynamicFacts: gmDynamicFacts, communityFacts: [...fantasyCommunity.facts(communityActor(me), msg.locale), ...fantasyStore.legacyFacts(me.id, msg.locale), ...fantasyStore.realmFacts(me.id,msg.locale)] })
+      .then(reply=>{
+        const current=fantasyStore.profile(me.id);
+        const actions=reply.reply.suggestions.flatMap(suggestion=>suggestion.action?[{action:suggestion.action,label:suggestion.label}]:[]);
+        let text=reply.reply.text;
+        if(me.session&&world==='fantasy'&&reply.source==='rules'&&actions.length&&current.revision===profile.revision&&(current.generation??1)===(profile.generation??1))text=fantasyConversationActions.propose({user:me.id,speaker:'gm',locale:msg.locale,profile:current,marketQuote:action=>fantasyMarketQuote(me,action,msg.locale),query:msg.text},actions).text;
+        send(ws,{t:'fantasyGmReply',...reply,reply:{text,suggestions:[]}},gmDiagnosticToken);
+      })
+      .catch(error => {
+        console.error('[fantasy-gm] request failed', error);
+        send(ws, { t: 'fantasyGmReply', requestId: msg.requestId, locale: msg.locale, source: 'local', error: 'unavailable', reply: { text: '', suggestions: [] } },gmDiagnosticToken);
+      }).finally(releaseConversation);
+    return;
+  }
   if (msg.t === 'marketLike') {
-    if (marketLikes.like(msg.product, me.id)) {
+    const original = homeUser(state) ?? me;
+    if (marketLikes.like(msg.product, original.id)) {
       saveMarketLikes();
-      for (const id of sockets.keys()) sendTo([id], { t: 'marketLikes', ...marketLikes.snapshot(id) });
-    } else send(ws, { t: 'marketLikes', ...marketLikes.snapshot(me.id) });
+      for (const [socket, connection] of homeConnections) {
+        const user = homeUser(connection);
+        if (user) send(socket, { t: 'marketLikes', ...marketLikes.snapshot(user.id) });
+      }
+    } else send(ws, { t: 'marketLikes', ...marketLikes.snapshot(original.id) });
     return;
   }
   if (msg.t === 'profileUpdated') {
-    const icon = iconVersion(me.name);
-    const avatar = avatarVersion(me.name);
-    const bio = bioOf(me.name);
-    for (const u of users.values()) if (u.name === me.name) { u.icon = icon; u.avatar = avatar; u.bio = bio; }
+    const original=homeUser(state)??me;
+    const icon = iconVersion(original.name);
+    const avatar = avatarVersion(original.name);
+    const bio = bioOf(original.name);
+    updateHomeUser(original.name,{icon,avatar,bio});
     broadcastUsers();
     return;
   }
   if (msg.t === 'followUser') {
+    const original = homeUser(state) ?? me;
     const target = typeof msg.name === 'string' ? msg.name : '';
     // 一度でも来たことのある名前だけ。打ち間違いや存在しない名前の辺を溜めない
-    if (target === me.name || !Object.hasOwn(people, target)) return;
-    const changed = msg.on ? follows.add(me.name, target) : follows.remove(me.name, target);
+    if (target === original.name || !Object.hasOwn(people, target)) return;
+    const changed = msg.on ? follows.add(original.name, target) : follows.remove(original.name, target);
     if (!changed) return;
     saveFollows();
-    const noticeKey = `${me.name}\u0000${target}`;
+    const noticeKey = `${original.name}\u0000${target}`;
     if (msg.on && !(Date.now() - (followNoticeAt.get(noticeKey) ?? 0) < FOLLOW_NOTICE_MS)) {
       followNoticeAt.set(noticeKey, Date.now());
-      sendToNames([target], { t: 'followed', from: me.id, fromName: me.name });
+      sendToNames([target], { t: 'followed', from: original.id, fromName: original.name });
     }
-    for (const n of [me.name, target]) sendToNames([n], { t: 'friends', names: friendsOf(n) });
+    for (const n of [original.name, target]) sendToNames([n], { t: 'friends', names: friendsOf(n) });
     broadcastFollows();
     broadcastSessions();
     broadcastPeople();
     return;
   }
-  if (handleTimeline(me, msg)) return;
-  if (handleHome(me, msg, ws)) return;
+  const original = homeUser(state) ?? me;
+  if (handleTimeline(original, msg)) return;
+  if (handleHome(original, msg, ws)) return;
   const sid = me.session;
 
   switch (msg.t) {
@@ -1009,24 +1609,37 @@ function handle(ws: WebSocket, state: { id: string | null; syncRequest?: string 
     }
     case 'join': {
       const def = guild.sessions.find((d) => d.id === msg.sid);
-      if (!def || !canSeeSession(def, me.name, friendsOf(me.name), home.groups, [...users.values()])) {
+      if (!def || !canSeeSession(def, original.name, friendsOf(original.name), home.groups, homeUsers())) {
         if (msg.requestId) send(ws, { t: 'sessionResult', requestId: msg.requestId, error: 'このセッションには参加できません' });
         return;
       }
-      if (sid === msg.sid) {
-        if (msg.requestId) send(ws, { t: 'sessionResult', requestId: msg.requestId });
+      const enteringFantasy=worldOf.get(msg.sid)==='fantasy';
+      if(enteringFantasy&&fantasyAccountSessionConflict(state,msg.sid)){
+        fantasyAccountState(ws,state,'unavailable');
+        if(msg.requestId)send(ws,{t:'sessionResult',requestId:msg.requestId,error:'このセッションには参加できません'});
         return;
       }
-      leaveSession(me);
-      me.session = msg.sid;
+      let entering=me;
+      if(enteringFantasy&&!fantasyAccountTestBypass(state)&&state.accountBinding&&fantasyAccounts.bindingCurrent(state.accountBinding))entering=switchFantasyIdentity(ws,state,state.accountBinding.account.principal)??me;
+      else if(!enteringFantasy&&me.id.startsWith('fantasy:')){
+        leaveSession(me);
+        for(const [socket,connection]of [...homeConnections])if(connection.id===me.id&&connection.homeId){switchFantasyIdentity(socket,connection,connection.homeId);fantasyAccountState(socket,connection);}
+        entering=users.get(state.id!)??me;
+      }
+      if(entering.session===msg.sid){if(enteringFantasy&&!fantasyAccountTestBypass(state)){fantasyAccountState(ws,state);publishFantasyInitial(ws,state,entering);}if(msg.requestId)send(ws,{t:'sessionResult',requestId:msg.requestId});return;}
+      leaveSession(entering);
+      entering.session = msg.sid;
+      if(enteringFantasy&&!fantasyAccountTestBypass(state))fantasyAccountState(ws,state);
+      publishFantasyParties();
       cancelEmptyCheck(msg.sid);
-      me.mode = '2d';
+      entering.mode = '2d';
       thumbnails.update(msg.sid, inSession(msg.sid));
       const visit = visits.get(msg.sid) ?? { from: Date.now(), people: new Set<string>(), log: [] };
-      visit.people.add(me.name);
+      visit.people.add(entering.name);
       visits.set(msg.sid, visit);
       broadcastUsers(); sendPresence(msg.sid);
-      event(msg.sid, `${me.name} が入室しました`);
+      event(msg.sid, `${entering.name} が入室しました`);
+      if(enteringFantasy){if(!fantasyAccountTestBypass(state))publishFantasyInitial(ws,state,entering);}else fantasyAccountState(ws,state);
       // フレンド+ のセッションは中にいる人で見える人が変わる
       broadcastSessions();
       if (msg.requestId) send(ws, { t: 'sessionResult', requestId: msg.requestId });
@@ -1034,6 +1647,7 @@ function handle(ws: WebSocket, state: { id: string | null; syncRequest?: string 
     }
     case 'leave': {
       leaveSession(me);
+      if(me.id.startsWith('fantasy:'))for(const [socket,connection]of [...homeConnections])if(connection.id===me.id&&connection.homeId){switchFantasyIdentity(socket,connection,connection.homeId);fantasyAccountState(socket,connection);}
       broadcastUsers();
       broadcastSessions();
       if (msg.requestId) send(ws, { t: 'sessionResult', requestId: msg.requestId });
@@ -1641,7 +2255,7 @@ function handleHome(me: User, msg: ClientMsg, ws: WebSocket): boolean {
       rec.statusText = trimTo(msg.text, STATUS_TEXT_MAX);
       if (rec.statusText) rec.recent = [rec.statusText, ...rec.recent.filter((t) => t !== rec.statusText)].slice(0, 5);
       savePeople();
-      for (const u of users.values()) if (u.name === me.name) { u.status = rec.status; u.statusText = rec.statusText; }
+      updateHomeUser(me.name,{status:rec.status,statusText:rec.statusText});
       broadcastUsers();
       broadcastPeople();
       sendWatching(me.name);
@@ -1658,7 +2272,7 @@ function handleHome(me: User, msg: ClientMsg, ws: WebSocket): boolean {
       return true;
     }
     case 'askJoin': {
-      const target = users.get(msg.to);
+      const target = homeUserById(msg.to);
       if (!target?.session || target.status === 'busy' || !friendsOf(me.name).includes(target.name)) return true;
       sendTo([target.id], { t: 'askJoin', from: me.id, fromName: me.name, session: target.session });
       return true;
@@ -1710,12 +2324,12 @@ function handleHome(me: User, msg: ClientMsg, ws: WebSocket): boolean {
       return true;
     }
     case 'invite': {
-      const other = users.get(msg.to);
+      const other = homeUserById(msg.to);
       // 取り込み中の人には誘いを届けない
       if (!other || other.name === me.name || other.status === 'busy') return true;
       if (msg.kind === 'session') {
         const def = guild.sessions.find((d) => d.id === msg.id);
-        if (!def || !canSeeSession(def, me.name, friendsOf(me.name), home.groups, [...users.values()])) return true;
+        if (!def || !canSeeSession(def, me.name, friendsOf(me.name), home.groups, homeUsers())) return true;
         if (def.owner && !def.invited!.includes(other.name)) { def.invited!.push(other.name); saveHome(); broadcastSessions(); }
       } else if (!home.groups.find((g) => g.id === msg.id)?.members.includes(me.name)) return true;
       sendTo(idsByName(other.name), { t: 'invite', kind: msg.kind, id: msg.id, from: me.id, fromName: me.name });
@@ -1725,7 +2339,7 @@ function handleHome(me: User, msg: ClientMsg, ws: WebSocket): boolean {
   return false;
 }
 
-function onClose(ws: WebSocket, id: string | null) {
+function onClose(ws: WebSocket, id: string | null, quiet=false) {
   revokeSync(ws);
   if (!id) return;
   const set = sockets.get(id);
@@ -1738,13 +2352,9 @@ function onClose(ws: WebSocket, id: string | null) {
   users.delete(id);
   lastAttention.delete(id);
   lastRoll.delete(id);
-  broadcastUsers();
-  if (wasIn) broadcastSessions();
-  if (u && !isOnline(u.name)) {
-    personRec(u.name).lastSeen = Date.now();
-    savePeople();
-    broadcastPeople();
-  }
+  fantasyPartyPublished.delete(id); fantasyCombatPublished.delete(id); publishFantasyParties();
+  if(!quiet)broadcastUsers();
+  if (wasIn&&!quiet) broadcastSessions();
 }
 
 const MIME: Record<string, string> = {
@@ -1759,6 +2369,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   // 絶対形式の壊れたリクエストターゲット（例: http://[::1）でも new URL が例外になるため、ここで 400 にする
   let url: URL;
   try { url = new URL(req.url ?? '/', 'http://x'); } catch { res.statusCode = 400; res.end('bad path'); return; }
+  if (await fantasyAccounts.handleHttp(req, res)) return;
   if (url.pathname === '/api/content-translations') {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
@@ -2001,15 +2612,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     }
     return;
   }
-  // 不正な % エンコーディングで例外になると、async ハンドラの未処理 rejection でプロセスごと落ちる
-  let pathname: string;
-  try { pathname = decodeURIComponent(url.pathname); } catch { res.statusCode = 400; res.end('bad path'); return; }
-  let file = path.join(DIST, pathname);
-  // 接頭辞一致だと DIST の兄弟 (dist2 等) を通してしまうため、相対パスで「中にある」ことを厳密に見る
-  const relToDist = path.relative(DIST, file);
-  const insideDist = relToDist === '' || (!relToDist.startsWith(`..${path.sep}`) && !path.isAbsolute(relToDist));
-  if (!insideDist || !fs.existsSync(file) || fs.statSync(file).isDirectory())
-    file = path.join(DIST, 'index.html');
+  try { decodeURIComponent(url.pathname); } catch { res.statusCode = 400; res.end('bad path'); return; }
+  const file = resolvePublicFile(DIST,url.pathname) ?? path.join(DIST,'index.html');
   if (!fs.existsSync(file)) {
     res.statusCode = 404;
     res.end('client not built. run `npm run dev` and open http://localhost:5173');
@@ -2057,16 +2661,22 @@ server.on('upgrade', (req, socket, head) => {
   else if (pathname === '/ws') wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
   else socket.destroy();
 });
-wss.on('connection', (ws) => {
-  const state = { id: null as string | null };
-  // maxPayload 超過などで ws が 'error' を出す。接続を閉じるのは ws 側が行う (超過時は 1009) が、
-  // リスナーが無いと例外として投げられプロセスごと落ちるため、受けるだけのハンドラを置く
+wss.on('connection', (ws, req) => {
+  let binding:AccountBinding|undefined;
+  try{
+    const origin=typeof req.headers.origin==='string'?new URL(req.headers.origin):undefined;
+    if(origin&&origin.host===req.headers.host&&['http:','https:'].includes(origin.protocol)&&req.headers['sec-fetch-site']!=='cross-site')binding=fantasyAccounts.readBinding(req);
+  }catch{}
+  const state: HomeConnectionState = { id: null, accountBinding:binding,browserAi:new BrowserAiBroker(message=>send(ws,message)), remoteAddress:req.socket.remoteAddress };
+  homeConnections.set(ws, state);
+  const unregisterAi=browserAiPool.register(state.browserAi,{user:()=>state.id,session:()=>state.id?users.get(state.id)?.session??null:null,eligible:()=>ws.readyState===WebSocket.OPEN&&fantasySocketAuthorized(ws)&&!!state.id&&worldOf.get(users.get(state.id)?.session??'')==='fantasy'});
+  // maxPayload 超過などの接続エラーを未処理例外にしない。
   ws.on('error', () => {});
   ws.on('message', (raw) => {
     try { handle(ws, state, JSON.parse(String(raw)) as ClientMsg); }
     catch (e) { console.error('bad message', e); }
   });
-  ws.on('close', () => onClose(ws, state.id));
+  ws.on('close', () => {const original=homeUser(state),actor=state.id?users.get(state.id):undefined;if(actor?.session&&worldOf.get(actor.session)==='fantasy')fantasyDiagnostics.record({type:'connection',actorId:actor.id,sessionId:actor.session,operation:'disconnect',status:'ok'});fantasyDialogueObserver.cancel(ws,'disconnect');unregisterAi();homeConnections.delete(ws);state.browserAi.close();onClose(ws,state.id);markHomeOffline(original);});
 });
 
 // 2D の人が他の人やアイテムと重なっていたら押し出す
@@ -2099,10 +2709,11 @@ const systemTick = setInterval(() => {
 }, 100);
 systemTick.unref();
 
+let shuttingDown=false;
 for (const sig of ['SIGINT', 'SIGTERM'] as const) process.on(sig, () => {
+  if(shuttingDown)return;shuttingDown=true;
   clearInterval(systemTick);
   systems.dispose();
-  // 遅延保存の保留分は落とす前に書き出す。broadcast の later は保存ではないので対象外
   saveMarketLikes.flush();
   saveSurvivorProfiles.flush();
   flushItems();
@@ -2111,10 +2722,16 @@ for (const sig of ['SIGINT', 'SIGTERM'] as const) process.on(sig, () => {
   saveTimeline.flush();
   savePeople.flush();
   saveInbox.flush();
-  shutdownRooms().finally(() => process.exit(0));
+  fantasyClock.checkpoint(true);
+  try{fantasyBackups.checkpoint('shutdown',true);}catch(error){console.error('[fantasy-backup] shutdown snapshot failed',error);}
+  fantasyDiagnostics.record({type:'runtime.stop',status:'ok',droppedCount:fantasyDiagnostics.stats.dropped});
+  const closeDiagnostics=Promise.race([fantasyDiagnostics.close(),new Promise<void>(resolve=>{setTimeout(resolve,2000).unref();})]);
+  Promise.all([shutdownRooms(),closeDiagnostics]).finally(()=>{fantasyBackups.releaseRuntime();process.exit(0);});
 });
+process.on('exit',()=>fantasyBackups.releaseRuntime());
 
 server.listen(PORT, () => {
+  fantasyDiagnostics.record({type:'runtime.start',status:'ok',operation:'server'});
   console.log(`server on http://localhost:${PORT}`);
   console.log(`sessions: ${guild.sessions.map((w) => w.name).join(' ')}`);
   if (!process.env.LIVEKIT_URL) console.warn('LIVEKIT_* が未設定: 音声・画面共有は無効になります');
