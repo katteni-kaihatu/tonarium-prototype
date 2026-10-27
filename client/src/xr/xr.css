@@ -35,6 +35,10 @@
 .xr-active .xr-source button { min-width: 44px; min-height: 44px; padding: 8px 10px; }
 .xr-active .xr-source button:disabled { opacity: .5; }
 .xr-active .xr-source button:focus-visible { outline: 3px solid #fff3a6; outline-offset: 2px; }
+.xr-active .xr-source.dock { background: var(--dock); color: var(--ink); border-color: var(--line); }
+.xr-active .xr-source.dock button:disabled { opacity: 1; }
+.xr-active .xr-source.dock button:focus-visible { outline-color: var(--accent); }
+.xr-active .xr-source.dock .dseg button:focus-visible { outline-offset: -3px; }
 .xr-active .xr-source :is(.modal, .confirm, .profilecard, .survivor-choices) { width: 100% !important; max-width: 100% !important; max-height: none; margin: 0; box-sizing: border-box; }
 .xr-active .xr-source:is(.nearlist, .noticelog, .worldbadge, .dock, .hoverlay, .survivor-panel) { display: flex !important; flex-direction: column; gap: 8px; }
 .xr-active .xr-source .panelcanvas { max-width: 100%; height: auto; }
