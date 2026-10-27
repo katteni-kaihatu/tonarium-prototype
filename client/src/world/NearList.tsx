@@ -23,6 +23,7 @@ import { openWindow, toggleFromList, useIsOpen } from './windows.ts';
 import { PeerVolume } from './VolumeMenus.tsx';
 import { EmoteBadge } from './Emotes.tsx';
 import { SystemItemPanel } from '../systems/SystemItem.tsx';
+import { copySessionUrl } from '../sessionLinks.ts';
 
 type Menu = { kind: 'user'; id: string; rect: DOMRect } | { kind: 'item'; id: string; rect: DOMRect };
 
@@ -285,6 +286,14 @@ function ItemPicker({ anchor, onClose }: { anchor: DOMRect; onClose: () => void 
   );
 }
 
+function SessionCopyButton() {
+  const session = useStore((s) => s.session);
+  if (!session) return null;
+  return <button type="button" className="ib session-copy" aria-label={tr('sessionLinkCopy')} title={tr('sessionLinkCopy')}
+    onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}
+    onClick={(e) => { e.stopPropagation(); void copySessionUrl(session); }}><Icon name="link" size={20} /></button>;
+}
+
 export function NearList() {
   const folded = useStore((s) => s.folded.left);
   const selfId = useStore((s) => s.selfId);
@@ -311,12 +320,15 @@ export function NearList() {
 
   if (folded) {
     return (
-      <button className="foldedpanel left" onClick={() => fold(false)} aria-label={tr("ui624")}>
-        <Icon name="right" size={14} stroke={2.4} />
-        <span className="fp"><Icon name="people" size={18} /><b>{players.length + 1}</b></span>
-        <span className="fpline" />
-        <span className="fp"><Icon name="box" size={18} /><b>{items.length}</b></span>
-      </button>
+      <div className="foldedpanel left">
+        <button type="button" className="ib folded-summary" onClick={() => fold(false)} aria-label={tr("ui624")}>
+          <Icon name="right" size={14} stroke={2.4} />
+          <span className="fp"><Icon name="people" size={18} /><b>{players.length + 1}</b></span>
+          <span className="fpline" />
+          <span className="fp"><Icon name="box" size={18} /><b>{items.length}</b></span>
+        </button>
+        <SessionCopyButton />
+      </div>
     );
   }
   return (
@@ -357,6 +369,7 @@ export function NearList() {
         />
         {!items.length && <div className="empty">{tr("ui629")}</div>}
       </div>
+      <div className="session-copy-row"><SessionCopyButton /></div>
       {menu && <ActionMenu menu={menu} onClose={() => setMenu(null)} />}
       {picker && <ItemPicker anchor={picker} onClose={() => setPicker(null)} />}
       {vol && <PeerVolume key={vol.name} name={vol.name} anchor={vol.rect} onClose={() => setVol(null)} />}

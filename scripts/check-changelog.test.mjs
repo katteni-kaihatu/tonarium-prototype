@@ -67,11 +67,11 @@ test('文字列のエスケープと省略可能なタグを読み取れる', ()
   assert.deepEqual(parseChangelog(data), [{ date: '2026-10-25', title: "開発者'の変更", items: ['引用符"と\n改行', '実施A'], tag: '保守' }]);
 });
 
-test('CLI はタスク全体の Git 比較元と作業ツリーを比較し、失敗時に修正方法を表示する', () => {
+test('CLI はモードごとに Git 比較元と作業ツリーの履歴を比較し、失敗時に修正方法を表示する', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'tonarium-changelog-'));
   const cli = fileURLToPath(new URL('./check-changelog.mjs', import.meta.url));
   const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-  const run = (...args) => spawnSync(process.execPath, [cli, ...args], { cwd, encoding: 'utf8', env: { ...process.env, CHANGELOG_BASE: '' } });
+  const run = (...args) => spawnSync(process.execPath, [cli, ...args], { cwd, encoding: 'utf8', env: { ...process.env, CHANGELOG_BASE: '', CHANGELOG_MODE: '' } });
   try {
     git('init', '-b', 'main');
     git('config', 'user.name', 'Changelog test');
@@ -81,65 +81,62 @@ test('CLI はタスク全体の Git 比較元と作業ツリーを比較し、�
     mkdirSync(join(cwd, 'changelog'));
     const fragment = join(cwd, 'changelog/2026-10-25-test-task.json');
     writeFileSync(path, base);
+    writeFileSync(fragment, JSON.stringify(added));
     git('add', '.');
     git('-c', 'core.hooksPath=', 'commit', '-m', 'base');
     const baseCommit = git('rev-parse', 'HEAD');
     git('update-ref', 'refs/remotes/origin/main', baseCommit);
 
-    const missing = run('--base', baseCommit);
-    assert.equal(missing.status, 1);
-    assert.match(missing.stderr, /changelog\/YYYY-MM-DD/);
-    assert.match(missing.stderr, /今回実際に行った変更/);
-    assert.equal(run().status, 1);
-    assert.equal(run('--base', 'missing-ref').status, 1);
-
-    writeFileSync(path, source([added, old, older]));
-    assert.equal(run('--base', baseCommit).status, 1);
-    writeFileSync(path, base);
-    writeFileSync(fragment, JSON.stringify(added));
-    assert.equal(run('--base', baseCommit).status, 0);
-    writeFileSync(path, source([entry('置き換えられた履歴'), older]));
-    assert.equal(run('--base', baseCommit).status, 1);
-    writeFileSync(path, base);
-    assert.equal(run('--base', baseCommit).status, 0);
-    git('add', '.');
-    assert.equal(run('--base', baseCommit).status, 0);
-    git('-c', 'core.hooksPath=', 'commit', '-m', 'task changelog');
-    writeFileSync(join(cwd, 'maintenance.md'), '同じタスクの文書更新');
-    git('add', '.');
-    git('-c', 'core.hooksPath=', 'commit', '-m', 'task maintenance');
     assert.equal(run('--base', baseCommit).status, 0);
     assert.equal(run().status, 0);
-    git('update-ref', 'refs/remotes/origin/develop', 'HEAD');
-    assert.equal(run().status, 1);
-    git('update-ref', '-d', 'refs/remotes/origin/develop');
-    assert.equal(run('--base', 'HEAD^').status, 1);
-    const existingBase = git('rev-parse', 'HEAD');
-    const second = join(cwd, 'changelog/2026-10-25-second-task.json');
-    writeFileSync(second, JSON.stringify(entry('次の作業')));
-    assert.equal(run('--base', existingBase).status, 0);
-    writeFileSync(fragment, JSON.stringify(entry('改変')));
-    assert.equal(run('--base', existingBase).status, 1);
-    rmSync(fragment);
-    assert.equal(run('--base', existingBase).status, 1);
-    writeFileSync(fragment, JSON.stringify(added));
-    writeFileSync(second, JSON.stringify(added));
-    assert.equal(run('--base', existingBase).status, 1);
+    assert.equal(run('--base', baseCommit, '--mode', 'main').status, 0);
+    const emptyRelease = run('--base', baseCommit, '--mode', 'release');
+    assert.equal(emptyRelease.status, 1);
+    assert.match(emptyRelease.stderr, /changelog\/YYYY-MM-DD/);
+    assert.equal(run('--base', 'missing-ref').status, 1);
+    assert.equal(run('--base', baseCommit, '--mode', 'unknown').status, 1);
+
+    writeFileSync(join(cwd, 'maintenance.md'), '履歴以外の変更');
+    assert.equal(run('--base', baseCommit).status, 0);
+
+    const second = join(cwd, 'changelog/2026-10-26-second-task.json');
+    writeFileSync(second, JSON.stringify({ ...entry('次の作業'), date: '2026-10-26' }));
+    const developAdded = run('--base', baseCommit);
+    assert.equal(developAdded.status, 1);
+    assert.match(developAdded.stderr, /PR 本文/);
+    assert.equal(spawnSync(process.execPath, [cli, '--base', baseCommit], { cwd, encoding: 'utf8', env: { ...process.env, CHANGELOG_MODE: 'develop' } }).status, 1);
+    assert.equal(run('--base', baseCommit, '--mode', 'main').status, 0);
+    assert.equal(run('--base', baseCommit, '--mode', 'release').status, 0);
+    assert.equal(spawnSync(process.execPath, [cli, '--base', baseCommit], { cwd, encoding: 'utf8', env: { ...process.env, CHANGELOG_MODE: 'release' } }).status, 0);
     writeFileSync(second, '{ invalid JSON');
-    assert.equal(run('--base', existingBase).status, 1);
+    assert.equal(run('--base', baseCommit, '--mode', 'main').status, 1);
     writeFileSync(second, JSON.stringify(old));
-    assert.equal(run('--base', existingBase).status, 1);
-    writeFileSync(second, JSON.stringify(entry('次の作業')));
-    writeFileSync(path, source([old]));
-    assert.equal(run('--base', existingBase).status, 1);
+    assert.equal(run('--base', baseCommit, '--mode', 'release').status, 1);
+    writeFileSync(second, JSON.stringify(added));
+    assert.equal(run('--base', baseCommit, '--mode', 'release').status, 1);
+    rmSync(second);
+
+    for (const mode of ['develop', 'main', 'release']) {
+      writeFileSync(fragment, JSON.stringify(entry('改変')));
+      assert.equal(run('--base', baseCommit, '--mode', mode).status, 1);
+      rmSync(fragment);
+      assert.equal(run('--base', baseCommit, '--mode', mode).status, 1);
+      writeFileSync(fragment, JSON.stringify(added));
+      writeFileSync(path, source([entry('置き換えられた履歴'), older]));
+      assert.equal(run('--base', baseCommit, '--mode', mode).status, 1);
+      writeFileSync(path, base);
+    }
+    writeFileSync(path, source([entry('共通履歴への追記'), old, older]));
+    assert.equal(run('--base', baseCommit).status, 1);
+    assert.equal(run('--base', baseCommit, '--mode', 'main').status, 0);
     writeFileSync(path, base);
-    assert.equal(run('--base', existingBase).status, 0);
+    assert.equal(run('--base', baseCommit).status, 0);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
 });
 
-test('完了処理と全 PR の CI が履歴チェックを必須で実行する', () => {
+test('完了処理と全 PR の CI が履歴チェックを実行し、develop 宛てでは履歴の変更を拒否する', () => {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(pkg.scripts['check:completion'], 'npm run check:changelog && npm run check:content-locales && npm run typecheck && npm run build');
   const ci = readFileSync(new URL('../.github/workflows/web-checks.yml', import.meta.url), 'utf8');
@@ -147,6 +144,7 @@ test('完了処理と全 PR の CI が履歴チェックを必須で実行する
   assert.doesNotMatch(ci, /paths(?:-ignore)?:|continue-on-error:/);
   assert.match(ci, /fetch-depth: 0/);
   assert.match(ci, /CHANGELOG_BASE:.*github.event.pull_request.base.sha/);
+  assert.match(ci, /CHANGELOG_MODE:.*github.base_ref == 'develop'.*'develop' \|\| 'main'/);
   assert.match(ci, /run: npm run test:changelog/);
   assert.match(ci, /run: npm run check:completion/);
 });

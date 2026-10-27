@@ -1,6 +1,7 @@
 // drei の Html は 3D を開いた瞬間にいる人の分が空になることがあり、撮影・配信にも写らないので、スプライトで描く
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
+import { renderedQuaternion } from '../xr/pose.ts';
 
 const FONT = '"Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif';
 
@@ -41,7 +42,7 @@ export function Label({ text, position, bg = 'rgba(0,0,0,0.75)', fg = '#ffffff',
   return (
     <sprite position={position} scale={[height * aspect, height, 1]} userData={{ noRay: true }} renderOrder={10}
       onBeforeRender={(_renderer, _scene, camera, _geometry, material) => {
-        roll.e.setFromQuaternion(camera.getWorldQuaternion(roll.q), 'YXZ');
+        roll.e.setFromQuaternion(renderedQuaternion(camera, roll.q), 'YXZ');
         (material as THREE.SpriteMaterial).rotation = -roll.e.z;
       }}>
       <spriteMaterial map={tex} transparent depthWrite={false} toneMapped={false} />

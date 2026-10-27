@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 20
     env:
       CHANGELOG_BASE: ${{ github.event.pull_request.base.sha || format('{0}^', github.sha) }}
+      # develop 宛ての作業 PR は履歴に触れない。main 宛て（リリース・main からの同期）は既存履歴の保持と形式だけを見る
+      CHANGELOG_MODE: ${{ github.event_name == 'pull_request' && github.base_ref == 'develop' && github.head_ref != 'main' && 'develop' || 'main' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -27,7 +29,7 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - name: Require a new changelog entry
+      - name: Check changelog policy
         if: github.event_name == 'pull_request'
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}

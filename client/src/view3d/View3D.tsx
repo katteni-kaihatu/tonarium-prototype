@@ -23,6 +23,7 @@ import { Label } from './Label.tsx';
 import { OekakiAvatar } from './OekakiAvatar.tsx';
 import { Emote3D } from './Emote3D.tsx';
 import { CameraModel, CameraStreamer, CamMonitor } from './camera3d.tsx';
+import { CameraRecorder } from './CameraRecorder.tsx';
 import { WORLD_BG, WorldMesh } from './worlds3d.tsx';
 import { useLastSaid } from '../world/common.tsx';
 import { ShareDisplay } from './shareDisplay.tsx';
@@ -186,13 +187,13 @@ export function Avatar3D({ id, self = false, rig }: { id: string; self?: boolean
     d = Math.atan2(Math.sin(d), Math.cos(d));
     g.rotation.order = 'YXZ';
     g.rotation.y += ride.current ? d : d * k;
-    g.rotation.z = bike ? 0 : state.lean ?? 0;
+    g.rotation.z = bike || state.xr ? 0 : state.lean ?? 0;
     const s = get();
     if (self && rig) {
       g.visible = rig.thirdPerson || xrState().active;
       g.position.copy(rig.avatarPosition);
       g.rotation.order = 'YXZ';
-      g.rotation.set(0, rig.yaw + (xrState().active ? xr.headYaw : 0), rig.lean);
+      g.rotation.set(0, rig.yaw + (xrState().active ? xr.headYaw : 0), xrState().active ? 0 : rig.lean);
     }
     const b = bump(s.hits[id]);
     body.current?.scale.set(1 + 0.3 * b, 1 - 0.45 * b, 1 + 0.3 * b);
@@ -208,6 +209,7 @@ export function Avatar3D({ id, self = false, rig }: { id: string; self?: boolean
         <Suspense fallback={null}>
           <OekakiAvatar userId={id} name={name} version={avatarV} speaking={speaking} look={() => pitchOf(id)}
             tracked={() => self && xrState().active ? xr.pose : get().avatars[id]?.xr} handsOnly={() => self && xrState().active}
+            trackingRoot={() => ref.current}
             seated={() => !!seatOf(id)} onSeatOffset={onSeatOffset}
             crouching={() => (self ? get().selfAvatar : get().avatars[id])?.crouching === true}
             walking={() => {
@@ -356,6 +358,7 @@ export function View3D() {
         </Canvas>
       </EyeHeightContext.Provider>
       <Viewfinder />
+      <CameraRecorder />
       <Crosshair />
       <NoteEditor />
     </div>

@@ -545,11 +545,16 @@ function chatMedia(m: ChatMedia | undefined): ChatMedia | undefined {
   return { kind, url: m.url, w: size(m.w), h: size(m.h) };
 }
 
-function pushChat(sid: string, from: User | null, text: string, opt: { scope?: ChatScope; image?: string; media?: ChatMedia; to?: string[]; about?: string; dice?: DiceRoll } = {}, peerEvent?: PeerOperation) {
+function pushChat(sid: string, from: User | null, text: string, opt: { scope?: ChatScope; image?: string; media?: ChatMedia; to?: string[]; about?: string; dice?: DiceRoll; clientRequestId?: string } = {}, peerEvent?: PeerOperation) {
   const list = chats.get(sid);
   if (!list) return;
+  if (from && opt.clientRequestId) {
+    const existing = list.find(m => m.from === from.id && m.clientRequestId === opt.clientRequestId);
+    if (existing) { roomSend(sid, { t: 'chat', sid, m: existing }, [from.id]); return; }
+  }
   const m: ChatMessage = {
     id: peerEvent?.id ?? randomUUID(), from: from?.id ?? null, fromName: from?.name ?? '', text, at: peerEvent?.at ?? Date.now(), scope: opt.scope ?? 'all',
+    ...(opt.clientRequestId ? { clientRequestId: opt.clientRequestId } : {}),
     ...(opt.image ? { image: opt.image } : {}), ...(opt.media ? { media: opt.media } : {}), ...(opt.to ? { to: opt.to } : {}), ...(opt.about ? { about: opt.about } : {}), ...(opt.dice ? { dice: opt.dice } : {}),
   };
   list.push(m);
@@ -1090,11 +1095,12 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
     }
     case 'chat': {
       const text = String(msg.text ?? '').trim().slice(0, 1000);
-      const image = typeof msg.image === 'string' && /^data:image\/(jpeg|png);base64,/.test(msg.image) && msg.image.length < 2_000_000
+      const image = typeof msg.image === 'string' && /^data:image\/(jpeg|png|gif);base64,/.test(msg.image) && msg.image.length < 2_000_000
         ? msg.image : undefined;
       const media = chatMedia(msg.media);
       const scope: ChatScope = msg.scope === 'near' || msg.scope === 'announce' ? msg.scope : 'all';
-      if (text || image || media) pushChat(sid, me, text, { scope, image, media, to: scope === 'near' ? nearIds(sid, me) : undefined }, peerEvent);
+      const clientRequestId = typeof msg.clientRequestId === 'string' && /^[\da-f-]{36}$/i.test(msg.clientRequestId) ? msg.clientRequestId : undefined;
+      if (text || image || media) pushChat(sid, me, text, { scope, image, media, clientRequestId, to: scope === 'near' ? nearIds(sid, me) : undefined }, peerEvent);
       return;
     }
     case 'viewing': {

@@ -48,7 +48,11 @@
   position: absolute; top: 74px; flex-direction: column; gap: 12px; width: 52px; height: auto; padding: 12px 0; border: 0; border-radius: 18px;
   background: rgba(255, 253, 249, .92); backdrop-filter: blur(16px); box-shadow: var(--shadow);
 }
-.foldedpanel.left { left: 20px; }
+.foldedpanel.left { left: 20px; display: flex; align-items: center; gap: 4px; padding: 4px; max-height: calc(100dvh - 94px); overflow-y: auto; }
+.folded-summary { flex: none; flex-direction: column; gap: 12px; width: 44px; height: auto; padding: 8px 0; border-radius: 14px; }
+.session-copy { flex: none; width: 44px; height: 44px; padding: 0; border-radius: 14px; }
+.session-copy:focus-visible, .folded-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.session-copy-row { flex: none; padding: 4px; border-top: 1px solid var(--line2); }
 .foldedpanel.right { right: 20px; top: 20px; }
 .fp { display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; }
 .fp b { font-size: 11px; line-height: 1; }

@@ -37,8 +37,8 @@ export function editNote(id: string, patch: { text?: string; color?: string }) {
   send({ t: 'itemAction', id, action: { a: 'noteEdit', ...patch } });
 }
 
-export function postImage(text: string, image: string) {
-  if (get().session) send({ t: 'chat', text, image, scope: 'all' });
+export function postImage(text: string, image: string, clientRequestId?: string) {
+  if (get().session) send({ t: 'chat', text, image, scope: 'all', ...(clientRequestId ? { clientRequestId } : {}) });
 }
 
 export function removeItem(id: string) {

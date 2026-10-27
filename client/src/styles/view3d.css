@@ -1,4 +1,9 @@
 /* 3D */
+.camera-recorder { position: absolute; right: 16px; bottom: 110px; z-index: 5; width: min(340px, calc(100% - 32px)); padding: 12px; border-radius: 12px; background: var(--paper); box-shadow: var(--pop); display: flex; flex-direction: column; gap: 8px; }
+.camera-recorder canvas { width: 100%; image-rendering: pixelated; }
+.camera-recorder label { display: flex; flex-direction: column; gap: 4px; }
+.camera-recorder .row { flex-wrap: wrap; gap: 8px; }
+.camera-recorder p { margin: 0; }
 .view3d canvas { touch-action: none; }
 .crosshair { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px #0008; pointer-events: none; }
 .crosshair.on { width: 14px; height: 14px; margin: -7px 0 0 -7px; background: transparent; box-shadow: 0 0 0 3px #fde047, 0 0 0 5px #0008; }

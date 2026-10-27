@@ -195,6 +195,7 @@ export interface SessionInfo {
 export type ChatScope = 'near' | 'all' | 'announce';
 
 export interface ChatMessage {
+  clientRequestId?: string;
   id: string;
   /** null はシステムメッセージ（ログのイベント） */
   from: string | null;
@@ -344,7 +345,7 @@ export type RoomClientMsg =
   | { t: 'place2d'; target: string; pos: AvatarState | null }
   /** 3D で配信ディスプレイを持ち運ぶ */
   | { t: 'displayMove'; target: string; x: number; z: number; ry: number }
-  | { t: 'chat'; text: string; image?: string; media?: ChatMedia; scope: ChatScope }
+  | { t: 'chat'; text: string; image?: string; media?: ChatMedia; scope: ChatScope; clientRequestId?: string }
   | { t: 'avatar'; s: AvatarState }
   | { t: 'viewing'; keys: string[] }
   | { t: 'poke'; to: string }
