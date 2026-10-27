@@ -36,7 +36,7 @@ export type WinMode = 'simple' | 'free';
 /** ウィンドウのキー: share（画面共有）/ cam:<アイテムID> / view:<ユーザーID> / item:<アイテムID> */
 export interface Win { key: string; x: number; y: number }
 /** key は attention ならウィンドウのキー、invite なら session:<id> / group:<id>、askJoin なら session:<id> */
-export interface Notice { id: number; kind: 'poke' | 'hit' | 'follow' | 'live' | 'attention' | 'invite' | 'askJoin' | 'online'; from: string; key?: string; fromName: string; at: number; unread: boolean }
+export interface Notice { id: number; kind: 'poke' | 'hit' | 'follow' | 'live' | 'attention' | 'invite' | 'askJoin' | 'online'; from: string; key?: string; fromName: string; at: number; unread: boolean; count?: number; lastHitAt?: number }
 /** ホームの右の欄に出すもの */
 export type SideWidget = 'now' | 'events' | 'sessions' | 'worlds' | 'items';
 

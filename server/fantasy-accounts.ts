@@ -43,6 +43,40 @@ const normalizeAddress = (value?: string): string | undefined => {
   return `${first >>> 8}.${first & 255}.${second >>> 8}.${second & 255}`;
 };
 const loopback = (value?: string) => { const address = normalizeAddress(value); return address === '::1' || !!address?.startsWith('127.'); };
+interface TrustedProxyRange { version: 4 | 6; network: bigint; mask: bigint }
+const addressValue = (address: string): { version: 4 | 6; value: bigint } | undefined => {
+  if (isIP(address) === 4) {
+    let value = 0n;
+    for (const part of address.split('.')) value = value * 256n + BigInt(part);
+    return { version: 4, value };
+  }
+  if (isIP(address) !== 6) return undefined;
+  const halves = address.split('::');
+  if (halves.length > 2) return undefined;
+  const left = halves[0] ? halves[0].split(':') : [], right = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  if (halves.length === 1 && left.length !== 8) return undefined;
+  const missing = 8 - left.length - right.length;
+  if (missing < 0) return undefined;
+  let value = 0n;
+  for (const group of [...left, ...Array<string>(missing).fill('0'), ...right]) {
+    if (!/^[a-f0-9]{1,4}$/u.test(group)) return undefined;
+    value = value * 65536n + BigInt(Number.parseInt(group, 16));
+  }
+  return { version: 6, value };
+};
+// CIDR 項目は許可帯域として解釈する。全域指定（/0）は「誰の転送ヘッダでも信じる」と同義なので不正として扱う。
+const parseTrustedProxyRange = (entry: string): TrustedProxyRange | undefined => {
+  const slash = entry.indexOf('/');
+  if (slash < 0 || entry.indexOf('/', slash + 1) >= 0) return undefined;
+  const address = normalizeAddress(entry.slice(0, slash)), prefixText = entry.slice(slash + 1);
+  if (!address || !/^\d+$/u.test(prefixText)) return undefined;
+  const parsed = addressValue(address);
+  if (!parsed) return undefined;
+  const bits = parsed.version === 4 ? 32 : 128, prefix = Number(prefixText);
+  if (prefix < 1 || prefix > bits) return undefined;
+  const mask = ((1n << BigInt(prefix)) - 1n) << BigInt(bits - prefix);
+  return { version: parsed.version, network: parsed.value & mask, mask };
+};
 
 export function saveFantasyAccountsAtomic(file: string, serialized: string): void {
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
@@ -96,13 +130,20 @@ export class FantasyAccounts {
   private onError: NonNullable<FantasyAccountsOptions['onError']>;
   private options: FantasyAccountsOptions;
   private readonly trustedProxyAddresses: Set<string>;
+  private readonly trustedProxyRanges: TrustedProxyRange[];
   private tickets = new Map<string, Ticket>();
   private attempts = new Map<string, { count: number; until: number }>();
   private hashing = 0;
 
   constructor(options: FantasyAccountsOptions) {
     this.options = options; this.file = options.file; this.now = options.now ?? Date.now;
-    this.trustedProxyAddresses = new Set((options.trustedProxyAddresses ?? []).map(normalizeAddress).filter((address): address is string => address !== undefined));
+    this.trustedProxyAddresses = new Set(); this.trustedProxyRanges = [];
+    for (const entry of options.trustedProxyAddresses ?? []) {
+      const range = entry.includes('/') ? parseTrustedProxyRange(entry) : undefined;
+      if (range) { this.trustedProxyRanges.push(range); continue; }
+      const address = normalizeAddress(entry);
+      if (address !== undefined) this.trustedProxyAddresses.add(address);
+    }
     this.save = options.save ?? saveFantasyAccountsAtomic; this.onError = options.onError ?? (() => {});
     try {
       if (fs.existsSync(this.file)) {
@@ -116,7 +157,12 @@ export class FantasyAccounts {
 
   private trustedProxy(req: IncomingMessage): boolean {
     const address = normalizeAddress(req.socket.remoteAddress);
-    return !!address && (this.trustedProxyAddresses.has(address) || !!this.options.trustProxy && loopback(address));
+    return !!address && (this.trustedProxyAddresses.has(address) || this.trustedProxyRangeMatches(address) || !!this.options.trustProxy && loopback(address));
+  }
+  private trustedProxyRangeMatches(address: string): boolean {
+    if (!this.trustedProxyRanges.length) return false;
+    const parsed = addressValue(address);
+    return !!parsed && this.trustedProxyRanges.some(range => range.version === parsed.version && (parsed.value & range.mask) === range.network);
   }
   private secure(req: IncomingMessage): boolean {
     return (req.socket as typeof req.socket & { encrypted?: boolean }).encrypted === true
