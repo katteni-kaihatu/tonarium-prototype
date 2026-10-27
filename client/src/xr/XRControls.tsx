@@ -11,29 +11,40 @@ import { DEFAULT_TURN, turnSettings, unicodeCharacter } from './input.ts';
 import { writeField, type TextField } from './domInput.ts';
 import { endVR, resetXRInput, startVR, useXR, xr, xrPatch } from './runtime.ts';
 import './xr.css';
+import { t as tr, useLanguage } from '../i18n/index.ts';
+import { ModeButton } from '../home/ModeButton.tsx';
 
 export function XRLaunch() {
   const state = useXR();
   const session = useStore(s => s.session);
   const mode = useStore(s => s.mode);
-  const [support, setSupport] = useState('WebXRを確認中');
-  const [supported, setSupported] = useState(false);
+  useLanguage();
+  const [support, setSupport] = useState<'checking' | 'supported' | 'unsupported' | 'failed'>('checking');
+  const supported = support === 'supported';
   const electron = /Electron\//.test(navigator.userAgent);
   useEffect(() => {
     let alive = true;
-    if (electron) { setSupport('Electron版はVR非対応です。WebXR対応の単体ブラウザで開いてください。'); return; }
-    if (!isSecureContext || !navigator.xr) { setSupport('VR非対応: HTTPSとWebXR対応の単体ブラウザが必要です。ElectronはVR動作保証の対象外です。'); return; }
+    if (electron || !isSecureContext || !navigator.xr) return;
     void navigator.xr.isSessionSupported('immersive-vr').then(ok => {
-      if (alive) { setSupported(ok); setSupport(ok ? 'Quest 3 / Steam Frame: ブラウザのWebXR対応が必要です。実機未検証。' : 'このブラウザではVRを利用できません。通常の2D・3Dは利用できます。'); }
-    }).catch(() => { if (alive) setSupport('WebXRの確認に失敗しました。通常の画面をご利用ください。'); });
+      if (alive) setSupport(ok ? 'supported' : 'unsupported');
+    }).catch(() => { if (alive) setSupport('failed'); });
     return () => { alive = false; };
   }, [electron]);
-  return <button type="button" disabled={!session || !supported || state.pending} title={!session ? 'セッションに入ってからVRを準備してください。' : support}
-    aria-label={state.active ? 'VRを終了' : mode === '3d' && state.ready ? 'VRを開始' : 'VRを準備'} onClick={() => {
+  const explanation = electron ? tr('xrElectronHelp')
+    : !isSecureContext ? tr('xrSecureHelp')
+    : !navigator.xr ? tr('xrApiHelp')
+    : support === 'checking' ? tr('xrCheckingHelp')
+    : support === 'failed' ? tr('xrFailedHelp')
+    : !supported ? tr('xrUnsupportedHelp')
+    : !session ? tr('xrJoinHelp')
+    : state.pending ? `${tr('xrPendingHelp')} ${tr('xrRequirementsHelp')}` : tr('xrRequirementsHelp');
+  const action = state.active ? 'end' : mode === '3d' && state.ready ? 'start' : 'prepare';
+  return <ModeButton type="button" disabled={!session || !supported || state.pending} explanation={explanation}
+    aria-label={tr(action === 'end' ? 'xrEndName' : action === 'start' ? 'xrStartName' : 'xrPrepareName')} onClick={() => {
       if (state.active) void endVR();
       else if (mode !== '3d') setMode('3d');
       else void startVR();
-    }}><Icon name="vr" size={14} />{electron ? 'VR（Electron非対応）' : state.active ? 'VR終了' : mode === '3d' && state.ready ? 'VR開始' : 'VR'}</button>;
+    }}><Icon name="vr" size={14} />{tr(action === 'end' ? 'xrEndLabel' : action === 'start' ? 'xrStartLabel' : 'xrPrepareLabel')}</ModeButton>;
 }
 
 export function XRSettings() {
