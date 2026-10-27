@@ -81,8 +81,6 @@ button.market-card-open { width: 100%; height: auto; padding: 0; gap: 0; display
 .soundboard .sgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .soundboard .sbtn { height: auto; min-height: 56px; padding: 13px 14px 8px 5px; white-space: normal; }
 .soundboard .market-origin { top: 3px; right: 3px; }
-.emote-picker .emote-option { height: 110px; }
-.emote-picker { max-height: calc(100dvh - 130px); overflow-y: auto; }
 @media (max-width: 1000px) { .market-detail { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .home.market-home { grid-template-columns: 1fr; } .market-detail { padding: 18px; gap: 22px; } .market-topline { font-size: 12px; } .market-detail-copy h2 { font-size: 23px; } }
 
