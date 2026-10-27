@@ -4,6 +4,7 @@ import { setMode, switchMode } from '../actions.ts';
 import { get, set, useStore } from '../store.ts';
 import { openWindow } from '../world/windows.ts';
 import { itemLabel } from '../world/common.tsx';
+import { Icon } from '../world/Icon.tsx';
 import { PANELS } from '../items/panels.ts';
 import { worldKindOf } from '../store.ts';
 import { DEFAULT_TURN, turnSettings, unicodeCharacter } from './input.ts';
@@ -32,7 +33,7 @@ export function XRLaunch() {
       if (state.active) void endVR();
       else if (mode !== '3d') setMode('3d');
       else void startVR();
-    }}>{electron ? 'VR（Electron非対応）' : state.active ? 'VR終了' : mode === '3d' && state.ready ? 'VR開始' : 'VR'}</button>;
+    }}><Icon name="vr" size={14} />{electron ? 'VR（Electron非対応）' : state.active ? 'VR終了' : mode === '3d' && state.ready ? 'VR開始' : 'VR'}</button>;
 }
 
 export function XRSettings() {
