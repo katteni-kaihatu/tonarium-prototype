@@ -1,7 +1,7 @@
 :root {
   --ground: #EAE5DB; --dots: #D6CFC1; --paper: #FFFDF9; --glass: rgba(255, 253, 249, .86); --sand: #F3EEE4; --sand2: #F1ECE3;
   --ink: #26262E; --ink2: #3A3942; --muted: #5E5C64; --muted2: #4A4852; --line: #DCD5C8; --line2: #EEE8DD;
-  --hover: rgba(38, 38, 46, .07); --dock: #26262E; --dock2: #3A3B44; --dock3: #44454F;
+  --hover: rgba(38, 38, 46, .07); --dock: #FFFDF9; --dock2: #EEEEF1; --dock3: #DFDFE5;
   --accent: #2F5FC4; --accentbg: #EEF3FC; --live: #D9483B; --danger: #C2402F; --speak: #2E9A64; --global: #5B47A8; --globalbg: #EEEAF8;
   --hi: #FDEBD9; --shadow: 0 8px 30px rgba(60, 40, 10, .12); --pop: 0 12px 32px rgba(40, 30, 10, .18);
   font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
