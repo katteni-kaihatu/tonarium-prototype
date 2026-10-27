@@ -13,6 +13,9 @@ services:
       - KOKOSYNC_USERNAME=${KOKOSYNC_USERNAME}
       - KOKOSYNC_PASSWORD=${KOKOSYNC_PASSWORD}
       - SERVER_PORT=3001
+      # HTTPS 終端プロキシの実アドレスだけを信頼する。未設定では転送ヘッダーを信頼しない。
+      - FANTASY_TRUST_PROXY=${FANTASY_TRUST_PROXY:-0}
+      - FANTASY_TRUSTED_PROXY_IPS=${FANTASY_TRUSTED_PROXY_IPS:-}
       # - SESSIONS_FILE=/config/sessions.json
     expose:
       - "3001"
