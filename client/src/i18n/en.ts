@@ -733,7 +733,7 @@ export default {
   "ui635": "Send as a pinned announcement above notifications",
   "ui636": "Send announcement (pinned for everyone)",
   "ui637": " poked you",
-  "ui638": " hit you with a toy hammer",
+  "ui638": " hit you with a toy hammer {0} time(s)",
   "ui640": " requested a live viewpoint",
   "ui641": " is drawing attention",
   "ui642": " invited you",

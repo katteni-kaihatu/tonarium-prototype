@@ -275,5 +275,16 @@ export function markNoticesRead() {
 let noticeSeq = 0;
 export function pushNotice(kind: Notice['kind'], from: string, fromName = nameOf(from), key?: string) {
   if (get().blocked.includes(fromName)) return;
-  set((s) => ({ ...arrivalPatch('notice', s), notices: [{ id: ++noticeSeq, kind, from, fromName, key, at: Date.now(), unread: true }, ...s.notices].slice(0, 30) }));
+  const now = Date.now();
+  set((s) => {
+    const latest = kind === 'hit' ? s.notices.find((n) => n.kind === 'hit' && n.from === from) : undefined;
+    const elapsed = latest ? now - (latest.lastHitAt ?? latest.at) : -1;
+    if (latest && elapsed >= 0 && elapsed <= 10_000) {
+      return { ...arrivalPatch('notice', s, now), notices: s.notices.map((n) => n === latest
+        ? { ...n, fromName, count: (n.count ?? 1) + 1, lastHitAt: now, unread: true } : n) };
+    }
+    const notice: Notice = { id: ++noticeSeq, kind, from, fromName, key, at: now, unread: true,
+      ...(kind === 'hit' ? { count: 1, lastHitAt: now } : {}) };
+    return { ...arrivalPatch('notice', s, now), notices: [notice, ...s.notices].slice(0, 30) };
+  });
 }

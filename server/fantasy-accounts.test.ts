@@ -128,9 +128,38 @@ test('explicit bridge proxy IPs support HTTPS cookies and normalize IPv4-mapped 
   }
 });
 
+test('configured proxy CIDR ranges trust only bridge clients inside the range',async()=>{
+  const state=temporary({trustedProxyAddresses:['172.18.0.0/16']});try{
+    const inside={host:'game.example',origin:'https://game.example',address:'172.18.0.2',proto:'https',forwarded:'198.51.100.8'};
+    const registered=await request(state.store,'register',{username:'bridge_owner',password},'',inside);
+    assert.equal(registered.status,200);assert.match(registered.headers['set-cookie'],/^__Host-/);assert.match(registered.headers['set-cookie'],/; Secure$/);
+    const resumed=await request(state.store,'status',{},cookie(registered),{...inside,address:'::ffff:172.18.0.2'});assert.equal(resumed.body.account?.id,registered.body.account?.id);
+    const outside=await request(state.store,'register',{username:'bridge_owner2',password},'',{...inside,address:'172.19.0.2'});
+    assert.equal(outside.status,403);assert.equal(outside.body.error,'secure-connection-required');assert.equal(outside.headers['set-cookie'],undefined);
+    const plain=await request(state.store,'register',{username:'bridge_owner3',password},'',{...inside,proto:'http'});
+    assert.equal(plain.status,403);assert.equal(plain.body.error,'secure-connection-required');
+  }finally{removeTemporary(state.directory);}
+});
+
+test('configured IPv6 proxy CIDR ranges and forwarded rate limits follow the same trust',async()=>{
+  const v6=temporary({trustedProxyAddresses:['2001:db8::/32']});try{
+    const inside={host:'game.example',origin:'https://game.example',address:'2001:db8::2',proto:'https',forwarded:'198.51.100.8'};
+    const registered=await request(v6.store,'register',{username:'bridge_owner',password},'',inside);
+    assert.equal(registered.status,200);assert.match(registered.headers['set-cookie'],/; Secure$/);
+    const outside=await request(v6.store,'register',{username:'bridge_owner2',password},'',{...inside,address:'2001:db9::2'});
+    assert.equal(outside.status,403);assert.equal(outside.body.error,'secure-connection-required');
+  }finally{removeTemporary(v6.directory);}
+  const proxied=temporary({trustedProxyAddresses:['172.18.0.0/16']});try{
+    const extra={host:'game.example',origin:'https://game.example',proto:'https',address:'172.18.0.9'};
+    for(let index=0;index<10;index++)assert.equal((await request(proxied.store,'register',{username:`x${index}`,password},'',{...extra,forwarded:'198.51.100.1'})).status,400);
+    assert.equal((await request(proxied.store,'register',{username:'xx',password},'',{...extra,forwarded:'198.51.100.1'})).status,429);
+    assert.equal((await request(proxied.store,'register',{username:'xy',password},'',{...extra,forwarded:'198.51.100.2'})).status,400);
+  }finally{removeTemporary(proxied.directory);}
+});
+
 test('unconfigured bridge clients and invalid proxy specifications cannot spoof forwarded HTTPS',async()=>{
   const configurations=[{}, {trustProxy:true}, {trustedProxyAddresses:['172.18.0.3']},
-    {trustedProxyAddresses:['172.18.0.0/16','172.18.*','proxy.internal','*','172.18.0.2\n']}];
+    {trustedProxyAddresses:['172.18.0.0/0','0.0.0.0/0','172.18.0.0/33','172.18.0.0/','172.18.*','proxy.internal','*','172.18.0.2\n']}];
   for(const options of configurations){
     const state=temporary(options);try{
       const denied=await request(state.store,'register',{username:'bridge_owner',password},'',{host:'game.example',origin:'https://game.example',address:'172.18.0.2',proto:'https',forwarded:'127.0.0.1'});

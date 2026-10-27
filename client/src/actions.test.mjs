@@ -16,7 +16,7 @@ stub('./spatial.ts', { placesOf: () => new Map(), resumeAudio() {} });
 stub('./phone.ts', { touchOnly: true });
 stub('./walk.ts', { stopWalk() {} });
 stub('../../shared/places.ts', { approach() {} });
-const { createSession, joinSession, leaveSession, pushNotice } = await import('./actions.ts');
+const { createSession, joinSession, leaveSession, pushNotice, markNoticesRead, removeNotice } = await import('./actions.ts');
 
 beforeEach(() => {
   calls = []; errors = []; serverSession = null;
@@ -32,6 +32,108 @@ beforeEach(() => {
   };
   voiceConnect = async (sid) => { calls.push(`voice:${sid}`); set({ voice: 'connected' }); };
   voiceLeave = async () => { calls.push('voice:leave'); set({ voice: 'off' }); };
+});
+
+function hitClock(t) {
+  let now = 100_000;
+  mock.method(Date, 'now', () => now);
+  t.after(() => mock.restoreAll());
+  Object.assign(state, { session: 'room', blocked: [], folded: { right: true } });
+  return (next) => { now = next; };
+}
+
+for (const delta of [0, 10_000, 10_001, -1]) {
+  test(`hit aggregation boundary ${delta}ms`, (t) => {
+    const clock = hitClock(t);
+    pushNotice('hit', 'a', 'A');
+    const first = state.notices[0];
+    clock(100_000 + delta);
+    pushNotice('hit', 'a', 'A');
+    const merged = delta >= 0 && delta <= 10_000;
+    assert.equal(state.notices.length, merged ? 1 : 2);
+    assert.equal(state.notices[0].count, merged ? 2 : 1);
+    assert.equal(state.notices[0].lastHitAt, 100_000 + delta);
+    assert.equal(state.notices[0].at, merged ? first.at : 100_000 + delta);
+    assert.equal(state.notices[0].id === first.id, merged);
+    assert.equal(first.count, 1);
+  });
+}
+
+test('sender IDs aggregate across renamed users and intervening notices without reordering', (t) => {
+  const clock = hitClock(t);
+  pushNotice('hit', 'a', 'Same');
+  const first = state.notices[0];
+  pushNotice('hit', 'b', 'Same');
+  pushNotice('poke', 'a', 'Same');
+  const others = state.notices.slice(0, 2);
+  for (const now of [110_000, 120_000, 130_000]) {
+    clock(now);
+    pushNotice('hit', 'a', 'Renamed');
+  }
+  assert.equal(state.notices.length, 3);
+  assert.deepEqual(state.notices.slice(0, 2), others);
+  assert.deepEqual(state.notices[2], { ...first, fromName: 'Renamed', count: 4, lastHitAt: 130_000 });
+});
+
+test('legacy hits default to one and at; only the latest matching hit is considered', (t) => {
+  hitClock(t);
+  const legacy = { id: -1, kind: 'hit', from: 'a', fromName: 'A', at: 95_000, unread: false };
+  state.notices = [legacy];
+  pushNotice('hit', 'a', 'A');
+  assert.deepEqual(state.notices[0], { ...legacy, count: 2, lastHitAt: 100_000, unread: true });
+  for (const lastHitAt of [100_001, 89_999]) {
+    const latest = { ...state.notices[0], lastHitAt };
+    state.notices = [latest, legacy];
+    pushNotice('hit', 'a', 'A');
+    assert.equal(state.notices.length, 3);
+    assert.equal(state.notices[0].count, 1);
+    assert.equal(state.notices[1], latest);
+    assert.equal(state.notices[2], legacy);
+  }
+});
+
+test('removed or evicted hit targets start new rows within the 30 notice limit', (t) => {
+  hitClock(t);
+  pushNotice('hit', 'a', 'A');
+  const id = state.notices[0].id;
+  removeNotice(id);
+  pushNotice('hit', 'a', 'A');
+  assert.notEqual(state.notices[0].id, id);
+  const evicted = state.notices[0].id;
+  for (let i = 0; i < 30; i++) pushNotice('poke', 'b', 'B');
+  assert.equal(state.notices.length, 30);
+  assert.ok(!state.notices.some(n => n.id === evicted));
+  pushNotice('hit', 'a', 'A');
+  assert.equal(state.notices.length, 30);
+  assert.equal(state.notices[0].count, 1);
+  assert.notEqual(state.notices[0].id, evicted);
+});
+
+test('merged hits become unread, obey popup conditions, and block before any update', (t) => {
+  const clock = hitClock(t);
+  pushNotice('hit', 'a', 'A');
+  for (const [now, patch, popup] of [
+    [101_000, {}, true],
+    [102_000, { hubOpen: false, folded: { right: false }, rightView: 'log' }, false],
+    [103_000, { folded: { right: true }, popupPausedUntil: 104_000 }, false],
+    [104_000, {}, true],
+  ]) {
+    const before = state.notices[0];
+    markNoticesRead();
+    assert.deepEqual(state.notices[0], { ...before, unread: false });
+    Object.assign(state, patch, { arrivals: {} });
+    clock(now);
+    pushNotice('hit', 'a', 'A');
+    assert.equal(state.notices[0].unread, true);
+    assert.equal(state.notices[0].count, before.count + 1);
+    assert.equal(!!state.arrivals.notice, popup);
+    if (popup) assert.equal(state.arrivals.notice.at, now);
+  }
+  state.blocked = ['A'];
+  const before = state;
+  pushNotice('hit', 'a', 'A');
+  pushNotice('hit', 'b', 'A');
+  assert.equal(state, before);
 });
 
 test('creation joins the returned session and connects voice through the shared join flow', async () => {
