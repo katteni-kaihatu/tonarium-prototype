@@ -238,20 +238,26 @@
 .dseg button:focus-visible { outline-offset: -3px; }
 .dseg button:disabled { background: #F5F5F7; color: #85838D; box-shadow: none; opacity: 1; }
 .popover.soundboard { width: 260px; padding: 8px; }
-.popover.emote-picker { width: min(310px, calc(100vw - 24px)); padding: 14px; border-radius: 20px; }
-.emote-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.emote-heading > span { display: flex; flex-direction: column; gap: 2px; }
+.popover.emote-picker { width: 310px; padding: 10px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); }
+.emote-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.emote-heading > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.emote-heading .sub { white-space: normal; }
 .emote-heading b { font-family: "Zen Maru Gothic", sans-serif; font-size: 16px; }
-.emote-heading button { width: 30px; height: 30px; padding: 0; }
-.emote-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.emote-option { height: 110px; padding: 10px; flex-direction: column; gap: 3px; color: var(--emote-ink); background: var(--emote-tint); border: 1px solid transparent; border-radius: 15px; transition: transform .15s, box-shadow .15s; }
-.emote-option:hover:not(:disabled), .emote-option:focus-visible { transform: translateY(-3px) rotate(-2deg); border-color: currentColor; box-shadow: 0 4px 0 var(--emote-ink); outline: none; }
+.emote-heading button { width: 30px; height: 30px; padding: 0; flex: none; }
+.emote-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr)); gap: 6px; }
+.emote-grid .market-entry { min-width: 0; }
+.emote-option { height: auto; min-height: 110px; min-width: 0; padding: 10px; flex-direction: column; gap: 4px; color: var(--ink); background: var(--sand); border: 1px solid var(--line2); border-radius: 10px; white-space: normal; overflow-wrap: anywhere; text-align: center; }
+.emote-option:hover:not(:disabled) { background: var(--hover); border-color: var(--line); }
+.emote-picker button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .emote-option:disabled { opacity: .55; }
-.emote-option.playing { opacity: 1; border-color: currentColor; }
+.emote-option.playing:disabled { opacity: 1; background: var(--accentbg); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.emote-picker .market-entry:has(.market-origin) .emote-option { padding-bottom: 38px; }
+.emote-picker .market-origin { top: auto; bottom: 8px; right: 8px; color: var(--muted); background: var(--paper); border-color: var(--line); }
+.emote-picker .market-origin:hover { color: var(--ink); background: var(--hover); border-color: var(--accent); }
 .emote-option-mark { font-size: 30px; line-height: 1.2; }
-.emote-option b { font-size: 13px; }
-.emote-option .sub { font-size: 11px; color: inherit; }
-.emote-hint { margin: 12px 0 0; min-height: 18px; text-align: center; font-size: 11px; color: var(--muted); }
+.emote-option b { max-width: 100%; font-size: 13px; }
+.emote-option .sub { max-width: 100%; font-size: 11px; color: var(--muted); white-space: normal; overflow: visible; text-overflow: clip; }
+.emote-hint { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--line2); min-height: 18px; text-align: center; font-size: 11px; line-height: 1.6; color: var(--muted); overflow-wrap: anywhere; }
 .emote-badge { display: inline-flex; flex: none; align-items: center; gap: 3px; max-width: 100px; padding: 3px 6px; border-radius: 20px; font-size: 10px; font-weight: 700; color: var(--emote-ink); background: var(--emote-tint); box-shadow: 0 0 0 1px var(--emote-ink); animation: emote-pop .35s ease-out; }
 .emote-badge > span:first-child { font-size: 15px; }
 .emote-badge-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -273,8 +279,6 @@
 @keyframes emote-dizzy { from { transform: rotate(-20deg) scale(.8); } to { transform: rotate(35deg) scale(1.2); } }
 @media (prefers-reduced-motion: reduce) {
   .emote-badge, .emote-caption, .emote-particle { animation: none; }
-  .emote-option { transition: none; }
-  .emote-option:hover:not(:disabled), .emote-option:focus-visible { transform: none; }
 }
 .popover.volume { width: 260px; padding: 8px; gap: 4px; }
 .volrow { display: flex; flex-direction: column; gap: 4px; padding: 6px 12px; }
