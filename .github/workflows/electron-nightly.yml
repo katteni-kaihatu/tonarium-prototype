@@ -3,6 +3,11 @@ name: Electron nightly
 on:
   push:
     branches: [main]
+    # main へは15分ごとに反映するため、Electron 本体と配布処理が変わったときだけビルドする
+    paths:
+      - 'electron/**'
+      - '.github/workflows/electron-nightly.yml'
+      - '.github/scripts/publish-nightly.py'
   workflow_dispatch:
 
 permissions:

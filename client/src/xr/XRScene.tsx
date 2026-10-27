@@ -6,7 +6,7 @@ import { useEyeHeight } from '../view3d/eyeHeight.ts';
 import { stick, turnStep } from './input.ts';
 import { TerminalPointer } from './domInput.ts';
 import { PanelSurfaces } from './panelSurfaces.ts';
-import { calibratedOrigin } from './pose.ts';
+import { avatarTrackingPose, calibratedOrigin, controllerRay } from './pose.ts';
 import type { TrackedPose } from '../../../shared/xr-pose.ts';
 import { endVR, resetXRInput, useXR, xr, xrPatch, xrState } from './runtime.ts';
 
@@ -52,9 +52,7 @@ export function XRScene({ rig }: { rig: PlayerCamera }) {
     const controllerFor = (source: XRInputSource) => controllers.find(c => c.userData.inputSource === source);
     const rayFor = (controller: THREE.Group) => {
       const ray = rays[controllers.findIndex(c => c === controller)];
-      controller.updateWorldMatrix(true, false);
-      ray.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-      ray.ray.direction.set(0, 0, -1).applyQuaternion(controller.getWorldQuaternion(new THREE.Quaternion()));
+      controllerRay(controller, ray.ray);
       return ray;
     };
     const point = (controller: THREE.Group, move: boolean) => {
@@ -133,10 +131,9 @@ export function XRScene({ rig }: { rig: PlayerCamera }) {
       const euler = new THREE.Euler().setFromQuaternion(new THREE.Quaternion(head.orientation.x, head.orientation.y, head.orientation.z, head.orientation.w), 'YXZ');
       xr.headYaw = euler.y; xr.headPitch = euler.x;
       const tracking = (transform: XRRigidTransform): TrackedPose => {
-        const p = new THREE.Vector3(transform.position.x, transform.position.y, transform.position.z).sub(initial!).add(new THREE.Vector3(0, eye.current.current, 0));
+        const p = new THREE.Vector3(transform.position.x, transform.position.y, transform.position.z);
         const q = new THREE.Quaternion(transform.orientation.x, transform.orientation.y, transform.orientation.z, transform.orientation.w);
-        const inverse = new THREE.Quaternion().setFromAxisAngle(THREE.Object3D.DEFAULT_UP, -xr.headYaw);
-        return { p: p.applyQuaternion(inverse).toArray() as TrackedPose['p'], q: inverse.multiply(q).toArray() as TrackedPose['q'] };
+        return avatarTrackingPose(p, q, initial!, eye.current.current, xr.headYaw);
       };
       xr.pose = { head: tracking(head) };
       for (const source of session.inputSources) {
@@ -147,7 +144,7 @@ export function XRScene({ rig }: { rig: PlayerCamera }) {
         const pad = source.gamepad;
         if (!pad || pad.mapping !== 'xr-standard') continue;
         const axes = stick(pad.axes), old = buttons.get(source) ?? [], current = pad.buttons.map(b => b.pressed);
-        if (current[5] && !old[5]) { clear(); xrPatch({ open: !xrState().open }); }
+        if (current[5] && !old[5]) { resetXRInput(true); xrPatch({ open: !xrState().open }); }
         if (current[4] !== !!old[4]) window.dispatchEvent(new KeyboardEvent(current[4] ? 'keydown' : 'keyup', { code: 'Space', key: ' ' }));
         buttons.set(source, current);
         const controller = controllerFor(source), hit = controller && point(controller, false);

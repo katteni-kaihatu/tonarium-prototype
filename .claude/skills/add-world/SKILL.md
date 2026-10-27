@@ -223,7 +223,7 @@ export function useMyMapOnEntry() {
 
 ## 確認
 
-- `changelog/YYYY-MM-DD-<識別子>.json` を新規追加し（共通履歴 `shared/changelog.ts` への手動追記は不要。形式は `docs/changelog.md` を参照）、`npm run check:completion`（履歴チェック・型チェック・ビルド）を通す。失敗したら完了にしない
+- 変更履歴（`changelog/`・`shared/changelog.ts`）には触れず、PR 本文の「利用者向けの変更」に追加内容を書く。`npm run check:completion`（履歴チェック・型チェック・ビルド）を通す。失敗したら完了にしない
 - 見た目はブラウザで確かめる効果が高い。`npm run dev`（`.claude/launch.json` の `dev`）で入って 3D にし、`window.__t3d.pos(x, z)` と `look(yaw, pitch)` で見たい所へ動かして撮る。前面のパネルは `document.querySelectorAll('.panel, .worldbadge').forEach((e) => (e.style.visibility = 'hidden'))` で隠せる
 - 当たり判定は `pos` で家具の中に入れてから `state().selfAvatar` を読み、外へ出されているかを見る
 - ワールドの切り替えは設定メニューの「ワールド」から（全員に反映され、ログに出る）

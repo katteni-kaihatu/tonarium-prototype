@@ -22,10 +22,11 @@ export const xr = {
   use: null as null | (() => void), release: null as null | (() => void), carry: null as null | (() => boolean),
   cancel: null as null | (() => void),
 };
-export function resetXRInput() {
+export function resetXRInput(preserveTracking = false) {
   xr.clearControllers?.();
-  xr.pose = undefined; xr.carryRay = null;
-  xr.move = [0, 0]; xr.turn = 0; xr.ray = null; xr.headYaw = 0; xr.headPitch = 0;
+  if (!preserveTracking) { xr.pose = undefined; xr.headYaw = 0; xr.headPitch = 0; }
+  xr.carryRay = null;
+  xr.move = [0, 0]; xr.turn = 0; xr.ray = null;
   window.dispatchEvent(new Event('blur'));
   xr.release?.();
   xr.cancel?.();

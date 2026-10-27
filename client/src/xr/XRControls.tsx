@@ -117,7 +117,7 @@ export function XRControls() {
       {state.panels.filter(p => !candidates.some(c => c.key === p.id)).map(panel => <button key={panel.id} aria-pressed={panel.open} onClick={() => { xrPatch({ open: true }); xr.togglePanel?.(panel.id); }}>{panel.open ? '閉じる' : '開く'} · {panel.title}</button>)}
     </div>
     <div className="xr-toolbar" data-xr-surface="tools" data-xr-utility="true" data-xr-title="VR操作">
-      <button onClick={() => { resetXRInput(); xrPatch({ open: !state.open }); }}>仮想端末を{state.open ? '閉じる' : '開く'} (B/Y)</button>
+      <button onClick={() => { resetXRInput(true); xrPatch({ open: !state.open }); }}>仮想端末を{state.open ? '閉じる' : '開く'} (B/Y)</button>
       <button onClick={() => void endVR()}>VR終了</button>
       <button onClick={() => void endVR()}>ファイル・外部画面をブラウザで操作</button>
       <button onClick={() => { void endVR().then(() => { if (get().session) switchMode('2d'); }); }}>2Dへ戻る</button>
