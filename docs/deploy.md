@@ -56,6 +56,23 @@ cloudflared 以外（ngrok など）を使う場合は、`.env` の `ALLOWED_HOS
   ```
   （この場合 LiveKit は別に用意する）
 
+## RPG アカウントが HTTPS でも「安全な接続」を要求する場合
+
+デスクトップ版も同じ Web サーバーへ接続する。HTTPS のドメインでホーム画面が開いても、TLS を終了したプロキシからアプリまでは HTTP のため、RPG アカウント側で転送元を信頼していないと `secure-connection-required` で拒否する。パスワードやクライアント側の設定で直す問題ではない。
+
+Coolify の Docker Compose では、`tonarium` の環境変数に次を設定して再デプロイする。今回追加した Compose の参照で値をコンテナへ渡す。
+
+- `FANTASY_TRUSTED_PROXY_IPS`: **アプリの接続元として見える実際のプロキシ IP**。複数ならカンマ区切り。Docker ブリッジの範囲全体や `*` は指定しない。値は対象サーバーで確認し、固定するか変更時に更新する。
+- `FANTASY_TRUST_PROXY=1`: プロキシがアプリへループバックで接続する場合だけ使用する。この値だけでは Docker ブリッジを信頼しない。通常の別コンテナ構成では前項を設定する。
+
+プロキシは外部の `Host` を維持し、信頼できる HTTPS 終端からの `X-Forwarded-Proto: https` をアプリへ渡す。任意のクライアントが送った転送ヘッダーをそのまま採用しない。Cloudflare など複数段の経路でも、実際の TLS 終端とアプリ直前のヘッダーを運営側で確認する。
+
+設定後、認証 Cookie を付けずに `GET https://<公開ドメイン>/api/fantasy/account/status` を確認する。正常なら HTTP200 と `{"account":null}` が返る。HTTP403 の `secure-connection-required` が続くなら、実接続元 IP・コンテナに届いた環境変数・転送プロトコルを再確認する。`origin-denied` なら公開 Origin とアプリに届く Host/HTTPS の組合せを確認する。パスワード・Cookie・復旧コードを診断ログへ貼らない。
+
+この変更は設定値を渡すだけで、実際のプロキシ IP を推測して自動許可しない。未設定のままマージ・再デプロイしても登録エラーは解消しない。詳細は [RPG アカウントの通信条件](fantasy-accounts.md) を参照。
+
+参考: [Coolify の Compose 環境変数](https://coolify.io/docs/applications/configuration/environment-variables)、[Docker のコンテナ環境変数](https://docs.docker.com/compose/how-tos/environment-variables/set-environment-variables/)。
+
 ## 変更履歴の集約
 
 Web の Vite ビルド時に、既存の共通履歴と作業別 JSON を自動集約する。Dockerfile の `npx vite build` でも同じ処理が動く。集約結果を入力へ書き戻さないため再デプロイでも重複しない。配置・形式・並び順は [変更履歴の開発ガイド](changelog.md) を参照。

@@ -46,6 +46,8 @@ node --experimental-transform-types scripts/fantasy-account-admin.ts --data-dir 
 
 Coolify·Docker의 역방향 프록시가 브리지 주소로 연결하면 **게임 서버에서 보이는 해당 프록시의 정확한 IP**를 `FANTASY_TRUSTED_PROXY_IPS`에 쉼표로 나누어 지정한다. 예를 들어 프록시의 고정 주소가 `172.18.0.2`일 때 `FANTASY_TRUSTED_PROXY_IPS=172.18.0.2`로 설정한다. 기본값은 빈 목록이다. 개별 IPv4·IPv6만 받으며 CIDR·와일드카드·호스트명·범위는 허용하지 않고 잘못된 항목은 신뢰하지 않는다. IPv4와 IPv4-mapped IPv6 표기는 같은 주소로 취급한다. 컨테이너를 다시 만들 때 주소가 달라지지 않도록 프록시에 고정 주소를 할당하거나 실제 주소를 확인해 설정을 갱신한다.
 
+저장소의 `docker-compose.yml`은 위 두 설정을 `tonarium` 컨테이너에 전달한다. 운영자는 Coolify에 실제 프록시 IP를 입력하고 다시 배포해야 한다. 설정을 비운 채 PR만 반영하면 원격 HTTPS 계정 요청은 계속 거절된다. 데스크톱 앱도 같은 서버에 접속하므로 앱 재설치로 해결되지 않는다. 구체적인 확인 순서는 [배포 안내](deploy.md)를 따른다.
+
 신뢰한 프록시는 외부에서 받은 `X-Forwarded-Proto`를 실제 연결 방식으로 덮어쓰고, `X-Forwarded-For`의 마지막 IP가 직접 접속한 클라이언트가 되도록 덮어쓰거나 추가해야 한다. 원래 `Host`를 유지해 브라우저의 `Origin`과 일치시킨다. 계정 HTTPS 판단과 접속 IP별 요청 제한은 같은 프록시 허용 목록을 사용한다. 허용하지 않은 주소가 보낸 전달 헤더는 두 판단 모두에 사용하지 않는다.
 
 로그인은 HttpOnly·SameSite=Strict 쿠키를 사용하고 HTTPS에서는 Secure 쿠키를 쓴다. HTTP에서 받은 짧은 1회 티켓은 현재 WebSocket을 계정에 연결할 때만 사용하며, 티켓이나 월드 소유자 ID 자체를 장기 로그인 수단으로 저장하지 않는다. 변경 요청은 같은 출처와 요청 제한을 확인한다. 계정 기능의 경로는 `/api/fantasy/account/` 아래이며 공통 Tonarium 로그인 경로를 바꾸지 않는다.
