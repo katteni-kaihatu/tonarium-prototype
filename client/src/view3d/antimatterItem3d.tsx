@@ -6,7 +6,6 @@ import { openWindow } from '../world/windows.ts';
 import type { Interactable } from './interact.ts';
 import { removable, useFollow } from './itemHelpers.ts';
 import { Label } from './Label.tsx';
-import { emitAdFeedback } from '../ad/feedback.ts';
 
 const TOWERS: { x: number; z: number; h: number }[] = [
   { x: -0.32, z: 0.18, h: 0.45 },
@@ -21,7 +20,7 @@ export function AntimatterItem3D({ item }: { item: Item & { kind: 'antimatter' }
     ...removable(item),
     hint: 'クリック: AD 研究所を開く',
     // パネルをマウスで操作できるようロックを外す
-    use: () => { openWindow(`item:${item.id}`); document.exitPointerLock(); emitAdFeedback({ kind: 'navigate' }); },
+    use: () => { openWindow(`item:${item.id}`); document.exitPointerLock(); },
   };
   return (
     <group ref={ref} position={[item.x, 0, item.z]} rotation-y={item.ry} userData={data}>
