@@ -385,7 +385,7 @@ export function GroupsPage({ q }: { q: string }) {
   );
 }
 
-export const WORLD_FACE: Record<WorldKind, string> = { room: '#DCE6F3', cafe: '#F3E6C6', game: '#E7DDF2', survivors: '#F2D5E2', city: '#D7EAD3', garden: '#DDEBCF', starlounge: '#DBE1F4', antimatter: '#D9D6F5' };
+export const WORLD_FACE: Record<WorldKind, string> = { room: '#DCE6F3', cafe: '#F3E6C6', game: '#E7DDF2', survivors: '#F2D5E2', city: '#D7EAD3', garden: '#DDEBCF', starlounge: '#DBE1F4', antimatter: '#D9D6F5', fantasy: '#DFD0A8' };
 
 export function WorldSelectDialog({ onClose }: { onClose: () => void }) {
   const [q, setQ] = useState('');

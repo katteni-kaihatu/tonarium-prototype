@@ -1,6 +1,6 @@
 import { sourceText as uiSource } from '../i18n/core.ts';
 import { useUpdateDraft } from '../updateDraft.ts';
-import { localized, t as tr, msg } from '../i18n/index.ts';
+import { localized, t as tr, msg, useLanguage } from '../i18n/index.ts';
 import { useOwnedItems, type OwnedItem } from '../market/items.ts';
 import { OriginBadge } from '../market/OriginBadge.tsx';
 import { MarketPage } from '../market/Market.tsx';
@@ -33,6 +33,7 @@ import { FEEDBACK_URL } from '../feedback.ts';
 import { CHANGELOG } from '../i18n/static.ts';
 import { useChangelog } from './changelog.ts';
 import { XRLaunch } from '../xr/XRControls.tsx';
+import { ModeButton } from './ModeButton.tsx';
 import { homePageOf } from '../homePage.ts';
 import { TimelinePage, TimelinePhoneSheet, TimelineSide, TimelineTabs } from './Timeline.tsx';
 
@@ -61,6 +62,7 @@ const useUpcoming = () => useStore((s) => s.events).filter((e) => e.at > Date.no
 
 /** セッション外では次に入るときのモードを選ぶ。 */
 function ClientMode() {
+  useLanguage();
   const session = useStore((s) => s.session);
   const mode = useStore((s) => (s.session ? s.mode : touchOnly ? '2d' : s.joinMode));
   const switching = useStore((s) => !!s.switching);
@@ -71,12 +73,12 @@ function ClientMode() {
   return (
     <div className="hside-sec hclient">
       <span className="hlabel">{tr("ui156")}</span>
-      <div role="radiogroup" aria-label={tr("ui156")} className="hseg">
+      <div role="group" aria-label={tr("ui156")} className="hseg">
         {(['2d', '3d'] as const).map((m) => (
-          <button key={m} role="radio" aria-checked={mode === m} aria-label={tr("ui157", m.toUpperCase())} className={mode === m ? 'on' : ''} disabled={switching || (m === '3d' && touchOnly)}
-            title={m === '3d' && touchOnly ? tr("ui158") : session ? undefined : tr("ui159")} onClick={() => pick(m)}>
+          <ModeButton key={m} aria-pressed={mode === m} aria-label={tr("ui157", m.toUpperCase())} className={mode === m ? 'on' : ''} disabled={switching || (m === '3d' && touchOnly)}
+            explanation={m === '3d' && touchOnly ? tr("ui158") : switching ? tr('modeSwitchingHelp') : session ? tr("ui157", m.toUpperCase()) : tr("ui159")} onClick={() => pick(m)}>
             <Icon name={m === '2d' ? 'flat' : 'cube'} size={14} />{m.toUpperCase()}
-          </button>
+          </ModeButton>
         ))}
         <XRLaunch />
       </div>
@@ -253,7 +255,7 @@ function EventsWidget() {
   );
 }
 
-const WORLD_TINT: Record<string, string> = { room: '#DCE6F3', cafe: '#F3E6C6', game: '#E7DDF2', city: '#D7EAD3', garden: '#DDEBCF', starlounge: '#DBE1F4', antimatter: '#D9D6F5' };
+const WORLD_TINT: Record<string, string> = { room: '#DCE6F3', cafe: '#F3E6C6', game: '#E7DDF2', city: '#D7EAD3', garden: '#DDEBCF', starlounge: '#DBE1F4', antimatter: '#D9D6F5', fantasy: '#DFD0A8' };
 
 /** フレンドの今／参加できるセッション：セッションの行。押すと参加する（セッション中なら移動） */
 function SessionRows({ onlyFriends }: { onlyFriends: boolean }) {

@@ -16,6 +16,24 @@ function fixture(peer: string) {
 }
 const context = { sid: 'room', user: 'user-a', name: 'Alice', at: Date.now() };
 
+test('GIF attachments preserve bytes and retry identity through peer proposals within the image limit', () => {
+  const clientRequestId = crypto.randomUUID();
+  for (const mime of ['gif', 'jpeg', 'png']) {
+    const image = `data:image/${mime};base64,R0lGODlh`;
+    const event = proposeEvent({ t: 'chat', scope: 'all', text: 'camera', image, clientRequestId }, context)!;
+    assert.equal(event.payload.message.t, 'chat');
+    if (event.payload.message.t === 'chat') {
+      assert.equal(event.payload.message.m.image, image);
+      assert.equal(event.payload.message.m.clientRequestId, clientRequestId);
+      assert.equal(event.payload.message.m.scope, 'all');
+    }
+  }
+  for (const image of ['data:image/gif;base64,' + 'A'.repeat(2_000_000), 'data:image/svg+xml;base64,AAAA']) {
+    const event = proposeEvent({ t: 'chat', scope: 'all', text: 'camera', image }, context)!;
+    if (event.payload.message.t === 'chat') assert.equal(event.payload.message.m.image, undefined);
+  }
+});
+
 test('peer event remains encrypted until a server commit, independent of property order', async () => {
   const a = fixture('a'), b = fixture('b');
   try {

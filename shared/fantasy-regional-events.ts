@@ -1,0 +1,121 @@
+import type { FantasyCheckContext, FantasyEvent, FantasyEventChoice, FantasyStat } from './fantasy.ts';
+
+type Text = [ko: string, en: string, ja: string];
+const l = ([ko, en, ja]: Text) => ({ ko, en, ja });
+const choice = (id: string, label: Text, stat: FantasyStat, context: FantasyCheckContext, dc: number, success: Text, failure: Text, gold: number, item: string): FantasyEventChoice => ({
+  id, labels: l(label), label: label[2], stat, context, dc, successes: l(success), success: success[2], failures: l(failure), failure: failure[2], gold, item,
+});
+const event = (id: string, locations: string[], title: Text, description: Text, choices: [FantasyEventChoice, FantasyEventChoice]): FantasyEvent => ({
+  id: `regional-${id}`, locations, names: l(title), name: title[2], descriptions: l(description), description: description[2], choices,
+});
+
+export const FANTASY_REGIONAL_EVENTS: FantasyEvent[] = [
+  event('rain-awning', ['hearth'], ['비를 머금은 시장 차양', 'The Rain-heavy Awning', '雨を含んだ市場の天幕'],
+    ['갑작스러운 비에 시장 천막이 기울었다. 상인은 손님을 물리고 안전하게 천막을 고정할 사람을 찾는다.', 'Sudden rain tilts a market awning. A trader clears the area and asks for help securing it safely.', '急な雨で市場の天幕が傾いた。商人が客を離れさせ、安全に支える手を求める。'], [
+      choice('brace', ['기둥을 받쳐 물을 빼낸다', 'Brace the pole and drain the water', '柱を支えて水を抜く'], 'strength', 'heavy-lifting', 11,
+        ['기둥을 받친 사이 물이 빠져 물품을 지켰다.', 'The water drains while you brace the pole, protecting the goods.', '柱を支える間に水が抜け、品物を守れた。'],
+        ['기둥이 무거워 물러났다. 상인이 천막을 접고 안전하게 장사를 마쳤다.', 'The pole is too heavy. You step back while the trader closes the awning safely.', '柱が重く、一度退いた。商人は天幕を畳んで安全に店じまいした。'], 18, 'wood'),
+      choice('retie', ['좁은 가판대 사이에서 매듭을 고친다', 'Retie the cords between the stalls', '屋台の隙間から結び直す'], 'dexterity', 'narrow-space', 12,
+        ['손이 닿는 틈으로 끈을 다시 묶어 천막을 안정시켰다.', 'You reach through the gap and retie the cords, steadying the awning.', '隙間から縄を結び直し、天幕を安定させた。'],
+        ['틈이 비좁아 매듭에 닿지 못했다. 가판대를 옮긴 뒤 함께 정리했다.', 'The gap is too tight to reach the knot. You help clear the stalls instead.', '隙間が狭く結び目に届かず、屋台を動かして片付けを手伝った。'], 22, 'bread'),
+    ]),
+  event('forest-path', ['greenwood', 'rainvault'], ['비 뒤의 숲길', 'The Path after Rain', '雨上がりの森道'],
+    ['비에 씻긴 길의 표지가 낙엽에 덮였다. 길을 넓히지 않고 작은 안내 표시만 되살려야 한다.', 'Wet leaves hide the trail markers. Restore the small signs without widening the path.', '雨で流れた葉が道標を覆う。道を広げず、小さな目印だけを戻したい。'], [
+      choice('read', ['발자국과 나무 표식을 대조한다', 'Compare tracks with tree marks', '足跡と木の印を照合する'], 'intelligence', 'keen-senses', 11,
+        ['표식의 방향을 찾아 기존 길 위에 안내를 되살렸다.', 'You find the marker direction and restore guidance along the existing path.', '印の向きを確かめ、元の道に案内を戻した。'],
+        ['흔적이 뒤섞여 판단을 보류했다. 돌아가는 사람에게 길을 확인했다.', 'Mixed traces leave you unsure. You ask returning travelers to confirm the route.', '痕跡が混じっていたため判断を保留し、戻る旅人に道を確かめた。'], 16, 'herb'),
+      choice('cross', ['미끄러운 뿌리 사이를 건너 표지를 세운다', 'Cross the slick roots to restore a marker', '滑る根を渡って道標を立てる'], 'agility', 'trap', 12,
+        ['발이 걸릴 뿌리를 피해 표지를 제자리에 세웠다.', 'You avoid the catching roots and reset the marker.', '足を取る根を避け、道標を立て直した。'],
+        ['젖은 뿌리에 발이 걸려 잠시 쉬었다. 안내 표식은 다른 손길에 맡겼다.', 'A wet root catches your foot. You rest and leave the marker to another helper.', '濡れた根に足を取られて休み、道標は別の手に任せた。'], 20, 'wood'),
+    ]),
+  event('cooling-cart', ['emberhall'], ['식기를 기다리는 운반대', 'The Cooling Cart', '冷ます荷車'],
+    ['대장간 바깥 운반대에 따뜻한 금속이 실려 있다. 작업자는 서둘러 옮기기보다 안전한 순서를 정하려 한다.', 'Warm metal rests on a cart outside the smithy. Workers need a safe moving order rather than haste.', '鍛冶場の外の荷車に温かな金属が載っている。職人は急がず、安全な順序を決めたい。'], [
+      choice('balance', ['무게를 나눠 차가운 손잡이로 옮긴다', 'Balance the load using the cool handles', '重さを分けて冷えた取っ手で運ぶ'], 'strength', 'heavy-lifting', 12,
+        ['무게를 고르게 나눠 운반대를 작업장 그늘로 옮겼다.', 'You distribute the load and move the cart into the workshop shade.', '重さを均等にし、荷車を作業場の陰へ運んだ。'],
+        ['한쪽으로 무게가 쏠려 내려놓았다. 작업자가 인원을 더 불렀다.', 'The load leans to one side. You set it down while the workers call more help.', '重さが片側に寄ったため下ろし、職人が追加の手を呼んだ。'], 22, 'ore'),
+      choice('observe', ['열이 빠지는 순서를 확인한다', 'Check which parts cool first', '熱の抜ける順を確かめる'], 'intelligence', 'heat', 11,
+        ['차례로 식힌 부품을 구분해 안전한 운반 순서를 정했다.', 'You sort the cooling parts and establish a safe moving order.', '冷えた部品を見分け、安全な運搬順を整えた。'],
+        ['표면과 안쪽의 열을 구분하기 어려워 충분히 식을 때까지 기다렸다.', 'Surface heat is hard to judge, so everyone waits until the parts are fully cool.', '表面と内部の熱を見分けにくく、十分に冷めるまで待った。'], 18, 'ingot'),
+    ]),
+  event('public-reading', ['suncourt'], ['광장의 낭독 순서', 'Reading in the Square', '広場の朗読順'],
+    ['광장 사람들이 생활 기록을 한 구절씩 읽는다. 작은 목소리도 묻히지 않도록 차례와 기록을 정리하려 한다.', 'People in the square read passages from everyday records. Help arrange turns so quieter voices can be heard.', '広場で暮らしの記録を一節ずつ読む。小さな声も届くよう、順番と記録を整えたい。'], [
+      choice('listen', ['작은 목소리에 귀 기울여 순서를 나눈다', 'Listen for quiet voices and arrange turns', '小さな声を聞いて順を整える'], 'charisma', 'keen-senses', 11,
+        ['말을 마칠 시간을 고르게 나눠 모두가 자기 구절을 읽었다.', 'You give each speaker enough time, letting everyone read their passage.', '話す時間を均等に取り、皆が自分の一節を読めた。'],
+        ['목소리가 겹쳐 잠시 멈췄다. 진행자가 번호표로 순서를 다시 정했다.', 'Voices overlap. The organizer pauses and resets the turns with numbered slips.', '声が重なったため一度止め、係が番号札で順を決め直した。'], 18, 'spice'),
+      choice('sort', ['좁은 책상에서 낱장을 정렬한다', 'Sort loose pages on the small table', '狭い机で紙片を揃える'], 'dexterity', 'narrow-space', 12,
+        ['낱장을 차례대로 놓아 낭독자가 다음 기록을 쉽게 찾았다.', 'You order the pages so readers can find the next passage easily.', '紙片を順に並べ、読み手が次の記録を見つけやすくした。'],
+        ['바람에 낱장이 섞여 다시 묶었다. 낭독은 남은 기록부터 이어졌다.', 'The wind mixes the pages. You bind them again while other readings continue.', '風で紙片が混じったため束ね直し、朗読は残る記録から続けた。'], 22, 'bread'),
+    ]),
+  event('harbor-lines', ['tidehaven', 'dawnport', 'mirror-isle'], ['물결과 계류줄', 'Waves and Mooring Lines', '波と係留縄'],
+    ['작은 선착장의 줄이 반복해서 젖는다. 도착할 배를 기다리는 동안 줄과 발판을 함께 살핀다.', 'Waves repeatedly soak the small landing. Check its ropes and footing while waiting for a boat.', '小さな船着き場の縄が波に濡れる。船を待つ間、縄と足場を一緒に確かめたい。'], [
+      choice('secure', ['물가에서 줄을 다시 감는다', 'Recoil the lines at the water edge', '水際で縄を巻き直す'], 'dexterity', 'deep-water', 12,
+        ['물살을 피해 줄을 감아 배가 댈 자리를 정돈했다.', 'You work around the wash and prepare a clear berth.', '水の動きを避けて縄を巻き、船を寄せる場所を整えた。'],
+        ['파도가 줄을 당겨 작업을 멈췄다. 안전한 높이에서 도착을 기다렸다.', 'A wave pulls the line, so you stop and wait on higher, safer footing.', '波が縄を引いたため作業を止め、安全な高い足場で待った。'], 22, 'fish'),
+      choice('watch', ['찬 바람을 견디며 안전한 발판을 지킨다', 'Watch the footing through the cold wind', '冷たい風の中で足場を見守る'], 'vitality', 'cold', 11,
+        ['미끄러운 곳을 알려 도착한 사람들이 안전하게 내렸다.', 'You point out slick spots and help arriving travelers disembark safely.', '滑る場所を知らせ、着いた人々が安全に降りられた。'],
+        ['찬 바람에 몸이 굳어 교대를 요청했다. 준비된 등불을 다음 사람에게 넘겼다.', 'The wind chills you, so you request relief and pass the prepared lamp along.', '風で体が冷えたため交代を頼み、用意した灯りを引き継いだ。'], 18, 'jerky'),
+    ]),
+  event('archive-draft', ['mooncity'], ['문틈을 타는 서고 바람', 'A Draft in the Archive', '書庫の隙間風'],
+    ['서고 문틈에서 들어온 바람이 정리 중인 종이를 움직인다. 오래된 잠금 장치를 건드리지 않고 기록을 지켜야 한다.', 'A draft moves papers being sorted in the archive. Protect them without disturbing the old locking mechanism.', '書庫の隙間風が整理中の紙を揺らす。古い錠の仕掛けに触れず記録を守りたい。'], [
+      choice('trace', ['잠금 장치와 바람길을 대조한다', 'Trace the lock and the airflow', '錠の仕掛けと風の道を照合する'], 'intelligence', 'trap', 12,
+        ['장치를 피할 틈을 찾아 바람막이를 고정했다.', 'You find a safe gap and secure a draft screen clear of the mechanism.', '仕掛けを避ける隙間を見つけ、風よけを固定した。'],
+        ['장치의 연결이 분명하지 않아 손대지 않았다. 관리인이 기록을 다른 책상으로 옮겼다.', 'The linkage is unclear, so you leave it alone while the archivist moves the papers.', '仕掛けの繋がりが不明で手を止め、管理人が紙を別の机へ移した。'], 22, 'crystal'),
+      choice('catch', ['좁은 선반 사이에서 종이를 모은다', 'Gather pages between the narrow shelves', '狭い棚の間で紙を集める'], 'agility', 'narrow-space', 11,
+        ['종이가 바닥 틈에 들기 전에 모아 순서를 지켰다.', 'You gather the pages before they slip into the floor gaps, preserving their order.', '紙が床の隙間に入る前に集め、順番を保った。'],
+        ['몸을 돌릴 공간이 부족해 관리인과 선반을 비우고 다시 모았다.', 'There is too little turning room, so you clear a shelf with the archivist first.', '向きを変える余地がなく、管理人と棚を空けてから集め直した。'], 18, 'herb'),
+    ]),
+  event('cloud-watch', ['starspire'], ['구름 사이의 짧은 관측', 'The Brief Cloud Gap', '雲間の短い観測'],
+    ['구름이 잠깐 갈라져 탑의 관측 시간을 열어 준다. 기록자는 장비를 고정할 손과 눈으로 변화를 읽을 사람을 찾는다.', 'A brief break in the clouds allows a tower observation. A recorder needs steady hands and an attentive observer.', '雲が一時開き、塔で観測できる時間が訪れた。記録係は道具を支える手と変化を読む目を求める。'], [
+      choice('brace', ['찬 바람 속에서 관측대를 받친다', 'Brace the stand in the cold wind', '冷たい風の中で観測台を支える'], 'vitality', 'cold', 12,
+        ['관측대의 흔들림을 줄여 기록자가 눈앞의 모습을 적었다.', 'You steady the stand long enough for the recorder to note the visible pattern.', '台の揺れを抑え、記録係が見えている模様を書き留めた。'],
+        ['추위에 손이 굳어 지지대를 내려놓았다. 관측은 다음 틈을 기다렸다.', 'Cold stiffens your hands. You lower the stand and wait for another opening.', '寒さで手が固まり、支えを下ろして次の雲間を待った。'], 22, 'crystal'),
+      choice('note', ['빛과 구름의 변화를 짧게 기록한다', 'Note the changing light and clouds', '光と雲の変化を短く記す'], 'intelligence', 'keen-senses', 11,
+        ['관측한 것과 보이지 않은 것을 나눠 쓸 만한 기록을 남겼다.', 'You separate what was seen from what remained hidden, leaving a useful record.', '見えたことと見えなかったことを分け、有用な記録を残した。'],
+        ['구름이 너무 빨리 움직여 수치를 확정하지 않고 날씨만 적었다.', 'The clouds move too quickly for a firm reading, so you record only the weather.', '雲の動きが速く数値は確定せず、天候だけを記録した。'], 18, 'gem'),
+    ]),
+  event('field-water', ['sunmeadow'], ['목초지의 얕은 물길', 'The Shallow Field Channel', '牧草地の浅い水路'],
+    ['작은 물길에 풀과 흙이 엉켰다. 주민은 밭을 새로 소유하라는 뜻이 아니라 함께 쓰는 물길을 잠깐 정리해 달라고 한다.', 'Grass and soil clog a small shared channel. A resident asks for a little maintenance, not ownership of a field.', '小さな共同水路に草と土が詰まった。住民は畑の所有ではなく、少しの手入れを頼んでいる。'], [
+      choice('lift', ['돌받침을 들어 흐름을 돌린다', 'Lift the stone brace to divert the flow', '石の支えを持ち上げて流れを変える'], 'strength', 'heavy-lifting', 11,
+        ['물을 잠시 돌려 막힌 구간을 안전하게 비웠다.', 'You divert the water long enough to clear the blocked section safely.', '水を一時迂回させ、詰まった場所を安全に空けた。'],
+        ['돌이 무거워 억지로 들지 않았다. 주민과 가벼운 흙부터 걷어냈다.', 'The stone is too heavy, so you leave it and clear lighter soil with the resident.', '石が重いため無理はせず、住民と軽い土から取り除いた。'], 18, 'bread'),
+      choice('clear', ['좁은 틈에서 풀뿌리를 풀어낸다', 'Untangle roots in the narrow gap', '狭い隙間で草の根をほぐす'], 'dexterity', 'narrow-space', 12,
+        ['물길 벽을 상하게 하지 않고 엉킨 뿌리를 풀었다.', 'You free the roots without damaging the channel walls.', '水路の壁を傷めず、絡んだ根をほどいた。'],
+        ['뿌리가 깊이 엉켜 작업을 멈췄다. 물을 낮춘 뒤 다시 손보기로 했다.', 'The roots are too deeply tangled. Work pauses until the water can be lowered.', '根が深く絡み、作業を止めて水を下げてから直すことにした。'], 22, 'herb'),
+    ]),
+  event('sail-signals', ['verdant-quay'], ['젖은 돛의 신호', 'Signals on a Wet Sail', '濡れた帆の合図'],
+    ['선원들이 항구에서 쓰는 천 신호를 말리고 있다. 물결과 바람을 보며 올바른 높이에 걸어야 한다.', 'Sailors dry cloth signals used in the harbor. Read the water and wind to hang them at a useful height.', '船員が港の布の合図を乾かしている。波と風を見て、役立つ高さに掛けたい。'], [
+      choice('read', ['물결과 천의 흔들림을 함께 읽는다', 'Read the waves and moving cloth', '波と布の揺れを合わせて読む'], 'intelligence', 'keen-senses', 11,
+        ['서로 가리지 않는 순서를 찾아 선원들이 신호를 구분했다.', 'You find an unobstructed order, making the signals distinct for the sailors.', '互いを隠さない順を見つけ、船員が合図を区別できた。'],
+        ['바람이 자꾸 바뀌어 해석을 보류했다. 익숙한 선원에게 확인을 맡겼다.', 'The wind keeps shifting, so you leave the final reading to an experienced sailor.', '風が変わり続けたため判断を保留し、慣れた船員に確認を任せた。'], 18, 'silk'),
+      choice('raise', ['높은 발판에서 신호 천을 고정한다', 'Secure the cloth from the high platform', '高い足場から合図の布を固定する'], 'agility', 'high-place', 12,
+        ['발판을 확인하며 천을 고정해 항구에서 잘 보이게 했다.', 'You check each foothold and secure the cloth where it can be seen from the harbor.', '足場を確かめながら布を固定し、港から見やすくした。'],
+        ['젖은 발판이 미끄러워 내려왔다. 낮은 위치에 임시 신호를 걸었다.', 'The wet footing is unsafe. You descend and hang a temporary signal lower down.', '濡れた足場が滑るため降り、低い位置に仮の合図を掛けた。'], 22, 'wood'),
+    ]),
+  event('loom-rain', ['loom-village'], ['직조 틀 앞의 소나기', 'A Shower at the Loom', '織り台のにわか雨'],
+    ['공동 직조장 창가로 빗물이 들어온다. 작업 중인 천의 장력과 젖지 않은 실을 함께 지켜야 한다.', 'Rain reaches the window of a shared weaving space. Protect both the cloth tension and the dry thread.', '共同の織り場の窓から雨が入る。織りかけの張りと乾いた糸を共に守りたい。'], [
+      choice('thread', ['좁은 틀 사이에서 실을 정돈한다', 'Arrange the threads between the narrow frames', '狭い枠の間で糸を整える'], 'dexterity', 'narrow-space', 12,
+        ['날실을 뒤엉키지 않게 묶어 직조 작업을 이어 갈 수 있게 했다.', 'You tie the warp without tangling it, allowing weaving to resume.', '縦糸が絡まぬよう束ね、織り仕事を続けられるようにした。'],
+        ['몇 가닥이 엉켜 속도를 늦췄다. 직조사와 풀어 놓고 다음 작업으로 넘겼다.', 'A few threads tangle. You slow down and untangle them with the weaver.', '数本が絡んだため手を緩め、織り手とほどいて次の作業へ回した。'], 22, 'silk'),
+      choice('cover', ['찬 빗바람을 막으며 실꾸리를 옮긴다', 'Move the spools while shielding them from cold rain', '冷たい雨風を避けて糸巻きを運ぶ'], 'vitality', 'cold', 11,
+        ['마른 실꾸리를 먼저 옮겨 비가 그친 뒤 바로 사용할 수 있었다.', 'You move the dry spools first, keeping them ready for use after the shower.', '乾いた糸巻きを先に移し、雨の後すぐ使える状態を守った。'],
+        ['빗바람에 지쳐 나눠 옮기기로 했다. 젖은 실은 따로 널었다.', 'The cold rain tires you, so the work is shared and wet thread is set aside to dry.', '雨風に疲れて運ぶ手を分け、濡れた糸は別に干した。'], 18, 'bread'),
+    ]),
+  event('shade-stores', ['saffron-port'], ['그늘로 옮기는 꾸러미', 'Bundles for the Shade', '日陰へ移す包み'],
+    ['항구의 마른 바람이 장터의 꾸러미를 덥힌다. 상인은 내용물을 열지 말고 그늘과 통로를 정리해 달라고 한다.', 'Dry harbor wind heats the market bundles. A trader asks you to arrange shade and clear passage without opening them.', '港の乾いた風が市場の包みを温める。商人は中を開かず、日陰と通路を整えるよう頼む。'], [
+      choice('shade', ['더위를 견디며 차양을 옮긴다', 'Shift the awning through the heat', '暑さの中で日よけを移す'], 'vitality', 'heat', 11,
+        ['꾸러미를 덮는 그늘을 만들어 거래가 천천히 다시 시작됐다.', 'You create shade over the bundles, letting trade resume at a safer pace.', '包みを覆う陰を作り、取引が無理のない速さで再開した。'],
+        ['열기에 지쳐 그늘에서 쉬었다. 상인은 늦은 시간에 물건을 옮기기로 했다.', 'The heat tires you. You rest in the shade while the trader delays moving the goods.', '暑さに疲れて陰で休み、商人は遅い時刻に荷を動かすことにした。'], 18, 'spice'),
+      choice('stack', ['좁은 통로를 남기며 꾸러미를 배치한다', 'Arrange bundles while keeping a narrow passage clear', '狭い通路を残して包みを並べる'], 'dexterity', 'narrow-space', 12,
+        ['통로와 그늘을 함께 확보해 사람과 물건이 엉키지 않았다.', 'You preserve both shade and a clear passage, keeping people and goods apart.', '通路と日陰を両立させ、人と荷がぶつからずに済んだ。'],
+        ['꾸러미 간격이 맞지 않아 쌓지 않고 바닥에 나눠 두었다.', 'The bundles do not stack safely, so you lay them out separately instead.', '包みの間隔が合わず、積まずに床へ分けて置いた。'], 22, 'jerky'),
+    ]),
+  event('cooling-clay', ['redweave'], ['식어 가는 흙 받침', 'The Cooling Clay Supports', '冷めゆく土の台'],
+    ['작업장 사람들이 구운 흙 받침을 마당으로 옮긴다. 수량을 늘리는 일보다 깨지지 않게 쉬어 가는 순서가 중요하다.', 'Workers move fired clay supports into a yard. A careful cooling order matters more than moving many at once.', '工房の人々が焼いた土の台を庭へ移す。多く運ぶより、割らずに休ませる順が大切だ。'], [
+      choice('cool', ['남은 열과 마른 자리를 대조한다', 'Compare residual heat and dry resting places', '残る熱と乾いた置き場を照合する'], 'intelligence', 'heat', 11,
+        ['급히 식히지 않을 자리를 골라 받침을 온전히 말렸다.', 'You choose places that cool gradually and keep the supports intact.', '急に冷えない場所を選び、台を無事に乾かした。'],
+        ['열 차이를 확신하기 어려워 숙련자에게 마지막 배치를 맡겼다.', 'The temperature difference is uncertain, so an experienced worker chooses the final layout.', '熱の差を確信できず、最後の配置は熟練者に任せた。'], 18, 'ore'),
+      choice('carry', ['무게를 나눠 받침을 천천히 운반한다', 'Distribute the weight and carry the supports slowly', '重さを分けて台をゆっくり運ぶ'], 'strength', 'heavy-lifting', 12,
+        ['한 번에 적게 나르며 받침을 안전한 바닥에 내려놓았다.', 'You carry fewer at a time and set the supports down safely.', '一度に少なく運び、安全な床へ台を置いた。'],
+        ['무게가 생각보다 커서 내려놓고 운반판을 빌렸다.', 'The weight is greater than expected. You set it down and borrow a carrying board.', '予想より重く、いったん下ろして運搬板を借りた。'], 22, 'ingot'),
+    ]),
+];

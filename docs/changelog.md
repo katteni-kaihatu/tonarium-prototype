@@ -1,6 +1,21 @@
 # 変更履歴の登録と集約
 
-修正・文書更新・保守を含む全タスクで、`changelog/` 直下に作業別 JSON ファイルを一つ新規追加する。共通の `shared/changelog.ts` への手動追記は不要。このファイルは移行前の履歴として保持する。今回の方式移行に限り、依頼に従って共通履歴にも一項目を追記している。
+変更履歴は `main` への反映時に、リリース担当（Tonarium Agent）だけが `changelog/` 直下へ作業別 JSON ファイルを追加する。人の開発者も Agent の実装担当も、作業の中で `changelog/` と共通の `shared/changelog.ts` を追加・編集・削除しない。複数の作業が同じ履歴を同時に書いて競合するのを避けるため。共通の `shared/changelog.ts` は移行前の履歴として保持する。
+
+## 作業での書き方
+
+PR 本文の「利用者向けの変更」（[PR テンプレート](../.github/pull_request_template.md)）に、利用者から見て何が変わるかを書く。内部だけの変更なら「なし」と書く。`develop` 宛ての PR が `changelog/` か `shared/changelog.ts` に触れると、Web checks の「Check changelog policy」が失敗する。
+
+## main への反映
+
+リリース担当は15分ごとに `origin/main..origin/develop` を確認し、差分がなければ何もしない。差分があれば次の順で反映する。
+
+1. 開始時点の `develop` のコミットを固定する。以降に入った変更は次回に回す
+2. 範囲内の PR（Agent の PR、人の PR）と、PR を通さない直接のコミットを集める。PR 本文の「利用者向けの変更」を優先し、書かれていない・情報が少ない場合はタイトル・コミットメッセージ・差分から最低限の内容を作る
+3. 機能ごとに `changelog/YYYY-MM-DD-rel<時刻>-<名前>.json` を作る。内部だけの変更は「開発・保守」タグの項目にまとめる。範囲内で追加と取り消しがそろった機能は記載しない。旧運用で履歴ファイルを含んだまま入った PR は、記録済みとして扱う
+4. `main` からリリース用ブランチを作り、固定した `develop` のコミットをマージし、履歴を追加して `main` 宛ての PR を出す。Web checks が通ったらマージする
+
+履歴ファイルは `main` にだけ入り、`develop` には戻さない。`develop` 側は履歴に触れないため構造上競合しない。`develop` の環境の変更履歴ページには、最新の反映分が出ない。
 
 ## 配置と記載形式
 
@@ -17,7 +32,7 @@
 
 一ファイル一項目。`date` はファイル名と一致する実在日付、`title` は空でない文字列、`items` は空でない文字列を一つ以上含む配列。`tag` は省略可能で、指定時は空でない文字列。これ以外の項目、サブディレクトリ、JSON 以外のファイルは認めない。履歴をコードとして実行しない。
 
-追加した JSON は実装と一緒にコミット対象へ含める。ローカルの完了チェックは未追跡ファイルも読むため、成功しても `git status --short` で追加漏れがないか確認する。
+リリース担当は追加した JSON をリリース用ブランチにコミットし、`npm run check:changelog -- --mode release --base origin/main` で検証する。
 
 ## 識別と表示順
 
@@ -33,6 +48,14 @@ Web は Vite が `shared/changelog.ts` を取り込む際に、共通履歴と�
 
 ## 完了チェック
 
-タスク完了前に `npm run check:completion` を実行する。`npm run check:changelog` は比較元に存在しない作業別ファイルが一つ以上あること、全作業別ファイルの形式・内容重複、既存履歴の保持を確認する。コミット済み・ステージ済み・未ステージ・未追跡の現在のファイルを対象とする。共通履歴の追記だけでは通過しない。記載内容と実際の差分の一致はレビューで確認する。
+タスク完了前に `npm run check:completion` を実行する。`npm run check:changelog` は比較元に対する履歴の変更を、モードごとに確認する。コミット済み・ステージ済み・未ステージ・未追跡の現在のファイルを対象とする。
 
-比較元は既定で `git merge-base HEAD origin/develop`（`origin/develop` が無ければ `origin/main`）。タスク開始時のコミットを明示する場合は `CHANGELOG_BASE` を設定するか、`npm run check:changelog -- --base <比較元コミット>` を使う。比較元を取得できない場合も失敗する。PR の Web checks も同じ検証を使う。回帰テストは `npm run test:changelog`。
+| モード | 使う場面 | 確認内容 |
+| --- | --- | --- |
+| `develop`（既定） | 通常の作業、`develop` 宛ての PR | `changelog/` と `shared/changelog.ts` が比較元から変わっていない |
+| `main` | `main` 宛ての PR、`main` から `develop` への同期 | 既存履歴の保持（編集・削除・改名なし）、全作業別ファイルの形式、内容の重複なし。新規の追加は任意 |
+| `release` | リリース担当の検証 | `main` の確認に加え、新規の作業別ファイルが一つ以上ある |
+
+モードは `--mode` か `CHANGELOG_MODE` で指定する。Web checks は `develop` 宛ての PR（`main` からの同期を除く）に `develop`、それ以外に `main` を使う。利用者に見えない変更だけの反映でもリリース担当は「開発・保守」の項目を作るが、CI では新規の追加を強制しない。
+
+比較元は既定で `git merge-base HEAD origin/develop`（`origin/develop` が無ければ `origin/main`）。タスク開始時のコミットを明示する場合は `CHANGELOG_BASE` を設定するか、`npm run check:changelog -- --base <比較元コミット>` を使う。比較元を取得できない場合も失敗する。回帰テストは `npm run test:changelog`。

@@ -36,6 +36,23 @@ test('hammer hit counts are displayed in each supported language', () => {
   } finally { setLanguage(previous); }
 });
 
+test('hit notification counts follow language changes while preserving the sender', () => {
+  const previous = getLanguage();
+  const notice = { fromName: 'Alice', count: 4 };
+  try {
+    for (const count of [1, notice.count]) {
+      for (const [lang, expected] of [
+        ['ja', `Alice にピコピコハンマーで${count}回叩かれました`],
+        ['en', `Alice hit you with a toy hammer ${count} time(s)`],
+        ['ko', `Alice님이 장난감 망치로 나를 ${count}번 두드렸습니다`],
+      ] as const) {
+        setLanguage(lang);
+        assert.equal(notice.fromName + t('ui638', count), expected);
+      }
+    }
+  } finally { setLanguage(previous); }
+});
+
 test('browser initialization and document metadata follow preferred supported language', () => {
   assert.equal(getLanguage(), 'en');
   assert.equal(page.documentElement.lang, 'en');

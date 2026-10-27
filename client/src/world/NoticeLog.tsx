@@ -31,9 +31,8 @@ function useVisibleChat() {
   return chat.filter((m) => !(m.from && blocked.includes(m.fromName)));
 }
 
-const NOTICE_TEXT: Record<Notice['kind'], string> = localized({
+const NOTICE_TEXT: Record<Exclude<Notice['kind'], 'hit'>, string> = localized({
   poke: uiSource('ui637'),
-  hit: uiSource('ui638'),
   follow: uiSource('followNotice'),
   live: uiSource('ui640'),
   attention: uiSource('ui641'),
@@ -60,6 +59,7 @@ function NoticeRow({ n, onMessage }: { n: Notice; onMessage: (conv: string) => v
   const inviteTo = useStore((s) => inviteTarget(s, n));
   const followingBack = useStore((s) => s.following.includes(n.fromName));
   const text = n.kind === 'attention' ? (target ? tr("ui644", itemLabel(target)) : tr("ui645"))
+    : n.kind === 'hit' ? tr('ui638', n.count ?? 1)
     : n.kind === 'invite' ? tr("ui177", inviteTo ? `「${inviteTo.name}」` : tr("ui178")) : NOTICE_TEXT[n.kind];
   const reply = n.kind === 'askJoin'
     ? <button className="ib reply" onClick={() => { invite('session', n.key!.slice(8), n.from); removeNotice(n.id); }}>{tr("ui646")}</button>

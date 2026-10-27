@@ -1,3 +1,6 @@
+import type { FantasyRealmCommand, FantasyRealmState } from './fantasy-realm.ts';
+import type { BrowserAiClientMsg, BrowserAiServerMsg } from './ai-support.ts';
+import type { FantasyPartyCommand, FantasyPartyError, FantasyPartyState } from './fantasy-party.ts';
 import type { Item, ItemAction, ItemKind, MediaInit } from './items.ts';
 import type { ItemVariant } from './item-variants.ts';
 import type { WorldKind } from './worlds.ts';
@@ -7,6 +10,19 @@ import type { SurvivorMetaUpgrade, SurvivorProfile, SurvivorState, SurvivorStyle
 import type { ElevatorState } from './city.ts';
 import type { SyncConfig } from './session-wire.ts';
 import type { PeerOperation } from './session-events.ts';
+import type { FantasyAction, FantasyProfile, FantasyWorldClock, FantasyLegacyRecord } from './fantasy.ts';
+import type { NpcChatRequest, NpcReply } from './npc.ts';
+import type { FantasyGmChatRequest, FantasyGmChatResponse } from './fantasy-gm.ts';
+import type { FantasyCommunityError, FantasyCommunityRequest, FantasyCommunityState } from './fantasy-community.ts';
+import type { FantasyContractBoard, FantasyContractError } from './fantasy-contracts.ts';
+import type { FantasyCombatOrder, FantasyCombatState } from './fantasy-combat.ts';
+import type { FantasyCombatStartKind } from './fantasy-combat-challenges.ts';
+import type { FantasyPropertyCommand, FantasyPropertyError, FantasyPropertyState } from './fantasy-property.ts';
+import type { FantasyAccountPublic } from './fantasy-account.ts';
+export type { FantasyCombatStartKind } from './fantasy-combat-challenges.ts';
+export type FantasyCombatCommand = { type: 'sync' } | { type: 'inspect'; target: string }
+  | { type: 'start'; source: FantasyCombatStartKind; target: string; confirm?: boolean }
+  | { type: 'order'; combatId: string; revision: number; order: FantasyCombatOrder };
 import type { AssetCommand, AssetView } from './shared-assets.ts';
 import type { AssetDelta } from './shared-sync.ts';
 import type { Post, PostAttach } from './timeline.ts';
@@ -195,6 +211,7 @@ export interface SessionInfo {
 export type ChatScope = 'near' | 'all' | 'announce';
 
 export interface ChatMessage {
+  clientRequestId?: string;
   id: string;
   /** null はシステムメッセージ（ログのイベント） */
   from: string | null;
@@ -288,6 +305,19 @@ export interface SessionSnapshot {
 
 /** WebSocket でサーバーへ送るもの（セッションの外でも使う） */
 export type HomeClientMsg =
+  | BrowserAiClientMsg
+  | { t: 'fantasyAccountBind'; ticket: string }
+  | { t: 'fantasyAccountUnbind' }
+  | { t: 'fantasyAction'; revision: number; action: FantasyAction }
+  | ({ t: 'fantasyRealmRequest' } & FantasyRealmCommand)
+  | { t: 'fantasyPartyRequest'; command: FantasyPartyCommand }
+  | { t: 'fantasyPropertyRequest'; command: FantasyPropertyCommand }
+  | { t: 'fantasyCombatRequest'; command: FantasyCombatCommand }
+  | { t: 'fantasyTestReset'; revision: number; confirm: 'RESET_LIFE' }
+  | { t: 'fantasyContracts' }
+  | ({ t: 'npcChat' } & NpcChatRequest)
+  | ({ t: 'fantasyGmChat' } & FantasyGmChatRequest)
+  | ({ t: 'communityContribute' } & FantasyCommunityRequest)
   | { t: 'thumbnailUpload'; sid: string; thumbnail: string }
   | { t: 'marketLike'; product: string }
   | { t: 'hello'; id: string; name: string; compat?: number }
@@ -344,7 +374,7 @@ export type RoomClientMsg =
   | { t: 'place2d'; target: string; pos: AvatarState | null }
   /** 3D で配信ディスプレイを持ち運ぶ */
   | { t: 'displayMove'; target: string; x: number; z: number; ry: number }
-  | { t: 'chat'; text: string; image?: string; media?: ChatMedia; scope: ChatScope }
+  | { t: 'chat'; text: string; image?: string; media?: ChatMedia; scope: ChatScope; clientRequestId?: string }
   | { t: 'avatar'; s: AvatarState }
   | { t: 'viewing'; keys: string[] }
   | { t: 'poke'; to: string }
@@ -395,6 +425,8 @@ export const isRoomClientMsg = (m: ClientMsg): m is RoomClientMsg => Object.hasO
 
 /** WebSocket でサーバーから届くもの */
 export type HomeServerMsg =
+  | BrowserAiServerMsg
+  | { t: 'fantasyAccountState'; account: FantasyAccountPublic | null; homeId: string; activeId: string; user?: User; error?: string }
   | { t: 'sessionCreated'; sid: string; requestId?: string }
   | { t: 'sessionResult'; requestId: string; error?: string }
   | { t: 'thumbnailRequest'; sid: string }
@@ -427,6 +459,19 @@ export type HomeServerMsg =
   | { t: 'people'; list: Person[] }
   | { t: 'watching'; names: string[]; recentStatus: string[] }
   | { t: 'survivorProfile'; profile: SurvivorProfile }
+  | { t: 'fantasyProfile'; profile: FantasyProfile; error?: string }
+  | { t: 'fantasyRealmState'; state: FantasyRealmState | null; error?: string }
+  | { t: 'fantasyPartyState'; state: FantasyPartyState; error?: FantasyPartyError }
+  | { t: 'fantasyPropertyState'; state: FantasyPropertyState | null; error?: FantasyPropertyError }
+  | { t: 'fantasyCombatState'; state: FantasyCombatState | null; error?: string }
+  | { t: 'fantasyTestMode'; enabled: boolean }
+  | { t: 'fantasyLegacies'; records: FantasyLegacyRecord[] }
+  | { t: 'fantasyContractBoard'; board: FantasyContractBoard | null; error?: FantasyContractError }
+  | { t: 'fantasyClock'; clock: FantasyWorldClock }
+  | ({ t: 'fantasyGmReply' } & FantasyGmChatResponse)
+  | { t: 'communityState'; state: FantasyCommunityState | null; error?: FantasyCommunityError }
+  | ({ t: 'npcReply' } & NpcReply)
+  | { t: 'fantasyDialogueChunk'; requestId: string; kind: 'npc' | 'gm'; locale: 'ko' | 'en' | 'ja'; npcId?: string; text: string }
   | { t: 'askJoin'; from: string; fromName: string; session: string }
   | { t: 'online'; from: string; fromName: string };
 

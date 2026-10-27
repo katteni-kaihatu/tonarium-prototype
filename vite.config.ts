@@ -31,7 +31,9 @@ export default defineConfig(({ mode }) => {
     server: {
       port: Number(env.CLIENT_PORT || 5173),
       allowedHosts: allowedHosts(env.ALLOWED_HOSTS),
+      fs:{deny:['**/.env','**/.env.*','**/*.{crt,pem,key}','**/.git/**','**/data/**','**/work/**','**/fantasy-backups/**','**/fantasy-diagnostics/**','**/.actor-key','**/fantasy-accounts.json','**/fantasy.json','**/fantasy-clock.json','**/fantasy-community.json','**/fantasy-contracts.json']},
       proxy: {
+        '/api/fantasy/account': { target:`http://${api}`,changeOrigin:false },
         '/sync': { target: `http://${api}`, ws: true },
         '/token': `http://${api}`,
         '/icon': `http://${api}`,

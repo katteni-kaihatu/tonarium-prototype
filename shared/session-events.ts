@@ -55,7 +55,7 @@ export function proposeEvent(command: RoomClientMsg, context: { sid: string; use
   let roll: DiceRoll | undefined;
   if (command.t === 'chat') {
     const text = String(command.text ?? '').trim().slice(0, 1000);
-    const image = typeof command.image === 'string' && /^data:image\/(jpeg|png);base64,/.test(command.image) && command.image.length < 2_000_000 ? command.image : undefined;
+    const image = typeof command.image === 'string' && /^data:image\/(jpeg|png|gif);base64,/.test(command.image) && command.image.length < 2_000_000 ? command.image : undefined;
     const scope = command.scope === 'near' || command.scope === 'announce' ? command.scope : 'all';
     // 近距離の宛先はサーバーが確定するため、本文は従来経路で扱う。
     if (scope === 'near') return null;
@@ -67,6 +67,7 @@ export function proposeEvent(command: RoomClientMsg, context: { sid: string; use
     }
     if (!text && !image && !media) return null;
     const m: ChatMessage = { id, from: context.user, fromName: context.name, text, at, scope,
+      ...(typeof command.clientRequestId === 'string' && /^[\da-f-]{36}$/i.test(command.clientRequestId) ? { clientRequestId: command.clientRequestId } : {}),
       ...(image ? { image } : {}), ...(media ? { media } : {}) };
     message = { t: 'chat', sid: context.sid, m };
   } else if (command.action.a === 'diceRoll') {

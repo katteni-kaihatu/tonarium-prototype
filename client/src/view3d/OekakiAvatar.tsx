@@ -10,7 +10,8 @@ import { get } from '../store.ts';
 import { useReducedMotion } from '../emotes.ts';
 import { applySeatedFoot, avatarHipHeight, seatedBodyOffset, stepSeatedWeight } from './seatedPose.ts';
 import { CROUCH_WEIGHT } from './crouch.ts';
-import type { AvatarXR, TrackedPose } from '../../../shared/xr-pose.ts';
+import type { AvatarXR } from '../../../shared/xr-pose.ts';
+import { applyTrackedPose } from '../xr/pose.ts';
 
 const MODEL = '/oekaki/avatar.glb';
 const X_AXIS = new THREE.Vector3(1, 0, 0);
@@ -51,7 +52,7 @@ function baseAnimation(p: AvatarParams) {
 
 /** モデルは +Z 向きなので、こちらの「前 = -Z」に合わせて回してある */
 /** look は顔の上下の向き（ラジアン、上向きが正）を返す */
-export function OekakiAvatar({ name, version, speaking, look, walking, seated, crouching, userId, previewEmote, onEyeHeight, onSeatOffset, textureUrl, tracked, handsOnly }: { name: string; version: string | null; speaking: boolean; look?: () => number; walking?: () => boolean; seated?: () => boolean; crouching?: () => boolean; userId?: string; previewEmote?: ActiveEmote | null; onEyeHeight?: (height: number) => void; onSeatOffset?: (offset: number) => void; textureUrl?: string; tracked?: () => AvatarXR | undefined; handsOnly?: () => boolean }) {
+export function OekakiAvatar({ name, version, speaking, look, walking, seated, crouching, userId, previewEmote, onEyeHeight, onSeatOffset, textureUrl, tracked, trackingRoot, handsOnly }: { name: string; version: string | null; speaking: boolean; look?: () => number; walking?: () => boolean; seated?: () => boolean; crouching?: () => boolean; userId?: string; previewEmote?: ActiveEmote | null; onEyeHeight?: (height: number) => void; onSeatOffset?: (offset: number) => void; textureUrl?: string; tracked?: () => AvatarXR | undefined; trackingRoot?: () => THREE.Object3D | null; handsOnly?: () => boolean }) {
   const { scene, animations } = useGLTF(MODEL);
   const clone = useMemo(() => scene.clone(), [scene]);
   const { nodes } = useGraph(clone);
@@ -180,28 +181,21 @@ export function OekakiAvatar({ name, version, speaking, look, walking, seated, c
     tiltQ.setFromAxisAngle(X_AXIS, pose.bow - Math.max(-0.7, Math.min(0.7, tilt.current * 0.8)));
     for (const f of faceBase) f.o.quaternion.copy(tiltQ).multiply(f.q);
     const tracking = tracked?.();
-    const base = motion.current?.parent?.parent;
+    const base = trackingRoot?.();
     if (tracking && base) {
       base.updateWorldMatrix(true, true);
       const baseQ = base.getWorldQuaternion(new THREE.Quaternion());
-      const apply = (object: THREE.Object3D, pose: TrackedPose, offset = new THREE.Vector3(), correction = new THREE.Quaternion()) => {
-        const q = new THREE.Quaternion().fromArray(pose.q);
-        const p = new THREE.Vector3().fromArray(pose.p).add(offset.applyQuaternion(q));
-        object.position.copy(object.parent!.worldToLocal(base.localToWorld(p)));
-        const parentQ = object.parent!.getWorldQuaternion(new THREE.Quaternion()).invert();
-        object.quaternion.copy(parentQ.multiply(baseQ).multiply(q).multiply(correction));
-      };
       const correction = (object: THREE.Object3D, original: THREE.Quaternion) => baseQ.clone().invert().multiply(object.parent!.getWorldQuaternion(new THREE.Quaternion())).multiply(original);
       for (const [i, side] of (['left', 'right'] as const).entries()) {
         const pose = tracking[side], hand = hands[i];
-        if (pose && hand) apply(hand.o, pose, new THREE.Vector3(), correction(hand.o, hand.q));
+        if (pose && hand) applyTrackedPose(hand.o, base, pose, new THREE.Vector3(), correction(hand.o, hand.q));
       }
       // 目の追跡点から頭の中心までの距離を、アバター設定に合わせる。
       const forward = Math.abs(AVATAR_EYES.headSize + params.headSize) * AVATAR_EYES.forward * AVATAR_SCALE;
       for (const f of faceBase) {
         f.o.quaternion.copy(f.q);
         const offset = base.worldToLocal(f.o.getWorldPosition(new THREE.Vector3())).sub(new THREE.Vector3(0, getAvatarEyeHeight(params), -forward));
-        apply(f.o, tracking.head, offset, correction(f.o, f.q));
+        applyTrackedPose(f.o, base, tracking.head, offset, correction(f.o, f.q));
       }
     }
     for (const entry of meshes) entry.o.visible = entry.visible && (!handsOnly?.() || entry.hand);
