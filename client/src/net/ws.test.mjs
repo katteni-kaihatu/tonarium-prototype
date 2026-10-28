@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { beforeEach, mock, test } from 'node:test';
 
-let state, systemReplies = [], systemResets = 0, notices = [], hits = [];
+let state, systemReplies = [], systemResets = 0, notices = [], hits = [], chatSounds = 0, chatSoundAttempts = 0, chatAudioRunning = true;
 const stub = (path, namedExports) => mock.module(new URL(path, import.meta.url).href, { namedExports });
+stub('../ai/support.ts', { setAiSupportTransport() {}, handleAiSupportMessage() {} });
 stub('../store.ts', { get: () => state, set: (patch) => { state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) }; }, recompute() {}, spawnPoint() {} });
 stub('../sessionView.ts', { applyAvatars() {} });
 stub('../systems/api.ts', {
@@ -13,7 +14,7 @@ stub('../items/actions.ts', { applyDelta() {} });
 stub('../items/effects.ts', { onHit(...args) { hits.push(args); } });
 stub('../actions.ts', { pushNotice(...args) { notices.push(args); } });
 stub('../spatial.ts', { volumeFrom() {} });
-stub('../world/sounds.ts', { playPoke() {}, playSynth() {} });
+stub('../world/sounds.ts', { playPoke() {}, playSynth() {}, playChatNotification() { chatSoundAttempts++; if (chatAudioRunning) chatSounds++; } });
 stub('../emotes.ts', { receiveEmote() {} });
 stub('../world/survivorAudio.ts', { playSurvivorSound() {} });
 stub('./session.ts', { startSessionSync() {}, stopSessionSync() {}, roomSend() {}, configureSessionSync() {}, syncError() {}, resetSessionSync() {} });
@@ -28,14 +29,146 @@ const { onMessage, requestSession, applySessionSnapshot } = await import('./ws.t
 const { useSystems } = await import('../systems/state.ts');
 
 beforeEach(() => {
-  state = { session: 'existing', hubOpen: true, mode: '3d', guild: { name: 'test', sessions: [] } };
+  state = { session: 'existing', hubOpen: true, mode: '3d', guild: { name: 'test', sessions: [] },
+    users: [], audioVol: { fx: 0.5 }, chatNotificationSound: true, popupPausedUntil: 0,
+    selfId: 'self', selfName: 'Self', blocked: [], chats: {}, inbox: {}, arrivals: {} };
   globalThis.__tonariumWs = new WebSocket();
   systemReplies = []; systemResets = 0;
   notices = []; hits = [];
+  chatSounds = 0; chatSoundAttempts = 0; chatAudioRunning = true;
   useSystems.setState({ sid: '', view: undefined, error: undefined });
 });
 
 const systemView = revision => ({ revision, map: { schema: 1, id: 'test-map', objects: [], systems: [], connections: [] }, systems: [], objects: {}, seats: {}, diagnostics: [], traces: [] });
+
+function chatReceiver(kind, prefix) {
+  const conv = `${kind}:${prefix}`;
+  return {
+    conv,
+    message: (id, from = 'Other') => ({ id: `${prefix}-${id}`, from, fromName: from, text: 'same text', at: 100 }),
+    receive(m) { onMessage(kind === 'session' ? { t: 'chat', sid: state.session, m } : { t: 'msg', conv, m }); },
+    history(messages) {
+      if (kind === 'session') {
+        Object.assign(state, { survivors: {}, avatarsBy: {}, itemsBy: {}, broadcast: {}, worldBy: {}, games: {}, elevators: {} });
+        applySessionSnapshot({ sid: state.session, now: 100, chats: messages, avatars: {}, items: [], presence: [],
+          broadcast: null, world: 'room', game: null, survivor: null, elevator: null });
+      } else onMessage({ t: 'inbox', convs: { [conv]: messages }, reads: {}, people: [], watching: [], recentStatus: {} });
+    },
+  };
+}
+
+for (const kind of ['session', 'dm', 'channel']) {
+  test(`${kind}: live messages sound once across mode switches, updates and exclusions`, () => {
+    const r = chatReceiver(kind, `${kind}-eligibility`);
+    state.hubOpen = false; state.folded = { right: false }; state.rightView = kind === 'session' ? 'log' : 'msg';
+    state.rightConversation = r.conv;
+    r.receive(r.message('first'));
+    assert.equal(chatSounds, 1);
+    assert.deepEqual(state.arrivals, {});
+    state.mode = '2d';
+    r.receive(r.message('first'));
+    r.receive({ ...r.message('first'), text: 'edited', at: 999 });
+    r.receive(r.message('self', kind === 'session' ? 'self' : 'Self'));
+    state.blocked = ['Blocked'];
+    r.receive(r.message('blocked', 'Blocked'));
+    r.receive(r.message('log', null)); r.receive(r.message('empty-log', ''));
+    state.blocked = [];
+    r.receive(r.message('blocked', 'Blocked'));
+    r.receive(r.message('log')); r.receive(r.message('empty-log'));
+    if (kind === 'session') onMessage({ t: 'chat', sid: 'elsewhere', m: r.message('wrong-session') });
+    assert.equal(chatSounds, 1);
+    state.folded.right = true;
+    r.receive(r.message('next'));
+    assert.equal(chatSounds, 2);
+    assert.ok(state.arrivals.chat);
+    state.session = null;
+    if (kind !== 'session') {
+      r.receive(r.message('home'));
+      assert.equal(chatSounds, 2);
+    }
+  });
+
+  test(`${kind}: history replacement and display eviction retain known IDs`, () => {
+    const r = chatReceiver(kind, `${kind}-history`);
+    const old = r.message('old'), live = r.message('live'), restored = r.message('restored');
+    r.history([old]);
+    assert.equal(chatSounds, 0);
+    r.receive(old);
+    assert.equal(chatSounds, 0);
+    r.receive(live);
+    assert.equal(chatSounds, 1);
+    r.history([restored]);
+    r.receive(old); r.receive(live); r.receive(restored);
+    assert.equal(chatSounds, 1);
+    const limit = kind === 'session' ? 500 : 300;
+    for (let i = 0; i <= limit; i++) r.receive(r.message(`fill-${i}`));
+    const displayed = kind === 'session' ? state.chats[state.session] : state.inbox[r.conv];
+    assert.equal(displayed.length, limit);
+    assert.equal(displayed.some((m) => m.id === live.id), false);
+    const before = chatSounds;
+    r.receive(live); r.receive(old);
+    assert.equal(chatSounds, before);
+    r.history([]);
+    r.receive(live); r.receive(restored);
+    assert.equal(chatSounds, before);
+  });
+
+  test(`${kind}: suppressed arrivals are consumed and only future messages sound`, () => {
+    const r = chatReceiver(kind, `${kind}-suppression`);
+    const suppressions = [
+      () => { state.chatNotificationSound = false; },
+      () => { state.audioVol.fx = 0; },
+      () => { state.users = [{ id: 'self', status: 'busy' }]; },
+      () => { state.popupPausedUntil = Date.now() + 60_000; },
+    ];
+    for (const [i, suppress] of suppressions.entries()) {
+      suppress();
+      r.receive(r.message(`suppressed-${i}`));
+      const before = chatSounds;
+      state.chatNotificationSound = true; state.audioVol.fx = 0.5; state.users = []; state.popupPausedUntil = 0;
+      r.receive(r.message(`suppressed-${i}`));
+      assert.equal(chatSounds, before);
+      r.receive(r.message(`future-${i}`));
+      assert.equal(chatSounds, before + 1);
+    }
+  });
+
+  test(`${kind}: unavailable audio preserves receipt and popups without replay on unlock`, () => {
+    const r = chatReceiver(kind, `${kind}-audio-unlock`);
+    state.folded = { right: true };
+    chatAudioRunning = false;
+    r.receive(r.message('locked'));
+    assert.equal(chatSounds, 0);
+    assert.equal(chatSoundAttempts, 1);
+    assert.ok(state.arrivals.chat);
+    const displayed = kind === 'session' ? state.chats[state.session] : state.inbox[r.conv];
+    assert.equal(displayed.at(-1).id, r.message('locked').id);
+    chatAudioRunning = true;
+    state.mode = '2d';
+    r.receive(r.message('locked'));
+    assert.equal(chatSoundAttempts, 1);
+    r.receive(r.message('future'));
+    assert.equal(chatSounds, 1);
+  });
+}
+
+test('known IDs survive session changes and remain isolated by session and conversation', () => {
+  const r = chatReceiver('session', 'scope-lifetime');
+  const message = r.message('same-id');
+  r.receive(message);
+  state.session = 'second-session';
+  r.receive(message);
+  assert.equal(chatSounds, 2);
+  state.session = 'existing'; state.chats = {};
+  r.history([]);
+  r.receive(message);
+  assert.equal(chatSounds, 2);
+  for (const conv of ['dm:scope-a', 'channel:scope-b']) {
+    onMessage({ t: 'msg', conv, m: message });
+    onMessage({ t: 'msg', conv, m: message });
+  }
+  assert.equal(chatSounds, 4);
+});
 test('2d and 3d share the self-only same-session hit notification path and retain effects', () => {
   state.selfId = 'self';
   for (const mode of ['2d', '3d']) {

@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { t } from '../i18n/index.ts';
 import { ARRIVAL_LIFETIME, shouldShowArrival, openArrivalPatch, POPUP_PAUSE_MINUTES } from '../newArrival.ts';
-import { set, useStore } from '../store.ts';
+import { save, set, useStore } from '../store.ts';
 
 export function PopupPauseSettings() {
   const until = useStore((s) => s.popupPausedUntil);
+  const sound = useStore((s) => s.chatNotificationSound);
   const [, tick] = useState(0);
   useEffect(() => {
     if (until <= Date.now()) return;
@@ -14,6 +15,11 @@ export function PopupPauseSettings() {
   }, [until]);
   return <section>
     <h3>{t('popupSettings')}</h3>
+    <label className="switchrow"><span><b>{t('chatNotificationSound')}</b><span className="sub wrap">{t('chatNotificationSoundHelp')}</span></span><input type="checkbox" role="switch" checked={sound} onChange={(e) => {
+      const enabled = e.target.checked;
+      save('tonarium.chatNotificationSound', enabled);
+      set({ chatNotificationSound: enabled });
+    }} /></label>
     <label>{t('popupPause')} <select value="" onChange={(e) => {
       const minutes = Number(e.target.value);
       if (POPUP_PAUSE_MINUTES.some((n) => n === minutes)) set({ popupPausedUntil: Date.now() + minutes * 60_000, arrivals: {} });

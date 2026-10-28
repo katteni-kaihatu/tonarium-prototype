@@ -13,6 +13,33 @@ export interface ArrivalState {
 
 export const POPUP_PAUSE_MINUTES = [15, 30, 60] as const;
 export const ARRIVAL_LIFETIME = 6000;
+
+export class KnownChatMessages {
+  private scopes = new Map<string, Set<string>>();
+
+  remember(scope: string, messages: readonly { id: string }[]) {
+    let ids = this.scopes.get(scope);
+    if (!ids) this.scopes.set(scope, ids = new Set());
+    for (const message of messages) ids.add(message.id);
+    return ids;
+  }
+
+  receive(scope: string, message: { id: string }, history: readonly { id: string }[]) {
+    const ids = this.remember(scope, history);
+    const fresh = !ids.has(message.id);
+    ids.add(message.id);
+    return fresh;
+  }
+}
+
+export function shouldPlayChatArrival(state: {
+  session: string | null; chatNotificationSound: boolean; audioVol: { fx: number };
+  selfId: string; users: readonly { id: string; status?: string }[]; popupPausedUntil: number;
+}, now: number) {
+  return !!state.session && state.chatNotificationSound && state.audioVol.fx > 0
+    && !state.users.some((u) => u.id === state.selfId && u.status === 'busy')
+    && state.popupPausedUntil <= now;
+}
 export const initialArrivalState = () => ({
   popupPausedUntil: 0,
   arrivals: {} as Partial<Record<ArrivalKind, Arrival>>,

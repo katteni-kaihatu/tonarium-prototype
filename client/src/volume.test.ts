@@ -1,6 +1,27 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+test('chat notification sound defaults on and saved false survives reload', async (t) => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const values = new Map<string, string>();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+  } });
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'localStorage', previous);
+    else Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+  const first = await import(new URL('./store.ts?chat-sound-default', import.meta.url).href) as typeof import('./store.ts');
+  assert.equal(first.get().chatNotificationSound, true);
+  first.save('tonarium.chatNotificationSound', false);
+  first.set({ chatNotificationSound: false });
+  const reloaded = await import(new URL('./store.ts?chat-sound-reloaded', import.meta.url).href) as typeof import('./store.ts');
+  assert.equal(reloaded.get().chatNotificationSound, false);
+  assert.equal(reloaded.useStore.getInitialState().chatNotificationSound, false);
+  assert.equal(values.get('tonarium.chatNotificationSound'), 'false');
+});
+
 test('master volumes default independently without rewriting saved settings', async (t) => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   const values = new Map<string, string>();
