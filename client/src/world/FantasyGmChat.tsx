@@ -7,12 +7,10 @@ import { send } from '../net/ws.ts';
 import { useLocale } from '../locale.ts';
 import { appendFantasyGmMessages, registerFantasyGmRequest, useFantasyGmHistory } from './fantasy-gm-history.ts';
 import { scrollChatAnchor } from './chat-scroll.ts';
-import { beginAiSupportConversation } from '../ai/support.ts';
 import { matchPrewrittenTopic } from '../../../shared/fantasy-dialogue-topics.ts';
 
 type GmTab=NonNullable<FantasyGmReply['suggestions'][number]['tab']>;
 export function FantasyGmChat({profile}:{profile:FantasyProfile;onAction:(action:FantasyAction)=>void;onSelect:(id:string)=>void;onTab:(tab:GmTab)=>void;blocked:boolean}) {
-  useEffect(()=>beginAiSupportConversation(),[]);
   const [locale]=useLocale();const user=useStore(s=>s.selfId);
   const connected=useStore(s=>s.wsConnected),pending=useStore(s=>s.gmPending);
   const error=useStore(s=>!s.gmErrorLocale||s.gmErrorLocale===locale?s.gmError:null);

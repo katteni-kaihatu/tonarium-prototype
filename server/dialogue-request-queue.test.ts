@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createLocalInferenceScheduler } from './local-inference.ts';
+import { createDialogueRequestQueue } from './dialogue-request-queue.ts';
 
 test('NPC and GM jobs share one generator and preserve queued order', async () => {
   let active = 0, peak = 0;
@@ -11,7 +11,7 @@ test('NPC and GM jobs share one generator and preserve queued order', async () =
     await new Promise<void>(resolve => releases.push(resolve));
     active--; return new Response('reply');
   }) as typeof fetch;
-  const schedule = createLocalInferenceScheduler(fetcher);
+  const schedule = createDialogueRequestQueue(fetcher);
   const a = schedule('http://local/npc'), b = schedule('http://local/gm');
   assert.deepEqual(seen, ['http://local/npc']);
   releases.shift()!(); await a;
@@ -23,7 +23,7 @@ test('NPC and GM jobs share one generator and preserve queued order', async () =
 
 test('cancelled queue entries never consume a model call and a full queue refuses excess work', async () => {
   let release!: () => void; let calls = 0;
-  const schedule = createLocalInferenceScheduler((async () => { calls++; await new Promise<void>(resolve => { release = resolve; }); return new Response('ok'); }) as typeof fetch, { maxQueue: 1 });
+  const schedule = createDialogueRequestQueue((async () => { calls++; await new Promise<void>(resolve => { release = resolve; }); return new Response('ok'); }) as typeof fetch, { maxQueue: 1 });
   const first = schedule('http://local/first');
   const controller = new AbortController();
   const queued = schedule('http://local/queued', { signal: controller.signal });
@@ -37,7 +37,7 @@ test('two configured slots generate concurrently while the third request waits',
   let active=0, peak=0;
   const releases:(()=>void)[]=[];
   const seen:string[]=[];
-  const schedule=createLocalInferenceScheduler((async input=>{
+  const schedule=createDialogueRequestQueue((async input=>{
     active++;peak=Math.max(peak,active);seen.push(String(input));
     await new Promise<void>(resolve=>releases.push(resolve));
     active--;return new Response('ok');

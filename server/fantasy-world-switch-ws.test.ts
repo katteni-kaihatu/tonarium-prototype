@@ -84,7 +84,7 @@ async function fixture(t: TestContext) {
   const origin = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ['--import', 'tsx', '--import', pathToFileURL(loader).href, 'server/index.ts', '--dev'], {
     env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '0', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
-      LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', NPC_LLM_URL: 'http://127.0.0.1:1/v1' }, stdio: ['ignore', 'pipe', 'pipe'],
+      LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = '';
   child.stdout.on('data', data => { logs += String(data); }); child.stderr.on('data', data => { logs += String(data); });

@@ -1,7 +1,7 @@
 type Fetch = typeof globalThis.fetch;
 type Task = { run: () => Promise<Response>; drained?: Promise<void>; signal?: AbortSignal | null; resolve: (response: Response) => void; reject: (error: unknown) => void; abort: () => void };
 
-export function createLocalInferenceScheduler(fetcher: Fetch, options: { maxQueue?: number; concurrency?: number } = {}): Fetch {
+export function createDialogueRequestQueue(fetcher: Fetch, options: { maxQueue?: number; concurrency?: number } = {}): Fetch {
   const queue: Task[] = [];
   let active = 0;
   const concurrency = Math.max(1, Math.min(2, Math.floor(options.concurrency ?? 1)));
@@ -24,7 +24,7 @@ export function createLocalInferenceScheduler(fetcher: Fetch, options: { maxQueu
         abort: () => { const index = queue.indexOf(task); if (index >= 0) { queue.splice(index, 1); reject(new DOMException('Aborted', 'AbortError')); } },
         run: async () => {
           const response = await fetcher(input, init);
-          // 本文まで受け取り、モデルの生成枠を越える処理を待たせる。
+          // Hold the request slot until its bounded response body has drained.
           const reader = response.body?.getReader();
           if (!reader) return response;
           if (response.headers.get('content-type')?.includes('text/event-stream')) {
@@ -39,7 +39,7 @@ export function createLocalInferenceScheduler(fetcher: Fetch, options: { maxQueu
                   const chunk = await reader.read();
                   if (chunk.done) { controller.close(); done(); return; }
                   length += chunk.value.byteLength;
-                  if (length > 262144) throw new Error('Local inference stream too large');
+                  if (length > 262144) throw new Error('Dialogue stream too large');
                   controller.enqueue(chunk.value);
                 } catch (error) { try { controller.error(error); } catch {} await reader.cancel().catch(() => {}); done(); }
               },
@@ -53,7 +53,7 @@ export function createLocalInferenceScheduler(fetcher: Fetch, options: { maxQueu
               const part = await reader.read();
               if (part.done) break;
               length += part.value.byteLength;
-              if (length > 65_536) { await reader.cancel(); throw new Error('Local inference response too large'); }
+              if (length > 65_536) { await reader.cancel(); throw new Error('Dialogue response too large'); }
               parts.push(part.value);
             }
           } finally { reader.releaseLock(); }
@@ -68,4 +68,4 @@ export function createLocalInferenceScheduler(fetcher: Fetch, options: { maxQueu
   }) as Fetch;
 }
 
-export const localInferenceFetch = createLocalInferenceScheduler(globalThis.fetch, { concurrency: 2 });
+export const dialogueFetch = createDialogueRequestQueue(globalThis.fetch, { concurrency: 2 });

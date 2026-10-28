@@ -31,7 +31,7 @@ async function isolated(t: TestContext) {
   assert.ok(![3011, 18081, 8190, 5183, 3199, 5199].includes(port));
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], { cwd: process.cwd(),
     env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
-      LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', NPC_LLM_URL: 'http://127.0.0.1:1/v1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+      LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
   let logs = ''; child.stdout.on('data', value => { logs += value; }); child.stderr.on('data', value => { logs += value; });
   const sockets: WebSocket[] = [];
   const until = async <T>(read: () => T | undefined, timeout = 8000): Promise<T> => {

@@ -3,7 +3,6 @@ import { beforeEach, mock, test } from 'node:test';
 
 let state, systemReplies = [], systemResets = 0, notices = [], hits = [], chatSounds = 0, chatSoundAttempts = 0, chatAudioRunning = true;
 const stub = (path, namedExports) => mock.module(new URL(path, import.meta.url).href, { namedExports });
-stub('../ai/support.ts', { setAiSupportTransport() {}, handleAiSupportMessage() {} });
 stub('../store.ts', { get: () => state, set: (patch) => { state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) }; }, recompute() {}, spawnPoint() {} });
 stub('../sessionView.ts', { applyAvatars() {} });
 stub('../systems/api.ts', {

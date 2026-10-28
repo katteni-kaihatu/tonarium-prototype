@@ -25,7 +25,7 @@ async function isolated(t:TestContext,options:{friends?:[string,string][]}={}){
   const sessions=path.join(directory,'sessions.json');fs.writeFileSync(sessions,JSON.stringify({name:'Account fixture',sessions:[{id:'account-world',name:'Private fixture world',world:'fantasy'}]}));
   const probe=net.createServer();await new Promise<void>(resolve=>probe.listen(0,'127.0.0.1',resolve));
   const port=(probe.address() as net.AddressInfo).port;await new Promise<void>(resolve=>probe.close(()=>resolve()));
-  const child=spawn(process.execPath,['--import','tsx','server/index.ts','--dev'],{env:{...process.env,NODE_ENV:'test',FANTASY_ACCOUNT_TEST_BYPASS:'0',SERVER_PORT:String(port),DATA_DIR:directory,SESSIONS_FILE:sessions,LIVEKIT_URL:'',LIVEKIT_API_KEY:'',LIVEKIT_API_SECRET:'',NPC_LLM_URL:'http://127.0.0.1:1/v1'},stdio:['ignore','pipe','pipe']});
+  const child=spawn(process.execPath,['--import','tsx','server/index.ts','--dev'],{env:{...process.env,NODE_ENV:'test',FANTASY_ACCOUNT_TEST_BYPASS:'0',SERVER_PORT:String(port),DATA_DIR:directory,SESSIONS_FILE:sessions,LIVEKIT_URL:'',LIVEKIT_API_KEY:'',LIVEKIT_API_SECRET:'',KOKOAAI_APIKEY: ''},stdio:['ignore','pipe','pipe']});
   let logs='';child.stdout.on('data',data=>{logs+=String(data);});child.stderr.on('data',data=>{logs+=String(data);});
   const sockets:WebSocket[]=[];
   t.after(async()=>{

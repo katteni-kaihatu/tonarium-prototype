@@ -65,8 +65,6 @@ import { FantasyCommunity, type CommunityActor } from './fantasy-community.ts';
 import { FantasyContracts, type FantasyContractActor } from './fantasy-contracts.ts';
 import { fantasyPersonalQuest, fantasyContractErrorText } from '../shared/fantasy-contracts.ts';
 import { FANTASY_QUESTS } from '../shared/fantasy-data.ts';
-import { BrowserAiBroker } from './browser-ai.ts';
-import { BrowserAiPool } from './browser-ai-pool.ts';
 import { FantasyPropertyDialogue } from './fantasy-property-dialogue.ts';
 import { FantasyBargaining } from './fantasy-bargaining.ts';
 import { FantasyConversationActions } from './fantasy-conversation-actions.ts';
@@ -90,7 +88,6 @@ const fantasyGmChat = new FantasyGmChat();
 const fantasyPropertyDialogue = new FantasyPropertyDialogue();
 const fantasyBargaining = new FantasyBargaining();
 const fantasyConversationActions = new FantasyConversationActions();
-const browserAiPool = new BrowserAiPool();
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'client/dist');
 // index.html は読み込むファイル名にハッシュを含むので、画面が変わったときだけ版が変わる
@@ -1064,8 +1061,6 @@ function leaveSession(u: Participant) {
   revokeUserSync(u.id);
   const sid = u.session;
   if (!sid) return;
-  browserAiPool.cancelOwner(u.id);
-  for (const connection of homeConnections.values()) if (connection.id === u.id) connection.browserAi.cancelPending();
   eliminate(sid, u.id, gameDeps);
   removeSurvivor(sid, u.id, survivorDeps);
   const av = avatars.get(sid)!.get(u.id);
@@ -1115,7 +1110,6 @@ interface HomeConnectionState {
   homeUser?: Participant;
   accountBinding?: AccountBinding;
   syncRequest?: string;
-  browserAi: BrowserAiBroker;
   remoteAddress?: string;
   testModeSent?: boolean;
 }
@@ -1184,7 +1178,7 @@ function switchFantasyIdentity(ws:WebSocket,state:HomeConnectionState,target:str
     const source=state.homeUser??old;Object.assign(next,{name:source.name,icon:source.icon,avatar:source.avatar,bio:source.bio,status:source.status,statusText:source.statusText});
   }
   fantasyDialogueObserver.cancel(ws,'identity-changed');
-  state.syncRequest=undefined;state.browserAi.cancelPending();browserAiPool.cancelOwner(old.id);
+  state.syncRequest=undefined;
   onClose(ws,old.id,true);state.id=target;
   if(!sockets.has(target))sockets.set(target,new Set());sockets.get(target)!.add(ws);
   return next;
@@ -1340,13 +1334,6 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
   if(msg.t==='fantasyAccountUnbind'){unbindFantasyAccount(ws,state);return;}
   const worldRequest=msg.t.startsWith('fantasy')||msg.t==='communityContribute'||msg.t==='npcChat'&&!!me.session&&worldOf.get(me.session)==='fantasy';
   if(worldRequest&&!fantasySocketAuthorized(ws)){if(state.id?.startsWith('fantasy:'))unbindFantasyAccount(ws,state,'unauthenticated');else fantasyAccountState(ws,state,'unauthenticated');return;}
-  if(msg.t==='aiSupport'){
-    const receiving=state.browserAi.allowsRemote;
-    const accepted=state.browserAi.setReady(msg.ready===true&&(!me.session||worldOf.get(me.session)!=='fantasy'||!fantasySocketAuthorized(ws))?{...msg,ready:false}:msg);
-    if(accepted&&receiving&&!state.browserAi.allowsRemote)browserAiPool.cancelOwner(me.id);
-    return;
-  }
-  if(msg.t==='aiSupportResult'||msg.t==='aiSupportChunk'){state.browserAi.result(msg);return;}
   if (msg.t === 'fantasyTestReset') {
     let result;
     const prior = fantasyStore.profile(me.id);
@@ -1359,8 +1346,6 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
       for (const grant of Object.values(prior.character?.contracts ?? {})) fantasyContracts.release(me.id, grant.offerId);
       fantasyConversationActions.clear(me.id);
       fantasyBargaining.clear(me.id);
-      browserAiPool.cancelOwner(me.id);
-      for (const connection of homeConnections.values()) if (connection.id === me.id) connection.browserAi.cancelPending();
       reportedFantasyHunts.delete(me.id);
       sendTo([me.id], { t: 'fantasyProfile', profile: result.profile });
       sendTo([me.id], { t: 'communityState', state: fantasyCommunity.state(communityActor(me)) });
@@ -1377,9 +1362,7 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
       ?fantasyDialogueObserver.begin(ws,{actorId:me.id,sessionId:me.session,kind:'npc',requestId:msg.requestId,locale:msg.locale,npcId:msg.npcId,query:msg.text,
         generation:profile.generation??1,location:character?.location,profile,dynamicFacts:npcDynamicFacts}):undefined;
     const validDialogue=typeof msg.requestId==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(msg.requestId)&&['ko','en','ja'].includes(msg.locale)&&typeof msg.text==='string'&&msg.text.length<=800&&NPC_PUBLIC.some(npc=>npc.id===msg.npcId&&npc.homeLocation===character?.location);
-    const releaseConversation=inFantasy&&validDialogue?browserAiPool.beginConversation(me.id):()=>{};
     if(inFantasy&&validDialogue&&(profile.activity||profile.combatId||fantasyStore.civicBlocked(me.id))){
-      releaseConversation();
       send(ws,{t:'npcReply',requestId:msg.requestId,npcId:msg.npcId,locale:msg.locale,text:{ko:'하던 일을 마친 뒤에 다시 이야기하자.',en:'Let us talk after you have finished what you are doing.',ja:'今の用事が終わってから、また話しましょう。'}[msg.locale],model:'',source:'canon',relationship:'familiar',error:'busy'},npcDiagnosticToken);return;
     }
     if(inFantasy&&validDialogue){
@@ -1388,11 +1371,10 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
       const land = fantasyPropertyDialogue.chat({user:me.id,npc:msg.npcId,text:msg.text,locale:msg.locale,profile,state:fantasyStore.propertyState(me.id),requestId:msg.requestId},command=>{
         const result=fantasyStore.propertyRequest(me.id,command);for(const update of result.updates)sendTo([update.user],{t:'fantasyProfile',profile:update.profile});return result;
       },()=>fantasyStore.propertyState(me.id));
-      if(land.handled){releaseConversation();send(ws,{t:'npcReply',requestId:msg.requestId,npcId:msg.npcId,locale:msg.locale,text:land.text??'',model:'',source:'canon',relationship:'familiar'},npcDiagnosticToken);send(ws,{t:'fantasyPropertyState',state:fantasyStore.propertyState(me.id)});publishFantasyRealms();return;}
+      if(land.handled){send(ws,{t:'npcReply',requestId:msg.requestId,npcId:msg.npcId,locale:msg.locale,text:land.text??'',model:'',source:'canon',relationship:'familiar'},npcDiagnosticToken);send(ws,{t:'fantasyPropertyState',state:fantasyStore.propertyState(me.id)});publishFantasyRealms();return;}
       const bargain=fantasyBargaining.chat({...context,npcId:msg.npcId},apply);
       const conversation=bargain.handled?bargain:fantasyConversationActions.confirm(context,apply);
       if(conversation.handled){
-        releaseConversation();
         if(conversation.result)sendTo([me.id],{t:'fantasyProfile',profile:conversation.result.profile,error:conversation.result.error});
         send(ws,{t:'npcReply',requestId:msg.requestId,npcId:msg.npcId,locale:msg.locale,text:conversation.result?.error?{ko:'지금은 그렇게 도와주기 어렵겠어. 준비가 되면 다시 이야기하자.',en:'I cannot arrange that just now. Let us talk again when you are ready.',ja:'今はそうするのは難しそうです。準備が整ってから話しましょう。'}[msg.locale]:conversation.text??'',model:'',source:'canon',relationship:'familiar'},npcDiagnosticToken);
         publishFantasyWorld(me);return;
@@ -1404,7 +1386,7 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
       return ws.readyState===WebSocket.OPEN&&(!inFantasy||fantasySocketAuthorized(ws))&&state.id===me.id&&current.revision===profile.revision&&(current.generation??1)===(profile.generation??1)&&current.character?.lifeStartedAt===profile.character?.lifeStartedAt&&current.character?.location===profile.character?.location&&users.get(me.id)?.session===npcConversationSession&&(npcConversationSession?worldOf.get(npcConversationSession):undefined)===npcConversationWorld;
     };
     void npcChat.chat(character?me.id+':life-'+(profile.generation??1):me.id, { requestId: msg.requestId, text: msg.text, reset: msg.reset, locale: msg.locale, npcId: msg.npcId }, {
-      browserGenerate:inFantasy?(personal,signal,shared,progress)=>browserAiPool.generateFor(me.id,npcConversationSession!,state.browserAi,personal,signal,shared,progress):undefined,onProgress:inFantasy?text=>{if(conversationCurrent())send(ws,{t:'fantasyDialogueChunk',kind:'npc',requestId:msg.requestId,locale:msg.locale,npcId:msg.npcId,text});}:undefined,isCurrent:conversationCurrent,completedQuests: character?.completed ?? [], character,
+      onProgress:inFantasy?text=>{if(conversationCurrent())send(ws,{t:'fantasyDialogueChunk',kind:'npc',requestId:msg.requestId,locale:msg.locale,npcId:msg.npcId,text});}:undefined,isCurrent:conversationCurrent,completedQuests: character?.completed ?? [], character,
       contractBoard:character&&NPC_PUBLIC.some(npc=>npc.id===msg.npcId&&npc.building==='guild')?fantasyContracts.state(contractActor(me),fantasyClock.snapshot().hour)??undefined:undefined,
       dynamicFacts:npcDynamicFacts,
       communityFacts: character ? [...fantasyCommunity.facts(communityActor(me), msg.locale), ...fantasyStore.legacyFacts(me.id, msg.locale), ...fantasyStore.realmFacts(me.id,msg.locale,msg.npcId)] : [],
@@ -1416,7 +1398,7 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
         text=proposal.text;
       }
       send(ws,{t:'npcReply',...reply,text,actions:undefined},npcDiagnosticToken);
-    },error=>{console.error('[npc] request failed',error);send(ws,{t:'npcReply',requestId:msg.requestId,text:'',model:'',npcId:'rin',locale:'en',relationship:'stranger',error:'unavailable'},npcDiagnosticToken);}).finally(releaseConversation);
+    },error=>{console.error('[npc] request failed',error);send(ws,{t:'npcReply',requestId:msg.requestId,text:'',model:'',npcId:'rin',locale:'en',relationship:'stranger',error:'unavailable'},npcDiagnosticToken);});
     return;
   }
   if (msg.t === 'communityContribute') {
@@ -1512,11 +1494,9 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
       ?fantasyDialogueObserver.begin(ws,{actorId:me.id,sessionId:me.session,kind:'gm',requestId:msg.requestId,locale:msg.locale,query:msg.text,
         generation:profile.generation??1,location:profile.character?.location,profile,dynamicFacts:gmDynamicFacts}):undefined;
     const validDialogue=typeof msg.requestId==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(msg.requestId)&&['ko','en','ja'].includes(msg.locale)&&typeof msg.text==='string'&&msg.text.length<=500;
-    const releaseConversation=me.session&&world==='fantasy'&&validDialogue?browserAiPool.beginConversation(me.id):()=>{};
     if(me.session&&world==='fantasy'&&validDialogue){
       const confirmed=fantasyConversationActions.confirm({user:me.id,speaker:'gm',locale:msg.locale,profile,marketQuote:action=>fantasyMarketQuote(me,action,msg.locale),text:msg.text},(revision,action)=>applyFantasyUserAction(contractActor(me),revision,action));
       if(confirmed.handled){
-        releaseConversation();
         if(confirmed.result)sendTo([me.id],{t:'fantasyProfile',profile:confirmed.result.profile,error:confirmed.result.error});
         send(ws,{t:'fantasyGmReply',requestId:msg.requestId,locale:msg.locale,source:'rules',reply:{text:confirmed.result?.error?{ko:'지금은 진행할 수 없습니다. 현재 상태를 확인해 주세요.',en:'This cannot be started now. Please check your current state.',ja:'今は開始できません。現在の状態を確認してください。'}[msg.locale]:confirmed.text??'',suggestions:[]}},gmDiagnosticToken);publishFantasyWorld(me);return;
       }
@@ -1526,7 +1506,7 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
       const current=fantasyStore.profile(me.id);
       return ws.readyState===WebSocket.OPEN&&fantasySocketAuthorized(ws)&&state.id===me.id&&current.revision===profile.revision&&(current.generation??1)===(profile.generation??1)&&current.character?.lifeStartedAt===profile.character?.lifeStartedAt&&current.character?.location===profile.character?.location&&users.get(me.id)?.session===conversationSession&&worldOf.get(conversationSession??'')===world;
     };
-    void fantasyGmChat.chat(me.id+':life-'+(profile.generation??1), { requestId: msg.requestId, text: msg.text, locale: msg.locale }, { browserGenerate:me.session&&world==='fantasy'?(personal,signal,shared,progress)=>browserAiPool.generateFor(me.id,conversationSession!,state.browserAi,personal,signal,shared,progress):undefined,onProgress:text=>{if(conversationCurrent())send(ws,{t:'fantasyDialogueChunk',kind:'gm',requestId:msg.requestId,locale:msg.locale,text});},isCurrent:conversationCurrent,session: me.session, world, profile, dynamicFacts: gmDynamicFacts, communityFacts: [...fantasyCommunity.facts(communityActor(me), msg.locale), ...fantasyStore.legacyFacts(me.id, msg.locale), ...fantasyStore.realmFacts(me.id,msg.locale)] })
+    void fantasyGmChat.chat(me.id+':life-'+(profile.generation??1), { requestId: msg.requestId, text: msg.text, locale: msg.locale }, { onProgress:text=>{if(conversationCurrent())send(ws,{t:'fantasyDialogueChunk',kind:'gm',requestId:msg.requestId,locale:msg.locale,text});},isCurrent:conversationCurrent,session: me.session, world, profile, dynamicFacts: gmDynamicFacts, communityFacts: [...fantasyCommunity.facts(communityActor(me), msg.locale), ...fantasyStore.legacyFacts(me.id, msg.locale), ...fantasyStore.realmFacts(me.id,msg.locale)] })
       .then(reply=>{
         const current=fantasyStore.profile(me.id);
         const actions=reply.reply.suggestions.flatMap(suggestion=>suggestion.action?[{action:suggestion.action,label:suggestion.label}]:[]);
@@ -1537,7 +1517,7 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
       .catch(error => {
         console.error('[fantasy-gm] request failed', error);
         send(ws, { t: 'fantasyGmReply', requestId: msg.requestId, locale: msg.locale, source: 'local', error: 'unavailable', reply: { text: '', suggestions: [] } },gmDiagnosticToken);
-      }).finally(releaseConversation);
+      });
     return;
   }
   if (msg.t === 'marketLike') {
@@ -2641,16 +2621,15 @@ wss.on('connection', (ws, req) => {
     const origin=typeof req.headers.origin==='string'?new URL(req.headers.origin):undefined;
     if(origin&&origin.host===req.headers.host&&['http:','https:'].includes(origin.protocol)&&req.headers['sec-fetch-site']!=='cross-site')binding=fantasyAccounts.readBinding(req);
   }catch{}
-  const state: HomeConnectionState = { id: null, accountBinding:binding,browserAi:new BrowserAiBroker(message=>send(ws,message)), remoteAddress:req.socket.remoteAddress };
+  const state: HomeConnectionState = { id: null, accountBinding:binding, remoteAddress:req.socket.remoteAddress };
   homeConnections.set(ws, state);
-  const unregisterAi=browserAiPool.register(state.browserAi,{user:()=>state.id,session:()=>state.id?users.get(state.id)?.session??null:null,eligible:()=>ws.readyState===WebSocket.OPEN&&fantasySocketAuthorized(ws)&&!!state.id&&worldOf.get(users.get(state.id)?.session??'')==='fantasy'});
   // maxPayload 超過などの接続エラーを未処理例外にしない。
   ws.on('error', () => {});
   ws.on('message', (raw) => {
     try { handle(ws, state, JSON.parse(String(raw)) as ClientMsg); }
     catch (e) { console.error('bad message', e); }
   });
-  ws.on('close', () => {const original=homeUser(state),actor=state.id?users.get(state.id):undefined;if(actor?.session&&worldOf.get(actor.session)==='fantasy')fantasyDiagnostics.record({type:'connection',actorId:actor.id,sessionId:actor.session,operation:'disconnect',status:'ok'});fantasyDialogueObserver.cancel(ws,'disconnect');unregisterAi();homeConnections.delete(ws);state.browserAi.close();onClose(ws,state.id);markHomeOffline(original);});
+  ws.on('close', () => {const original=homeUser(state),actor=state.id?users.get(state.id):undefined;if(actor?.session&&worldOf.get(actor.session)==='fantasy')fantasyDiagnostics.record({type:'connection',actorId:actor.id,sessionId:actor.session,operation:'disconnect',status:'ok'});fantasyDialogueObserver.cancel(ws,'disconnect');homeConnections.delete(ws);onClose(ws,state.id);markHomeOffline(original);});
 });
 
 // 2D の人が他の人やアイテムと重なっていたら押し出す

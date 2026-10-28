@@ -7,9 +7,9 @@ import { itemLabel } from '../world/common.tsx';
 import { Icon } from '../world/Icon.tsx';
 import { PANELS } from '../items/panels.ts';
 import { worldKindOf } from '../store.ts';
-import { DEFAULT_TURN, turnSettings, unicodeCharacter } from './input.ts';
+import { unicodeCharacter } from './input.ts';
 import { writeField, type TextField } from './domInput.ts';
-import { endVR, resetXRInput, startVR, useXR, xr, xrPatch } from './runtime.ts';
+import { endVR, resetXRInput, startVR, updateXRSettings, useXR, xr, xrPatch } from './runtime.ts';
 import './xr.css';
 import { t as tr, useLanguage } from '../i18n/index.ts';
 import { ModeButton } from '../home/ModeButton.tsx';
@@ -49,16 +49,21 @@ export function XRLaunch() {
 
 export function XRSettings() {
   useLanguage();
-  const [value, setValue] = useState(xr.settings);
-  const update = (patch: Partial<typeof DEFAULT_TURN>) => {
-    xr.settings = turnSettings({ ...value, ...patch }); setValue(xr.settings);
-    try { localStorage.setItem('tonarium.xr.turn', JSON.stringify(xr.settings)); } catch { /* 保存不可でもその場で反映する */ }
-  };
+  const { active } = useXR();
+  const value = xr.settings;
+  const update = updateXRSettings;
+  if (!active) return null;
   return <fieldset className="xr-settings"><legend>{tr('xrSettings')}</legend>
-    <label>{tr('xrTurnMode')} <select value={value.mode} onChange={e => update({ mode: e.target.value as typeof value.mode })}><option value="snap">{tr('xrSnap')}</option><option value="smooth">{tr('xrSmooth')}</option></select></label>
-    <label>{tr('xrTurnSpeed', value.speed)} <input aria-label={tr('xrTurnSpeedName')} type="range" min="15" max="180" step="15" value={value.speed} onChange={e => update({ speed: Number(e.target.value) })} /></label>
-    <label>{tr('xrTurnAngle', value.angle)} <input aria-label={tr('xrTurnAngleName')} type="range" min="15" max="90" step="15" value={value.angle} onChange={e => update({ angle: Number(e.target.value) })} /></label>
-    <label><input type="checkbox" checked={value.restrictMovementWhileAiming} onChange={e => update({ restrictMovementWhileAiming: e.target.checked })} />{tr('xrRestrictMovement')}</label>
+    <label className="settings-select-row"><span>{tr('xrTurnMode')}</span><select className="settings-select" value={value.mode} onChange={e => update({ mode: e.target.value as typeof value.mode })}><option value="snap">{tr('xrSnap')}</option><option value="smooth">{tr('xrSmooth')}</option></select></label>
+    <label className="volrow">
+      <span className="vollabel"><span>{tr('xrTurnSpeed')}</span><b>{tr('xrTurnSpeedValue', value.speed)}</b></span>
+      <input aria-label={tr('xrTurnSpeedName')} type="range" min="15" max="180" step="15" value={value.speed} onChange={e => update({ speed: Number(e.target.value) })} />
+    </label>
+    <label className="volrow">
+      <span className="vollabel"><span>{tr('xrTurnAngle')}</span><b>{tr('xrTurnAngleValue', value.angle)}</b></span>
+      <input aria-label={tr('xrTurnAngleName')} type="range" min="15" max="90" step="15" value={value.angle} onChange={e => update({ angle: Number(e.target.value) })} />
+    </label>
+    <label className="switchrow settings-row"><span>{tr('xrRestrictMovement')}</span><input type="checkbox" checked={value.restrictMovementWhileAiming} onChange={e => update({ restrictMovementWhileAiming: e.target.checked })} /></label>
   </fieldset>;
 }
 

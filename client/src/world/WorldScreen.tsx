@@ -105,7 +105,7 @@ function WorldBadge() {
           <span className="menutitle">{tr("ui856")}</span>
           <SessionRename current={world?.name ?? ''} onDone={() => setMenu(null)} />
           <span className="menusep" />
-          <label className="switchrow">
+          <label className="switchrow settings-row">
             <span><b>{tr("ui857")}</b><span className="sub wrap">{tr("ui858")}</span></span>
             <input type="checkbox" role="switch" checked={broadcast} onChange={(e) => send({ t: 'broadcast', on: e.target.checked })} />
           </label>

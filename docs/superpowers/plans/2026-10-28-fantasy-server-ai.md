@@ -1,5 +1,7 @@
 # Fantasy server AI repair plan
 
+> Superseded: production dialogue now uses external KokoaAI. The bundled model containers, provisioning scripts and browser AI were removed. This file records the earlier plan only; current setup is in docs/local-npc.md and docs/deploy.md.
+
 > For agentic workers: execute the scoped tasks below with regression tests and an independent review. The user requested implementation, verification and a PR.
 
 **Goal:** supply the missing production inference process and private endpoint so NPC/GM free dialogue has a working server fallback after deployment.

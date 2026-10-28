@@ -10,7 +10,7 @@ import { npcWardrobe } from '../../../shared/npc-wardrobe.ts';
 import { FANTASY_LOCATIONS } from '../../../shared/fantasy-data.ts';
 
 const publicRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../public');
-const text=(id:string)=>fs.readFileSync(path.join(publicRoot,npcSvgPortraitUrl(id)!), 'utf8');
+const text=(id:string)=>fs.readFileSync(path.join(publicRoot,npcSvgPortraitUrl(id)!), 'utf8').replace(/\r\n/g,'\n');
 const geometry=(svg:string)=>[...svg.matchAll(/<(?:path|ellipse|circle|g)\b[^>]*>/g)].map(([tag])=>tag.replace(/(?:fill|fill-opacity|stroke|stroke-opacity|opacity|data-prop)="[^"]*"/g,'')).join('');
 const metadata=(svg:string)=>JSON.parse(svg.match(/<metadata>(.*?)<\/metadata>/)![1].replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&'));
 type Bounds={left:number;top:number;right:number;bottom:number};

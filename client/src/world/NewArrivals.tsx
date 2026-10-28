@@ -15,12 +15,12 @@ export function PopupPauseSettings() {
   }, [until]);
   return <section>
     <h3>{t('popupSettings')}</h3>
-    <label className="switchrow"><span><b>{t('chatNotificationSound')}</b><span className="sub wrap">{t('chatNotificationSoundHelp')}</span></span><input type="checkbox" role="switch" checked={sound} onChange={(e) => {
+    <label className="switchrow settings-row"><span><b>{t('chatNotificationSound')}</b><span className="sub wrap">{t('chatNotificationSoundHelp')}</span></span><input type="checkbox" role="switch" checked={sound} onChange={(e) => {
       const enabled = e.target.checked;
       save('tonarium.chatNotificationSound', enabled);
       set({ chatNotificationSound: enabled });
     }} /></label>
-    <label>{t('popupPause')} <select value="" onChange={(e) => {
+    <label className="settings-select-row"><span>{t('popupPause')}</span><select className="settings-select" value="" onChange={(e) => {
       const minutes = Number(e.target.value);
       if (POPUP_PAUSE_MINUTES.some((n) => n === minutes)) set({ popupPausedUntil: Date.now() + minutes * 60_000, arrivals: {} });
     }}>

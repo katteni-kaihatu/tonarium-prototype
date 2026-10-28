@@ -56,7 +56,7 @@ export interface NpcChatMessage {
   text: string;
   npcId: NpcId;
   locale: NpcLocale;
-  source?: 'canon' | 'local' | 'browser';
+  source?: 'canon' | 'local';
   actions?: FantasyAction[];
 }
 
@@ -75,7 +75,7 @@ export interface NpcReply {
   npcId: NpcId;
   locale: NpcLocale;
   relationship: NpcRelationship;
-  source?: 'canon' | 'local' | 'browser';
+  source?: 'canon' | 'local';
   actions?: FantasyAction[];
   error?: 'unavailable' | 'busy' | 'invalid' | 'timeout';
 }

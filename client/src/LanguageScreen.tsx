@@ -1,10 +1,9 @@
 import { useLocale } from './locale.ts';
 import { GameLanguageSwitch } from './LanguageSwitch.tsx';
 import './language.css';
-import { AiSupportControl } from './ai/AiSupport.tsx';
 
 export function LanguageSelect() {
-  return <div className="language-ai-tools"><GameLanguageSwitch/><AiSupportControl/></div>;
+  return <div className="language-ai-tools"><GameLanguageSwitch/></div>;
 }
 
 export function LanguageScreen() {
