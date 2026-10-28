@@ -12,6 +12,7 @@ import { ProfilePanel } from './ProfilePanel.tsx';
 import { ProgressPicker } from './ProgressPicker.tsx';
 import { StatsPanel } from './StatsPanel.tsx';
 import { getLanguage, setLanguage, t } from '../../i18n/core.ts';
+import { formatDuration } from './format.ts';
 
 function harness(game: GameState) {
   let slice: AdSlice;
@@ -19,6 +20,43 @@ function harness(game: GameState) {
   slice.adGame = game;
   return slice;
 }
+
+test('ranking labels and collapsed self inclusion are shown in all three languages', () => {
+  const previous = getLanguage();
+  const slice = harness(createNewGame());
+  slice.adProfile = { id: 'profile', name: 'Other', createdAt: null };
+  slice.adLeaderboard = [
+    { name: 'Shared', antimatterLog10: 100, infinities: 3, playTimeSec: 90061 },
+    { name: 'Other', antimatterLog10: 90, infinities: 2, playTimeSec: 60 },
+    { name: 'Shared', antimatterLog10: 80, infinities: 1, playTimeSec: 10, self: true },
+  ];
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      const html = renderToStaticMarkup(<StatsPanel ad={adaptAdSlice(slice)!} notice={() => {}} />);
+      const [representatives, children] = html.split('<tbody id=');
+      for (const key of ['adLabText52', 'adRankingRank', 'adLabText54', 'adLabText55', 'adRankingInfinity', 'adLabText56', 'adRankingContainsSelf', 'adRankingExpand']) assert.ok(representatives.includes(t(key)));
+      assert.ok(representatives.includes(t('adRankingRecordCount', 2)));
+      assert.ok(!representatives.includes(t('adRankingSelf') + '</span>'));
+      assert.ok(children.includes(t('adRankingSelf')));
+      assert.match(html, /aria-expanded="false"/);
+      assert.match(children, /hidden=""/);
+      assert.equal([...html.matchAll(/ad-ranking-rank/g)].length, 2);
+      assert.ok(html.includes(formatDuration(90061)));
+      assert.equal(formatDuration(90061), language === 'ja' ? '1日 1時間 1分 1秒' : language === 'en' ? '1d 1h 1m 1s' : '1일 1시간 1분 1초');
+      assert.equal(formatDuration(-10), language === 'ja' ? '0秒' : language === 'en' ? '0s' : '0초');
+      const buttons = [...html.matchAll(/id="([^"]+)"[^>]*aria-expanded="false" aria-controls="([^"]+)"/g)];
+      assert.equal(buttons.length, 1);
+      assert.ok(html.includes(`id="${buttons[0][2]}" hidden="" aria-labelledby="${buttons[0][1]}"`));
+      const ad = adaptAdSlice(slice)!;
+      const own = renderToStaticMarkup(<StatsPanel ad={{ ...ad, leaderboard: [{ ...ad.leaderboard[0], self: true }] }} notice={() => {}} />);
+      assert.ok(own.includes(t('adRankingSelf') + '</span>'));
+      assert.ok(!own.includes(t('adRankingContainsSelf')));
+      const unrelated = renderToStaticMarkup(<StatsPanel ad={{ ...ad, leaderboard: [ad.leaderboard[1]] }} notice={() => {}} />);
+      assert.ok(!unrelated.includes('ad-ranking-badge'));
+    }
+  } finally { setLanguage(previous); }
+});
 
 test('共通プロフィール・ランキングの同期案内とv3形式は三言語で表示される', () => {
   const previous = getLanguage();

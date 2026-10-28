@@ -45,3 +45,21 @@
   .ad-feedback-burst { display: none; }
   .ad-lab-panel *, .ad-lab-panel *::before, .ad-lab-panel *::after { animation: none !important; transition: none !important; }
 }
+.ad-ranking { min-width: 0; overflow-wrap: anywhere; }
+.ad-ranking-scroll { max-width: 100%; overflow-x: auto; margin-top: 8px; }
+.ad-ranking-table { min-width: 520px; }
+.ad-ranking-table th, .ad-ranking-table td { padding: 8px; vertical-align: top; border-bottom: 1px solid #ffffff18; }
+.ad-ranking-table thead { color: #b5fff2; }
+.ad-ranking-table .ad-ranking-name { text-align: left; font-weight: 400; min-width: 140px; max-width: 220px; overflow-wrap: anywhere; }
+.ad-ranking-table .ad-ranking-rank { color: #b5fff2; font-weight: 700; }
+.ad-ranking-table td { white-space: nowrap; }
+.ad-ranking-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.ad-ranking-controls button, .ad-ranking-badge { display: inline-flex; align-items: center; gap: 4px; }
+.ad-ranking-controls button { white-space: normal; text-align: left; }
+.ad-ranking-controls svg, .ad-ranking-badge svg { flex-shrink: 0; }
+.ad-ranking-badge { color: #b5fff2; font-size: 11px; margin: 4px 6px 0 0; }
+.ad-ranking-self { background: #7fffe310; font-weight: 700; }
+.ad-ranking-child { background: #ffffff04; }
+.ad-ranking-child .ad-ranking-name { padding-left: 24px; }
+.ad-ranking-self .ad-ranking-name { font-weight: 700; }
+.ad-ranking-scroll:focus-visible, .ad-ranking-controls button:focus-visible { outline: 2px solid #fff188; outline-offset: -2px; }
