@@ -114,7 +114,7 @@ export function XRControls() {
   };
   if (!state.active) return state.error ? createPortal(<div className="xr-error" role="status">{state.error}<button onClick={() => xrPatch({ error: '' })}>閉じる</button></div>, document.body) : null;
   const candidates = [
-    ...(world === 'antimatter' ? [{ key: 'antimatter', title: 'AD研究所' }, { key: 'antimatter-space', title: 'AD空間設定' }] : []),
+    ...(world === 'antimatter' ? [{ key: 'antimatter', title: tr('mergeAdLab') }, { key: 'antimatter-space', title: tr('adSpaceSettings') }] : []),
     ...(world === 'survivors' ? [{ key: 'survivors', title: 'サバイバー' }, { key: 'survivor-library', title: 'サバイバー図鑑' }] : []),
     ...(sharer ? [{ key: 'share', title: '画面共有' }] : []),
     ...participants.map(p => ({ key: `face:${p.id}`, title: `顔: ${p.name}` })),

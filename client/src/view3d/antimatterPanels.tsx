@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n/index.ts';
 // antimatter の空間内ボードと前面操作パネル。
 // 購入ロジックはここに置かない。AdActions は親が engine.mjs の呼び出し（buyDimension /
 // buyMaxDimension / buyTickspeed / dimensionalBoost / antimatterGalaxy / sacrifice /
@@ -6,10 +7,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { ANTIMATTER_EXHIBITS, type AdLabSnapshot, type AdPanelTarget } from '../../../shared/antimatterLayout.ts';
-import { drawText, makeCanvasTexture } from './textTexture.ts';
+import { makeCanvasTexture } from './textTexture.ts';
+import { drawAdBoard } from './antimatterText.ts';
+import { adExhibitTitle } from '../ad/labView.ts';
 import { emitAdFeedback } from '../ad/feedback.ts';
 import { uprightQuaternion } from '../xr/pose.ts';
-import { t } from '../i18n/core.ts';
+
 
 /** 親が engine へ結ぶ操作口。3D 側は数値計算もセーブもしない */
 export interface AdActions {
@@ -34,23 +37,28 @@ export function PanelBoard({ position, lines, hint, onOpen }: {
   /** あればボード自体が操作対象になる。無ければ飾り（noRay） */
   hint?: string; onOpen?: () => void;
 }) {
+  const language = useLanguage();
   const group = useRef<THREE.Group>(null);
   const latest = useRef(lines);
   latest.current = lines;
-  const [shown, setShown] = useState(lines);
+  const [shown, setShown] = useState({ language, lines });
+  const visible = shown.language === language ? shown.lines : lines;
+  useEffect(() => {
+    setShown(previous => previous.language === language ? previous : { language, lines: latest.current });
+  }, [language]);
   // 板のテクスチャ再描画は最大 1 秒に 1 回。100ms の tick ごとに描き直すと 13 枚分で重くなるため
   useEffect(() => {
     const t = setInterval(() => {
-      if (latest.current.join('\n') !== shown.join('\n')) setShown(latest.current);
+      if (language !== shown.language || latest.current.join('\n') !== shown.lines.join('\n')) setShown({ language, lines: latest.current });
     }, 1000);
     return () => clearInterval(t);
-  }, [shown]);
+  }, [shown, language]);
   const tex = useMemo(() => {
     const { canvas, tex: t } = makeCanvasTexture(512, 320);
-    drawText(canvas, shown.map((text, i) => ({ text, color: i === 0 ? '#aef3ff' : '#e8ecff', size: i === 0 ? 52 : 42 })), { bg: 'rgba(16,20,40,0.92)' });
+    drawAdBoard(canvas, visible);
     t.needsUpdate = true;
     return t;
-  }, [shown]);
+  }, [visible, language]);
   useEffect(() => () => tex.dispose(), [tex]);
   useFrame(({ gl, camera }) => {
     if (!group.current) return;
@@ -73,10 +81,10 @@ export function PanelBoard({ position, lines, hint, onOpen }: {
 
 // ---- 前面操作パネル（親が WindowLayer のウィンドウ中身として描く DOM） ----
 
-const panelStyle: React.CSSProperties = { color: '#e8ecff', fontSize: 14, lineHeight: 1.6 };
+const panelStyle: React.CSSProperties = { color: '#e8ecff', fontSize: 14, lineHeight: 1.6, overflowWrap: 'anywhere' };
 const btnStyle: React.CSSProperties = {
   margin: '2px 6px 2px 0', padding: '6px 12px', borderRadius: 6, border: '1px solid #4f7dff',
-  background: '#1b2a5e', color: '#e8ecff', cursor: 'pointer',
+  background: '#1b2a5e', color: '#e8ecff', cursor: 'pointer', maxWidth: '100%', whiteSpace: 'normal', overflowWrap: 'anywhere',
 };
 const mockBadge: React.CSSProperties = {
   display: 'inline-block', marginLeft: 8, padding: '0 8px', borderRadius: 10,
@@ -88,10 +96,11 @@ function Btn({ label, onClick, disabled }: { label: string; onClick: () => void;
 }
 
 function Foot({ onClose }: { onClose?: () => void }) {
+  useLanguage();
   return (
     <p style={{ color: '#9aa3c7', fontSize: 12 }}>
-      閉じたらキャンバスをクリックすると 3D 操作に戻ります。
-      {onClose && <Btn label="閉じて3Dへ戻る" onClick={() => { onClose(); emitAdFeedback({ kind: 'navigate' }); }} />}
+      {t('adLabText99')}
+      {onClose && <Btn label={t('adLabText112')} onClick={() => { onClose(); emitAdFeedback({ kind: 'navigate' }); }} />}
     </p>
   );
 }
@@ -102,15 +111,16 @@ function Foot({ onClose }: { onClose?: () => void }) {
 export function AntimatterSpacePanel({ target, snapshot, actions, isOwn, onClose }: {
   target: AdPanelTarget; snapshot: AdLabSnapshot; actions: AdActions; isOwn: boolean; onClose?: () => void;
 }) {
+  useLanguage();
   const own = isOwn;
   if (target === 'core') {
     return (
       <div style={panelStyle}>
-        <h3>反物質コア</h3>
-        <p>反物質：{snapshot.antimatterText}</p>
-        <p>生産：{snapshot.perSecondText} / 秒</p>
-        <p>Infinity Point：{snapshot.infinityPointsText}（到達 {snapshot.infinities} 回）</p>
-        {actions.buyMaxAll && <Btn label="すべて Max" onClick={actions.buyMaxAll} disabled={!own} />}
+        <h3>{t('adLabText88')}</h3>
+        <p>{t('adLabText100', snapshot.antimatterText)}</p>
+        <p>{t('adLabText101', snapshot.perSecondText)}</p>
+        <p>{t('adLabText102', snapshot.infinityPointsText, snapshot.infinities)}</p>
+        {actions.buyMaxAll && <Btn label={t('adLabText113')} onClick={actions.buyMaxAll} disabled={!own} />}
         <Foot onClose={onClose} />
       </div>
     );
@@ -119,8 +129,8 @@ export function AntimatterSpacePanel({ target, snapshot, actions, isOwn, onClose
     return (
       <div style={panelStyle}>
         <h3>Tickspeed</h3>
-        <p>現在：{snapshot.tickspeedText}（購入 {snapshot.tickspeedBought} 回）</p>
-        <Btn label="購入" onClick={actions.buyTickspeed} disabled={!own} />
+        <p>{t('adLabText103', snapshot.tickspeedText, snapshot.tickspeedBought)}</p>
+        <Btn label={t('adLabText114')} onClick={actions.buyTickspeed} disabled={!own} />
         {actions.buyMaxTickspeed && <Btn label="Max" onClick={actions.buyMaxTickspeed} disabled={!own} />}
         <Foot onClose={onClose} />
       </div>
@@ -130,10 +140,10 @@ export function AntimatterSpacePanel({ target, snapshot, actions, isOwn, onClose
     return (
       <div style={panelStyle}>
         <h3>Dimension Boost / Shift</h3>
-        <p>現在の Boost：{snapshot.boosts} 回</p>
-        <p>要件：{snapshot.boostRequirementText}</p>
+        <p>{t('adLabText104', snapshot.boosts)}</p>
+        <p>{t('adLabText105', snapshot.boostRequirementText)}</p>
         <p>{t('adRequirementCurrentAmount', snapshot.boostCurrentAmountText)}</p>
-        <Btn label="Boost を実行" onClick={actions.dimensionalBoost} disabled={!own || !snapshot.canBoost} />
+        <Btn label={t('adLabText115')} onClick={actions.dimensionalBoost} disabled={!own || !snapshot.canBoost} />
         <Foot onClose={onClose} />
       </div>
     );
@@ -142,8 +152,8 @@ export function AntimatterSpacePanel({ target, snapshot, actions, isOwn, onClose
     return (
       <div style={panelStyle}>
         <h3>Dimensional Sacrifice</h3>
-        <p>{snapshot.sacrificeUnlocked ? `現在の倍率：${snapshot.sacrificeText}` : 'Boost 5 回で解放されます'}</p>
-        <Btn label="Sacrifice を実行" onClick={actions.sacrifice} disabled={!own || !snapshot.canSacrifice} />
+        <p>{snapshot.sacrificeUnlocked ? t('adLabText116', snapshot.sacrificeText) : t('adLabText117')}</p>
+        <Btn label={t('adLabText118')} onClick={actions.sacrifice} disabled={!own || !snapshot.canSacrifice} />
         <Foot onClose={onClose} />
       </div>
     );
@@ -152,10 +162,10 @@ export function AntimatterSpacePanel({ target, snapshot, actions, isOwn, onClose
     return (
       <div style={panelStyle}>
         <h3>Antimatter Galaxy</h3>
-        <p>現在の銀河：{snapshot.galaxies} 個</p>
-        <p>要件：{snapshot.galaxyRequirementText}</p>
+        <p>{t('adLabText106', snapshot.galaxies)}</p>
+        <p>{t('adLabText105', snapshot.galaxyRequirementText)}</p>
         <p>{t('adRequirementCurrentAmount', snapshot.galaxyCurrentAmountText)}</p>
-        <Btn label="Galaxy を実行" onClick={actions.antimatterGalaxy} disabled={!own || !snapshot.canGalaxy} />
+        <Btn label={t('adLabText119')} onClick={actions.antimatterGalaxy} disabled={!own || !snapshot.canGalaxy} />
         <Foot onClose={onClose} />
       </div>
     );
@@ -164,8 +174,8 @@ export function AntimatterSpacePanel({ target, snapshot, actions, isOwn, onClose
     return (
       <div style={panelStyle}>
         <h3>Big Crunch / Infinity</h3>
-        <p>{snapshot.canCrunch ? '到達しています。実行すると IP +1 され、次元がリセットされます。' : '反物質 1.79e308 到達で実行できます。'}</p>
-        <Btn label="Big Crunch を実行" onClick={actions.prestigeInfinity} disabled={!own || !snapshot.canCrunch} />
+        <p>{snapshot.canCrunch ? t('adLabText120') : t('adLabText121')}</p>
+        <Btn label={t('adLabText122')} onClick={actions.prestigeInfinity} disabled={!own || !snapshot.canCrunch} />
         <Foot onClose={onClose} />
       </div>
     );
@@ -173,19 +183,19 @@ export function AntimatterSpacePanel({ target, snapshot, actions, isOwn, onClose
   if (target.startsWith('dimension-')) {
     const tier = Number(target.slice('dimension-'.length));
     const view = snapshot.dimensions[tier - 1];
-    if (!view) return <div style={panelStyle}>次元が見つかりません</div>;
+    if (!view) return <div style={panelStyle}>{t('adLabText107')}</div>;
     return (
       <div style={panelStyle}>
-        <h3>第{tier}次元</h3>
+        <h3>{t('adLabText13', tier)}</h3>
         {view.locked ? (
-          <p>未解放です。Boost を進めると解放されます。</p>
+          <p>{t('adLabText108')}</p>
         ) : (
           <>
-            <p>所持：{view.amountText}（購入 {view.bought} 個）</p>
-            <p>生産：{view.productionText} / 秒</p>
-            <p>次コスト：{view.nextCostText}</p>
-            <Btn label="1個" onClick={() => actions.buyDimension(tier)} disabled={!own} />
-            <Btn label="10個まで" onClick={() => actions.buyDimensionUpTo(tier, 10)} disabled={!own} />
+            <p>{t('adLabText109', view.amountText, view.bought)}</p>
+            <p>{t('adLabText101', view.productionText)}</p>
+            <p>{t('adLabText110', view.nextCostText)}</p>
+            <Btn label={t('adLabText123')} onClick={() => actions.buyDimension(tier)} disabled={!own} />
+            <Btn label={t('adLabText124')} onClick={() => actions.buyDimensionUpTo(tier, 10)} disabled={!own} />
             <Btn label="Max" onClick={() => actions.buyDimensionMax(tier)} disabled={!own} />
           </>
         )}
@@ -196,9 +206,9 @@ export function AntimatterSpacePanel({ target, snapshot, actions, isOwn, onClose
   const exhibit = ANTIMATTER_EXHIBITS.find((e) => e.id === target);
   return (
     <div style={panelStyle}>
-      <h3>{exhibit?.title ?? '展示'}<span style={mockBadge}>モック</span></h3>
-      <p>Infinity 層以降の展示です。購入ボタンはまだ実装されていません。</p>
-      <Btn label="購入（モック）" onClick={() => undefined} disabled />
+      <h3>{exhibit ? adExhibitTitle(exhibit.id) : t('adLabText125')}<span style={mockBadge}>{t('ui1154')}</span></h3>
+      <p>{t('adLabText111')}</p>
+      <Btn label={t('adLabText126')} onClick={() => undefined} disabled />
       <Foot onClose={onClose} />
     </div>
   );

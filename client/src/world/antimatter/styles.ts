@@ -1,3 +1,4 @@
+import { t } from '../../i18n/core.ts';
 import type { CSSProperties } from 'react';
 import { formatNumber as formatNumberLocal } from './format.ts';
 // 共通部品はインライン、反応・アニメーションは名前空間付き CSS で定義する。
@@ -21,7 +22,7 @@ export const s: Record<string, CSSProperties> = {
   notice: { padding: '8px 10px', borderRadius: 10, background: 'rgba(255,211,109,0.16)', color: '#ffe9b0' },
   modal: { position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.55)', padding: 16 },
   modalBox: { maxWidth: 480, width: '100%', borderRadius: 14, background: '#10122c', color: '#f2eef5', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: 12 },
+  table: { width: '100%', tableLayout: 'fixed', overflowWrap: 'anywhere', borderCollapse: 'collapse', fontSize: 12 },
   num: { textAlign: 'right', fontVariantNumeric: 'tabular-nums' },
   sectionTitle: { fontSize: 14, fontWeight: 700, margin: '4px 0 0' },
 };
@@ -29,13 +30,13 @@ export const s: Record<string, CSSProperties> = {
 export const TIER_EN = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
 
 export const ACHIEVEMENT_DEFS = [
-  { id: 'first-dimension', name: 'はじめの一歩', desc: '第1次元を初めて購入する' },
-  { id: 'eighth-dimension', name: '第8次元到達', desc: '第8次元を初めて購入する' },
-  { id: 'antimatter-1e100', name: '反物質 1e100', desc: '反物質を 1e100 以上にする' },
-  { id: 'first-boost', name: '初めての Dimension Boost', desc: 'Dimension Boost を初めて行う' },
-  { id: 'first-galaxy', name: '初めての銀河', desc: 'Antimatter Galaxy を初めて作る' },
-  { id: 'first-sacrifice', name: '初めての Sacrifice', desc: 'Sacrifice を初めて行う' },
-  { id: 'first-infinity', name: '初めての Infinity', desc: 'Big Crunch を初めて行い、Infinity に到達する' },
+  { id: 'first-dimension', get name() { return t('adLabText133'); }, get desc() { return t('adLabText134'); } },
+  { id: 'eighth-dimension', get name() { return t('adLabText135'); }, get desc() { return t('adLabText136'); } },
+  { id: 'antimatter-1e100', get name() { return t('adLabText137'); }, get desc() { return t('adLabText138'); } },
+  { id: 'first-boost', get name() { return t('adLabText139'); }, get desc() { return t('adLabText140'); } },
+  { id: 'first-galaxy', get name() { return t('adLabText141'); }, get desc() { return t('adLabText142'); } },
+  { id: 'first-sacrifice', get name() { return t('adLabText143'); }, get desc() { return t('adLabText144'); } },
+  { id: 'first-infinity', get name() { return t('adLabText145'); }, get desc() { return t('adLabText146'); } },
 ] as const;
 
 // app.js の dimensionMultiplierText と同じ表示規則。生産計算には使わない。

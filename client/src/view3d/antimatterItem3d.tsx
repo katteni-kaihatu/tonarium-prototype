@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n/index.ts';
 // AD ポータルの 3D 表示。研究所のミニチュアで、入口だけを担う。
 import { useRef } from 'react';
 import * as THREE from 'three';
@@ -15,17 +16,18 @@ const TOWERS: { x: number; z: number; h: number }[] = [
 ];
 
 export function AntimatterItem3D({ item }: { item: Item & { kind: 'antimatter' } }) {
+  useLanguage();
   const ref = useRef<THREE.Group>(null);
   useFollow(ref, item.id, item.x, item.z, item.ry);
   const data: Interactable = {
     ...removable(item),
-    hint: 'クリック: AD 研究所を開く',
+    hint: t('adLabText128'),
     // パネルをマウスで操作できるようロックを外す
     use: () => { openWindow(`item:${item.id}`); document.exitPointerLock(); emitAdFeedback({ kind: 'navigate' }); },
   };
   return (
     <group ref={ref} position={[item.x, 0, item.z]} rotation-y={item.ry} userData={data}>
-      <Label text="AD ポータル" position={[0, 1.95, 0]} height={0.16} bg="rgba(43,26,74,0.95)" />
+      <Label text={t('adLabText129')} position={[0, 1.95, 0]} height={0.16} bg="rgba(43,26,74,0.95)" />
       <mesh position-y={0.04}>
         <cylinderGeometry args={[0.62, 0.7, 0.08, 32]} />
         <meshStandardMaterial color="#2c2f4a" />

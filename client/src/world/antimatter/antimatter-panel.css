@@ -12,8 +12,9 @@
 }
 /* The window body clips overflow; this panel owns the bounded scroll area. */
 .ad-lab-panel > * { flex-shrink: 0; min-width: 0; }
+.ad-lab-panel input, .ad-lab-panel select, .ad-lab-panel textarea { max-width: 100%; box-sizing: border-box; }
 .ad-lab-panel:focus-visible { outline: 2px solid #7fffe3; outline-offset: -3px; }
-.ad-lab-panel button { transition: border-color .15s, background-color .15s, box-shadow .15s; }
+.ad-lab-panel button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; transition: border-color .15s, background-color .15s, box-shadow .15s; }
 .ad-lab-panel button:not(:disabled):hover { border-color: #7fffe3 !important; box-shadow: 0 0 12px #79ffe333; }
 .ad-lab-panel button:focus-visible { outline: 2px solid #fff188; outline-offset: 2px; }
 .ad-lab-panel button:disabled { opacity: .45; cursor: not-allowed !important; }
@@ -25,7 +26,7 @@
 .ad-dimension-card.is-affordable { border-color: #7fffe35c; }
 .ad-dimension-details { min-width: 0; overflow-wrap: anywhere; }
 .ad-dimension-title { font-weight: 800; }
-.ad-dimension-buy { display: flex; flex-direction: column; gap: 6px; }
+.ad-dimension-buy { display: flex; flex-direction: column; gap: 6px; max-width: 180px; min-width: 0; }
 .ad-dimension-buy button:first-child { background: linear-gradient(115deg, #455cb777, #308c7c55) !important; }
 .ad-dimension-progress { height: 4px; margin-top: 8px; background: #ffffff15; border-radius: 4px; overflow: hidden; }
 .ad-dimension-progress > span { display: block; height: 100%; background: linear-gradient(90deg, #b6a2ff, #7fffe3); }
@@ -39,7 +40,7 @@
 @keyframes ad-reactor-turn { to { transform: rotate(360deg); } }
 @container (max-width: 460px) {
   .ad-dimension-card { grid-template-columns: 60px minmax(0, 1fr); gap: 8px; padding: 10px; }
-  .ad-dimension-buy { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; }
+  .ad-dimension-buy { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ad-feedback-burst { display: none; }

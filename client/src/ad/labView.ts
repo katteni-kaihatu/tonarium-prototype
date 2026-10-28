@@ -1,3 +1,4 @@
+import { t } from '../i18n/core.ts';
 // AD のゲーム状態を 3D 研究所用のスナップショットと操作口へ変換する接着層。
 // 3D 側は BigNum を扱わず、数値は format 済み文字列と log10 だけを受け取る。
 import {
@@ -26,6 +27,14 @@ const log10Of = (v: Parameters<typeof bigLog10>[0]): number => {
   return Number.isFinite(v2) ? v2 : 0;
 };
 
+const EXHIBIT_KEYS: Record<string, string> = {
+  'exhibit-infinity': 'adExhibitInfinity',
+  'exhibit-eternity': 'adExhibitEternity',
+  'exhibit-reality': 'adExhibitReality',
+  'exhibit-celestials': 'adExhibitCelestials',
+};
+export const adExhibitTitle = (id: string): string => t(EXHIBIT_KEYS[id] ?? 'adLabText125');
+
 export function buildAdLabSnapshot(game: GameState): AdLabSnapshot {
   const maxUnlockedTier = getMaxUnlockedTier(game);
   const boostReq = getDimensionalBoostRequirement(game);
@@ -52,11 +61,11 @@ export function buildAdLabSnapshot(game: GameState): AdLabSnapshot {
     tickspeedText: formatNumber(getEffectiveTickspeed(game)),
     tickspeedBought: game.tickspeedBought,
     boosts: game.dimensionalBoosts,
-    boostRequirementText: `${boostReq.tier}次元を${boostReq.amount}個`,
+    boostRequirementText: t('adLabText130', boostReq.tier, boostReq.amount),
     boostCurrentAmountText: formatNumber(game.dimensions[boostReq.tier - 1].amount),
     canBoost: canDimensionalBoost(game),
     galaxies: game.galaxies,
-    galaxyRequirementText: `8次元を${galaxyReq.amount}個`,
+    galaxyRequirementText: t('adLabText131', galaxyReq.amount),
     galaxyCurrentAmountText: formatNumber(game.dimensions[galaxyReq.tier - 1].amount),
     canGalaxy: canAntimatterGalaxy(game),
     sacrificeText: formatNumber(game.sacrificeBoost),
@@ -88,7 +97,7 @@ export function buildAdActions(slice: AdSlice): AdActions {
     sacrifice: () => { void slice.adSacrifice(); },
     prestigeInfinity: () => {
       // Big Crunch は取り消せないため、呼び出し前に確認する（3D パネル側では出さない約束）
-      if (!window.confirm('Big Crunch を実行しますか？次元・反物質は初期化され、Infinity Point が +1 されます。')) return;
+      if (!window.confirm(t('adLabText132'))) return;
       void slice.adPrestige();
     },
   };
