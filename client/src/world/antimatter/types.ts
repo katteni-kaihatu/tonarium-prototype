@@ -108,7 +108,12 @@ export interface AntimatterSlice {
   game: GameState;
   derived: DerivedSnapshot;
   tickVersion: number;
-  profiles: AdProfile[];
+  migration: boolean;
+  syncSources: { local: Record<string, unknown>; remote: Record<string, unknown> } | null;
+  progressSources: import('../../ad/user.mjs').ProgressSource[];
+  selectProgress: (key: string) => void;
+  restoreProgress: (key: string) => void;
+  exportProgress: (key: string) => string;
   activeProfile: AdProfile | null;
   offlineNotice: OfflineNotice | null;
   leaderboard: LeaderboardEntry[];
@@ -126,9 +131,6 @@ export interface AntimatterSlice {
   antimatterGalaxy: () => boolean;
   sacrifice: () => boolean;
   prestigeInfinity: () => number;
-  switchProfile: (userId: string) => void;
-  createProfile: (name: string) => void;
-  deleteProfile: (userId: string) => void;
   resetGame: () => void;
   exportBundle: () => string;
   recoveryRecords: { key: string; createdAt: string | null }[];

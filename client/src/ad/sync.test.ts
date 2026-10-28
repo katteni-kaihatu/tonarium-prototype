@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import { setImmediate } from 'node:timers/promises';
 import { createNewGame, serialize, bigFromLog10 } from './engine.mjs';
-import { compareProgress } from './sync.mjs';
+import { compareProgress, sameSave } from './sync.mjs';
 import { createAdSlice, type AdSlice } from './slice.ts';
-import { buildExportBundle, createProfile, getActiveProfile, importBundleInto, listProfiles, listRecoveryRecords, retainSyncSources, parseImportBundle, readConnection, readSaveRaw, switchProfile, writeConnection, writeSave, type StorageLike } from './user.mjs';
+import { buildExportBundle, createProfile, getActiveProfile, importBundleInto, listProfiles, listRecoveryRecords, retainSyncSources, parseImportBundle, readConnection, readSaveRaw, switchProfile, writeConnection, writeSave, prepareProgressSelection, readProgressSelection, selectProgress, type StorageLike } from './user.mjs';
 import { linkTonariumProfile } from './link.ts';
 import { subscribeAdFeedback } from './feedback.ts';
 
@@ -16,22 +16,29 @@ function storage() {
     removeItem: (key: string) => { values.delete(key); },
   }, { values });
 }
+let testTimerId = 0;
 function harness(t: TestContext, data: StorageLike) {
   const timers = new Map<number, { callback: () => void; ms: number }>();
-  let next = 0;
-  const oldWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: {
-    setInterval: (callback: () => void, ms: number) => { timers.set(++next, { callback, ms }); return next; },
-  } });
-  t.mock.method(globalThis, 'clearInterval', (id: Parameters<typeof clearInterval>[0]) => { timers.delete(Number(id)); });
+  const previousClear = globalThis.clearInterval;
+  t.mock.method(globalThis, 'clearInterval', (id: Parameters<typeof clearInterval>[0]) => {
+    if (!timers.delete(Number(id))) previousClear(id);
+  });
   let state: AdSlice;
   state = createAdSlice(partial => Object.assign(state, partial), () => state);
   t.after(() => {
     state.adStop();
-    if (oldWindow) Object.defineProperty(globalThis, 'window', oldWindow);
-    else Reflect.deleteProperty(globalThis, 'window');
   });
-  return { state, timers, start: () => state.adStart({ storage: data }), fire: (ms: number) => {
+  return { state, timers, start: () => {
+    const oldWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: {
+      setInterval: (callback: () => void, ms: number) => { const id = ++testTimerId; timers.set(id, { callback, ms }); return id; },
+    } });
+    try { state.adStart({ storage: data }); }
+    finally {
+      if (oldWindow) Object.defineProperty(globalThis, 'window', oldWindow);
+      else Reflect.deleteProperty(globalThis, 'window');
+    }
+  }, fire: (ms: number) => {
     for (const value of timers.values()) if (value.ms === ms) value.callback();
   } };
 }
@@ -58,7 +65,7 @@ function api(t: TestContext) {
         return response({ revision: ++revision });
       }
       reads++;
-      return response({ save: remote, revision });
+      return response({ save: remote ?? (route.endsWith('/transferred') ? createNewGame(2000) : null), revision });
     }
     if (options?.method === 'POST') { submissions++; return response({}); }
     return response({ entries: [{ name: 'Public', antimatterLog10: 10, infinities: 0, playTimeSec: 1 }] });
@@ -178,6 +185,9 @@ test('legacy profiles, per-profile saves, active selection and Tonarium links ar
   const { state, start } = harness(t, data);
   start(); await setImmediate();
   assert.equal(state.adProfile?.id, a.id);
+  assert.equal(state.adMigration, true);
+  assert.equal(readConnection(data, a.id), null);
+  state.adSelectProgress('profile:' + a.id); await setImmediate();
   assert.deepEqual(listProfiles(data).map(p => p.id), [a.id, b.id]);
   assert.equal(readSaveRaw(data, b.id), original);
   assert.equal(readConnection(data, a.id)?.id, 'destination');
@@ -212,7 +222,7 @@ test('initial load freezes tick, offline progress and autosaves until comparison
   assert.equal(state.adSync, 'ready');
   assert.equal(state.adGame!.galaxies, 2);
   const backup = JSON.parse(data.getItem(state.adRecoveryKey!)!);
-  assert.deepEqual(backup, { local, remote });
+  assert.deepEqual(backup, { local, remote, connection: { id: 'owned', token: 'grant' } });
   assert.deepEqual(state.adExportRecovery('local')!.save, local);
   assert.deepEqual(state.adExportRecovery('remote')!.save, remote);
 });
@@ -242,6 +252,8 @@ test('CAS conflict returns to comparison, failed loads never enable writes, and 
   const progressed = createNewGame(); progressed.infinities = 10;
   server.replace(progressed);
   assert.equal(await state.adSaveServer(), false);
+  assert.equal(state.adSync, 'choice');
+  state.adChooseSave('remote');
   assert.equal(state.adGame!.infinities, 10);
   assert.equal(state.adSync, 'ready');
   server.mock.mock.mockImplementation(async () => { throw new Error('offline'); });
@@ -253,13 +265,14 @@ test('CAS conflict returns to comparison, failed loads never enable writes, and 
   assert.equal(JSON.parse(readSaveRaw(data, state.adProfile!.id)!).infinities, 10);
   server.mock.mock.mockImplementation(server.implementation);
   fire(30000); await setImmediate();
-  assert.equal(state.adSync, 'choice');
+  assert.equal(state.adSync, 'ready');
   assert.equal(server.stats().writes, writes);
 });
 
 test('late load after profile switch or stop cannot replace the active game', async t => {
   const data = storage(), a = createProfile(data, 'A'), b = createProfile(data, 'B');
   switchProfile(data, a.id);
+  selectProgress(data, a.id);
   writeConnection(data, a.id, { id: 'a', token: 'grant-a' });
   writeConnection(data, b.id, { id: 'b', token: 'grant-b' });
   const delayed = deferred<Response>();
@@ -324,6 +337,7 @@ test('transfer creates a separate local profile without merging guests, and bind
 test('late save and ranking responses do not leak revisions or entries into the next profile', async t => {
   const data = storage(), a = createProfile(data, 'A'), b = createProfile(data, 'B');
   switchProfile(data, a.id);
+  selectProgress(data, a.id);
   writeConnection(data, a.id, { id: 'a', token: 'grant-a' });
   writeConnection(data, b.id, { id: 'b', token: 'grant-b' });
   const server = api(t);
@@ -358,6 +372,7 @@ test('late save and ranking responses do not leak revisions or entries into the 
 test('failed local persistence stops profile switching and preserves the current game', async t => {
   const data = storage(), a = createProfile(data, 'A'), b = createProfile(data, 'B');
   switchProfile(data, a.id);
+  selectProgress(data, a.id);
   api(t);
   const { state, start } = harness(t, data);
   start(); await setImmediate();
@@ -384,6 +399,7 @@ test('timers and requests do not duplicate, stop removes timers, ranking read su
       if (String(url).includes('/save/')) { posts++; return save.promise; }
       throw new Error('score failure');
     }
+    if (String(url).includes('/save/')) return response({ save: null, revision: 0 });
     rankingReads++; return response({ entries: [] });
   });
   fire(30000); fire(30000); await setImmediate();
@@ -427,4 +443,458 @@ test('legacy v2 confirmation cannot be bypassed by parsing first; invalid format
   importBundleInto(data, parsed, { confirmLegacy: true });
   const active = getActiveProfile(data)!;
   assert.notEqual(active.id, 'source'); assert.equal(readConnection(data, active.id), null);
+});
+
+function paired(t: TestContext) {
+  t.mock.method(Date, 'now', () => 10_000);
+  const seed = createNewGame();
+  let save = JSON.parse(serialize(seed));
+  let revision = 1, writes = 0, reads = 0;
+  const grants = new Set(['grant-a', 'grant-b']);
+  let code: string | null = null;
+  const implementation: typeof fetch = async (url, options) => {
+    const path = String(url);
+    const grant = new Headers(options?.headers).get('Authorization')?.replace(/^Bearer /, '');
+    if (path.endsWith('/api/ad/exchange')) {
+      const input = JSON.parse(String(options?.body)).code;
+      if (!code || input !== code) return response({}, 400);
+      code = null; grants.add('grant-c');
+      return response({ id: 'shared', token: 'grant-c' });
+    }
+    if (path.includes('/save/') || path.endsWith('/ad/transfer')) {
+      if (!grant || !grants.has(grant)) return response({}, 403);
+      if (path.endsWith('/ad/transfer')) { code = 'single-use'; return response({ code, expiresAt: 610_000 }); }
+      if (!path.endsWith('/save/shared')) return response({}, 403);
+      if (options?.method === 'POST') {
+        const body = JSON.parse(String(options.body));
+        if (body.revision !== revision) return response({}, 409);
+        save = structuredClone(body.save); writes++;
+        return response({ revision: ++revision });
+      }
+      reads++;
+      return response({ save, revision });
+    }
+    return response({ entries: [] });
+  };
+  const mock = t.mock.method(globalThis, 'fetch', implementation);
+  const device = (name: string, token: string) => {
+    const data = storage(), profile = createProfile(data, name);
+    writeSave(data, profile.id, serialize(seed));
+    writeConnection(data, profile.id, { id: 'shared', token });
+    return { ...harness(t, data), data, profile };
+  };
+  return {
+    a: device('A', 'grant-a'), b: device('B', 'grant-b'), mock, implementation,
+    remote: () => structuredClone(save), stats: () => ({ writes, reads, revision }),
+    replace: (next: ReturnType<typeof createNewGame>) => { save = JSON.parse(serialize(next)); revision++; },
+  };
+}
+
+test('independent devices alternate automatic updates and resume after restart without manual load or save', async t => {
+  const { a, b, remote, stats } = paired(t);
+  a.start(); b.start(); await setImmediate();
+  assert.notEqual(a.data, b.data);
+  assert.equal(a.timers.size, 3); assert.equal(b.timers.size, 3);
+  const idleWrites = stats().writes;
+  a.fire(100); b.fire(100);
+  a.fire(30000); b.fire(30000); await setImmediate();
+  assert.equal(a.state.adSync, 'ready'); assert.equal(b.state.adSync, 'ready');
+  assert.equal(stats().writes, idleWrites);
+  a.state.adGame!.infinities = 1;
+  a.fire(30000); await setImmediate();
+  b.fire(30000); await setImmediate();
+  assert.equal(remote().infinities, 1);
+  assert.equal(b.state.adGame!.infinities, 1);
+  b.state.adGame!.galaxies = 2;
+  b.fire(30000); await setImmediate();
+  a.fire(30000); await setImmediate();
+  assert.equal(a.state.adGame!.galaxies, 2);
+  b.state.adStop(); b.start(); await setImmediate();
+  a.state.adGame!.infinities = 3;
+  a.fire(30000); await setImmediate();
+  b.fire(30000); await setImmediate();
+  assert.equal(b.state.adGame!.infinities, 3);
+  assert.equal(b.state.adMigration, false);
+});
+
+test('idle periodic synchronization preserves the clock before a purchase and restart', async t => {
+  let now = 10_000;
+  const { a, stats } = paired(t);
+  t.mock.method(Date, 'now', () => now);
+  a.start(); await setImmediate();
+  const game = a.state.adGame;
+  const writes = stats().writes;
+  for (let period = 0; period < 3; period++) {
+    for (let tick = 0; tick < 300; tick++) { now += 100; a.fire(100); }
+    a.fire(1000); a.fire(30000); await setImmediate();
+    assert.equal(a.state.adGame, game);
+    assert.equal(a.state.adGame!.lastTick, now);
+  }
+  assert.equal(stats().writes, writes);
+  assert.equal(a.state.adBuyDimension(1), true);
+  a.state.adStop();
+  now += 1000;
+  a.start(); await setImmediate();
+  assert.equal(a.state.adSync, 'ready');
+  assert.equal(a.state.adOffline!.elapsedMs, 1000);
+  assert.equal(a.state.adGame!.dimensions[0].bought, 1);
+});
+
+for (const failedWrite of ['save', 'baseline']) {
+test(`failed adoption ${failedWrite} writes preserve the old baseline and cannot roll back the remote after restart`, async t => {
+  const { a, b, remote, stats } = paired(t);
+  a.start(); b.start(); await setImmediate();
+  a.state.adGame!.infinities = 7;
+  a.fire(30000); await setImmediate();
+  const baselineKey = 'ad:v4:baseline:' + b.profile.id;
+  const oldBaseline = b.data.getItem(baselineKey);
+  const oldSave = readSaveRaw(b.data, b.profile.id);
+  const saveKey = [...b.data.values.keys()].find(key => b.data.getItem(key) === oldSave)!;
+  const setItem = b.data.setItem;
+  const written: string[] = [];
+  const failure = t.mock.method(b.data, 'setItem', (key: string, value: string) => {
+    if (key === (failedWrite === 'save' ? saveKey : baselineKey)) throw new Error('storage unavailable');
+    setItem(key, value);
+    written.push(key);
+  });
+  b.fire(30000); await setImmediate();
+  assert.equal(b.state.adSync, 'error');
+  assert.equal(b.state.adGame!.infinities, 0);
+  assert.equal(b.data.getItem(baselineKey), oldBaseline);
+  assert.ok(written.some(key => key.startsWith('ad:v3:recovery:')));
+  assert.equal(readSaveRaw(b.data, b.profile.id), oldSave);
+  b.state.adStop();
+  failure.mock.restore();
+  const writes = stats().writes;
+  b.start(); await setImmediate();
+  b.fire(30000); await setImmediate();
+  assert.equal(b.state.adSync, 'ready');
+  assert.equal(b.state.adGame!.infinities, 7);
+  assert.equal(remote().infinities, 7);
+  assert.equal(stats().writes, writes);
+});
+}
+
+test('simultaneous updates retain both whole saves, survive restart and resume automatically after selection', async t => {
+  const { a, b, remote } = paired(t);
+  a.start(); b.start(); await setImmediate();
+  a.state.adGame!.galaxies = 4;
+  b.state.adGame!.galaxies = 8;
+  a.fire(30000); await setImmediate();
+  b.fire(30000); await setImmediate();
+  assert.equal(b.state.adSync, 'choice');
+  assert.equal(b.state.adExportRecovery('local')!.save.galaxies, 8);
+  assert.equal(b.state.adExportRecovery('remote')!.save.galaxies, 4);
+  b.state.adStop(); b.start(); await setImmediate();
+  assert.equal(b.state.adSync, 'choice');
+  b.state.adChooseSave('local'); b.fire(30000); await setImmediate();
+  assert.equal(remote().galaxies, 8);
+  a.fire(30000); await setImmediate();
+  assert.equal(a.state.adGame!.galaxies, 8);
+});
+
+test('identical full content continues silently even when both devices changed; equal metrics with other differences conflict', async t => {
+  const { a, b } = paired(t);
+  a.start(); b.start(); await setImmediate();
+  a.state.adGame!.galaxies = b.state.adGame!.galaxies = 3;
+  a.fire(30000); await setImmediate();
+  b.fire(30000); await setImmediate();
+  assert.equal(b.state.adSync, 'ready');
+  assert.ok(sameSave(a.state.adGame, b.state.adGame));
+  a.state.adGame!.galaxies = 4; b.state.adGame!.galaxies = 5;
+  assert.equal(compareProgress(a.state.adGame, b.state.adGame), 0);
+  a.fire(30000); await setImmediate();
+  b.fire(30000); await setImmediate();
+  assert.equal(b.state.adSync, 'choice');
+});
+
+test('actions during fetch and save are preserved, periodic requests serialize, and a 409 rechecks both sources', async t => {
+  const server = paired(t), { a } = server;
+  a.start(); await setImmediate();
+  const load = deferred<Response>();
+  server.mock.mock.mockImplementation(async (url, options) => String(url).includes('/save/') && options?.method !== 'POST' ? load.promise : server.implementation(url, options));
+  a.fire(30000); a.fire(30000);
+  assert.equal(a.state.adBuyDimension(1), true);
+  a.state.adGame!.galaxies = 9;
+  const other = createNewGame(); other.galaxies = 7;
+  server.replace(other);
+  load.resolve(response({ save: other, revision: server.stats().revision })); await setImmediate();
+  assert.equal(a.state.adSync, 'choice');
+  assert.equal(a.state.adExportRecovery('local')!.save.galaxies, 9);
+  assert.equal((a.state.adExportRecovery('local')!.save.dimensions as { bought: number }[])[0].bought, 1);
+  a.state.adChooseSave('local');
+  const saving = deferred<Response>();
+  server.mock.mock.mockImplementation(async (url, options) => options?.method === 'POST' && String(url).includes('/save/') ? saving.promise : server.implementation(url, options));
+  a.fire(30000); await setImmediate();
+  a.state.adGame!.galaxies = 11;
+  saving.resolve(response({}, 409)); await setImmediate();
+  assert.equal(a.state.adSync, 'choice');
+  assert.equal(a.state.adExportRecovery('local')!.save.galaxies, 11);
+  server.mock.mock.mockImplementation(server.implementation);
+  a.state.adChooseSave('local'); a.fire(30000); await setImmediate();
+  assert.equal(server.remote().galaxies, 11);
+});
+
+test('successful save acknowledges only its submitted snapshot, leaving later operations for the next automatic round', async t => {
+  const server = paired(t), { a, b } = server;
+  a.start(); b.start(); await setImmediate();
+  const gate = deferred<void>();
+  server.mock.mock.mockImplementation(async (url, options) => {
+    if (options?.method === 'POST' && String(url).includes('/save/')) await gate.promise;
+    return server.implementation(url, options);
+  });
+  a.state.adGame!.galaxies = 2; a.fire(30000); await setImmediate();
+  a.state.adGame!.galaxies = 3; a.fire(30000);
+  gate.resolve(); await setImmediate();
+  assert.equal(server.remote().galaxies, 2);
+  assert.equal(a.state.adGame!.galaxies, 3);
+  server.mock.mock.mockImplementation(server.implementation);
+  a.fire(30000); await setImmediate(); b.fire(30000); await setImmediate();
+  assert.equal(b.state.adGame!.galaxies, 3);
+});
+
+for (const status of [0, 429, 500]) {
+  test(`automatic synchronization resumes after ${status || 'network/timeout'} failure without losing unsynced operations`, async t => {
+    const server = paired(t), { a, b } = server;
+    a.start(); b.start(); await setImmediate();
+    a.state.adGame!.galaxies = 12;
+    server.mock.mock.mockImplementation(async () => { if (!status) throw new DOMException('Timeout', 'TimeoutError'); return response({}, status); });
+    a.fire(30000); await setImmediate();
+    assert.equal(a.state.adSync, 'error');
+    a.state.adGame!.galaxies = 13; a.fire(1000);
+    a.state.adStop(); a.start(); await setImmediate();
+    assert.equal(a.state.adGame!.galaxies, 13);
+    server.mock.mock.mockImplementation(server.implementation);
+    a.fire(30000); await setImmediate(); a.fire(30000); await setImmediate();
+    b.fire(30000); await setImmediate();
+    assert.equal(b.state.adGame!.galaxies, 13);
+    assert.equal(a.state.adSync, 'ready');
+  });
+}
+
+test('code connection adopts destination even with an existing stronger local candidate; issuer remains connected', async t => {
+  const server = paired(t), { a, b } = server;
+  a.start(); b.start(); await setImmediate();
+  a.state.adGame!.infinities = 2;
+  b.state.adGame!.infinities = 100;
+  const { code } = await a.state.adIssueTransfer();
+  const oldId = b.profile.id;
+  await b.state.adExchangeTransfer(code); await setImmediate();
+  assert.equal(b.state.adGame!.infinities, 2);
+  assert.equal(b.state.adSync, 'ready');
+  assert.equal(JSON.parse(readSaveRaw(b.data, oldId)!).infinities, 100);
+  assert.equal(readConnection(b.data, oldId)?.token, 'grant-b');
+  assert.equal(readConnection(a.data, a.profile.id)?.token, 'grant-a');
+  a.state.adGame!.infinities = 3; a.fire(30000); await setImmediate();
+  b.fire(30000); await setImmediate();
+  assert.equal(b.state.adGame!.infinities, 3);
+  assert.ok(b.state.adExportProgress('profile:' + oldId));
+  b.state.adRestoreProgress('profile:' + oldId); await setImmediate();
+  assert.equal(b.state.adGame!.infinities, 100);
+  assert.equal(b.state.adSync, 'choice');
+  assert.ok(b.state.adProgressSources().some(source => source.save.infinities === 3));
+  assert.ok(!JSON.stringify(b.state.adExportProgress('profile:' + oldId)).includes('grant-b'));
+});
+
+test('destination adoption intent survives failed reads, stop and restart', async t => {
+  const server = paired(t), { a, b } = server;
+  a.start(); b.start(); await setImmediate();
+  a.state.adGame!.infinities = 2;
+  const { code } = await a.state.adIssueTransfer();
+  b.state.adGame!.infinities = 100;
+  server.mock.mock.mockImplementation(async (url, options) => {
+    if (String(url).includes('/save/') && options?.method !== 'POST') throw new Error('offline');
+    return server.implementation(url, options);
+  });
+  await b.state.adExchangeTransfer(code); await setImmediate();
+  assert.equal(b.state.adSync, 'error');
+  assert.equal(readConnection(b.data, b.state.adProfile!.id)?.adoptRemote, true);
+  b.state.adStop(); b.start(); await setImmediate();
+  server.mock.mock.mockImplementation(server.implementation);
+  b.fire(30000); await setImmediate();
+  assert.equal(b.state.adSync, 'ready');
+  assert.equal(b.state.adGame!.infinities, 2);
+  assert.equal(server.remote().infinities, 2);
+});
+
+test('code connection resumes a partially persisted selection after restart without consuming the code again', async t => {
+  const server = paired(t), { a, b } = server;
+  a.start(); b.start(); await setImmediate();
+  a.state.adGame!.infinities = 5;
+  const { code } = await a.state.adIssueTransfer();
+  b.state.adGame!.infinities = 99;
+  const setItem = b.data.setItem;
+  const failure = t.mock.method(b.data, 'setItem', (key: string, value: string) => {
+    if (key === 'ad:v4:selection') throw new Error('quota');
+    setItem(key, value);
+  });
+  await assert.rejects(b.state.adExchangeTransfer(code), /quota/);
+  assert.ok(b.data.getItem('ad:v4:pendingConnection'));
+  assert.equal(b.state.adGame!.infinities, 99);
+  failure.mock.restore();
+  b.state.adStop(); b.start(); await setImmediate();
+  assert.equal(b.state.adGame!.infinities, 5);
+  assert.equal(b.state.adSync, 'ready');
+  assert.equal(b.data.getItem('ad:v4:pendingConnection'), null);
+  assert.equal(JSON.parse(readSaveRaw(b.data, b.profile.id)!).infinities, 99);
+});
+
+test('backup failure aborts remote adoption and writes; recovery safely handles missing sides', async t => {
+  const server = paired(t), { a } = server;
+  a.start(); await setImmediate();
+  const other = createNewGame(); other.infinities = 10; server.replace(other);
+  const originalSet = a.data.setItem;
+  const failure = t.mock.method(a.data, 'setItem', (key: string, value: string) => {
+    if (key.startsWith('ad:v3:recovery:')) throw new Error('quota');
+    originalSet(key, value);
+  });
+  a.fire(30000); await setImmediate();
+  assert.equal(a.state.adGame!.infinities, 0);
+  assert.equal(a.state.adSync, 'error');
+  assert.equal(server.stats().writes, 0);
+  failure.mock.restore();
+  a.fire(30000); await setImmediate();
+  assert.equal(a.state.adGame!.infinities, 10);
+  const key = retainSyncSources(a.data, a.profile.id, null, null);
+  assert.equal(a.state.adExportRecovery('local', key), null);
+  assert.equal(a.state.adExportRecovery('remote', key), null);
+});
+
+test('migration handles zero, one and multiple candidates, stays offline before confirmation and keeps legacy storage', async t => {
+  const empty = storage();
+  assert.equal(prepareProgressSelection(empty).confirmed, true);
+  assert.equal(listProfiles(empty).length, 1);
+  assert.equal(prepareProgressSelection(empty).confirmed, true);
+  const data = storage();
+  const a = createProfile(data, 'A'), b = createProfile(data, 'B');
+  writeSave(data, a.id, serialize(createNewGame(1000)));
+  assert.equal(prepareProgressSelection(data).profileId, a.id);
+  data.removeItem('ad:v4:selection');
+  writeSave(data, b.id, serialize(createNewGame(2000)));
+  switchProfile(data, b.id);
+  const previous = [...data.values];
+  const server = api(t), device = harness(t, data);
+  device.start(); await setImmediate();
+  assert.equal(device.state.adMigration, true);
+  assert.equal(device.state.adProfile!.id, b.id);
+  device.fire(100); device.fire(1000); device.fire(30000); await setImmediate();
+  assert.deepEqual(server.stats(), { reads: 0, writes: 0, submissions: 0 });
+  for (const [key, value] of previous) assert.equal(data.getItem(key), value);
+  const failure = t.mock.method(data, 'setItem', () => { throw new Error('quota'); });
+  assert.throws(() => device.state.adSelectProgress('profile:' + a.id), /quota/);
+  assert.equal(device.state.adMigration, true);
+  failure.mock.restore();
+  device.state.adSelectProgress('profile:' + a.id); await setImmediate();
+  device.state.adStop(); device.start(); await setImmediate();
+  assert.equal(device.state.adMigration, false);
+  assert.equal(device.state.adProfile!.id, a.id);
+  device.state.adBindTonarium('another-user', 'Name');
+  assert.equal(device.state.adProfile!.id, a.id);
+  assert.equal(readProgressSelection(data)!.profileId, a.id);
+});
+
+test('guest migration resumes after interrupted persistence without deleting its source or creating duplicate candidates', () => {
+  const data = storage(), original = serialize(createNewGame(1000));
+  data.setItem('ad-save-v1', original);
+  const setItem = data.setItem;
+  let fail = true;
+  data.setItem = (key, value) => { if (fail && key === 'ad:v2:profiles') throw new Error('quota'); setItem(key, value); };
+  assert.throws(() => prepareProgressSelection(data), /quota/);
+  fail = false;
+  const selection = prepareProgressSelection(data);
+  assert.equal(selection.confirmed, true);
+  assert.equal(readSaveRaw(data, selection.profileId), original);
+  assert.equal(data.getItem('ad-save-v1'), original);
+  assert.equal(prepareProgressSelection(data).profileId, selection.profileId);
+  assert.equal(listProfiles(data).length, 1);
+});
+
+test('restoring invalidates an older in-flight read and keeps the previous progress and connection recoverable', async t => {
+  const server = paired(t), { a } = server;
+  a.start(); await setImmediate();
+  a.state.adGame!.infinities = 7;
+  const late = deferred<Response>();
+  let delay = true;
+  server.mock.mock.mockImplementation(async (url, options) => {
+    if (delay && String(url).includes('/save/') && options?.method !== 'POST') { delay = false; return late.promise; }
+    return server.implementation(url, options);
+  });
+  a.fire(30000);
+  a.state.adRestoreProgress('profile:' + a.profile.id); await setImmediate();
+  const restoredId = a.state.adProfile!.id;
+  const lateGame = createNewGame(); lateGame.infinities = 100;
+  late.resolve(response({ save: lateGame, revision: 99 })); await setImmediate();
+  assert.equal(a.state.adProfile!.id, restoredId);
+  assert.equal(a.state.adGame!.infinities, 0);
+  assert.ok(a.state.adProgressSources().some(source => source.save.infinities === 7));
+  assert.equal(readConnection(a.data, a.profile.id)?.token, 'grant-a');
+});
+
+test('backup and selection persistence failures leave restore, code exchange and conflict choices unchanged', async t => {
+  const server = paired(t), { a, b } = server;
+  a.start(); b.start(); await setImmediate();
+  a.state.adGame!.galaxies = 2; b.state.adGame!.galaxies = 3;
+  a.fire(30000); await setImmediate(); b.fire(30000); await setImmediate();
+  const setItem = b.data.setItem;
+  const failure = t.mock.method(b.data, 'setItem', (key: string, value: string) => {
+    if (key.startsWith('ad:v4:resolved:')) throw new Error('quota');
+    setItem(key, value);
+  });
+  assert.throws(() => b.state.adChooseSave('remote'), /quota/);
+  assert.equal(b.state.adSync, 'choice');
+  assert.equal(b.state.adGame!.galaxies, 3);
+  failure.mock.restore();
+  b.state.adChooseSave('remote');
+  const selected = readProgressSelection(b.data), connection = readConnection(b.data, b.profile.id);
+  const noBackup = t.mock.method(b.data, 'setItem', (key: string, value: string) => {
+    if (key.startsWith('ad:v3:recovery:')) throw new Error('quota');
+    setItem(key, value);
+  });
+  assert.throws(() => b.state.adRestoreProgress('profile:' + b.profile.id), /quota/);
+  await assert.rejects(b.state.adExchangeTransfer('unused'), /quota/);
+  assert.deepEqual(readProgressSelection(b.data), selected);
+  assert.deepEqual(readConnection(b.data, b.profile.id), connection);
+  assert.equal(b.state.adGame!.galaxies, 2);
+  noBackup.mock.restore();
+});
+
+test('a response from before restart cannot replace the new game or revision', async t => {
+  const server = paired(t), { a } = server;
+  a.start(); await setImmediate();
+  const late = deferred<Response>();
+  let delay = true;
+  server.mock.mock.mockImplementation(async (url, options) => {
+    if (delay && String(url).includes('/save/') && options?.method !== 'POST') { delay = false; return late.promise; }
+    return server.implementation(url, options);
+  });
+  a.fire(30000); a.state.adStop(); a.start(); await setImmediate();
+  const obsolete = createNewGame(); obsolete.infinities = 100;
+  late.resolve(response({ save: obsolete, revision: 99 })); await setImmediate();
+  assert.equal(a.state.adGame!.infinities, 0);
+  assert.equal(a.state.adSync, 'ready');
+  a.state.adGame!.infinities = 1; a.fire(30000); await setImmediate();
+  assert.equal(server.remote().infinities, 1);
+  assert.equal(server.stats().revision, 2);
+});
+
+test('the API timeout aborts a stalled read and the next automatic attempt reconnects safely', async t => {
+  const server = paired(t), { a } = server;
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let aborted = false;
+  server.mock.mock.mockImplementation(async (url, options) => {
+    if (String(url).includes('/save/')) return new Promise<Response>((_, reject) => {
+      options?.signal?.addEventListener('abort', () => { aborted = true; reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
+    });
+    return server.implementation(url, options);
+  });
+  a.start();
+  assert.equal(a.state.adSync, 'loading');
+  t.mock.timers.tick(5000); await setImmediate();
+  assert.equal(aborted, true);
+  assert.equal(a.state.adSync, 'error');
+  assert.equal(a.state.adGame!.infinities, 0);
+  server.mock.mock.mockImplementation(server.implementation);
+  a.fire(30000); await setImmediate();
+  assert.equal(a.state.adSync, 'ready');
+  assert.equal(server.stats().writes, 0);
 });

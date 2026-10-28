@@ -1,5 +1,14 @@
 import { bigCompare, deserialize } from './engine.mjs';
 
+export function saveIdentity(save) {
+  const value = typeof save === 'string' ? JSON.parse(save) : save;
+  const canonical = v => Array.isArray(v) ? v.map(canonical) : v && typeof v === 'object'
+    ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
+  return JSON.stringify(canonical(value));
+}
+
+export function sameSave(a, b) { return saveIdentity(a) === saveIdentity(b); }
+
 export function compareProgress(local, remote) {
   const a = deserialize(local), b = deserialize(remote);
   return Math.sign(a.infinities - b.infinities) || bigCompare(a.totalAntimatter, b.totalAntimatter);

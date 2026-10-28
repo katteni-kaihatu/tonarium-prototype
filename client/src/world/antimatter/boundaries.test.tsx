@@ -9,6 +9,7 @@ import { adaptAdSlice } from './adapter.tsx';
 import { ActionBar } from './ActionBar.tsx';
 import type { AdPanelTarget } from '../../../../shared/antimatterLayout.ts';
 import { ProfilePanel } from './ProfilePanel.tsx';
+import { ProgressPicker } from './ProgressPicker.tsx';
 import { StatsPanel } from './StatsPanel.tsx';
 import { getLanguage, setLanguage, t } from '../../i18n/core.ts';
 
@@ -24,6 +25,7 @@ test('共通プロフィール・ランキングの同期案内とv3形式は三
   const slice = harness(createNewGame());
   slice.adProfile = { id: 'local-profile', name: 'Player', createdAt: null };
   slice.adListRecovery = () => [{ key: 'old-record', createdAt: null }, { key: 'recent-record', createdAt: '2026-10-28T00:00:00.000Z' }];
+  slice.adProgressSources = () => slice.adListRecovery().map(record => ({ ...record, profileId: 'local-profile', name: 'Player', source: 'local', save: JSON.parse(JSON.stringify(slice.adGame)) }));
   try {
     for (const language of ['ja', 'en', 'ko'] as const) {
       setLanguage(language);
@@ -33,7 +35,17 @@ test('共通プロフィール・ランキングの同期案内とv3形式は三
         const profile = renderToStaticMarkup(<ProfilePanel ad={ad} notice={() => {}} />);
         const stats = renderToStaticMarkup(<StatsPanel ad={ad} notice={() => {}} />);
         assert.ok(profile.includes(t('adIssueCode')));
-        assert.ok(profile.includes(t('adChecksumHelp')));
+        assert.ok(profile.includes(t('adPreviousProgress')));
+        assert.ok(profile.includes(t('adTransfer')));
+        assert.ok(!profile.includes('adChecksumHelp'));
+        assert.ok(!profile.includes('チェックサムは破損'));
+        assert.ok(!profile.includes('newName'));
+        assert.ok(!profile.includes('プロフィール・セーブ'));
+        assert.ok(!profile.includes('adDeleteProfile'));
+        assert.ok(!profile.includes('adNewProfile'));
+        assert.equal([...profile.matchAll(/<input\b/g)].length, 1);
+        assert.ok(!profile.includes('checksums detect'));
+        assert.ok(!profile.includes('체크섬은 손상'));
         assert.ok(profile.includes(t('adRecoveryHistory')));
         assert.ok(profile.includes('value="old-record"'));
         assert.ok(profile.includes('value="recent-record"'));
@@ -41,6 +53,28 @@ test('共通プロフィール・ランキングの同期案内とv3形式は三
         assert.ok(!profile.includes('Tonarium サーバーに保存しています'));
         assert.equal(ad.serverStatus, status === 'ready' ? null : t(status === 'loading' ? 'adSyncLoading' : status === 'choice' ? 'adSyncChoice' : 'adSyncError'));
       }
+    }
+  } finally { setLanguage(previous); }
+});
+
+test('migration previews the active progress by default and offers only selection in all three languages', () => {
+  const previous = getLanguage();
+  const slice = harness(createNewGame());
+  slice.adProfile = { id: 'current', name: 'Current', createdAt: null };
+  slice.adMigration = true;
+  slice.adProgressSources = () => ['previous', 'current'].map((id, index) => ({ key: 'profile:' + id, profileId: id, name: id, save: { ...JSON.parse(JSON.stringify(slice.adGame)), infinities: index + 1 } }));
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      const ad = adaptAdSlice(slice)!;
+      const html = renderToStaticMarkup(<ProgressPicker ad={ad} migration notice={() => {}} />);
+      const selectedOption = html.match(/<option\b[^>]*value="profile:current"[^>]*>/)?.[0];
+      assert.ok(selectedOption?.includes('selected=""'));
+      assert.ok(html.includes('Infinity: 2'));
+      assert.ok(html.includes(t('adTotalAntimatter')));
+      assert.ok(html.includes(t('adUseProgress')));
+      assert.ok(!html.includes(t('adRestoreProgress')));
+      assert.ok(!html.includes(t('adExport')));
     }
   } finally { setLanguage(previous); }
 });
