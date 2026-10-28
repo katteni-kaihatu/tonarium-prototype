@@ -6,7 +6,7 @@
     "check:kokoa-ai": "node --import tsx scripts/check-kokoa-ai.ts",
     "test:fantasy-ai-config": "tsx --test server/kokoa-ai-config.test.ts server/kokoa-ai.test.ts",
     "test:kokoa-ai": "tsx --test server/kokoa-ai-config.test.ts server/kokoa-ai.test.ts server/kokoa-ai-ws.test.ts scripts/check-kokoa-ai.test.ts",
-    "test:ad": "node --test client/src/ad/engine-boundaries.test.mjs && tsx --test client/src/ad/labView.test.ts client/src/ad/feedback.test.ts client/src/ad/sync.test.ts client/src/ad/audio.test.ts client/src/world/antimatter/boundaries.test.tsx",
+    "test:ad": "node --test client/src/ad/engine-boundaries.test.mjs && node --import ./scripts/register-test-css.mjs --import tsx --test client/src/ad/labView.test.ts client/src/ad/feedback.test.ts client/src/ad/sync.test.ts client/src/ad/audio.test.ts client/src/world/antimatter/boundaries.test.tsx client/src/world/antimatter/leaderboard.test.ts",
     "test:ad-server": "tsx --test server/ad-store.test.ts",
     "test:media-placement": "tsx --test shared/media-placement.test.ts client/src/view3d/playerCamera.test.ts",
     "test:session-links": "tsx --test shared/session-links.test.ts server/session-links.integration.test.ts",

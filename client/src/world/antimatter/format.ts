@@ -1,3 +1,4 @@
+import { t } from '../../i18n/core.ts';
 import type { BigNum } from './types.ts';
 
 const SMALL_SUFFIXES = ['', 'K', 'M', 'B', 'T'];
@@ -92,10 +93,10 @@ export function formatDuration(totalSec: number): string {
   const m = Math.floor(rest / 60);
   const s = rest - m * 60;
   const parts: string[] = [];
-  if (d > 0) parts.push(`${d}日`);
-  if (d > 0 || h > 0) parts.push(`${h}時間`);
-  if (d > 0 || h > 0 || m > 0) parts.push(`${m}分`);
-  parts.push(`${s}秒`);
+  if (d > 0) parts.push(t('adDays', d));
+  if (d > 0 || h > 0) parts.push(t('adHours', h));
+  if (d > 0 || h > 0 || m > 0) parts.push(t('adMinutes', m));
+  parts.push(t('adSeconds', s));
   return parts.join(' ');
 }
 

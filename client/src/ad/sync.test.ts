@@ -627,6 +627,9 @@ test('actions during fetch and save are preserved, periodic requests serialize, 
   server.mock.mock.mockImplementation(async (url, options) => options?.method === 'POST' && String(url).includes('/save/') ? saving.promise : server.implementation(url, options));
   a.fire(30000); await setImmediate();
   a.state.adGame!.galaxies = 11;
+  // 409 は別端末の更新による競合として再現し、前の選択と同じ remote を返さない。
+  const changedRemote = createNewGame(); changedRemote.galaxies = 10;
+  server.replace(changedRemote);
   saving.resolve(response({}, 409)); await setImmediate();
   assert.equal(a.state.adSync, 'choice');
   assert.equal(a.state.adExportRecovery('local')!.save.galaxies, 11);
