@@ -6,6 +6,7 @@ export interface LeaderboardEntry {
   antimatterLog10: number;
   infinities: number;
   playTimeSec: number;
+  dimensionalBoosts?: number;
   self?: boolean;
 }
 
@@ -16,6 +17,7 @@ export interface LeaderboardSubmission {
   antimatterLog10: number;
   infinities: number;
   playTimeSec: number;
+  dimensionalBoosts?: number;
 }
 
 export class AdApiClient {

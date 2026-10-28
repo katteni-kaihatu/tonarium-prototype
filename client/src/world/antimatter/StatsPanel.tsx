@@ -59,7 +59,7 @@ export function StatsPanel({ ad, notice }: { ad: AntimatterSlice; notice: (messa
         ) : (
           <div className="ad-ranking-scroll" role="region" aria-label={t('adRankingScroll')} tabIndex={0}>
             <table style={s.table} className="ad-ranking-table">
-              <thead><tr><th scope="col" style={s.num}>{t('adRankingRank')}</th><th scope="col">{t('adLabText54')}</th><th scope="col" style={s.num}>{t('adLabText55')}</th><th scope="col" style={s.num}>{t('adRankingInfinity')}</th><th scope="col" style={s.num}>{t('adLabText56')}</th></tr></thead>
+              <thead><tr><th scope="col" style={s.num}>{t('adRankingRank')}</th><th scope="col">{t('adLabText54')}</th><th scope="col" style={s.num}>{t('adLabText55')}</th><th scope="col" style={s.num}>{t('adRankingBoost')}</th><th scope="col" style={s.num}>{t('adRankingInfinity')}</th><th scope="col" style={s.num}>{t('adLabText56')}</th></tr></thead>
               {groups.map(({ rank, representative: e, records, hasSelfInRecords }, index) => {
                 const expanded = expandedNames.has(e.name);
                 const recordsId = `${rankingId}-records-${index}`;
@@ -80,6 +80,7 @@ export function StatsPanel({ ad, notice }: { ad: AntimatterSlice; notice: (messa
                         </div>}
                       </th>
                       <td style={s.num}>{formatFromLog10(e.antimatterLog10)}</td>
+                      <td style={s.num}>{e.dimensionalBoosts === undefined ? t('adRankingUnavailable') : e.dimensionalBoosts}</td>
                       <td style={s.num}>{e.infinities}</td>
                       <td style={s.num}>{formatDuration(e.playTimeSec)}</td>
                     </tr>
@@ -89,6 +90,7 @@ export function StatsPanel({ ad, notice }: { ad: AntimatterSlice; notice: (messa
                       <td />
                       <th scope="row" className="ad-ranking-name"><span>{record.name}</span>{record.self && <span className="ad-ranking-badge"><Icon name="user" size={14} />{t('adRankingSelf')}</span>}</th>
                       <td style={s.num}>{formatFromLog10(record.antimatterLog10)}</td>
+                      <td style={s.num}>{record.dimensionalBoosts === undefined ? t('adRankingUnavailable') : record.dimensionalBoosts}</td>
                       <td style={s.num}>{record.infinities}</td>
                       <td style={s.num}>{formatDuration(record.playTimeSec)}</td>
                     </tr>)}

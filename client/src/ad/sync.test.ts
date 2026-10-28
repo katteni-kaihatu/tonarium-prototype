@@ -384,6 +384,26 @@ test('failed local persistence stops profile switching and preserves the current
   assert.equal(getActiveProfile(data)!.id, a.id);
 });
 
+test('manual and automatic score bodies capture the current Boost count, including reset to zero', async t => {
+  const data = storage();
+  const server = api(t);
+  const { state, start, fire } = harness(t, data);
+  start(); await setImmediate();
+  const bodies: Record<string, unknown>[] = [];
+  server.mock.mock.mockImplementation(async (url, options) => {
+    if (String(url).endsWith('/leaderboard') && options?.method === 'POST') bodies.push(JSON.parse(String(options.body)));
+    return server.implementation(url, options);
+  });
+  state.adGame!.dimensionalBoosts = 23;
+  const manual = state.adSubmitScore();
+  state.adGame!.dimensionalBoosts = 24;
+  assert.equal(await manual, true);
+  assert.equal(bodies[0].dimensionalBoosts, 23);
+  state.adGame!.dimensionalBoosts = 0;
+  fire(30000); await setImmediate();
+  assert.deepEqual(bodies.map(body => body.dimensionalBoosts), [23, 0]);
+});
+
 test('timers and requests do not duplicate, stop removes timers, ranking read survives submission failure, and automatic work is silent', async t => {
   const data = storage();
   const server = api(t);

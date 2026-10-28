@@ -54,6 +54,8 @@ export default {
   adLabText53: "The leaderboard is empty.",
   adLabText54: "Name",
   adLabText55: "Antimatter",
+  adRankingBoost: "Boost",
+  adRankingUnavailable: "Not recorded",
   adLabText56: "Play time",
   adLabText57: "Unlocked achievement",
   adLabText58: "Your research is paying off!",

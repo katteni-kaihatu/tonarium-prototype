@@ -96,3 +96,59 @@ test('public leaderboard hides identifiers and preserves the existing score orde
   const publicText = JSON.stringify(store.leaderboard(''));
   for (const secret of [a.id, a.token, b.id, b.token, 'playerId', 'self']) assert.ok(!publicText.includes(secret));
 });
+
+test('Boost snapshots persist across restarts, distinguish omission from zero, and stay public without identifiers', t => {
+  const { store, file } = fixture(t);
+  const a = store.create(), b = store.create(), c = store.create();
+  const score = { name: 'Shared', antimatterLog10: 20, infinities: 2, playTimeSec: 60 };
+  store.submit(a.token, { ...score, playerId: a.id, dimensionalBoosts: 17 });
+  store.submit(b.token, { ...score, playerId: b.id, dimensionalBoosts: 0 });
+  store.submit(c.token, { ...score, playerId: c.id });
+  const restarted = new AdStore(file);
+  assert.deepEqual(restarted.leaderboard(a.token), [
+    { ...score, dimensionalBoosts: 17, self: true },
+    { ...score, dimensionalBoosts: 0 },
+    score,
+  ]);
+  assert.equal(Object.hasOwn(restarted.leaderboard('')[2], 'dimensionalBoosts'), false);
+  const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+  raw.scores[0].token = 'private-extra-field';
+  fs.writeFileSync(file, JSON.stringify(raw));
+  const publicRows = new AdStore(file).leaderboard('');
+  assert.deepEqual(publicRows, [{ ...score, dimensionalBoosts: 17 }, { ...score, dimensionalBoosts: 0 }, score]);
+  for (const row of publicRows) assert.deepEqual(Object.keys(row).sort(), [...Object.keys(score), ...(Object.hasOwn(row, 'dimensionalBoosts') ? ['dimensionalBoosts'] : [])].sort());
+});
+
+test('old stored scores and legacy imports keep Boost absent after persistence', t => {
+  const { file } = fixture(t);
+  const legacy = { playerId: 'legacy', name: 'Old', antimatterLog10: 10, infinities: 1, playTimeSec: 3 };
+  const imported = new AdStore(file, Date.now, [legacy]);
+  const { playerId: _, ...publicScore } = legacy;
+  assert.deepEqual(imported.leaderboard(''), [publicScore]);
+  imported.create();
+  assert.deepEqual(new AdStore(file).leaderboard(''), [publicScore]);
+  assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(file, 'utf8')).scores[0], 'dimensionalBoosts'), false);
+});
+
+test('invalid Boost values and unauthorized submissions never mutate stored state', t => {
+  const { store, file } = fixture(t);
+  const a = store.create(), b = store.create();
+  const score = { playerId: a.id, name: 'A', antimatterLog10: 10, infinities: 1, playTimeSec: 3, dimensionalBoosts: Number.MAX_SAFE_INTEGER };
+  store.submit(a.token, score);
+  const before = fs.readFileSync(file, 'utf8');
+  const rows = store.leaderboard(a.token);
+  for (const value of [null, '4', 1.5, -1, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity, -Infinity, true, {}, []]) {
+    assert.throws(() => store.submit(a.token, { ...score, dimensionalBoosts: value as number }), rejected(400));
+    assert.equal(fs.readFileSync(file, 'utf8'), before);
+    assert.deepEqual(store.leaderboard(a.token), rows);
+  }
+  for (const token of ['', a.id, b.token]) {
+    assert.throws(() => store.submit(token, score), rejected(403));
+    assert.equal(fs.readFileSync(file, 'utf8'), before);
+    assert.deepEqual(store.leaderboard(a.token), rows);
+  }
+  store.submit(a.token, { ...score, dimensionalBoosts: 0 });
+  const { dimensionalBoosts: _, ...oldSubmission } = score;
+  store.submit(a.token, oldSubmission);
+  assert.equal(Object.hasOwn(new AdStore(file).leaderboard('')[0], 'dimensionalBoosts'), false);
+});

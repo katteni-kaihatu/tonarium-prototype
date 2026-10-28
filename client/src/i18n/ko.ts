@@ -54,6 +54,8 @@ export default {
   adLabText53: "아직 순위 기록이 없습니다.",
   adLabText54: "이름",
   adLabText55: "반물질",
+  adRankingBoost: "Boost",
+  adRankingUnavailable: "미수집",
   adLabText56: "플레이 시간",
   adLabText57: "해제한 업적",
   adLabText58: "연구 성과가 쌓이고 있어요!",

@@ -202,7 +202,7 @@ const saveMarketLikes = later(() => fs.writeFileSync(MARKET_LIKES_FILE, JSON.str
 const survivorProfiles = nullRecord(readJson<Record<string, SurvivorProfile>>(SURVIVORS_FILE, {}));
 const saveSurvivorProfiles = later(() => fs.writeFileSync(SURVIVORS_FILE, JSON.stringify(survivorProfiles)));
 /** AD のセーブとランキングは Tonarium サーバー内で完結する（Workers は使わない） */
-interface AdLeaderboardEntry { playerId: string; name: string; antimatterLog10: number; infinities: number; playTimeSec: number }
+interface AdLeaderboardEntry { playerId: string; name: string; antimatterLog10: number; infinities: number; playTimeSec: number; dimensionalBoosts?: number }
 const adStore = new AdStore(path.join(DATA_DIR, 'ad-access.json'), Date.now, readJson<AdLeaderboardEntry[]>(AD_LEADERBOARD_FILE, []));
 function survivorCount(value: unknown, max: number) {
   return typeof value === 'number' && Number.isFinite(value)

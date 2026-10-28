@@ -645,6 +645,7 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
           name: name?.trim() || get().adProfile!.name,
           antimatterLog10: Number.isFinite(bigLog10(game.antimatter)) ? bigLog10(game.antimatter) : 0,
           infinities: game.infinities ?? 0,
+          dimensionalBoosts: game.dimensionalBoosts,
           playTimeSec: Math.max(0, Math.floor((Date.now() - (game.createdAt || Date.now())) / 1000)),
         });
         if (!current(ctx)) return false;
