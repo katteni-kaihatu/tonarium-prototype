@@ -71,6 +71,9 @@ export async function loginGuest(name: string) {
   enter(r.account);
 }
 
+/** 更新の橋（tonariumUpdates）が無い古いデスクトップ版も、User-Agent でアプリと分かる */
+export const isDesktopApp = (ua = navigator.userAgent) => isElectron() || /Electron\//.test(ua);
+
 /**
  * Misskey でログインを始める。ブラウザはそのまま Misskey へ移り、戻ってきたら Cookie で入る。
  * Electron はほかのサイトへ移らず外のブラウザで開くので、終わるまでこちらから問い合わせる。
@@ -78,7 +81,8 @@ export async function loginGuest(name: string) {
  */
 export async function startMisskeyLogin(onWaiting: (code: string) => void): Promise<Account | null> {
   const { url, code } = await post<{ url: string; code: string }>('/auth/misskey/start');
-  if (!isElectron()) { location.assign(url); return null; }
+  // アプリでブラウザと同じく移ろうとすると、外のブラウザに開かれるだけで、コードも出ず待ちもしない
+  if (!isDesktopApp()) { location.assign(url); return null; }
   window.open(url);
   // 許可したブラウザでこのコードを入れてもらい、始めた本人だと確かめる（他人の許可で入れないように）
   onWaiting(code);

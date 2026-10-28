@@ -29,7 +29,7 @@
 2. ブラウザはそのまま Misskey へ移る。許可すると Misskey が `/auth/misskey/callback?code=...&state=...` へ戻す。サーバーは認可コードを `code_verifier` と一緒にトークンに替え（`/oauth/token`）、`/api/i` で許可した人（Misskey のユーザー ID・ユーザー名・名前）を確かめる。待ち合わせの Cookie を持つブラウザ（＝ログインを始めたブラウザ）なら、そのアカウントに結び付け、ログインの Cookie を付けて `/` へ戻す
    - 1 つの state の callback を受けるのは一度だけ（最初に戻ってきたブラウザ。`login_pending.callback_hash`）。拒否された・認可コードが無い・トークンに替えられない・`iss` が違うときは、そのログインを取り消す
 3. 待ち合わせの Cookie が無いブラウザ（Electron から始めた、または他人から送られた URL を開いた）には、「〇〇 @ユーザー名 として Tonarium にログインします」と確認コードの入力欄、「自分で始めたときに表示されたコード以外は入れない」という注意を出す。このとき、そのブラウザにだけ HttpOnly の Cookie（`tonarium_confirm`）を付ける。コードは、その Cookie を持つブラウザから送られて合ったときだけアカウントに結び付け（`POST /auth/misskey/confirm`。同じオリジンのフォームだけ受ける）、「アプリに戻ってください」と出す。5 回間違えるとそのログインは取り消す。他人が始めたログインの許可 URL を開かされても、許可しただけでは他人がそのアカウントで入れない（ログイン CSRF の対策）。始めた側はコードを知っていても、この Cookie が無いので確定できない
-4. Electron 版は別のサイトへ移らず、許可画面を外のブラウザで開く（`window.open` → 外部ブラウザ）。アプリ側は確認コードを大きく出し、`POST /auth/misskey/poll` を 2 秒ごとに呼ぶ。手順 3 でコードが入って結び付いたら、その場でログインの Cookie を受け取る
+4. Electron 版は別のサイトへ移らず、許可画面を外のブラウザで開く（`window.open` → 外部ブラウザ）。アプリかどうかは、更新の橋（`window.tonariumUpdates`）か User-Agent の `Electron/` で見分ける（橋の無い古いデスクトップ版を、ブラウザと取り違えないため。`client/src/auth.ts` の `isDesktopApp`）。アプリ側は確認コードを大きく出し、`POST /auth/misskey/poll` を 2 秒ごとに呼ぶ。手順 3 でコードが入って結び付いたら、その場でログインの Cookie を受け取る
 5. 同じ Misskey の人は何度ログインしても同じアカウント（Misskey のユーザー ID で引く）。Misskey 側でユーザー名を変えていれば更新する
 
 ## セッション
