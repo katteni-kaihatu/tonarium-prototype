@@ -245,7 +245,7 @@ const browserSignals = (): Omit<AiResourceSignals, 'connected'> => {
   return { now: Date.now(), visible: typeof document === 'undefined' || document.visibilityState !== 'hidden', online: nav?.onLine !== false,
     webGpu: !!nav?.gpu && !!nav?.locks, deviceMemory: nav?.deviceMemory, heapRatio: memory?.jsHeapSizeLimit ? memory.usedJSHeapSize / memory.jsHeapSizeLimit : undefined, ...observed };
 };
-let observed: Pick<AiResourceSignals, 'fps' | 'eventLoopDelay' | 'longTaskMs'> = {};
+let observed: Pick<AiResourceSignals, 'fps' | 'eventLoopDelay' | 'longTaskMs' | 'performanceSampleId'> = {};
 function acquireBrowserLock(): Promise<(() => void) | null> {
   const locks = globalThis.navigator?.locks;
   if (!locks) return Promise.resolve(null);
@@ -284,30 +284,36 @@ export function initializeAiSupport() {
   if (!worldActive) return;
   controller.initialize();
   if (stopMonitoring || typeof window === 'undefined') return;
-  let frames = 0, frameStart = performance.now(), lastTick = performance.now(), longTasks = 0;
+  let frames = 0, frameStart = performance.now(), lastTick = performance.now(), longTasks = 0, performanceSampleId = 0;
   let stopped = false, frameId = 0;
   const frame = () => { if (stopped) return; frames++; frameId = requestAnimationFrame(frame); }; frameId = requestAnimationFrame(frame);
   let observer: PerformanceObserver | undefined;
   if (typeof PerformanceObserver !== 'undefined') {
     try { observer = new PerformanceObserver(list => { for (const entry of list.getEntries()) longTasks += entry.duration; }); observer.observe({ type: 'longtask', buffered: false }); } catch { /* このヒントに非対応でも他の指標を使う。 */ }
   }
-  const timer = window.setInterval(() => {
+  const measure = () => {
     const now = performance.now(), duration = now - frameStart;
-    observed = { fps: duration > 0 && document.visibilityState !== 'hidden' ? frames * 1000 / duration : undefined,
+    observed = { performanceSampleId: ++performanceSampleId, fps: duration > 0 && document.visibilityState !== 'hidden' ? frames * 1000 / duration : undefined,
       eventLoopDelay: Math.max(0, now - lastTick - 1000), longTaskMs: longTasks };
     frames = 0; frameStart = now; lastTick = now; longTasks = 0; controller.sample();
-  }, 1000);
-  const sample = () => controller.sample(), hide = () => controller.pageHide(), show = () => controller.pageShow();
+  };
+  let timer = window.setInterval(measure, 1000);
+  const resetObservation = () => {
+    frames = 0; frameStart = lastTick = performance.now(); longTasks = 0; observed = {};
+    window.clearInterval(timer); timer = window.setInterval(measure, 1000);
+  };
+  const sample = () => controller.sample(), hide = () => controller.pageHide(), show = () => { resetObservation(); controller.pageShow(); };
+  const visibility = () => { resetObservation(); controller.sample(); };
   const storage = (event: StorageEvent) => {
     if (event.key === AI_SUPPORT_CONSENT_KEY) controller.refreshConsent();
   };
   for (const event of ['online', 'offline']) window.addEventListener(event, sample);
-  document.addEventListener('visibilitychange', sample);
+  document.addEventListener('visibilitychange', visibility);
   window.addEventListener('pagehide', hide); window.addEventListener('pageshow', show); window.addEventListener('storage', storage);
   stopMonitoring = () => {
     stopped = true; cancelAnimationFrame(frameId); window.clearInterval(timer); observer?.disconnect();
     for (const event of ['online', 'offline']) window.removeEventListener(event, sample);
-    document.removeEventListener('visibilitychange', sample);
+    document.removeEventListener('visibilitychange', visibility);
     window.removeEventListener('pagehide', hide); window.removeEventListener('pageshow', show); window.removeEventListener('storage', storage);
   };
 }

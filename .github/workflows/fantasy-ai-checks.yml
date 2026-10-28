@@ -1,0 +1,55 @@
+name: Fantasy AI checks
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '.github/workflows/fantasy-ai-checks.yml'
+      - 'docker-compose.yml'
+      - 'Dockerfile.fantasy-ai-model'
+      - 'scripts/fantasy-ai-*.mjs'
+      - 'server/local-inference*'
+      - 'server/npc.ts'
+      - 'server/fantasy-gm-chat.ts'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fantasy-ai-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fantasy-ai:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Check model provisioning and smoke runner
+        run: node --test scripts/fantasy-ai-model.test.mjs scripts/fantasy-ai-smoke.test.mjs
+      - name: Check legacy inference URL migration
+        run: |
+          npm ci
+          npm run test:fantasy-ai-config
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Run real CPU model smoke
+        env:
+          FANTASY_AI_SMOKE_STATE_FILE: ${{ runner.temp }}/tonarium-fantasy-ai-smoke-project
+        run: |
+          set -o pipefail
+          node scripts/fantasy-ai-smoke.mjs | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Recover AI smoke cleanup after failure or cancellation
+        if: ${{ always() }}
+        timeout-minutes: 3
+        env:
+          FANTASY_AI_SMOKE_STATE_FILE: ${{ runner.temp }}/tonarium-fantasy-ai-smoke-project
+        run: node scripts/fantasy-ai-smoke.mjs --cleanup
