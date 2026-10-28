@@ -8,6 +8,16 @@ export function unlockEmoteAudio() {
   try { ctx ??= new AudioContext(); if (ctx.state === 'suspended') void ctx.resume().catch(() => {}); } catch { /* optional audio */ }
 }
 
+export function playChatNotification() {
+  try {
+    const volume = fxVolume() * 0.22;
+    if (volume <= 0) return;
+    if (!ctx || ctx.state !== 'running') return;
+    tone(ctx, ctx.destination, ctx.currentTime, 880, 880, 0.12, 'sine', volume);
+    tone(ctx, ctx.destination, ctx.currentTime + 0.1, 1174, 1174, 0.16, 'sine', volume * 0.7);
+  } catch { /* 音声が使えなくても受信は続ける。 */ }
+}
+
 export function playEmoteSound(id: EmoteId, distanceVolume: number) {
   const volume = distanceVolume * fxVolume() * 0.22;
   if (volume <= 0.001) return;

@@ -1,4 +1,4 @@
-import { arrivalPatch } from '../newArrival.ts';
+import { arrivalPatch, KnownChatMessages, shouldPlayChatArrival } from '../newArrival.ts';
 import { setAiSupportTransport, handleAiSupportMessage } from '../ai/support.ts';
 import { sourceText as uiSource } from '../i18n/core.ts';
 import { receiveShared } from '../shared-assets/state.ts';
@@ -19,10 +19,23 @@ import { applyDelta } from '../items/actions.ts';
 import { onHit } from '../items/effects.ts';
 import { pushNotice } from '../actions.ts';
 import { volumeFrom } from '../spatial.ts';
-import { playPoke, playSynth } from '../world/sounds.ts';
+import { playChatNotification, playPoke, playSynth } from '../world/sounds.ts';
 import { receiveEmote } from '../emotes.ts';
 import { playSurvivorSound } from '../world/survivorAudio.ts';
 import { startSessionSync, stopSessionSync, roomSend, configureSessionSync, syncError, resetSessionSync } from './session.ts';
+
+// 表示行の削除・履歴置換・再入場でも既知IDを失わないよう、ページの寿命まで保持する。
+const knownChats = new KnownChatMessages();
+const chatScope = (kind: 'session' | 'conversation', id: string) => JSON.stringify([kind, id]);
+
+function receiveChatArrival(scope: string, message: { id: string }, history: readonly { id: string }[], eligible: boolean, conversation?: string) {
+  const fresh = knownChats.receive(scope, message, history);
+  const s = get();
+  if (!fresh || !eligible || !s.session) return {};
+  const now = Date.now();
+  if (shouldPlayChatArrival(s, now)) playChatNotification();
+  return arrivalPatch('chat', s, now, conversation);
+}
 
 const PAGE_VERSION = document.querySelector('meta[name="tonarium-version"]')?.getAttribute('content') || null;
 
@@ -133,6 +146,8 @@ function playSurvivorTransitions(sid: string, next: SurvivorState) {
 export function applySessionSnapshot(snap: SessionSnapshot) {
   const sid = snap.sid;
   if (sid !== get().session) return;
+  knownChats.remember(chatScope('session', sid), get().chats[sid] ?? []);
+  knownChats.remember(chatScope('session', sid), snap.chats);
   resetSystemCommands();
   if (snap.sharedAssets) receiveShared(sid, snap.sharedAssets, undefined, true);
   if (snap.systems) receiveSystems(sid, snap.systems, undefined, true);
@@ -231,15 +246,18 @@ export function onMessage(msg: ServerMsg) {
       if (msg.sid !== get().session) return;
       set({ presence: msg.all });
       break;
-    case 'chat':
+    case 'chat': {
+      const s = get();
+      const arrival = receiveChatArrival(chatScope('session', msg.sid), msg.m, s.chats[msg.sid] ?? [],
+        msg.sid === s.session && !!msg.m.from && msg.m.from !== s.selfId && !s.blocked.includes(msg.m.fromName));
       set((s) => ({
-        ...(msg.sid === s.session && msg.m.from && msg.m.from !== s.selfId && !s.blocked.includes(msg.m.fromName)
-          && !(s.chats[msg.sid] ?? []).some((m) => m.id === msg.m.id) ? arrivalPatch('chat', s) : {}),
+        ...arrival,
         chats: { ...s.chats, [msg.sid]: (s.chats[msg.sid] ?? []).some((m) => m.id === msg.m.id)
           ? s.chats[msg.sid].map((m) => m.id === msg.m.id ? msg.m : m)
           : [...(s.chats[msg.sid] ?? []), msg.m].slice(-500) },
       }));
       return;
+    }
     case 'avatar':
       set(applyAvatars(get(), msg.sid, msg.id, msg.s));
       return;
@@ -440,6 +458,9 @@ export function onMessage(msg: ServerMsg) {
       pushNotice('invite', msg.from, msg.fromName, `${msg.kind}:${msg.id}`);
       return;
     case 'inbox':
+      for (const convs of [get().inbox, msg.convs]) {
+        for (const [conv, messages] of Object.entries(convs)) knownChats.remember(chatScope('conversation', conv), messages);
+      }
       set((s) => ({
         inbox: msg.convs, reads: msg.reads, people: Object.fromEntries(msg.people.map((p) => [p.name, p])),
         watching: msg.watching, recentStatus: msg.recentStatus,
@@ -447,17 +468,21 @@ export function onMessage(msg: ServerMsg) {
         lastSeen: s.lastSeen === undefined ? msg.lastSeen : s.lastSeen,
       }));
       return;
-    case 'msg':
+    case 'msg': {
+      const s = get();
+      const arrival = receiveChatArrival(chatScope('conversation', msg.conv), msg.m, s.inbox[msg.conv] ?? [],
+        !!msg.m.from && msg.m.from !== s.selfName && !s.blocked.includes(msg.m.from), msg.conv);
       set((s) => {
         const list = s.inbox[msg.conv] ?? [];
         const i = list.findIndex((m) => m.id === msg.m.id);
         const next = i >= 0 ? list.map((m, j) => (j === i ? msg.m : m)) : [...list, msg.m].slice(-300);
         return {
-          ...(i < 0 && msg.m.from && msg.m.from !== s.selfName && !s.blocked.includes(msg.m.from) ? arrivalPatch('chat', s, Date.now(), msg.conv) : {}),
+          ...arrival,
           inbox: { ...s.inbox, [msg.conv]: next },
         };
       });
       return;
+    }
     case 'read':
       set((s) => ({ reads: { ...s.reads, [msg.conv]: Math.max(s.reads[msg.conv] ?? 0, msg.at) } }));
       return;

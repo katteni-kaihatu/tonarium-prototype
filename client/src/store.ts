@@ -208,6 +208,7 @@ interface State extends AdSlice {
   /** 注目を集めているアイテム ID → 光らせる期限（performance.now） */
   attention: Record<string, number>;
   popupPausedUntil: number;
+  chatNotificationSound: boolean;
   arrivals: Partial<Record<ArrivalKind, Arrival>>;
   phoneLayout: boolean;
   rightView: 'log' | 'msg';
@@ -375,6 +376,7 @@ export const useStore = create<State>((set, get) => ({
   elevators: {},
   attention: {},
   ...initialArrivalState(),
+  chatNotificationSound: load('tonarium.chatNotificationSound', true),
   phoneLayout: false,
   rightView: 'log',
   rightConversation: null,
