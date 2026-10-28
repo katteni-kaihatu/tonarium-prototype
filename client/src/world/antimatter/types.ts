@@ -85,6 +85,7 @@ export interface LeaderboardEntry {
   antimatterLog10: number;
   infinities: number;
   playTimeSec: number;
+  dimensionalBoosts?: number;
   self?: boolean;
 }
 

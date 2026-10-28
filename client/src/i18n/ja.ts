@@ -54,6 +54,8 @@ export default {
   adLabText53: "ランキングはまだ空です。",
   adLabText54: "名前",
   adLabText55: "反物質",
+  adRankingBoost: "Boost",
+  adRankingUnavailable: "未取得",
   adLabText56: "プレイ時間",
   adLabText57: "解除済みの実績",
   adLabText58: "研究成果、積み上がってる！",

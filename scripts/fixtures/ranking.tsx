@@ -12,8 +12,8 @@ let slice: AdSlice;
 slice = createAdSlice(partial => Object.assign(slice, partial), () => slice);
 slice.adGame = createNewGame();
 const longName = '長い名前_LongName_긴이름_'.repeat(5);
-const entry = (name: string, score: number, infinities: number, playTimeSec: number, self = false) => ({ name, antimatterLog10: score, infinities, playTimeSec, self });
-const initial = [entry('Alpha', 1000, 10, 90061), entry('Beta', 900, 9, 3600, true), entry(longName, 800, 1234567890123456, 9876543210), entry('Alpha', 700, 7, 70, true), entry('Beta', 600, 6, 60), entry('Alpha', 500, 5, 50), entry(longName, 400, 987654321012345, 1234567890, true)];
+const entry = (name: string, score: number, infinities: number, playTimeSec: number, self = false, dimensionalBoosts?: number) => ({ name, antimatterLog10: score, infinities, playTimeSec, self, dimensionalBoosts });
+const initial = [entry('Alpha', 1000, 10, 90061, false, 17), entry('Beta', 900, 9, 3600, true), entry(longName, 800, 1234567890123456, 9876543210), entry('Alpha', 700, 7, 70, true, 0), entry('Beta', 600, 6, 60), entry('Alpha', 500, 5, 50), entry(longName, 400, 987654321012345, 1234567890, true)];
 
 function Fixture() {
   const [updated, setUpdated] = useState(false);

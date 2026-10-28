@@ -5,6 +5,24 @@ import type { LeaderboardEntry } from './types.ts';
 
 const entry = (name: string, antimatterLog10 = 10, self?: boolean): LeaderboardEntry => ({ name, antimatterLog10, self, infinities: 2, playTimeSec: 60 });
 
+test('Boost snapshots remain attached to each record without affecting ranks, representatives or self', () => {
+  const entries = [
+    { ...entry('A', 1, true), dimensionalBoosts: 100 },
+    { ...entry('B', 5), dimensionalBoosts: 0 },
+    { ...entry('A', 10), dimensionalBoosts: 4 },
+    { ...entry('A', 3), dimensionalBoosts: 0 },
+    entry('A', 2),
+  ];
+  const groups = groupLeaderboard(entries);
+  assert.deepEqual(groups.map(g => [g.rank, g.representative]), [[1, entries[1]], [2, entries[2]]]);
+  assert.deepEqual(groups[1].records, [entries[0], entries[3], entries[4]]);
+  assert.deepEqual(groups[1].records.map(r => r.dimensionalBoosts), [100, 0, undefined]);
+  assert.equal(groups[1].representative, entries[2]);
+  assert.equal(groups[1].records[0], entries[0]);
+  assert.equal(groups[1].hasSelfInRecords, true);
+  assert.equal(groups[1].representative.self, undefined);
+});
+
 test('empty and single record', () => {
   assert.deepEqual(groupLeaderboard([]), []);
   const e = entry('A');

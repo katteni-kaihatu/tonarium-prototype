@@ -48,7 +48,7 @@
 }
 .ad-ranking { min-width: 0; overflow-wrap: anywhere; }
 .ad-ranking-scroll { max-width: 100%; overflow-x: auto; margin-top: 8px; }
-.ad-ranking-table { min-width: 520px; }
+.ad-ranking-table { min-width: 640px; }
 .ad-ranking-table th, .ad-ranking-table td { padding: 8px; vertical-align: top; border-bottom: 1px solid #ffffff18; }
 .ad-ranking-table thead { color: #b5fff2; }
 .ad-ranking-table .ad-ranking-name { text-align: left; font-weight: 400; min-width: 140px; max-width: 220px; overflow-wrap: anywhere; }

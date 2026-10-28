@@ -34,7 +34,10 @@ try {
   assert.equal(await alphaButton.getAttribute('aria-expanded'), 'true');
   assert.deepEqual(await ranks(), ['1', '2', '3']);
   assert.equal(await children.count(), 2);
-  assert.deepEqual(await children.locator('td:nth-child(4)').allTextContents(), ['7', '5']);
+  assert.deepEqual(await children.locator('td:nth-child(4)').allTextContents(), ['0', '未取得']);
+  assert.equal(await ranking.locator('th[scope="col"]:visible').count(), 6);
+  assert.equal(await ranking.locator('tbody').first().locator('td').nth(2).textContent(), '17');
+  assert.deepEqual(await children.locator('td:nth-child(5)').allTextContents(), ['7', '5']);
   assert.deepEqual(await children.locator('td:nth-child(1)').allTextContents(), ['', '']);
   assert.equal(await children.locator('.ad-ranking-badge').count(), 1);
   assert.equal(await alphaButton.evaluate(el => el === document.activeElement), true);
@@ -49,11 +52,13 @@ try {
   assert.deepEqual(await ranks(), ['1', '2', '3']);
   for (const button of await buttons.all()) if (await button.getAttribute('aria-expanded') === 'false') await button.click();
   assert.equal(await children.count(), 4);
-  assert.deepEqual(await children.locator('td:nth-child(4)').allTextContents(), ['6', '987654321012345', '7', '5']);
+  assert.deepEqual(await children.locator('td:nth-child(5)').allTextContents(), ['6', '987654321012345', '7', '5']);
   for (const language of ['en', 'ko', 'ja']) {
     await page.getByRole('button', { name: language, exact: true }).click();
     assert.equal(await children.count(), 4);
-    assert.equal(await ranking.locator('th[scope="col"]').nth(4).textContent(), language === 'en' ? 'Play time' : language === 'ko' ? '플레이 시간' : 'プレイ時間');
+    assert.equal(await ranking.locator('th[scope="col"]:visible').nth(3).textContent(), 'Boost');
+    assert.deepEqual(await children.locator('td:nth-child(4)').allTextContents(), [language === 'en' ? 'Not recorded' : language === 'ko' ? '미수집' : '未取得', language === 'en' ? 'Not recorded' : language === 'ko' ? '미수집' : '未取得', '0', language === 'en' ? 'Not recorded' : language === 'ko' ? '미수집' : '未取得']);
+    assert.equal(await ranking.locator('th[scope="col"]').nth(5).textContent(), language === 'en' ? 'Play time' : language === 'ko' ? '플레이 시간' : 'プレイ時間');
   }
   await mkdir('.local/ranking-verification', { recursive: true });
   await page.screenshot({ path: '.local/ranking-verification/wide.png', fullPage: true });
