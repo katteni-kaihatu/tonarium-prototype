@@ -258,7 +258,7 @@ function NoteEditor() {
     moveItem(note.id, note.x, note.z, Math.atan2(a.x - note.x, a.z - note.z));
   };
   return (
-    <div className="noteeditor" data-xr-surface="note-editor" data-xr-title="付箋の編集">
+    <div className="noteeditor" data-xr-surface="note-editor" data-xr-min-width="360" data-xr-title="付箋の編集">
       <textarea
         autoFocus value={note.text} placeholder={tr("ui537")}
         style={{ background: note.color }}

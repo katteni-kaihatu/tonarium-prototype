@@ -208,6 +208,7 @@ function WindowFrame({ win, region, simple, z, compact = false }: {
     : simple ? { width, height } : { position: 'absolute', left, top, width, height, zIndex: z };
 
   const onDown = (e: React.PointerEvent) => {
+    if (immersive) return;
     raiseWindow(win.key);
     if (simple || max || (e.target as Element).closest('button')) return;
     drag.current = { sx: e.clientX, sy: e.clientY, ox: left, oy: top };
@@ -223,9 +224,10 @@ function WindowFrame({ win, region, simple, z, compact = false }: {
   // 最大化したウィンドウは前面のパネルより上に出す（ウィンドウ層の中だと重なり順で負ける）
   const frame = (
     <section
-      className={`win ${r.dark ? 'dark' : ''} k-${r.kind} ${compact ? 'compact' : ''}`} style={style} aria-label={r.title}
+      className={`win ${r.dark ? 'dark' : ''} k-${r.kind} ${compact ? 'compact' : ''}`} style={{ ...style, ...(immersive ? { '--xr-media-aspect': r.aspect } as React.CSSProperties : {}) }} aria-label={r.title}
       data-xr-surface={immersive ? win.key : undefined}
-      title={compact ? tr("ui842") : undefined} onPointerDown={() => raiseWindow(win.key)}
+      data-xr-min-width={immersive ? (r.item && PANELS[r.item.kind] ? PANELS[r.item.kind]!.w + 44 : r.width) : undefined}
+      title={compact ? tr("ui842") : undefined} onPointerDown={() => { if (!immersive) raiseWindow(win.key); }}
     >
       <div
         className={`winbar ${simple || max ? '' : 'draggable'}`} title={simple || max ? undefined : tr("ui843")}

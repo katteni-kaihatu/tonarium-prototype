@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { DEFAULT_TURN, replaceSelection, stick, turnSettings, turnStep, unicodeCharacter } from './input.ts';
+import { DEFAULT_TURN, movementAllowed, panelDistance, panelScale, replaceSelection, stick, turnSettings, turnStep, unicodeCharacter } from './input.ts';
 import { aimAt, aimOn } from '../view3d/interact.ts';
 
 test('xr-standard thumbstick uses axes 2/3, fallback uses 0/1, noise and invalid axes stop', () => {
@@ -28,7 +28,32 @@ test('smooth turn uses degrees per second and clamps long frames', () => {
 test('saved turn settings tolerate corrupted, missing and out of range data', () => {
   assert.deepEqual(turnSettings(null), DEFAULT_TURN);
   assert.deepEqual(turnSettings({ mode: 'other', speed: NaN, angle: -20 }), { ...DEFAULT_TURN, angle: 15 });
-  assert.deepEqual(turnSettings({ mode: 'smooth', speed: 1000, angle: 1000 }), { mode: 'smooth', speed: 180, angle: 90 });
+  assert.deepEqual(turnSettings({ mode: 'smooth', speed: 1000, angle: 1000 }), { ...DEFAULT_TURN, mode: 'smooth', speed: 180, angle: 90 });
+});
+test('legacy and invalid aiming settings preserve restrictions; only boolean false opts out', () => {
+  for (const v of [null, {}, { mode: 'smooth' }, { restrictMovementWhileAiming: 'false' }, { restrictMovementWhileAiming: 0 }]) assert.equal(turnSettings(v).restrictMovementWhileAiming, true);
+  const free = turnSettings({ restrictMovementWhileAiming: false });
+  assert.equal(movementAllowed(false, true, true, free), true);
+  assert.equal(movementAllowed(true, false, false, free), false);
+  assert.equal(movementAllowed(false, true, false, DEFAULT_TURN), false);
+  assert.equal(movementAllowed(false, false, true, DEFAULT_TURN), false);
+});
+test('holding distance consumes finite time with a dead zone and finite near/far limits', () => {
+  assert.equal(panelDistance(1, .1, .1), 1);
+  assert.equal(panelDistance(.25, 1, .1), .25);
+  assert.equal(panelDistance(3, -1, .1), 3);
+  assert.equal(panelDistance(1, -1, 10), panelDistance(1, -1, .1));
+  assert.equal(panelDistance(1, NaN, .1), 1);
+  assert.equal(panelDistance(1, 1, 0), 1);
+  assert.ok(Math.abs(panelDistance(panelDistance(1, 1, .05), 1, .05) - panelDistance(1, 1, .1)) < 1e-10);
+});
+test('two hand scaling rejects coincident hands and invalid tracking, and clamps scale', () => {
+  assert.equal(panelScale(.8, .4, 1), 2);
+  assert.equal(panelScale(0, .4, 1), .25);
+  assert.equal(panelScale(.029, .4, 1), panelScale(.031, .4, 1));
+  assert.equal(panelScale(.4, 1e-9, 1), 1);
+  assert.equal(panelScale(NaN, .4, 1), 1);
+  assert.equal(panelScale(20, .4, 1), 3);
 });
 test('text replacement preserves selection, unicode and field length limits', () => {
   assert.deepEqual(replaceSelection('こんにちは', 2, 4, '😀'), { value: 'こん😀は', cursor: 4 });
