@@ -1,3 +1,4 @@
+import { AdStore, AdStoreError } from './ad-store.ts';
 import { scheduleChessAiReply } from './chess-ai.ts';
 import 'dotenv/config';
 import { configuredTranslationModel, createTranslationHandler, createTranslator } from './translation.ts';
@@ -178,7 +179,7 @@ function communityActor(user: User): CommunityActor {
   const profile = fantasyStore.profile(user.id);
   return { id: user.id, session: user.session, world: user.session ? worldOf.get(user.session) : undefined, character: profile.character ?? undefined, busy: !!profile.activity };
 }
-const AD_SAVES_FILE = path.join(DATA_DIR, 'ad-saves.json');
+
 const AD_LEADERBOARD_FILE = path.join(DATA_DIR, 'ad-leaderboard.json');
 /** 2 人以上がこの時間以上いたセッションだけ、グループのチャンネルにまとめを残す */
 const RECAP_MIN_MS = Number(process.env.RECAP_MIN_MINUTES ?? 10) * 60_000;
@@ -205,16 +206,7 @@ const survivorProfiles = nullRecord(readJson<Record<string, SurvivorProfile>>(SU
 const saveSurvivorProfiles = later(() => fs.writeFileSync(SURVIVORS_FILE, JSON.stringify(survivorProfiles)));
 /** AD のセーブとランキングは Tonarium サーバー内で完結する（Workers は使わない） */
 interface AdLeaderboardEntry { playerId: string; name: string; antimatterLog10: number; infinities: number; playTimeSec: number }
-const adSaves = nullRecord(readJson<Record<string, { save: unknown; updatedAt: string }>>(AD_SAVES_FILE, {}));
-const adLeaderboard = readJson<AdLeaderboardEntry[]>(AD_LEADERBOARD_FILE, []);
-/** AD の保存は 30 秒に 1 回程度のため、survivors のデバウンス書きとは別に tmp＋リネームで同期書きする（再起動後も残る） */
-function writeJsonAtomic(file: string, value: unknown): void {
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(value));
-  fs.renameSync(tmp, file);
-}
-const saveAdSaves = () => writeJsonAtomic(AD_SAVES_FILE, adSaves);
-const saveAdLeaderboard = () => writeJsonAtomic(AD_LEADERBOARD_FILE, adLeaderboard);
+const adStore = new AdStore(path.join(DATA_DIR, 'ad-access.json'), Date.now, readJson<AdLeaderboardEntry[]>(AD_LEADERBOARD_FILE, []));
 function survivorCount(value: unknown, max: number) {
   return typeof value === 'number' && Number.isFinite(value)
     ? Math.min(max, Math.max(0, Math.floor(value)))
@@ -2514,64 +2506,46 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     res.end();
     return;
   }
-  // AD の保存・ランキング。Tonarium にアカウント認証は無く、URL の playerId をキーとしてそのまま受け入れる。
-  // Workers 版にあった他人セーブの 403 保護はここでは成立しない（docs/items.md の「AD ポータルと研究所パネル」参照）。
-  const adSaveMatch = /^\/api\/save\/([^/]+)$/.exec(url.pathname);
-  if (adSaveMatch) {
-    let playerId: string;
-    try { playerId = decodeURIComponent(adSaveMatch[1]).slice(0, 128); } catch { res.statusCode = 400; res.end('bad path'); return; }
+  if (url.pathname.startsWith('/api/save/') || url.pathname === '/api/leaderboard' || url.pathname.startsWith('/api/ad/')) {
     res.setHeader('Content-Type', 'application/json');
-    if (req.method === 'GET') {
-      const rec = playerId ? adSaves[playerId] : undefined;
-      if (!rec) { res.statusCode = 404; res.end(JSON.stringify({ error: 'not found' })); return; }
-      res.end(JSON.stringify({ save: rec.save }));
-      return;
+    res.setHeader('Cache-Control', 'no-store');
+    const token = typeof req.headers.authorization === 'string' ? req.headers.authorization.replace(/^Bearer /, '') : '';
+    const peer = req.socket.remoteAddress ?? 'unknown';
+    try {
+      const match = /^\/api\/save\/([^/]+)$/.exec(url.pathname);
+      const id = match ? decodeURIComponent(match[1]) : '';
+      const post = req.method === 'POST';
+      let body: Record<string, unknown> = {};
+      if (post) {
+        const raw = await readBody(req, 1_000_000);
+        if (!raw) throw new AdStoreError(413);
+        try { body = JSON.parse(raw.toString('utf8')); } catch { throw new AdStoreError(400); }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new AdStoreError(400);
+      }
+      let result: unknown;
+      if (url.pathname === '/api/ad/create' && post) {
+        adStore.limit(`create:${peer}`, 10);
+        result = adStore.create();
+      } else if (url.pathname === '/api/ad/exchange' && post) {
+        result = adStore.exchange(body.code, peer);
+      } else if (url.pathname === '/api/ad/transfer' && post) {
+        result = adStore.issue(String(body.id ?? ''), token);
+      } else if (match && req.method === 'GET') {
+        result = adStore.load(id, token);
+      } else if (match && post) {
+        result = adStore.save(id, token, body.revision, body.save);
+      } else if (url.pathname === '/api/leaderboard' && req.method === 'GET') {
+        result = { entries: adStore.leaderboard(token) };
+      } else if (url.pathname === '/api/leaderboard' && post) {
+        adStore.submit(token, body);
+        result = { ok: true };
+      } else throw new AdStoreError(405);
+      res.end(JSON.stringify(result));
+    } catch (error) {
+      res.statusCode = error instanceof AdStoreError ? error.status : 500;
+      res.end(JSON.stringify({ error: `AD request failed (${res.statusCode})` }));
     }
-    if (req.method === 'POST') {
-      const body = await readBody(req, 1_000_000);
-      if (!body || !playerId) { res.statusCode = 413; res.end(); return; }
-      let parsed: { save?: unknown; updatedAt?: unknown } | null = null;
-      try { parsed = JSON.parse(body.toString('utf-8')) as { save?: unknown; updatedAt?: unknown }; } catch { res.statusCode = 400; res.end(); return; }
-      if (!parsed || typeof parsed.save !== 'object' || parsed.save === null || Array.isArray(parsed.save)) { res.statusCode = 400; res.end(); return; }
-      adSaves[playerId] = { save: parsed.save, updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : new Date().toISOString() };
-      try { saveAdSaves(); } catch { res.statusCode = 500; res.end(); return; }
-      res.end(JSON.stringify({ ok: true }));
-      return;
-    }
-    res.statusCode = 405; res.end(); return;
-  }
-  if (url.pathname === '/api/leaderboard') {
-    res.setHeader('Content-Type', 'application/json');
-    if (req.method === 'GET') {
-      // playerId はセーブの読み書きキーそのものなので応答には含めない (#210)。
-      // 自分の行の強調表示のため、クライアントが既に送っている X-User-Id と一致する行にだけ self を付ける。
-      const selfId = typeof req.headers['x-user-id'] === 'string' ? req.headers['x-user-id'].slice(0, 128) : '';
-      const entries = adLeaderboard.map(({ playerId, ...rest }) => (selfId && playerId === selfId ? { ...rest, self: true } : rest));
-      res.end(JSON.stringify({ entries }));
-      return;
-    }
-    if (req.method === 'POST') {
-      const body = await readBody(req, 20_000);
-      if (!body) { res.statusCode = 413; res.end(); return; }
-      let e: Partial<AdLeaderboardEntry> | null = null;
-      try { e = JSON.parse(body.toString('utf-8')) as Partial<AdLeaderboardEntry>; } catch { res.statusCode = 400; res.end(); return; }
-      const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, v) : null);
-      const antimatterLog10 = num(e?.antimatterLog10);
-      const infinities = num(e?.infinities);
-      const playTimeSec = num(e?.playTimeSec);
-      const playerId = typeof e?.playerId === 'string' ? e.playerId.slice(0, 128) : '';
-      const name = typeof e?.name === 'string' ? e.name.slice(0, 24) : '';
-      if (!playerId || antimatterLog10 === null || infinities === null || playTimeSec === null) { res.statusCode = 400; res.end(); return; }
-      const entry: AdLeaderboardEntry = { playerId, name, antimatterLog10, infinities, playTimeSec };
-      const at = adLeaderboard.findIndex((x) => x.playerId === playerId);
-      if (at >= 0) adLeaderboard[at] = entry; else adLeaderboard.push(entry);
-      adLeaderboard.sort((a, b) => b.antimatterLog10 - a.antimatterLog10 || b.infinities - a.infinities);
-      adLeaderboard.length = Math.min(adLeaderboard.length, 50);
-      try { saveAdLeaderboard(); } catch { res.statusCode = 500; res.end(); return; }
-      res.end(JSON.stringify({ ok: true }));
-      return;
-    }
-    res.statusCode = 405; res.end(); return;
+    return;
   }
   if (url.pathname === '/healthz') {
     res.setHeader('Content-Type', 'text/plain');

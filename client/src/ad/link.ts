@@ -1,5 +1,5 @@
 import type { AdProfile, StorageLike } from './user.mjs';
-import { createProfile, listProfiles } from './user.mjs';
+import { ensureDefaultProfile, listProfiles } from './user.mjs';
 
 const LINK_KEY = 'ad:v2:tonariumLinks';
 
@@ -28,7 +28,7 @@ export function linkTonariumProfile(
     const found = listProfiles(storage).find((p) => p.id === linkedId);
     if (found) return found;
   }
-  const profile = createProfile(storage, tonariumName.trim() || 'Player 1');
+  const profile = ensureDefaultProfile(storage);
   links[tonariumId] = profile.id;
   storage.setItem(LINK_KEY, JSON.stringify(links));
   return profile;

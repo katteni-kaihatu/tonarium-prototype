@@ -1,3 +1,4 @@
+import { validateSave } from './sync.mjs';
 /**
  * user.mjs — Antimatter Dimensions ユーザー分離 / 認証差し替え / export・import
  *
@@ -30,9 +31,7 @@
  * {mode, getUserId(), getAuthHeaders()} を返す実装にすればよく、
  * 呼び出し側（API クライアント）は一切変更しなくてよい。
  *
- * 注意: token モードのトークンは呼び出し側がメモリ上（または Secure Vault 等）
- * で保持し、このモジュール経由で storage に平文保存することはしない。
- * このモジュール自体もトークンを storage へ書き込むことは決してない。
+ * 接続権限はプロフィール別に保持し、エクスポートには含めない。
  */
 
 // ---------------------------------------------------------------------------
@@ -44,7 +43,7 @@ export const ACTIVE_PROFILE_KEY = 'ad:v2:activeProfile';
 export const SAVE_KEY_PREFIX = 'ad:v2:save:';
 
 export const EXPORT_BUNDLE_TYPE = 'antimatter-dimensions-export';
-export const EXPORT_BUNDLE_VERSION = 2;
+export const EXPORT_BUNDLE_VERSION = 3;
 
 export const DEFAULT_PROFILE_NAME = 'Player 1';
 export const MAX_PROFILE_NAME_LENGTH = 64;
@@ -431,12 +430,6 @@ function normalizeBundleUser(user) {
   return { id, name: user.name.trim().slice(0, MAX_PROFILE_NAME_LENGTH) };
 }
 
-function assertBundleSave(save) {
-  if (!save || typeof save !== 'object' || Array.isArray(save)) {
-    throw new Error('Invalid export bundle: "save" must be an object');
-  }
-}
-
 function toExportedAtIso(exportedAt) {
   if (exportedAt === undefined || exportedAt === null) return new Date().toISOString();
   if (exportedAt instanceof Date) {
@@ -454,94 +447,84 @@ function toExportedAtIso(exportedAt) {
   throw new Error('buildExportBundle: exportedAt must be a Date, ISO string, or epoch ms');
 }
 
-/**
- * buildExportBundle(profile, saveObject, exportedAt?) ->
- *   {type: 'antimatter-dimensions-export', version: 2, exportedAt: ISO文字列,
- *    user: {id, name}, save}
- * profile は {id, name} でも {userId, name} でもよい。save はディープ
- * クローンするので、返した bundle を書き換えても元のセーブは汚れない。
- */
+function canonical(value) {
+  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
+  if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(k => JSON.stringify(k) + ':' + canonical(value[k])).join(',') + '}';
+  return JSON.stringify(value);
+}
+function payload(bundle) {
+  return { type: bundle.type, version: bundle.version, exportedAt: bundle.exportedAt, user: bundle.user, save: bundle.save };
+}
+function checksum(bundle) {
+  let crc = 0xffffffff;
+  for (const byte of new TextEncoder().encode(canonical(payload(bundle)))) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+  }
+  return 'crc32:' + ((crc ^ 0xffffffff) >>> 0).toString(16).padStart(8, '0');
+}
 export function buildExportBundle(profile, saveObject, exportedAt) {
   const user = normalizeBundleUser(profile);
-  assertBundleSave(saveObject);
-  return {
-    type: EXPORT_BUNDLE_TYPE,
-    version: EXPORT_BUNDLE_VERSION,
-    exportedAt: toExportedAtIso(exportedAt),
-    user,
-    save: clonePlain(saveObject),
-  };
+  validateSave(saveObject);
+  const bundle = { type: EXPORT_BUNDLE_TYPE, version: 3, exportedAt: toExportedAtIso(exportedAt), user, save: clonePlain(saveObject) };
+  return { ...bundle, checksum: checksum(bundle) };
 }
-
-/**
- * parseImportBundle(jsonTextOrObject) -> {user: {id, name}, save}
- * type / version / user / save を検証し、不正なら Error を投げる。
- * 戻り値の save はディープクローン（入力オブジェクトと参照を共有しない）。
- */
-export function parseImportBundle(jsonTextOrObject) {
-  let raw = jsonTextOrObject;
-  if (typeof raw === 'string') {
-    try {
-      raw = JSON.parse(raw);
-    } catch (err) {
-      throw new Error(`Invalid export bundle: not valid JSON (${err.message})`);
-    }
-  }
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new Error('Invalid export bundle: expected an object');
-  }
-  if (raw.type !== EXPORT_BUNDLE_TYPE) {
-    throw new Error(
-      `Invalid export bundle: type must be "${EXPORT_BUNDLE_TYPE}", got ${JSON.stringify(raw.type)}`,
-    );
-  }
-  if (raw.version !== EXPORT_BUNDLE_VERSION) {
-    throw new Error(
-      `Invalid export bundle: unsupported version ${JSON.stringify(raw.version)} (expected ${EXPORT_BUNDLE_VERSION})`,
-    );
-  }
-  const user = normalizeBundleUser(raw.user);
-  assertBundleSave(raw.save);
-  return { user, save: clonePlain(raw.save) };
+export function parseImportBundle(input) {
+  const raw = typeof input === 'string' ? JSON.parse(input) : clonePlain(input);
+  if (!raw || raw.type !== EXPORT_BUNDLE_TYPE || ![2, 3].includes(raw.version)) throw new Error('Invalid export bundle');
+  validateSave(raw.save);
+  normalizeBundleUser(raw.user);
+  if (raw.version === 3 && (typeof raw.exportedAt !== 'string' || toExportedAtIso(raw.exportedAt) !== raw.exportedAt)) throw new Error('Invalid export date');
+  if (raw.version === 3 && (typeof raw.checksum !== 'string' || raw.checksum !== checksum(raw))) throw new Error('Checksum mismatch');
+  return raw;
 }
-
-/** 既に parse 済みの {user, save} か、生の bundle かをどちらでも受理する。 */
-function coerceToParsedBundle(bundle) {
-  if (typeof bundle === 'string') return parseImportBundle(bundle);
-  if (bundle && typeof bundle === 'object' && 'type' in bundle) {
-    return parseImportBundle(bundle);
-  }
-  if (bundle && typeof bundle === 'object') {
-    const user = normalizeBundleUser(bundle.user);
-    assertBundleSave(bundle.save);
-    return { user, save: clonePlain(bundle.save) };
-  }
-  throw new Error('Invalid export bundle: expected an object or JSON string');
-}
-
-/**
- * importBundleInto(storage, bundle) ->
- *   {profile, userId, saveKey, sourceUser}
- *
- * 方針: bundle は「現在の（アクティブな）プロフィール配下に」取り込む。
- * つまり保存先は必ずアクティブプロフィールの save キーであり、bundle 元の
- * user.id を保存先キーにもプロフィール作成にも使わない。これにより他人の
- * bundle を取り込んでも、他人の userId 名義のデータが自分のストレージに
- * 生えることはない。アクティブプロフィールが無ければデフォルトを作成する。
- */
-export function importBundleInto(storage, bundle) {
+export function importBundleInto(storage, bundle, options = {}) {
   assertStorage(storage);
-  const parsed = coerceToParsedBundle(bundle);
+  const parsed = parseImportBundle(bundle);
+  if (parsed.version === 2 && options.confirmLegacy !== true) throw new Error('Legacy confirmation required');
   const active = ensureDefaultProfile(storage);
+  const previous = readSaveRaw(storage, active.id);
+  if (previous) retainSyncSources(storage, active.id, JSON.parse(previous), null);
+  storage.setItem('ad:v3:importPending:' + active.id, 'true');
   const key = writeSave(storage, active.id, parsed.save);
-  return {
-    profile: active,
-    userId: active.id,
-    saveKey: key,
-    sourceUser: clonePlain(parsed.user),
-  };
+  return { profile: active, userId: active.id, saveKey: key, sourceUser: normalizeBundleUser(parsed.user) };
 }
 
+export function readConnection(storage, profileId) {
+  const raw = storage.getItem('ad:v3:connection:' + profileId);
+  if (!raw) return null;
+  const value = JSON.parse(raw);
+  if (!value || typeof value.id !== 'string' || typeof value.token !== 'string') throw new Error('Invalid AD connection');
+  return value;
+}
+export function writeConnection(storage, profileId, connection) {
+  storage.setItem('ad:v3:connection:' + profileId, JSON.stringify(connection));
+}
+export function listRecoveryRecords(storage, profileId) {
+  const prefix = 'ad:v3:recovery:' + profileId + ':';
+  const records = JSON.parse(storage.getItem('ad:v3:recoveryIndex:' + profileId) || '[]');
+  const keys = new Set(records.map(record => record.key));
+  const add = key => {
+    if (key?.startsWith(prefix) && !keys.has(key) && storage.getItem(key)) {
+      records.push({ key, createdAt: null });
+      keys.add(key);
+    }
+  };
+  add(storage.getItem('ad:v3:lastRecovery:' + profileId));
+  // 旧版で一覧に登録されなかった記録も回収する。
+  if (typeof storage.key === 'function') {
+    for (let i = 0; i < storage.length; i++) add(storage.key(i));
+  }
+  return records.filter(record => record.key.startsWith(prefix) && storage.getItem(record.key));
+}
+export function retainSyncSources(storage, profileId, local, remote) {
+  const records = listRecoveryRecords(storage, profileId);
+  const key = 'ad:v3:recovery:' + profileId + ':' + generateUserId();
+  storage.setItem(key, JSON.stringify({ local, remote }));
+  storage.setItem('ad:v3:recoveryIndex:' + profileId, JSON.stringify([{ key, createdAt: new Date().toISOString() }, ...records]));
+  storage.setItem('ad:v3:lastRecovery:' + profileId, key);
+  return key;
+}
 export default {
   AUTH_MODES,
   PROFILES_KEY,
@@ -566,4 +549,8 @@ export default {
   buildExportBundle,
   parseImportBundle,
   importBundleInto,
+  readConnection,
+  writeConnection,
+  retainSyncSources,
+  listRecoveryRecords,
 };
