@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { AI_COOLDOWN_MS, AI_HEALTHY_MS, AI_HEAP_PAUSE_RATIO, AI_HEAP_RESUME_RATIO, evaluateAiResources, initialAiResourcePolicy, type AiResourceSignals } from './resource-policy.ts';
-import { AiSupportController, initializeAiSupport, setAiSupportWorldActive, type AiSupportEnvironment } from './support.ts';
+import { AiSupportController, getAiSupportSnapshot, initializeAiSupport, setAiSupportEnabled, setAiSupportTransport, setAiSupportWorldActive, type AiSupportEnvironment } from './support.ts';
 import { BROWSER_AI_MODEL, type BrowserAiClientMsg, type BrowserAiJob } from '../../../shared/ai-support.ts';
 import type { BrowserAiWorkerCallbacks } from './worker-client.ts';
 import { BrowserAiBroker } from '../../../server/browser-ai.ts';
@@ -31,6 +31,50 @@ test('resource observation starts only inside the fantasy world and removes ever
     initializeAiSupport(); assert.equal(frames, 1); assert.equal(timers, 0);
   } finally {
     setAiSupportWorldActive(false);
+    for (const [name, descriptor] of originals) { if (descriptor) Object.defineProperty(globalThis, name, descriptor); else Reflect.deleteProperty(globalThis, name); }
+  }
+});
+
+test('restoring visibility discards background drift and waits for a full visible performance interval', async () => {
+  let now = 0, nextTickAt: number | undefined, tick: (() => void) | undefined, frame: FrameRequestCallback | undefined;
+  const tickIfDue = () => { if (nextTickAt !== undefined && now >= nextTickAt) { nextTickAt = now + 1000; tick!(); } };
+  const documentEvents = new Map<string, () => void>(), storage = new Map<string, string>();
+  const documentState = { visibilityState: 'visible', addEventListener: (type: string, listener: () => void) => documentEvents.set(type, listener), removeEventListener: (type: string) => documentEvents.delete(type) };
+  const originals = new Map<string, PropertyDescriptor | undefined>();
+  const globals: Record<string, unknown> = {
+    window: { setInterval: (listener: () => void) => { tick = listener; nextTickAt = now + 1000; return 1; }, clearInterval() { nextTickAt = undefined; }, addEventListener() {}, removeEventListener() {} },
+    document: documentState,
+    performance: { now: () => now, memory: { usedJSHeapSize: 30, jsHeapSizeLimit: 100 } },
+    navigator: { gpu: {}, deviceMemory: 8, onLine: true, locks: { request: async (_name: string, _options: unknown, callback: (lock: object) => unknown) => callback({}) } },
+    localStorage: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) },
+    requestAnimationFrame: (listener: FrameRequestCallback) => { frame = listener; return 1; }, cancelAnimationFrame() {},
+    PerformanceObserver: class { observe() {} disconnect() {} },
+    Worker: class {
+      onmessage?: (event: { data: unknown }) => void;
+      postMessage(message: { type: string; id: string }) { queueMicrotask(() => this.onmessage?.({ data: { type: 'ok', id: message.id } })); }
+      terminate() {}
+    },
+  };
+  for (const [name, value] of Object.entries(globals)) { originals.set(name, Object.getOwnPropertyDescriptor(globalThis, name)); Object.defineProperty(globalThis, name, { configurable: true, value }); }
+  try {
+    setAiSupportTransport(() => {}, true); setAiSupportWorldActive(true); setAiSupportEnabled(true); await flush();
+    assert.equal(getAiSupportSnapshot().phase, 'ready');
+    now = 1000; for (let i = 0; i < 60; i++) frame!(now); tickIfDue();
+    now = 2000; for (let i = 0; i < 18; i++) frame!(now); tickIfDue();
+    setAiSupportTransport(() => {}, true); setAiSupportTransport(() => {}, true);
+    assert.equal(getAiSupportSnapshot().phase, 'ready', 'one browser observation must not count as repeated slowdown');
+    now = 2500; documentState.visibilityState = 'hidden'; documentEvents.get('visibilitychange')!(); await flush();
+    assert.equal(getAiSupportSnapshot().reason, 'hidden');
+    now = 61_500; documentState.visibilityState = 'visible'; documentEvents.get('visibilitychange')!();
+    now = 61_501; tickIfDue(); await flush();
+    assert.equal(getAiSupportSnapshot().phase, 'ready', 'a timer due immediately after visibility resumes has no full visible frame interval');
+    now = 62_500; for (let i = 0; i < 60; i++) frame!(now); tickIfDue(); await flush();
+    assert.equal(getAiSupportSnapshot().phase, 'ready', 'hidden time must not become a visible performance stall');
+    assert.equal(getAiSupportSnapshot().loads, 1);
+    now = 63_500; tickIfDue(); await flush();
+    assert.equal(getAiSupportSnapshot().reason, 'performance', 'a fresh severe visible stall must still stop support');
+  } finally {
+    setAiSupportEnabled(false); setAiSupportWorldActive(false); await flush();
     for (const [name, descriptor] of originals) { if (descriptor) Object.defineProperty(globalThis, name, descriptor); else Reflect.deleteProperty(globalThis, name); }
   }
 });
@@ -118,7 +162,7 @@ function fixture(saved: string | null = null, active = true) {
       messages: [{ role: 'system', content: 'Allowed NPC context.' }, { role: 'user', content: 'Hello.' }], maxTokens: 80, temperature: .7 };
   };
   return { controller, workers, sent, order, readyJob, get cleanup() { return cleanup; }, get stored() { return stored; }, get locked() { return locked; },
-    advance(value: number, change: Partial<typeof signals> = {}) { now = value; signals = { ...signals, ...change }; controller.sample(); },
+    advance(value: number, change: Partial<typeof signals> = {}) { now = value; signals = { ...signals, ...change, performanceSampleId: value }; controller.sample(); },
     blockLock(value: boolean) { lockBlocked = value; },
     store(value: string | null) { stored = value; },
   };
@@ -181,6 +225,31 @@ test('a previously consenting player loads immediately on first connection witho
   assert.equal(f.workers.length, 0); assert.equal(f.controller.getSnapshot().reason, 'connection');
   f.controller.setTransport(message => f.sent.push(message), true); await flush();
   assert.equal(f.workers.length, 1); assert.equal(f.controller.getSnapshot().phase, 'ready');
+});
+
+test('startup rechecks one slow performance observation without aborting the model load', async () => {
+  const f = fixture();
+  try {
+    f.advance(1000, { fps: 18 }); f.controller.setEnabled(true); await flush();
+    assert.equal(f.controller.getSnapshot().phase, 'ready');
+    assert.equal(f.workers.length, 1); assert.equal(f.workers[0].disposed, 0);
+  } finally { f.controller.setWorldActive(false); await flush(); }
+});
+
+test('opening an own conversation and receiving its job cannot count one slow observation repeatedly', async () => {
+  const f = fixture(); f.controller.setEnabled(true); await flush();
+  try {
+    const job = f.readyJob();
+    f.advance(1000, { fps: 18 }); f.controller.setConversationActive(true);
+    const pending = f.controller.handle({ t: 'aiSupportJob', job });
+    assert.equal(f.controller.getSnapshot().phase, 'busy');
+    assert.equal(f.workers[0].disposed, 0);
+    f.workers[0].active!.resolve('Own answer.'); await pending;
+    assert.ok(f.sent.some(message => message.t === 'aiSupportResult' && message.text === 'Own answer.'));
+    f.advance(2000, { fps: 18 }); assert.equal(f.controller.getSnapshot().phase, 'ready');
+    f.advance(3000, { fps: 18 }); await flush();
+    assert.equal(f.controller.getSnapshot().reason, 'performance', 'three distinct slow observations must still stop support');
+  } finally { f.controller.setWorldActive(false); await flush(); }
 });
 
 test('turning support off cancels an in-flight lease, disposes the worker and ignores its stale result', async () => {

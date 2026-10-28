@@ -1,0 +1,7 @@
+FROM node:24-slim
+
+RUN mkdir -p /models /app && chown node:node /models /app
+COPY --chown=node:node scripts/fantasy-ai-model.mjs /app/fantasy-ai-model.mjs
+
+USER node
+ENTRYPOINT ["node", "/app/fantasy-ai-model.mjs"]

@@ -21,7 +21,7 @@ cloudflared 以外（ngrok など）を使う場合は、`.env` の `ALLOWED_HOS
 ## Coolify にデプロイする
 リポジトリに `Dockerfile` と `docker-compose.yml` があるので、Coolify でそのまま動く。
 
-アプリ（`tonarium`）と LiveKit（`livekit`）の 2 つのサービスが立つ。
+アプリ（`tonarium`）、LiveKit（`livekit`）、RPG のモデル準備（`fantasy-ai-model`）、CPU 推論（`fantasy-ai`）の 4 サービスを定義する。モデル準備は検証完了後に終了する。必要資源は下の「RPG のサーバー AI」を参照。
 
 1. サーバーのファイアウォール（VPS のセキュリティグループなど）で **TCP 7881・UDP 7882・UDP 3478** を開ける（LiveKit の音声・映像と TURN。Coolify の外の設定）
 2. DNS で LiveKit 用のサブドメイン（例: `livekit.example.com`）をサーバーに向ける
@@ -72,6 +72,68 @@ Coolify の Docker Compose では、`tonarium` の環境変数に次を設定し
 この変更は設定値を渡すだけで、実際のプロキシ IP を推測して自動許可しない。未設定のままマージ・再デプロイしても登録エラーは解消しない。詳細は [RPG アカウントの通信条件](fantasy-accounts.md) を参照。
 
 参考: [Coolify の Compose 環境変数](https://coolify.io/docs/applications/configuration/environment-variables)、[Docker のコンテナ環境変数](https://docs.docker.com/compose/how-tos/environment-variables/set-environment-variables/)。
+
+## RPG のサーバー AI
+
+標準 Compose は NPC・GM の自由会話用 CPU 推論サービスも起動する。ブラウザの AI サポートが使えない場合は、このサービスへ引き継ぐ。Windows 開発用の `scripts/start-local-npc.ps1` を Linux のアプリコンテナで実行する構成ではない。
+
+`fantasy-ai-model` は既存の開発モデルと同じ Qwen3 1.7B Q8_0 を公式 Hugging Face の固定リビジョンから取得し、サイズ 1,834,426,016 バイトと SHA-256 を照合する。約 1.83 GB の初回取得には時間がかかる。検証前のファイルは公開せず、検証後に専用 `fantasy-ai-models` ボリュームへ確定する。再起動時は既存モデルを検証して再利用し、Git やアプリのビルド成果物には含めない。
+
+`fantasy-ai` はダイジェスト固定の公式 llama.cpp CPU イメージ（b11913）で、モデルを読み取り専用で使う。ホストにはポートを公開せず、アプリは同じ Compose ネットワークの `http://fantasy-ai:8080/v1` へ接続する。`127.0.0.1:18081` は Tonarium コンテナ自身を指し、ホストや別コンテナのモデルへは届かない。
+
+標準 Compose は内部移行先の `NPC_LLM_BUNDLED_URL` も固定で渡す。既存の `NPC_LLM_URL` に開発用の HTTP ループバック 18081 番が残っていても、NPC・GM は起動時に同梱サービスのアドレスへ自動移行する。対象は `127.0.0.1`・`localhost`・`[::1]` と既定 API パスだけで、別ホスト・別ポート・独自パスや HTTPS の設定は変更しない。明示的なプログラム側の URL 指定と既存の内部アドレス検証も維持する。サーバーに保存された環境変数を書き換える処理ではない。
+
+アプリはモデル準備・推論完了を待つ依存関係を持たず、準備中も Web サーバーと固定案内を使える。AI 側の失敗時の再試行は 3 回まで。デプロイツールが全サービスの正常性を要求する場合、その判定は別途確認する。
+
+### 資源と設定
+
+GPU は不要だが CPU・メモリ・ディスクの余裕が必要である。推論の既定は CPU 上限 2 コア、メモリ上限 3 GiB、2 スレッド、同時枠 2、各枠 4096 トークン。準備コンテナは CPU 上限 1 コア・メモリ上限 256 MiB でストリーム取得する。空きディスクはモデル全体と 128 MiB の余裕が必要で、破損モデルを置き換える場合は既存分と別に確保する。
+
+Linux では準備開始時の `/proc/meminfo` の `MemAvailable` が既定で 2304 MiB 未満なら中止してログに理由を出す。これは開始時点のホストの目安であり、その後の負荷や cgroup 内の余裕は保証しない。2 GiB 程度の小さな VPS にそのまま追加して動くことは保証しない。Tonarium・LiveKit・OS の分も含め、容量を確認すること。
+
+| 環境変数 | 既定 | 用途 |
+| --- | --- | --- |
+| `NPC_AI_THREADS` | `2` | 推論・入力処理の CPU スレッド数 |
+| `NPC_AI_CPU_LIMIT` | `2.0` | 推論コンテナの CPU 上限 |
+| `NPC_AI_MEMORY_LIMIT` | `3g` | 推論コンテナのメモリ上限。小さすぎると起動に失敗する |
+| `NPC_AI_MIN_AVAILABLE_MB` | `2304` | 準備開始時の最低 MemAvailable（MiB、256～65536）。下げる前に容量を確認する |
+| `NPC_LLM_URL` | `http://fantasy-ai:8080/v1` | アプリが接続する内部 OpenAI 互換 API |
+| `NPC_LLM_MODEL` | `qwen3-1.7b` | API のモデル名。同梱サービスでは既定名を使う |
+| `NPC_LLM_BUNDLED_URL` | 標準 Compose が固定指定 | 旧開発用 URL の内部移行先。運営側での追加設定は不要 |
+
+Coolify に旧開発用 URL が残っている場合も、標準 Compose の再デプロイで自動移行するため、手で削除・修正する必要はない。別の推論サービスへ上書きすることもできるが、同梱サービスを自動停止する設定ではない。別構成で不要な場合は `fantasy-ai` と `fantasy-ai-model` を起動対象から外す。Dockerfile のみのアプリ起動にはモデルサービスや移行先の目印は自動追加されず、既存の開発用設定を維持する。
+
+### 運営側の確認
+
+```bash
+docker compose ps --all
+docker compose logs --tail 100 fantasy-ai-model fantasy-ai
+docker compose exec -T fantasy-ai curl --fail --silent http://127.0.0.1:8080/health
+docker compose exec -T fantasy-ai curl --fail --silent http://127.0.0.1:8080/v1/models
+```
+
+モデル検証完了、推論の `/health` の HTTP200、`/v1/models` の `qwen3-1.7b` を確認する。アプリの `/healthz` は Web サーバーだけの確認で、AI の稼働を保証しない。アプリからの到達確認はコンテナ内で行う。次は会話や認証情報を送らず接続先ホスト・ポートと状態だけを表示する。
+
+```bash
+docker compose exec -T tonarium node --input-type=module -e '
+const {resolveLocalInferenceUrl} = await import("./server/local-inference-config.ts");
+const base = new URL(resolveLocalInferenceUrl());
+console.log({host: base.hostname, port: base.port});
+try {
+  const r = await fetch(new URL("/health", base), {signal: AbortSignal.timeout(5000), redirect: "error"});
+  console.log({healthStatus: r.status});
+  if (!r.ok) process.exitCode = 1;
+} catch (e) {
+  console.log({error: e.cause?.code ?? e.name});
+  process.exitCode = 1;
+}'
+```
+
+`ECONNREFUSED` は待受なし、`ENOTFOUND` はサービス名・ネットワークの不一致、llama.cpp の HTTP503 はロード中などの未準備状態である。ゲームの検証では **AI サポートと「自分の質問をほかのプレイヤーの端末で処理することを許可」の両方をオフ** にして自由会話を試し、固定案内でなく診断記録の `source: local`（サーバー生成）が成功したことを確認する。サポートをオフにするだけでは支援を受け取る設定が残る。画面の「サーバー AI 使用」は経路の案内であり稼働確認ではない。
+
+`npm run test:fantasy-ai-deploy` は小さな合成データによる取得・検証・中断・検査ランナーのテストで、本物のモデルは取得しない。Docker 対応検証機の `npm run check:fantasy-ai-container` は独立 Compose プロジェクトで AI の 2 サービスだけを起動し、実モデルの正常性・モデル名・三言語の合成プロンプトへの空でない応答を確認して後片付けする。プレイヤーデータは使わず、会話品質の採点ではない。PR の専用 GitHub Actions でも実行する。通常のビルド・合成テスト成功を、実モデルや本番ハードウェアでの成功と混同しないこと。
+
+参考: [llama.cpp の Docker 構成](https://github.com/ggml-org/llama.cpp/blob/b11913/docs/docker.md)、[固定モデル](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/tree/90862c4b9d2787eaed51d12237eafdfe7c5f6077)、[ブラウザ AI](browser-ai-support.md)。
 
 ## 変更履歴の集約
 
