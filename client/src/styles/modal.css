@@ -27,7 +27,8 @@
 .pcacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .pcacts button { height: 44px; border-radius: 12px; font-size: 13px; padding: 0 6px; }
 .pcfoot { display: flex; gap: 4px; padding-top: 12px; border-top: 1px solid var(--line2); }
-.pcfoot button { height: 36px; padding: 0 12px; font-size: 12px; color: var(--muted2); }
+.pcfoot button { height: 36px; padding: 0 12px; font-size: 12px; }
+.pcfoot button:not(.primary) { color: var(--muted2); }
 .pcfoot button.danger { color: #A8321F; }
 .reportbox { display: flex; flex-direction: column; gap: 6px; }
 .reportbox label { font-size: 12px; font-weight: 700; color: var(--muted); }
