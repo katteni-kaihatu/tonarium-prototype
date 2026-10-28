@@ -8,6 +8,9 @@ import { AntimatterSpacePanel } from '../../view3d/antimatterPanels.tsx';
 import { adaptAdSlice } from './adapter.tsx';
 import { ActionBar } from './ActionBar.tsx';
 import type { AdPanelTarget } from '../../../../shared/antimatterLayout.ts';
+import { ProfilePanel } from './ProfilePanel.tsx';
+import { StatsPanel } from './StatsPanel.tsx';
+import { getLanguage, setLanguage, t } from '../../i18n/core.ts';
 
 function harness(game: GameState) {
   let slice: AdSlice;
@@ -15,6 +18,32 @@ function harness(game: GameState) {
   slice.adGame = game;
   return slice;
 }
+
+test('共通プロフィール・ランキングの同期案内とv3形式は三言語で表示される', () => {
+  const previous = getLanguage();
+  const slice = harness(createNewGame());
+  slice.adProfile = { id: 'local-profile', name: 'Player', createdAt: null };
+  slice.adListRecovery = () => [{ key: 'old-record', createdAt: null }, { key: 'recent-record', createdAt: '2026-10-28T00:00:00.000Z' }];
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      for (const status of ['loading', 'choice', 'error', 'ready'] as const) {
+        slice.adSync = status;
+        const ad = adaptAdSlice(slice)!;
+        const profile = renderToStaticMarkup(<ProfilePanel ad={ad} notice={() => {}} />);
+        const stats = renderToStaticMarkup(<StatsPanel ad={ad} notice={() => {}} />);
+        assert.ok(profile.includes(t('adIssueCode')));
+        assert.ok(profile.includes(t('adChecksumHelp')));
+        assert.ok(profile.includes(t('adRecoveryHistory')));
+        assert.ok(profile.includes('value="old-record"'));
+        assert.ok(profile.includes('value="recent-record"'));
+        assert.ok(stats.includes(t('adRankingRefresh')));
+        assert.ok(!profile.includes('Tonarium サーバーに保存しています'));
+        assert.equal(ad.serverStatus, status === 'ready' ? null : t(status === 'loading' ? 'adSyncLoading' : status === 'choice' ? 'adSyncChoice' : 'adSyncError'));
+      }
+    }
+  } finally { setLanguage(previous); }
+});
 
 function disabled(html: string, label: string) {
   const button = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)].find((match) => match[2] === label);

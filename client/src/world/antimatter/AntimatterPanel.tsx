@@ -12,6 +12,7 @@ import './antimatter-panel.css';
 import { LabBanner } from './LabArt.tsx';
 import { emitAdFeedback } from '../../ad/feedback.ts';
 import { AdPurchaseParticles } from './AdPurchaseParticles.tsx';
+import { t, useLanguage } from '../../i18n/index.ts';
 
 type TabId = 'dimensions' | 'actions' | 'stats' | 'profiles' | 'layers';
 
@@ -24,6 +25,7 @@ const TABS: { id: TabId; label: string }[] = [
 ];
 
 export function AntimatterPanel({ ad }: AntimatterPanelProps) {
+  useLanguage();
   const root = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<TabId>('dimensions');
   const [notice, setNotice] = useState<string | null>(null);
@@ -61,6 +63,11 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
         ))}
       </div>
       {notice && <div style={s.notice}>{notice}</div>}
+      {ad.serverStatus && <div role="status" style={s.notice}>{ad.serverStatus}</div>}
+      {ad.syncState === 'choice' && <div style={s.row}>
+        <button style={s.btn} onClick={() => ad.chooseSave('local')}>{t('adChooseLocal')}</button>
+        <button style={s.btn} onClick={() => ad.chooseSave('remote')}>{t('adChooseRemote')}</button>
+      </div>}
       {tab === 'dimensions' && <DimensionList ad={ad} />}
       {tab === 'actions' && <ActionBar ad={ad} notice={showNotice} />}
       {tab === 'stats' && <StatsPanel ad={ad} notice={showNotice} />}

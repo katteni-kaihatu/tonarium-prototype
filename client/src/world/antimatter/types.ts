@@ -113,6 +113,10 @@ export interface AntimatterSlice {
   offlineNotice: OfflineNotice | null;
   leaderboard: LeaderboardEntry[];
   serverStatus: string | null;
+  syncState: 'disconnected' | 'loading' | 'choice' | 'ready' | 'error';
+  chooseSave: (source: 'local' | 'remote') => void;
+  issueTransfer: () => Promise<{ code: string; expiresAt: number }>;
+  exchangeTransfer: (code: string) => Promise<void>;
   lastSavedAt: string | null;
   buyDimension: (tier: number) => void;
   buyUntilNextTen: (tier: number) => void;
@@ -127,7 +131,9 @@ export interface AntimatterSlice {
   deleteProfile: (userId: string) => void;
   resetGame: () => void;
   exportBundle: () => string;
-  importBundle: (text: string) => ImportResult;
+  recoveryRecords: { key: string; createdAt: string | null }[];
+  exportRecoveryBundle: (source: 'local' | 'remote', key?: string) => string;
+  importBundle: (text: string, confirmLegacy?: boolean) => ImportResult;
   dismissOffline: () => void;
   saveToServer: () => Promise<void>;
   loadFromServer: () => Promise<void>;

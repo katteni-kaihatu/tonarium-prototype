@@ -1,5 +1,7 @@
 export interface AdProfile { id: string; name: string; createdAt: string | null }
 export interface StorageLike {
+  readonly length?: number;
+  key?(index: number): string | null;
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
@@ -13,8 +15,9 @@ export interface ExportBundle {
   type: string;
   version: number;
   exportedAt: string;
-  user: AdProfile;
+  user: Pick<AdProfile, 'id' | 'name'>;
   save: Record<string, unknown>;
+  checksum?: string;
 }
 export const PROFILES_KEY: string;
 export const ACTIVE_PROFILE_KEY: string;
@@ -48,6 +51,12 @@ export function buildExportBundle(
   saveObject: Record<string, unknown>,
   exportedAt?: string | number | Date,
 ): ExportBundle;
-export function parseImportBundle(jsonTextOrObject: string | Record<string, unknown>): ExportBundle;
-export interface ImportResult { profile: AdProfile; userId: string; saveKey: string; sourceUser: AdProfile }
-export function importBundleInto(storage: StorageLike, bundle: ExportBundle): ImportResult;
+export function parseImportBundle(jsonTextOrObject: unknown): ExportBundle;
+export interface ImportResult { profile: AdProfile; userId: string; saveKey: string; sourceUser: Pick<AdProfile, 'id' | 'name'> }
+export function importBundleInto(storage: StorageLike, bundle: unknown, options?: { confirmLegacy?: boolean }): ImportResult;
+export interface AdConnection { id: string; token: string }
+export function readConnection(storage: StorageLike, profileId: string): AdConnection | null;
+export function writeConnection(storage: StorageLike, profileId: string, connection: AdConnection): void;
+export function retainSyncSources(storage: StorageLike, profileId: string, local: unknown, remote: unknown): string;
+export interface RecoveryRecord { key: string; createdAt: string | null }
+export function listRecoveryRecords(storage: StorageLike, profileId: string): RecoveryRecord[];
