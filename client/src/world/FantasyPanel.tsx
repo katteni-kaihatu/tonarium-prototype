@@ -19,8 +19,7 @@ import { FANTASY_FOOD_META, foodSense } from '../../../shared/fantasy-life.ts';
 import { FantasyTownPanel } from './FantasyTownPanel.tsx';
 import { fantasySkillName } from '../../../shared/fantasy-skill-names.ts';
 import { LanguageScreen, LanguageSelect } from '../LanguageScreen.tsx';
-import { AiSupportConsent } from '../ai/AiSupport.tsx';
-import { setAiSupportWorldActive } from '../ai/support.ts';
+import { cleanupRetiredBrowserAi } from '../ai-retirement.ts';
 import { fantasyEventText, fantasyQuestText } from '../../../shared/fantasy-narrative.ts';
 import { fantasyHostileEncounter } from '../../../shared/fantasy-encounters.ts';
 import { fantasyTravelEffectName } from '../../../shared/fantasy-travel-goods.ts';
@@ -153,18 +152,15 @@ function Journal({profile,onSelect,blocked}:{profile:FantasyProfile;onSelect:(id
 type FantasyPanelProps = { socialOpen: boolean; onSocialToggle: () => void };
 
 export function FantasyPanel(props: FantasyPanelProps) {
+  useEffect(() => { void cleanupRetiredBrowserAi().catch(() => {}); }, []);
   const languageChosen = useLanguageChosen();
   const account=useStore(state=>state.fantasyAccount),ready=useStore(state=>state.fantasyAccountReady),connected=useStore(state=>state.wsConnected),error=useStore(state=>state.fantasyAccountError);
-  useEffect(() => {
-    setAiSupportWorldActive(languageChosen&&ready&&!!account);
-    return () => setAiSupportWorldActive(false);
-  }, [languageChosen,ready,account?.id,account?.principal]);
   const unbind=()=>{const state=get();set({...clearFantasyAccountPrivateState([state.selfId,state.fantasyAccount?.principal]),fantasyAccountReady:false,fantasyAccountError:null});send({t:'fantasyAccountUnbind'});};
   const authenticated=(response:FantasyAccountResponse)=>{
     if(response.ticket){set({fantasyAccountReady:false,fantasyAccountError:null});send({t:'fantasyAccountBind',ticket:response.ticket});}
     else if(!response.account&&get().fantasyAccount)unbind();
   };
-  return languageChosen ? <FantasyAccountGate account={account} ready={ready} connected={connected} error={error} onAuthenticated={authenticated} onLogout={unbind}><FantasyPanelContent key={`${account?.id??''}:${account?.principal??''}`} {...props}/><AiSupportConsent/></FantasyAccountGate> : <LanguageScreen/>;
+  return languageChosen ? <FantasyAccountGate account={account} ready={ready} connected={connected} error={error} onAuthenticated={authenticated} onLogout={unbind}><FantasyPanelContent key={`${account?.id??''}:${account?.principal??''}`} {...props}/></FantasyAccountGate> : <LanguageScreen/>;
 }
 
 function FantasyPanelContent({socialOpen,onSocialToggle}: FantasyPanelProps){

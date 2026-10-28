@@ -1,5 +1,4 @@
 import type { FantasyRealmCommand, FantasyRealmState } from './fantasy-realm.ts';
-import type { BrowserAiClientMsg, BrowserAiServerMsg } from './ai-support.ts';
 import type { FantasyPartyCommand, FantasyPartyError, FantasyPartyState } from './fantasy-party.ts';
 import type { Item, ItemAction, ItemKind, MediaInit } from './items.ts';
 import type { ItemVariant } from './item-variants.ts';
@@ -305,7 +304,6 @@ export interface SessionSnapshot {
 
 /** WebSocket でサーバーへ送るもの（セッションの外でも使う） */
 export type HomeClientMsg =
-  | BrowserAiClientMsg
   | { t: 'fantasyAccountBind'; ticket: string }
   | { t: 'fantasyAccountUnbind' }
   | { t: 'fantasyAction'; revision: number; action: FantasyAction }
@@ -425,7 +423,6 @@ export const isRoomClientMsg = (m: ClientMsg): m is RoomClientMsg => Object.hasO
 
 /** WebSocket でサーバーから届くもの */
 export type HomeServerMsg =
-  | BrowserAiServerMsg
   | { t: 'fantasyAccountState'; account: FantasyAccountPublic | null; homeId: string; activeId: string; user?: User; error?: string }
   | { t: 'sessionCreated'; sid: string; requestId?: string }
   | { t: 'sessionResult'; requestId: string; error?: string }

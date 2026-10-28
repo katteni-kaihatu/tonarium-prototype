@@ -12,7 +12,6 @@ import { applyFantasyAction, newFantasyProfile } from '../shared/fantasy-engine.
 import type { FantasyProfile } from '../shared/fantasy.ts';
 import type { FantasyGmReply } from '../shared/fantasy-gm.ts';
 import { FANTASY_DINING, FANTASY_LODGINGS } from '../shared/fantasy-life.ts';
-import { BROWSER_AI_MODEL } from '../shared/ai-support.ts';
 import { FANTASY_LIBRARY_BOOKS } from '../shared/fantasy-library.ts';
 import { fantasyLibraryHoldings } from '../shared/fantasy-town.ts';
 
@@ -36,7 +35,7 @@ async function isolated(t: TestContext, location = 'hearth') {
   const port = (listener.address() as net.AddressInfo).port; await new Promise<void>(resolve => listener.close(() => resolve()));
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], {
     env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
-      LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', NPC_LLM_URL: 'http://127.0.0.1:1/v1' },
+      LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = ''; child.stdout.on('data', data => { logs += String(data); }); child.stderr.on('data', data => { logs += String(data); });
@@ -142,7 +141,7 @@ test('active work blocks all NPC dialogue before bargaining or AI while GM can d
   assert.equal(bargain.error, undefined); assert.match(bargain.text ?? '', /할까요|답해|승인|확인/);
   const profession = await request({ t: 'fantasyGmChat', requestId: 'busy-prior-profession', text: '도둑이 되고 싶어', locale: 'ko' });
   assert.equal(profession.error, undefined); assert.match(profession.reply?.text ?? '', /도둑/);
-  send({ t: 'aiSupport', ready: true, epoch: 'busy-dialogue-test', model: BROWSER_AI_MODEL });
+  send({ t: 'aiSupport', ready: true, epoch: 'busy-dialogue-test', model: 'retired-browser-model' });
   send({ t: 'fantasyAction', revision: profile.revision, action: { type: 'work' } });
   const working = await until(() => { const current = read(); return current.activity?.action.type === 'work' ? current : undefined; });
   assert.equal(working.revision, profile.revision + 1);

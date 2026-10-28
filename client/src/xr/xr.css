@@ -7,8 +7,14 @@
 .xr-keyboard, .xr-command-panel, .xr-options { max-width: 960px; max-height: 42vh; overflow: auto; }
 .xr-keyboard { position: fixed; bottom: 8px; left: 8px; right: 8px; }
 .xr-keyboard span { display: inline-block; padding: 8px; }
-.xr-settings { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; padding: 8px; }
-.xr-settings label { display: flex; align-items: center; gap: 8px; }
+.xr-settings { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin: 8px 0; padding: 8px; }
+.xr-settings label:not(.volrow):not(.settings-row):not(.settings-select-row) { display: flex; align-items: center; gap: 8px; }
+.xr-source :is(.settings-row, .settings-select-row) { --accent: var(--paper); }
+.xr-settings .volrow { min-width: 0; }
+.xr-settings .vollabel { flex-wrap: wrap; gap: 4px 8px; }
+.xr-settings .vollabel > span { min-width: 0; overflow-wrap: anywhere; }
+.xr-settings .vollabel b { white-space: nowrap; margin-left: auto; }
+.xr-source .xr-settings { --ink2: #f4f1eb; --line: #899bb6; --accent: #fff3a6; }
 .xr-active .keyhelp { display: none; }
 .xr-active .xr-source {
   position: fixed !important;
@@ -59,7 +65,8 @@
 .xr-active .xr-source :is(p, span, td, th, small, label, a) { font-size: 18px !important; }
 .xr-active .xr-source :is(input, select, textarea) { min-height: 44px; max-width: 100%; box-sizing: border-box; }
 .xr-active .xr-source button[aria-label] { min-width: 72px; width: auto; }
-.xr-active .xr-source .xr-settings label { flex-wrap: wrap; }
+.xr-active .xr-source .xr-settings label:not(.volrow):not(.settings-row):not(.settings-select-row) { flex-wrap: wrap; }
+.xr-active .xr-source .settings-row > input[type=checkbox] { min-height: 0; }
 .xr-active .xr-source .xr-resize-controls { position: sticky; top: 0; z-index: 5; display: flex; gap: 8px; flex-shrink: 0; background: #252c36; }
 .xr-active .xr-source :is(img, video) { height: auto; object-fit: contain; }
 .xr-active .xr-source .videohost { flex: none; width: 100%; height: auto; aspect-ratio: var(--xr-media-aspect, 16 / 9); }

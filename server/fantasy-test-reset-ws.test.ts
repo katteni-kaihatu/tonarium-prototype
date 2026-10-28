@@ -26,7 +26,7 @@ async function isolated(t: TestContext, flag: string) {
   const port = (listener.address() as net.AddressInfo).port; await new Promise<void>(resolve => listener.close(() => resolve()));
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], {
     env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, FANTASY_TEST_TOOLS: flag,
-      LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', NPC_LLM_URL: 'http://127.0.0.1:1/v1' },
+      LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = ''; child.stdout.on('data', data => { logs += String(data); }); child.stderr.on('data', data => { logs += String(data); });

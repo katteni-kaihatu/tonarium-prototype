@@ -1,5 +1,4 @@
 import { arrivalPatch, KnownChatMessages, shouldPlayChatArrival } from '../newArrival.ts';
-import { setAiSupportTransport, handleAiSupportMessage } from '../ai/support.ts';
 import { sourceText as uiSource } from '../i18n/core.ts';
 import { receiveShared } from '../shared-assets/state.ts';
 import { useSharedAssets } from '../shared-assets/state.ts';
@@ -74,7 +73,6 @@ export function connectWs() {
     set({ wsConnected: true, wsReady: false });
     const s = get();
     send({ t: 'hello', id: fantasyReconnectIdentity(s), name: s.selfName, compat: COMPAT_VERSION });
-    setAiSupportTransport(send, true);
     if (s.session) {
       send({ t: 'join', sid: s.session });
       // ホームの再接続後は、参加資格と部屋の状態も取り直す。
@@ -86,7 +84,6 @@ export function connectWs() {
     for (const request of sessionRequests.values()) request.reject(new Error(uiSource('ui471')));
     console.warn('[home-ws] closed', { code: event.code, reason: event.reason, wasClean: event.wasClean,
       connectedSeconds: openedAt ? Math.round((performance.now() - openedAt) / 1000) : 0 });
-    setAiSupportTransport(send, false);
     stopSessionSync(true);
     const current = get();
     const accountReset = current.fantasyAccount || current.fantasyHomeId || current.session && current.worldBy[current.session] === 'fantasy'
@@ -170,7 +167,6 @@ export function applySessionSnapshot(snap: SessionSnapshot) {
 }
 
 export function onMessage(msg: ServerMsg) {
-  if (msg.t === 'aiSupportJob' || msg.t === 'aiSupportCancel') { handleAiSupportMessage(msg); return; }
   if (['fantasyProfile', 'fantasyLegacies', 'fantasyContractBoard', 'fantasyPartyState', 'fantasyRealmState', 'fantasyPropertyState', 'fantasyCombatState', 'communityState', 'fantasyDialogueChunk', 'fantasyGmReply'].includes(msg.t) && !fantasyPrivateMessagesAllowed(get())) return;
   switch (msg.t) {
     case 'fantasyAccountState': {

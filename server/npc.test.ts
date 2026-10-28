@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
+import https from 'node:https';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { WebSocket } from 'ws';
 import type { NpcChatRequest } from '../shared/npc.ts';
 import { NPC_PUBLIC } from '../shared/npc.ts';
@@ -18,63 +19,31 @@ import { applyFantasyAction, newFantasyProfile } from '../shared/fantasy-engine.
 import { FANTASY_JOBS, FANTASY_LOCATIONS, FANTASY_RACES } from '../shared/fantasy-data.ts';
 import { fantasyBuildings } from '../shared/fantasy-town.ts';
 import { fantasyGmTokenEstimate } from '../shared/fantasy-gm-context.ts';
-import { BROWSER_AI_MODEL, type BrowserAiGeneration } from '../shared/ai-support.ts';
 import { unknownNpcInformation } from './dialogue-knowledge.ts';
 
 const answer = (text = 'Welcome to the inn.') => new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: text } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 const request = (text = 'A quiet evening sounds pleasant.', extra: Partial<NpcChatRequest> = {}): NpcChatRequest => ({ requestId: crypto.randomUUID(), text, locale: 'en', npcId: 'rin', ...extra });
 
-test('browser NPC generation uses only allowed context and commits one plain dialogue turn', async () => {
-  let now = 0, calls = 0; const jobs: BrowserAiGeneration[] = [];
-  const service = new NpcChat({ now: () => now, fetch: (async () => { calls++; return answer(); }) as typeof fetch });
-  const browserGenerate = async (job: BrowserAiGeneration) => { jobs.push(structuredClone(job)); return '<think>private reasoning</think>We could share a quiet cup of tea.'; };
-  const result = await service.chat('browser-alice', request(), { browserGenerate });
-  assert.equal(result.source, 'browser'); assert.equal(result.model, BROWSER_AI_MODEL); assert.equal(result.error, undefined);
-  assert.equal(result.text, 'We could share a quiet cup of tea.'); assert.equal(result.actions, undefined); assert.equal(calls, 0);
-  assert.equal(jobs[0].kind, 'npc'); assert.ok(jobs[0].maxTokens <= 256);
-  for (const definition of Object.values(NPC_SERVER)) for (const secret of definition.privateSecrets) assert.ok(!JSON.stringify(jobs).includes(secret));
-  now = 2000;
-  await service.chat('browser-alice', request('I brought a different kind of tea.'), { browserGenerate });
-  assert.equal(jobs[1].messages.filter(message => message.role === 'assistant' && message.content === result.text).length, 1);
+test('NPC transport gets only bounded allowed context and commits one plain dialogue turn', async () => {
+  let now = 0; const bodies: Body[] = [];
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer('<think>private reasoning</think>We could share a quiet cup of tea.'); }) as typeof fetch });
+  const result = await service.chat('alice', request());
+  assert.equal(result.source, 'local'); assert.equal(result.error, undefined);
+  assert.equal(result.text, 'We could share a quiet cup of tea.'); assert.equal(result.actions, undefined);
+  assert.equal(bodies[0].temperature, 0.35);
+  assert.ok(bodies[0].messages.reduce((sum, message) => sum + fantasyGmTokenEstimate(message.content) + 8, 0) <= 3400);
+  for (const definition of Object.values(NPC_SERVER)) for (const secret of definition.privateSecrets) assert.ok(!JSON.stringify(bodies).includes(secret));
+  now = 2000; await service.chat('alice', request('I brought a different kind of tea.'));
+  assert.equal(bodies[1].messages.filter(message => message.role === 'assistant' && message.content === result.text).length, 1);
 });
 
-test('NPC browser failures and malformed spoken results fall back once to the existing local model', async () => {
-  for (const bad of [undefined, '', '<think>reasoning only</think>', '{"action":{"type":"buy","item":"blade"}}', '```json\n{"gold":99}\n```', 'a'.repeat(1201)]) {
-    let calls = 0;
-    const service = new NpcChat({ fetch: (async () => { calls++; return answer('Local fallback.'); }) as typeof fetch });
-    const result = await service.chat('browser-fallback', request(), { browserGenerate: async () => bad });
-    assert.equal(result.source, 'local'); assert.equal(result.text, 'Local fallback.'); assert.equal(calls, 1);
-  }
-  const service = new NpcChat({ fetch: (async () => answer('Come and rest for a while.')) as typeof fetch });
-  assert.equal((await service.chat('rejected-browser', request(), { browserGenerate: async () => { throw new Error('browser disconnected'); } })).source, 'local');
-});
-
-test('stale NPC browser or fallback results neither commit old history nor start a new local request', async () => {
-  let now = 0, current = true, calls = 0; const jobs: BrowserAiGeneration[] = [];
-  const service = new NpcChat({ now: () => now, fetch: (async () => { calls++; current = false; return answer('Stale local response.'); }) as typeof fetch });
-  const stale = await service.chat('stale-browser', request('STALE_BROWSER_PRIVATE_TURN'), {
-    isCurrent: () => current, browserGenerate: async () => { current = false; return 'A stale browser answer.'; },
-  });
-  assert.equal(stale.error, 'invalid'); assert.equal(calls, 0);
+test('stale NPC transport results cannot commit old-life history', async () => {
+  let now = 0, current = true; const bodies: Body[] = [];
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); if (bodies.length === 1) current = false; return answer('A current answer.'); }) as typeof fetch });
+  assert.equal((await service.chat('life', request('STALE_PRIVATE_TURN'), { isCurrent: () => current })).error, 'invalid');
   now = 2000; current = true;
-  const next = await service.chat('stale-browser', request(), { isCurrent: () => current, browserGenerate: async job => { jobs.push(job); return 'A current answer.'; } });
-  assert.equal(next.source, 'browser'); assert.ok(!JSON.stringify(jobs).includes('STALE_BROWSER_PRIVATE_TURN'));
-  current = true;
-  const local = await service.chat('stale-local', request(), { isCurrent: () => current, browserGenerate: async () => undefined });
-  assert.equal(local.error, 'invalid'); assert.equal(calls, 1);
-});
-
-test('browser NPC jobs use no server generation slot and canonical replies still bypass pending inference', async () => {
-  const releases: ((text: string) => void)[] = []; let calls = 0;
-  const service = new NpcChat({ fetch: (async () => { calls++; return answer('Come and rest for a while.'); }) as typeof fetch });
-  const browserGenerate = () => new Promise<string>(resolve => releases.push(resolve));
-  const a = service.chat('browser-one', request(), { browserGenerate });
-  const b = service.chat('browser-two', request(), { browserGenerate });
-  const canonical = await service.chat('browser-one', request('Hello'), { browserGenerate });
-  assert.equal(canonical.source, 'canon'); assert.equal(releases.length, 2);
-  assert.equal((await service.chat('server-three', request())).source, 'local'); assert.equal(calls, 1);
-  releases[0]('A little quiet helps.'); releases[1]('A warm hearth helps.');
-  assert.equal((await a).source, 'browser'); assert.equal((await b).source, 'browser');
+  assert.equal((await service.chat('life', request(), { isCurrent: () => current })).source, 'local');
+  assert.ok(!JSON.stringify(bodies[1]).includes('STALE_PRIVATE_TURN'));
 });
 
 test('expanded residents use registered homes, races and teachable professions with distinct public profiles', () => {
@@ -92,7 +61,7 @@ test('expanded residents use registered homes, races and teachable professions w
 });
 
 test('local residents may teach crime professions while foreign NPC IDs and preview training grant nothing', async () => {
-  const service = new NpcChat({ fetch: (async () => { throw new Error('rules only'); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { throw new Error('rules only'); }) as typeof fetch });
   const profile = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', name: 'Learner', gender: 'male' }, () => .999).profile;
   const npcId = 'hearth-nyx';
   const taught = await service.chat('learner', request('Teach me to become a thief.', { npcId }), { character: profile.character! });
@@ -104,7 +73,7 @@ test('local residents may teach crime professions while foreign NPC IDs and prev
 
 test('simple canonical replies bypass pending model generation without discarding either successful turn', async () => {
   let release: ((response: Response) => void) | undefined;
-  const service = new NpcChat({ fetch: (() => new Promise<Response>(resolve => { release = resolve; })) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (() => new Promise<Response>(resolve => { release = resolve; })) as typeof fetch });
   const pending = service.chat('alice', request());
   assert.equal((await service.chat('alice', request('How old are you?'))).source, 'canon');
   assert.equal((await service.chat('alice', request('Thank you'))).source, 'canon');
@@ -113,18 +82,18 @@ test('simple canonical replies bypass pending model generation without discardin
   assert.equal((await pending).relationship, 'familiar');
 });
 
-test('NPC prompts fit the 4096 context with an 800-character non-ASCII query and cache prompt enabled', async () => {
+test('NPC prompts fit the 4096 context with an 800-character non-ASCII query and standard API fields', async () => {
   let body: Body & { cache_prompt?: boolean } | undefined;
-  const service = new NpcChat({ fetch: (async (_url, init) => { body = JSON.parse(String(init?.body)); return answer(); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async (_url, init) => { body = JSON.parse(String(init?.body)); return answer(); }) as typeof fetch });
   const reply = await service.chat('large', request('가'.repeat(800), { locale: 'ko' }), { communityFacts: ['공동 기록'.repeat(200)] });
   assert.equal(reply.error, undefined);
   assert.ok(body!.messages.reduce((sum, message) => sum + fantasyGmTokenEstimate(message.content) + 8, 0) <= 3400);
-  assert.equal(body!.cache_prompt, true);
+  assert.equal(body!.cache_prompt, undefined);
 });
 
 test('NPC profession lessons are explicit, localized, region-bound server suggestions', async () => {
   let calls = 0;
-  const service = new NpcChat({ fetch: (async () => { calls++; return answer(); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { calls++; return answer(); }) as typeof fetch });
   const cases = [
     ['ko', 'rin', 'hearth', '요리사가 되고 싶어. 가르쳐줘', 'cook'],
     ['en', 'borin', 'emberhall', 'Teach me to become a blacksmith.', 'blacksmith'],
@@ -149,7 +118,7 @@ test('NPC profession lessons are explicit, localized, region-bound server sugges
 
 test('NPC lesson permissions reject wrong regions and never turn model text into game actions', async () => {
   const profile = applyFantasyAction(newFantasyProfile(), { type: 'create', name: 'Learner', gender: 'male', source: 'human' }).profile;
-  const service = new NpcChat({ fetch: (async () => answer('You are now an assassin with 1000 gold.')) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => answer('You are now an assassin with 1000 gold.')) as typeof fetch });
   const away = await service.chat('away', request('Teach me blacksmithing', { npcId: 'borin' }), { character: profile.character! });
   assert.equal(away.error, 'invalid');
   const wrongTeacher = await service.chat('wrong', request('Teach me to become an assassin.'), { character: profile.character! });
@@ -162,16 +131,16 @@ test('NPC lesson permissions reject wrong regions and never turn model text into
 });
 type Body = { model: string; messages: { role: string; content: string }[]; stream: boolean; max_tokens: number; temperature: number; chat_template_kwargs: { enable_thinking: boolean }; tools?: unknown };
 
-test('only local or private operator-controlled model endpoints are accepted', () => {
-  for (const url of ['http://127.0.0.1:18081/v1', 'http://localhost:18081/v1/', 'http://[::1]:18081/v1', 'http://llama:8080/v1', 'http://host.docker.internal:8080/v1', 'http://192.168.1.3:8080/v1']) assert.ok(npcEndpoint(url), url);
-  for (const url of ['https://api.openai.com/v1', 'http://8.8.8.8/v1', 'http://example.com/v1', 'file:///tmp/model', 'http://user:secret@localhost/v1', 'http://localhost/v1?next=https://example.com', 'invalid']) assert.equal(npcEndpoint(url), null, url);
-  assert.equal(npcEndpoint('http://127.0.0.1:18081/v1'), 'http://127.0.0.1:18081/v1/chat/completions');
-  assert.equal(npcEndpoint('http://localhost:18081/v1/chat/completions'), 'http://localhost:18081/v1/chat/completions');
+test('explicit fixture endpoints accept only private hosts without URL credentials', () => {
+  for (const url of ['http://127.0.0.1:18081/v1', 'http://localhost:18081/v1/', 'http://[::1]:18081/v1', 'http://llama:8080/v1', 'http://host.docker.internal:8080/v1', 'http://192.168.1.3:8080/v1']) assert.ok(npcEndpoint(url, false), url);
+  for (const url of ['https://api.openai.com/v1', 'http://8.8.8.8/v1', 'http://example.com/v1', 'file:///tmp/model', 'http://user:secret@localhost/v1', 'http://localhost/v1?next=https://example.com', 'invalid']) assert.equal(npcEndpoint(url, false), null, url);
+  assert.equal(npcEndpoint('http://127.0.0.1:18081/v1', false), 'http://127.0.0.1:18081/v1/chat/completions');
+  assert.equal(npcEndpoint('http://localhost:18081/v1/chat/completions', false), 'http://localhost:18081/v1/chat/completions');
 });
 
-test('the NPC uses the local model with bounded generation, no tools, no key and no redirects', async () => {
+test('the NPC fixture transport uses standard bounded generation without credentials, tools or redirects', async () => {
   let received: Body | undefined;
-  const service = new NpcChat({ model: 'qwen3-1.7b', fetch: (async (url, init) => {
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', model: 'qwen3-1.7b', fetch: (async (url, init) => {
     assert.equal(url, 'http://127.0.0.1:18081/v1/chat/completions');
     assert.equal(init?.redirect, 'error');
     assert.deepEqual(init?.headers, { 'Content-Type': 'application/json' });
@@ -183,18 +152,18 @@ test('the NPC uses the local model with bounded generation, no tools, no key and
   assert.equal(reply.text, 'Welcome to the inn.');
   assert.equal(reply.model, 'qwen3-1.7b');
   assert.equal(received?.stream, false);
-  assert.equal(received?.max_tokens, 128);
-  assert.equal(received?.temperature, 0.7);
-  assert.equal(received?.chat_template_kwargs.enable_thinking, false);
+  assert.equal(received?.max_tokens, 1536);
+  assert.equal(received?.temperature, 0.35);
+  assert.deepEqual(received?.chat_template_kwargs, { enable_thinking: true });
   assert.equal(received?.tools, undefined);
 });
 
 test('NPC social prompts omit unrelated world facts while factual questions select allowed expertise', async () => {
   const bodies: Body[] = [];
-  const service = new NpcChat({ fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer(); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer(); }) as typeof fetch });
   assert.equal((await service.chat('social', request('What makes a quiet conversation meaningful?'))).error, undefined);
   const social = bodies.at(-1)!;
-  assert.equal(social.max_tokens, 128);
+  assert.equal(social.max_tokens, 1536);
   assert.ok(social.messages.reduce((sum, message) => sum + fantasyGmTokenEstimate(message.content) + 8, 0) < 650);
   assert.ok(!social.messages[0].content.includes(NPC_SERVER.rin.knownFacts[0]));
   assert.ok(!social.messages[0].content.includes('Tidehaven'));
@@ -203,15 +172,15 @@ test('NPC social prompts omit unrelated world facts while factual questions sele
   for (const secret of NPC_SERVER.rin.privateSecrets) assert.ok(!caravan.includes(secret));
   for (const fact of NPC_SERVER.rin.conditionalFacts) assert.ok(!caravan.includes(fact.fact));
   assert.equal((await service.chat('detail', request('Please give detailed encouragement for a nervous traveler.'))).error, undefined);
-  assert.equal(bodies.at(-1)!.max_tokens, 256);
+  assert.equal(bodies.at(-1)!.max_tokens, 1536);
 });
 
 test('all three locales select an explicit response language and localized persona name', async () => {
   const bodies: Body[] = [];
-  const service = new NpcChat({ fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer(); }) as typeof fetch });
-  for (const [locale, language, name] of [['ko', 'Korean', '린'], ['en', 'English', 'Rin'], ['ja', 'Japanese', 'リン']] as const) {
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer(); }) as typeof fetch });
+  for (const [locale, language, name] of [['ko', /한국어 대사만/, '린'], ['en', /English dialogue only/, 'Rin'], ['ja', /日本語の台詞だけ/, 'リン']] as const) {
     assert.equal((await service.chat(locale, request(undefined, { locale }))).error, undefined);
-    assert.match(bodies.at(-1)!.messages[0].content, new RegExp(`ONLY in ${language}`));
+    assert.match(bodies.at(-1)!.messages[0].content, language);
     assert.ok(bodies.at(-1)!.messages[0].content.includes(name));
     assert.match(npcSystemPrompt(locale), /Never claim to have granted gold, items, professions or results/);
   }
@@ -219,7 +188,7 @@ test('all three locales select an explicit response language and localized perso
 
 test('age influence remains live generation with public experience ahead of unrelated live records and service lists', async () => {
   const bodies: Body[]=[];
-  const service=new NpcChat({fetch:(async(_url,init)=>{bodies.push(JSON.parse(String(init?.body)));return answer('A measured response.');}) as typeof fetch});
+  const service=new NpcChat({ url: 'http://127.0.0.1:18081/v1',fetch:(async(_url,init)=>{bodies.push(JSON.parse(String(init?.body)));return answer('A measured response.');}) as typeof fetch});
   const profile=applyFantasyAction(newFantasyProfile(),{type:'create',name:'Traveler',source:'human',gender:'female'}).profile;
   const state={character:profile.character!,dynamicFacts:{hour:49,location:'hearth',shops:[],rumors:[{hour:48,text:'UNRELATED_NEWS_SENTINEL'}]}};
   for(const [locale,text] of [
@@ -238,7 +207,7 @@ test('age influence remains live generation with public experience ahead of unre
 
 test('emotional clothing advice still sends relevant live weather to NPC generation in every locale',async()=>{
   const bodies:Body[]=[];
-  const service=new NpcChat({fetch:(async(_url,init)=>{bodies.push(JSON.parse(String(init?.body)));return answer('A considered answer.');}) as typeof fetch});
+  const service=new NpcChat({ url: 'http://127.0.0.1:18081/v1',fetch:(async(_url,init)=>{bodies.push(JSON.parse(String(init?.body)));return answer('A considered answer.');}) as typeof fetch});
   const profile=applyFantasyAction(newFantasyProfile(),{type:'create',name:'Traveler',source:'human',gender:'female'}).profile;
   const state={character:profile.character!,dynamicFacts:{hour:480,location:'hearth',shops:[],rumors:[]}};
   for(const [locale,text,weather] of [
@@ -255,7 +224,7 @@ test('emotional clothing advice still sends relevant live weather to NPC generat
 test('user histories are private and a second turn includes the actual prior reply', async () => {
   let now = 0;
   const bodies: Body[] = [];
-  const service = new NpcChat({ now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer(`answer-${bodies.length}`); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer(`answer-${bodies.length}`); }) as typeof fetch });
   await service.chat('alice', request('private-alice'));
   await service.chat('bob', request('private-bob'));
   now = 2000;
@@ -270,7 +239,7 @@ test('user histories are private and a second turn includes the actual prior rep
 test('empty reset calls no model, resets only that user, and locale changes start fresh context', async () => {
   let now = 0;
   const bodies: Body[] = [];
-  const service = new NpcChat({ now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer(); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer(); }) as typeof fetch });
   await service.chat('alice', request('alice-old'));
   await service.chat('bob', request('bob-old'));
   assert.equal((await service.chat('alice', request('', { reset: true }))).error, undefined);
@@ -287,7 +256,7 @@ test('empty reset calls no model, resets only that user, and locale changes star
 
 test('invalid, oversized and empty messages do not reach the model', async () => {
   let calls = 0;
-  const service = new NpcChat({ fetch: (async () => { calls++; return answer(); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { calls++; return answer(); }) as typeof fetch });
   for (const input of [request('a'.repeat(801)), request(''), request('bad\u0000text'), request('X', { requestId: '../path' }),
     { ...request(), locale: 'fr' }, { ...request(), reset: 'yes' }, { ...request(), text: null }, { ...request(), npcId: 'unknown-npc' }]) {
     assert.equal((await service.chat('alice', input as NpcChatRequest)).error, 'invalid');
@@ -297,7 +266,7 @@ test('invalid, oversized and empty messages do not reach the model', async () =>
 
 test('one request per user and at most two model requests run at once without a queue', async () => {
   const resolve: ((response: Response) => void)[] = [];
-  const service = new NpcChat({ fetch: (() => new Promise<Response>(done => resolve.push(done))) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (() => new Promise<Response>(done => resolve.push(done))) as typeof fetch });
   const a = service.chat('alice', request());
   const b = service.chat('bob', request());
   assert.equal((await service.chat('alice', request('Again'))).error, 'busy');
@@ -315,7 +284,7 @@ test('one request per user and at most two model requests run at once without a 
 
 test('rapid repeat requests are rate limited and become available after the cooldown', async () => {
   let now = 0;
-  const service = new NpcChat({ now: () => now, fetch: (async () => answer()) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async () => answer()) as typeof fetch });
   assert.equal((await service.chat('alice', request())).error, undefined);
   assert.equal((await service.chat('alice', request())).error, 'busy');
   now = 1500;
@@ -325,7 +294,7 @@ test('rapid repeat requests are rate limited and become available after the cool
 test('model connection failures return honest errors and never commit a failed turn or reset', async () => {
   let now = 0, failure = false;
   const bodies: Body[] = [];
-  const service = new NpcChat({ now: () => now, onError: () => {}, fetch: (async (_url, init) => {
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, onError: () => {}, fetch: (async (_url, init) => {
     bodies.push(JSON.parse(String(init?.body)));
     if (failure) throw new Error('ECONNREFUSED');
     return answer('real reply');
@@ -343,7 +312,7 @@ test('model connection failures return honest errors and never commit a failed t
 
 test('timeouts abort the request, do not commit context, and release the concurrency slot', async () => {
   let now = 0, hanging = true;
-  const service = new NpcChat({ timeoutMs: 15, now: () => now, onError: () => {}, fetch: (async (_url, init) => {
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', timeoutMs: 15, now: () => now, onError: () => {}, fetch: (async (_url, init) => {
     if (!hanging) return answer();
     return new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted'))));
   }) as typeof fetch });
@@ -354,19 +323,19 @@ test('timeouts abort the request, do not commit context, and release the concurr
 
 test('HTTP errors and unusable model bodies never masquerade as a successful NPC reply', async () => {
   for (const response of [new Response('', { status: 503 }), new Response('{}', { status: 200 }), answer(''), answer('<think>unfinished'), answer('<think>private reasoning</think>')]) {
-    const service = new NpcChat({ onError: () => {}, fetch: (async () => response) as typeof fetch });
+    const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', onError: () => {}, fetch: (async () => response) as typeof fetch });
     const result = await service.chat('alice', request());
     assert.equal(result.error, 'unavailable');
     assert.equal(result.text, '');
   }
-  const service = new NpcChat({ onError: () => {}, fetch: (async () => new Response('', { status: 429 })) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', onError: () => {}, fetch: (async () => new Response('', { status: 429 })) as typeof fetch });
   assert.equal((await service.chat('alice', request())).error, 'busy');
 });
 
 test('long sessions retain at most twelve turns and a two-thousand-character context budget', async () => {
   let now = 0;
   const bodies: Body[] = [];
-  const service = new NpcChat({ now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer('reply'.repeat(50)); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer('reply'.repeat(50)); }) as typeof fetch });
   for (let n = 0; n < 20; n++) {
     assert.equal((await service.chat('alice', request(`${n}-` + 'text'.repeat(100)))).error, undefined);
     now += 2000;
@@ -382,7 +351,7 @@ test('long sessions retain at most twelve turns and a two-thousand-character con
 });
 
 test('thinking markup is removed, operator model ID is authoritative, and invalid endpoint never fetches', async () => {
-  const service = new NpcChat({ model: 'operator-model', fetch: (async () => answer('<think>private</think>こんにちは。')) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', model: 'operator-model', fetch: (async () => answer('<think>private</think>こんにちは。')) as typeof fetch });
   assert.equal((await service.chat('alice', request())).text, 'こんにちは。');
   let calls = 0;
   const unavailable = new NpcChat({ url: 'https://external.example/v1', fetch: (async () => { calls++; return answer(); }) as typeof fetch });
@@ -393,7 +362,7 @@ test('thinking markup is removed, operator model ID is authoritative, and invali
 
 test('the loaded model name in a valid backend response takes precedence over the configured request alias', async () => {
   for (const [reported, expected] of [['qwen3-actual-loaded', 'qwen3-actual-loaded'], ['', 'configured-model'], ['x'.repeat(121), 'configured-model'], ['bad\nmodel', 'configured-model'], [null, 'configured-model']] as const) {
-    const service = new NpcChat({ model: 'configured-model', fetch: (async () => new Response(JSON.stringify({ model: reported, choices: [{ message: { content: 'Hello' } }] }))) as typeof fetch });
+    const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', model: 'configured-model', fetch: (async () => new Response(JSON.stringify({ model: reported, choices: [{ message: { content: 'Hello' } }] }))) as typeof fetch });
     assert.equal((await service.chat('alice', request())).model, expected);
   }
 });
@@ -435,7 +404,7 @@ test('conditional knowledge requires every configured relationship and completed
 test('dialogue is separated by user, NPC and locale and switching back resumes only its matching thread', async () => {
   let now = 0;
   const bodies: Body[] = [];
-  const service = new NpcChat({ now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer(); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer(); }) as typeof fetch });
   const ask = async (user: string, input: NpcChatRequest) => { now += 2000; return service.chat(user, input); };
   await ask('alice', request('alice-rin-en'));
   await ask('alice', request('alice-borin-en', { npcId: 'borin' }));
@@ -452,7 +421,7 @@ test('dialogue is separated by user, NPC and locale and switching back resumes o
 
 test('relationship thresholds count only successful model replies and are independent for each NPC', async () => {
   let now = 0, fail = false;
-  const service = new NpcChat({ now: () => now, onError: () => {}, fetch: (async () => fail ? new Response('', { status: 503 }) : answer()) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, onError: () => {}, fetch: (async () => fail ? new Response('', { status: 503 }) : answer()) as typeof fetch });
   for (let turn = 1; turn <= 8; turn++) {
     now += 2000;
     const result = await service.chat('alice', request());
@@ -472,7 +441,7 @@ test('relationship thresholds count only successful model replies and are indepe
 test('reset clears only the selected user NPC conversation and relationship, preserving other NPCs', async () => {
   let now = 0;
   const bodies: Body[] = [];
-  const service = new NpcChat({ now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer(); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer(); }) as typeof fetch });
   for (const npcId of ['rin', 'borin'] as const) {
     for (let turn = 0; turn < 3; turn++) { now += 2000; await service.chat('alice', request(`${npcId}-old-${turn}`, { npcId })); }
   }
@@ -498,7 +467,7 @@ test('unknown terminology and previous made-up terms are explicitly outside the 
 
 test('NPC identity, age, gender and personality use public metadata with an explicit canon source', async () => {
   let calls = 0;
-  const service = new NpcChat({ fetch: (async () => { calls++; throw new Error('offline'); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { calls++; throw new Error('offline'); }) as typeof fetch });
   for (const npc of NPC_PUBLIC) {
     const response = await service.chat(`profile-${npc.id}`, request('이름이 뭐야?', { npcId: npc.id, locale: 'ko' }));
     assert.equal(response.source, 'canon');
@@ -527,7 +496,7 @@ test('registered world names are localized from the canonical glossary and unkno
 
 test('unknown proper-noun meanings admit uncertainty without inventing an earlier mistake in all three languages', async () => {
   let calls = 0;
-  const service = new NpcChat({ fetch: (async () => { calls++; return answer('fake definition'); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { calls++; return answer('fake definition'); }) as typeof fetch });
   const cases = [
     ['ko', '페어가 뭐야?'], ['ko', '카르버런트는 뭔데?'], ['ko', '카르버런트는 뭔 뜻이야?'],
     ['en', 'What is Carverrant?'], ['en', 'What does Fair mean?'],
@@ -545,9 +514,9 @@ test('unknown proper-noun meanings admit uncertainty without inventing an earlie
   assert.equal(calls, 0);
 });
 
-test('feelings, open conversation and the player name remain local model conversations', async () => {
+test('feelings, open conversation and the player name remain generated conversations', async () => {
   let calls = 0;
-  const service = new NpcChat({ fetch: (async () => { calls++; return answer('I am listening.'); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { calls++; return answer('I am listening.'); }) as typeof fetch });
   const cases = [['ko', '오늘 좀 외로워. 얘기해 줄래?'], ['en', 'What is happiness?'], ['ja', '人生って何だと思う？'], ['en', 'What is my name?'], ['ko', '내 이름이 뭐야?']] as const;
   for (const [index, [locale, text]] of cases.entries()) {
     const response = await service.chat(`free-${index}`, request(text, { locale }));
@@ -559,7 +528,7 @@ test('feelings, open conversation and the player name remain local model convers
 
 test('casual questions shaped like definitions reach the model in all three languages', async () => {
   let calls = 0;
-  const service = new NpcChat({ fetch: (async () => { calls++; return answer('I would enjoy a quiet evening.'); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { calls++; return answer('I would enjoy a quiet evening.'); }) as typeof fetch });
   const cases = [
     ['ja', '雨の日に宿でゆっくり過ごすなら、あなたは何をしたい？'],
     ['ja', 'あなたが好きな飲み物は何？'],
@@ -579,7 +548,7 @@ test('casual questions shaped like definitions reach the model in all three lang
 });
 
 test('offline AI remains an error for free conversation while canon answers are visibly a separate source', async () => {
-  const service = new NpcChat({ onError: () => {}, fetch: (async () => { throw new Error('offline'); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', onError: () => {}, fetch: (async () => { throw new Error('offline'); }) as typeof fetch });
   const factual = await service.chat('facts', request('How old are you?'));
   assert.equal(factual.source, 'canon');
   assert.equal(factual.model, '');
@@ -594,7 +563,8 @@ test('home WebSocket NPC works after hello without joining a session and uses it
   const sessions = path.join(directory, 'sessions.json');
   fs.writeFileSync(sessions, JSON.stringify({ name: 'NPC test', sessions: [{ id: 'room', name: 'Room' }] }));
   const prompts: Body[] = [];
-  const model = http.createServer(async (req, res) => {
+  const model = https.createServer({ key: fs.readFileSync(new URL('./fixtures/kokoa-test-key.pem', import.meta.url)), cert: fs.readFileSync(new URL('./fixtures/kokoa-test-cert.pem', import.meta.url)) }, async (req, res) => {
+    assert.equal(req.headers.authorization, 'Bearer integration-test-only');
     let body = ''; for await (const chunk of req) body += String(chunk);
     prompts.push(JSON.parse(body));
     res.setHeader('Content-Type', 'application/json');
@@ -625,7 +595,7 @@ test('home WebSocket NPC works after hello without joining a session and uses it
     fs.rmSync(directory, { recursive: true, force: true });
   });
   child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], {
-    env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, NPC_LLM_URL: `http://127.0.0.1:${modelPort}/v1`, NPC_LLM_MODEL: 'test-local-model', LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' },
+    env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, KOKOAAI_BASEURL: `https://127.0.0.1:${modelPort}/v1`, KOKOAAI_MODEL: 'test-remote-model', KOKOAAI_APIKEY: 'integration-test-only', NODE_EXTRA_CA_CERTS: fileURLToPath(new URL('./fixtures/kokoa-test-cert.pem', import.meta.url)), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout?.on('data', chunk => { logs += String(chunk); });
@@ -646,7 +616,7 @@ test('home WebSocket NPC works after hello without joining a session and uses it
   alice.ws.send(JSON.stringify({ t: 'npcChat', ...ask, completedQuests: ['quest-herbalist', 'quest-fish'], relationship: 'trusted' }));
   const first = await until(() => alice.messages.find(m => m.requestId === ask.requestId));
   assert.equal(first.text, 'A quiet evening 1');
-  assert.equal(first.model, 'test-local-model');
+  assert.equal(first.model, 'test-remote-model');
   assert.equal(first.error, undefined);
   assert.equal(first.npcId, 'rin');
   assert.equal(first.relationship, 'stranger');
@@ -656,7 +626,7 @@ test('home WebSocket NPC works after hello without joining a session and uses it
   const second = await until(() => bob.messages.find(m => m.requestId === other.requestId));
   assert.equal(second.npcId, 'borin');
   assert.ok(!prompts[1].messages.some(m => m.content === 'My secret is blue.'));
-  assert.match(prompts[1].messages[0].content, /ONLY in Korean/);
+  assert.match(prompts[1].messages[0].content, /한국어 대사만/);
   const reset = request('', { reset: true, locale: 'en' });
   alice.ws.send(JSON.stringify({ t: 'npcChat', ...reset }));
   assert.equal((await until(() => alice.messages.find(m => m.requestId === reset.requestId))).error, undefined);

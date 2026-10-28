@@ -1231,7 +1231,7 @@ AI는 설정집을 수정하거나, 새 지명·종족·조직·기술을 공식
 
 현재 로컬 플레이 입구는 [RPG 프로토타입](http://127.0.0.1:3011/?rpg=1)이다. 별도 Vite 개발 화면은5183을 쓴다. 일반 로그인 뒤 시작 버튼으로 자기 전용 초대 세션을 만들고 참여한다. Web 구현이며 Avalonia·Unity에 동일 기능을 이식하지 않았다.
 
-실제 조작과 실행 설정은 [RPG 안내](fantasy.md), 로컬 모델 제약은 [로컬 NPC 대화](local-npc.md), 적대적 조우 목록은 [몬스터58종](fantasy-monster-list.md)을 참고한다. [직접 거래와 공유 상점](fantasy-economy.md)·[주민과 관청](fantasy-civics.md)·[부동산](fantasy-property-plan.md)·[사제 성장](priest-growth-plan.md)은 실제 규칙이다. 미채택 후보와 검증 상태는 [확장 계획](fantasy-expansion-plan.md)과 [공식 조사 출처](fantasy-expansion-candidates.md)에서 구분한다. 후속 확장의1,143개 검사와 저장 호환·빌드를 마쳤고, 이후 NPC 대화 버전5는1,189개 회귀 검사와 타입 검사·빌드를 통과했다. 이는 각 단계의 완료 기록이며 여러 실제 PC의 AI 처리량과 장기 자원 사용 실측을 대신하지 않는다.
+실제 조작과 실행 설정은 [RPG 안내](fantasy.md), 대화 AI 연결은 [KokoaAI 대화](local-npc.md), 적대적 조우 목록은 [몬스터58종](fantasy-monster-list.md)을 참고한다. [직접 거래와 공유 상점](fantasy-economy.md)·[주민과 관청](fantasy-civics.md)·[부동산](fantasy-property-plan.md)·[사제 성장](priest-growth-plan.md)은 실제 규칙이다. 미채택 후보와 검증 상태는 [확장 계획](fantasy-expansion-plan.md)과 [공식 조사 출처](fantasy-expansion-candidates.md)에서 구분한다. 후속 확장의1,143개 검사와 저장 호환·빌드를 마쳤고, 이후 NPC 대화 버전5는1,189개 회귀 검사와 타입 검사·빌드를 통과했다. 이는 각 단계의 완료 기록이며 여러 실제 PC의 AI 처리량과 장기 자원 사용 실측을 대신하지 않는다.
 
 독자 세계·동화·여행기를 사용한다. 복식 자료는 박물관의 재료·겹침·이동 생활에서 기능적 발상만 참고했으며 실제 의례·민족·신성한 무늬를 판타지 종족에 복제하지 않았다.
 

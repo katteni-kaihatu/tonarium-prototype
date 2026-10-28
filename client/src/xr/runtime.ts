@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import * as THREE from 'three';
-import { DEFAULT_TURN, turnSettings } from './input.ts';
+import { DEFAULT_TURN, turnSettings, type TurnSettings } from './input.ts';
 import type { AvatarXR } from '../../../shared/xr-pose.ts';
 
 let snapshot = { active: false, open: true, ready: false, pending: false, error: '', panels: [] as { id: string; title: string; open: boolean }[] };
@@ -26,6 +26,11 @@ export const xr = {
   use: null as null | (() => void), release: null as null | (() => void), carry: null as null | (() => boolean),
   cancel: null as null | (() => void),
 };
+export function updateXRSettings(patch: Partial<TurnSettings>) {
+  xr.settings = turnSettings({ ...xr.settings, ...patch });
+  xrPatch({});
+  try { localStorage.setItem('tonarium.xr.turn', JSON.stringify(xr.settings)); } catch { /* 保存不可でもその場で反映する */ }
+}
 export function resetXRInput(preserveTracking = false) {
   xr.clearControllers?.(preserveTracking);
   if (!preserveTracking) { xr.pose = undefined; xr.headYaw = 0; xr.headPitch = 0; }

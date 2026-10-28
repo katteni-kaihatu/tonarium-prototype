@@ -25,7 +25,7 @@ export function fantasyQueryNames(query: string): string[] {
   })).flatMap(term => [term.id, ...Object.values(term.names)]))];
 }
 
-/** Deliberately conservative estimate for the local model's multilingual input. */
+/** 多言語の入力は余裕を持って見積もる。 */
 export function fantasyGmTokenEstimate(text: string): number {
   let tokens = 0;
   for (const character of text) tokens += character.codePointAt(0)! <= 0x7f ? 0.4 : 2;

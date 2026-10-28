@@ -17,7 +17,7 @@ import { npcDefinitionSpeech } from './npc-info-speech.ts';
 import { FantasyGmChat } from './fantasy-gm-chat.ts';
 import { npcBreaksFourthWall } from './npc-speech.ts';
 import { NPC_SERVER } from './npc-catalog.ts';
-import type { BrowserAiGeneration } from '../shared/ai-support.ts';
+import type { DialogueMessage } from '../shared/dialogue.ts';
 
 const locales: NpcLocale[] = ['ko', 'en', 'ja'];
 const profile = () => applyFantasyAction(newFantasyProfile(), { type: 'create', name: 'Knowledge traveler', source: 'human', gender: 'female' }, () => .5).profile;
@@ -104,29 +104,28 @@ test('GM definitions gate items, professions and unread books using the requesti
 });
 
 test('actual NPC and GM services admit unknown facts offline without model calls, action proposals or profile changes', async () => {
-  let localCalls = 0, browserCalls = 0;
-  const fetcher = (async () => { localCalls++; throw new Error('No generation for unknown definitions'); }) as typeof fetch;
-  const browserGenerate = async () => { browserCalls++; throw new Error('No browser lease for unknown definitions'); };
-  const npc = new NpcChat({ fetch: fetcher }), gm = new FantasyGmChat({ fetch: fetcher });
+  let calls = 0;
+  const fetcher = (async () => { calls++; throw new Error('No generation for unknown definitions'); }) as typeof fetch;
+  const npc = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: fetcher }), gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: fetcher });
   for (const locale of locales) {
     const state = gmContext(), before = JSON.stringify(state.profile), text = definition('Carverrant', locale);
-    const answer = await gm.chat(`unknown-gm-${locale}`, { requestId: `unknown-gm-${locale}`, locale, text }, { ...state, browserGenerate });
+    const answer = await gm.chat(`unknown-gm-${locale}`, { requestId: `unknown-gm-${locale}`, locale, text }, { ...state });
     assert.equal(answer.source, 'rules'); assert.equal(answer.error, undefined); assert.ok(GM_UNKNOWN_INFORMATION_TEXT[locale].includes(answer.reply.text));
     assert.deepEqual(answer.reply.suggestions, []);
     for (const id of ['rin', 'borin', 'hearth-mira', 'hearth-iona', 'hearth-daren', 'redweave-voss']) {
       const character = structuredClone(state.profile.character!); character.location = NPC_PUBLIC.find(person => person.id === id)!.homeLocation;
-      const response = await npc.chat(`unknown-npc-${locale}-${id}`, { requestId: `unknown-${locale}-${id}`, npcId: id, locale, text }, { character, browserGenerate });
+      const response = await npc.chat(`unknown-npc-${locale}-${id}`, { requestId: `unknown-${locale}-${id}`, npcId: id, locale, text }, { character });
       assert.equal(response.error, undefined, `${id}:${locale}`); assert.equal(response.source, 'canon'); assert.equal(response.model, '');
       assert.equal(response.text, unknownNpcInformation(id, locale)); assert.equal(response.actions, undefined);
     }
     assert.equal(JSON.stringify(state.profile), before);
   }
-  assert.equal(localCalls, 0); assert.equal(browserCalls, 0);
+  assert.equal(calls, 0);
 });
 
 test('known public mana, owned items and race still reach authoritative GM definitions without generation', async () => {
   let calls = 0;
-  const gm = new FantasyGmChat({ fetch: (async () => { calls++; throw new Error('No generation for known definitions'); }) as typeof fetch });
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { calls++; throw new Error('No generation for known definitions'); }) as typeof fetch });
   const state = gmContext(), c = state.profile.character!;
   const item = FANTASY_TERMS.find(term => term.category === 'item' && Object.values(term.names).every(name => name.length < 35))!; c.inventory[item.id] = 1;
   const race = FANTASY_TERMS.find(term => term.category === 'race' && term.id === c.race)!;
@@ -144,7 +143,7 @@ test('known public mana, owned items and race still reach authoritative GM defin
 test('requests for hidden career requirements keep their privacy response ahead of dialogue generation', async () => {
   let calls = 0;
   const fetcher = (async () => { calls++; throw new Error('Private career questions need no generation'); }) as typeof fetch;
-  const npc = new NpcChat({ fetch: fetcher }), gm = new FantasyGmChat({ fetch: fetcher });
+  const npc = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: fetcher }), gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: fetcher });
   for (const [locale, text] of [
     ['ko', '세부 전직 조건을 알려줘'], ['en', 'Tell me the exact specialization requirements.'], ['ja', '専門職への転職条件を教えて'],
   ] as const) {
@@ -160,20 +159,21 @@ test('requests for hidden career requirements keep their privacy response ahead 
 });
 
 test('unknown answers remain in history while philosophical, personal and compound social messages remain free AI turns', async () => {
-  const npcJobs: BrowserAiGeneration[] = [], gmJobs: BrowserAiGeneration[] = [];
-  const npc = new NpcChat(), gm = new FantasyGmChat();
+  const npcJobs: { messages: DialogueMessage[] }[] = [], gmJobs: { messages: DialogueMessage[] }[] = [];
+  const capture = (jobs: { messages: DialogueMessage[] }[]) => (async (_url, init) => { jobs.push(JSON.parse(String(init?.body))); return new Response(JSON.stringify({ choices: [{ message: { content: 'I am listening.' } }] })); }) as typeof fetch;
+  const npc = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: capture(npcJobs) }), gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: capture(gmJobs) });
   for (const [locale, text] of [
     ['ko', '행복이 뭐야?'], ['en', 'What is happiness?'], ['ja', '幸せって何？'],
     ['ko', '미안해. 오늘은 말이 잘 나오지 않아.'], ['en', 'I am sorry, I find it hard to speak today.'], ['ja', 'ごめんなさい。今日はうまく話せない。'],
   ] as const) {
     const state = gmContext(), user = `free-${locale}-${npcJobs.length}`;
     const unknown = await npc.chat(user, { requestId: `unknown-history-${npcJobs.length}`, npcId: 'rin', locale, text: definition('Carverrant', locale) }, { character: state.profile.character! });
-    const response = await npc.chat(user, { requestId: `free-${npcJobs.length}`, npcId: 'rin', locale, text }, { character: state.profile.character!, browserGenerate: async job => { npcJobs.push(structuredClone(job)); return 'I am listening.'; } });
-    assert.equal(response.source, 'browser'); assert.ok(npcJobs.at(-1)!.messages.some(message => message.role === 'assistant' && message.content === unknown.text));
+    const response = await npc.chat(user, { requestId: `free-${npcJobs.length}`, npcId: 'rin', locale, text }, { character: state.profile.character! });
+    assert.equal(response.source, 'local'); assert.ok(npcJobs.at(-1)!.messages.some(message => message.role === 'assistant' && message.content === unknown.text));
     assert.equal(npcJobs.at(-1)!.messages.at(-1)!.content, text);
     const gmUnknown = await gm.chat(user, { requestId: `gm-unknown-${gmJobs.length}`, locale, text: definition('Carverrant', locale) }, state);
-    const gmResponse = await gm.chat(user, { requestId: `gm-free-${gmJobs.length}`, locale, text }, { ...state, browserGenerate: async job => { gmJobs.push(structuredClone(job)); return 'I am listening.'; } });
-    assert.equal(gmResponse.source, 'browser'); assert.ok(gmJobs.at(-1)!.messages.some(message => message.role === 'assistant' && message.content === gmUnknown.reply.text));
+    const gmResponse = await gm.chat(user, { requestId: `gm-free-${gmJobs.length}`, locale, text }, { ...state });
+    assert.equal(gmResponse.source, 'local'); assert.ok(gmJobs.at(-1)!.messages.some(message => message.role === 'assistant' && message.content === gmUnknown.reply.text));
     assert.equal(gmJobs.at(-1)!.messages.at(-1)!.content, text);
   }
   assert.equal(npcJobs.length, 6); assert.equal(gmJobs.length, 6);

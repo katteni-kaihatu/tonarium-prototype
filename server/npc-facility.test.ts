@@ -24,7 +24,7 @@ const name = (id: string, locale: NpcLocale) => FANTASY_ITEMS.find(item => item.
 
 test('every innkeeper knows the actual rooms and corrects invented room types without breaking character', async () => {
   let generated = 0;
-  const service = new NpcChat({ fetch: (async () => { generated++; throw Error('No model needed'); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { generated++; throw Error('No model needed'); }) as typeof fetch });
   for (const npc of NPC_PUBLIC.filter(npc => npc.building === 'inn')) for (const locale of locales) {
     const c = character(); c.location = npc.homeLocation;
     c.bargains = { room: { location: c.location, discount: .2, expiresAt: c.hour + 8, nextAt: c.hour + 4 } };
@@ -144,16 +144,15 @@ test('facility staff know their lessons, workbenches and boat terms without chan
   assert.match(boat, /20G/); assert.match(boat, /24 hours/); assert.match(boat, /180G/);
 });
 
-test('both browser and central generation replace fourth-wall speech with an in-world reply and discard it from later history', async () => {
+test('external dialogue responses replace fourth-wall speech with an in-world reply and discard it from later history', async () => {
   const unsafe = ['I am an AI model. Click the button below.', '게임 시스템의 공식 설정집을 확인해 주세요.', 'ゲームのデータベースにはありません。', 'According to the provided context, this NPC knows the official world records.'];
-  for (const browser of [true, false]) for (const [index, text] of unsafe.entries()) {
+  for (const [index, text] of unsafe.entries()) {
     let now = 0; const captured: { role: string; content: string }[][] = [];
-    const service = new NpcChat({ now: () => now, fetch: (async (_url, init) => { captured.push(JSON.parse(String(init?.body)).messages); return new Response(JSON.stringify({ choices: [{ message: { content: text } }] })); }) as typeof fetch });
-    const generate = async (job: { messages: { role: string; content: string }[] }) => { captured.push(job.messages); return text; };
-    const response = await service.chat(`unsafe-${index}`, ask('긴 여행 뒤라 조금 외로워.'), browser ? { browserGenerate: generate } : {});
+    const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async (_url, init) => { captured.push(JSON.parse(String(init?.body)).messages); return new Response(JSON.stringify({ choices: [{ message: { content: text } }] })); }) as typeof fetch });
+    const response = await service.chat(`unsafe-${index}`, ask('긴 여행 뒤라 조금 외로워.'));
     assert.equal(response.source, 'canon'); assert.equal(response.error, undefined); assert.equal(npcBreaksFourthWall(response.text), false); assert.notEqual(response.text, text);
     now += 2000;
-    await service.chat(`unsafe-${index}`, ask('계속 이야기해 줘.'), browser ? { browserGenerate: generate } : {});
+    await service.chat(`unsafe-${index}`, ask('계속 이야기해 줘.'));
     assert.equal(captured[1].slice(1).some(message => message.role === 'assistant' && message.content === text), false);
   }
   assert.equal(npcBreaksFourthWall('도서관의 기록과 책을 읽고 비교했어.'), false);
@@ -161,12 +160,12 @@ test('both browser and central generation replace fourth-wall speech with an in-
 });
 
 test('old invented room and meta dialogue is excluded while current premises outrank stale history', async () => {
-  const service = new NpcChat({ fetch: (async () => { throw Error('browser expected'); }) as typeof fetch });
+  let prompt = '';
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async (_url, init) => { prompt = JSON.stringify(JSON.parse(String(init?.body)).messages); return new Response(JSON.stringify({ choices: [{ message: { content: '쉴 시간을 먼저 생각하고, 필요한 만큼의 방을 고르면 돼.' } }] })); }) as typeof fetch });
   const old = service as unknown as { conversations: Map<string, Map<string, { turns: number; histories: { ko: { role: 'user' | 'assistant'; content: string }[] } }>> };
   old.conversations.set('old', new Map([['rin', { turns: 2, histories: { ko: [{ role: 'user', content: '객실은?' }, { role: 'assistant', content: '트리플과 특별 할인 객실이 있어.' }, { role: 'user', content: '그건 뭐야?' }, { role: 'assistant', content: '공식 설정집의 시스템 기록을 보세요.' }] } }]]));
-  let prompt = '';
-  const reply = await service.chat('old', ask('객실을 고르는 손님에게 어떤 조언을 해?'), { browserGenerate: async job => { prompt = JSON.stringify(job.messages); return '쉴 시간을 먼저 생각하고, 필요한 만큼의 방을 고르면 돼.'; } });
-  assert.equal(reply.source, 'browser'); assert.ok(!prompt.includes('트리플')); assert.ok(!prompt.includes('특별 할인 객실')); assert.ok(!prompt.includes('공식 설정집의 시스템 기록'));
+  const reply = await service.chat('old', ask('객실을 고르는 손님에게 어떤 조언을 해?'));
+  assert.equal(reply.source, 'local'); assert.ok(!prompt.includes('트리플')); assert.ok(!prompt.includes('특별 할인 객실')); assert.ok(!prompt.includes('공식 설정집의 시스템 기록'));
   assert.ok(prompt.includes('공동 객실')); assert.ok(prompt.includes('개인 객실')); assert.ok(prompt.includes('특실'));
   assert.ok(npcSystemPrompt('en', 'rin').includes('earlier dialogue is not evidence'));
 });
@@ -194,7 +193,7 @@ test('reading intent distinguishes deliberate requests from descriptions, hypoth
 
 test('local librarians resolve complete, spaced and unique partial titles without model generation or state changes', async () => {
   let generated = 0;
-  const service = new NpcChat({ fetch: (async () => { generated++; throw Error('Reading must not need a model'); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { generated++; throw Error('Reading must not need a model'); }) as typeof fetch });
   const queries = [
     ['ko', '시작하는 마나 를 읽고싶어'], ['ko', '숨 에서 시작 하는 마나 를 읽고 싶어요'], ['ko', '『숨에서 시작하는 마나』 책을 읽어 주세요'],
     ['en', 'I want to read Mana Begins with Breath'], ['en', 'I’d like to read Begins with Breath, please.'], ['en', 'Read Mana Begins with Breath'],
@@ -212,7 +211,7 @@ test('local librarians resolve complete, spaced and unique partial titles withou
 
 test('unknown, foreign, ambiguous-short and already-studied books never grant a reading action', async () => {
   let generated = 0;
-  const service = new NpcChat({ fetch: (async () => { generated++; throw Error('Shelf checks must not need a model'); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { generated++; throw Error('Shelf checks must not need a model'); }) as typeof fetch });
   const foreign = FANTASY_LIBRARY_BOOKS.find(book => book.id === 'staff-and-footwork')!;
   for (const locale of locales) for (const unknown of [false, true]) {
     const title = unknown ? { ko: '존재하지 않는 자주색 구름', en: 'Unwritten Purple Clouds', ja: '存在しない紫の雲' }[locale] : foreign.title[locale];
@@ -237,7 +236,7 @@ test('unknown, foreign, ambiguous-short and already-studied books never grant a 
 });
 
 test('describing a named book remains information only, while reading offers require a separate final approval', async () => {
-  const service = new NpcChat({ fetch: (async () => { throw Error('No model expected'); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { throw Error('No model expected'); }) as typeof fetch });
   const book = FANTASY_LIBRARY_BOOKS.find(book => book.id === 'mana-primer')!;
   for (const locale of locales) {
     const profile = applyFantasyAction(newFantasyProfile(), { type: 'create', name: 'Reader', gender: 'female', source: 'human' }, () => .5).profile;

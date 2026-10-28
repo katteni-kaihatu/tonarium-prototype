@@ -10,7 +10,7 @@ import { FantasyGmChat } from './fantasy-gm-chat.ts';
 import { NPC_SERVER } from './npc-catalog.ts';
 import { npcBreaksFourthWall } from './npc-speech.ts';
 import { applyFantasyAction, newFantasyProfile } from '../shared/fantasy-engine.ts';
-import type { BrowserAiGeneration } from '../shared/ai-support.ts';
+import type { DialogueMessage } from '../shared/dialogue.ts';
 import { quickNpcQuestion } from '../client/src/world/npc-request-tracker.ts';
 import { fantasyNpcTone } from '../shared/fantasy-dialogue-voice.ts';
 import { npcPersonaReply } from './npc-persona-lines.ts';
@@ -131,27 +131,26 @@ test('returned cache entries cannot poison later replies, other locales, residen
   assert.equal(preparedGmReply('ko', '안녕하세요')!.text, gmOriginal);
 });
 
-test('actual NPC and GM services return prewritten dialogue with no local or browser generation and no player-state mutation', async () => {
-  let localCalls = 0, browserCalls = 0;
-  const fetcher = (async () => { localCalls++; throw new Error('A prewritten reply must not call a model'); }) as typeof fetch;
-  const browserGenerate = async () => { browserCalls++; throw new Error('A prewritten reply must not lease a browser'); };
-  const npc = new NpcChat({ fetch: fetcher }), gm = new FantasyGmChat({ fetch: fetcher });
+test('actual NPC and GM services return prewritten dialogue with no inference and no player-state mutation', async () => {
+  let calls = 0;
+  const fetcher = (async () => { calls++; throw new Error('A prewritten reply must not call a model'); }) as typeof fetch;
+  const npc = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: fetcher }), gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: fetcher });
   for (const locale of locales) for (const topic of topics) {
     const text = PREWRITTEN_QUESTIONS[topic][locale][0], state = context(), before = JSON.stringify(state.profile);
-    const answer = await npc.chat(`prepared-user-${locale}-${topic}`, request('rin', locale, text, topic), { character: state.profile.character!, browserGenerate });
+    const answer = await npc.chat(`prepared-user-${locale}-${topic}`, request('rin', locale, text, topic), { character: state.profile.character! });
     assert.equal(answer.error, undefined); assert.equal(answer.source, 'canon'); assert.equal(answer.model, ''); assert.equal(answer.actions, undefined);
     assert.equal(answer.text, preparedNpcReply('rin', 'stranger', locale, text)!.text);
-    const gmAnswer = await gm.chat(`prepared-gm-${locale}-${topic}`, { requestId: `prepared-gm-${locale}-${topic}`, locale, text }, { ...state, browserGenerate });
+    const gmAnswer = await gm.chat(`prepared-gm-${locale}-${topic}`, { requestId: `prepared-gm-${locale}-${topic}`, locale, text }, { ...state });
     assert.equal(gmAnswer.error, undefined); assert.equal(gmAnswer.source, 'rules'); assert.deepEqual(gmAnswer.reply.suggestions, []);
     assert.equal(gmAnswer.reply.text, preparedGmReply(locale, text)!.text);
     assert.equal(JSON.stringify(state.profile), before);
   }
-  assert.equal(localCalls, 0); assert.equal(browserCalls, 0);
+  assert.equal(calls, 0);
 });
 
 test('membership, locale, NPC identity and stale-request checks still precede cached dialogue', async () => {
   let calls = 0; const fetcher = (async () => { calls++; throw new Error('invalid cached request'); }) as typeof fetch;
-  const npc = new NpcChat({ fetch: fetcher }), gm = new FantasyGmChat({ fetch: fetcher });
+  const npc = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: fetcher }), gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: fetcher });
   const hello = request('rin', 'ko', '안녕하세요', 'invalid'), state = context();
   assert.equal((await npc.chat('invalid-npc', { ...hello, npcId: 'missing' })).error, 'invalid');
   assert.equal((await npc.chat('invalid-locale', { ...hello, locale: 'fr' as NpcLocale })).error, 'invalid');
@@ -164,15 +163,16 @@ test('membership, locale, NPC identity and stale-request checks still precede ca
 });
 
 test('prewritten turns remain in the matching conversation history and do not replace later free conversations', async () => {
-  const npcJobs: BrowserAiGeneration[] = [], gmJobs: BrowserAiGeneration[] = [];
-  const npc = new NpcChat(), gm = new FantasyGmChat(), state = context();
+  const npcJobs: { messages: DialogueMessage[] }[] = [], gmJobs: { messages: DialogueMessage[] }[] = [];
+  const capture = (jobs: { messages: DialogueMessage[] }[]) => (async (_url, init) => { jobs.push(JSON.parse(String(init?.body))); return new Response(JSON.stringify({ choices: [{ message: { content: 'I am listening.' } }] })); }) as typeof fetch;
+  const npc = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: capture(npcJobs) }), gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: capture(gmJobs) }), state = context();
   const cached = await npc.chat('cached-history', request('rin', 'ko', '안녕하세요', 'history'), { character: state.profile.character! });
-  const free = await npc.chat('cached-history', request('rin', 'ko', 'Uncached probe for this test.', 'free'), { character: state.profile.character!, browserGenerate: async job => { npcJobs.push(structuredClone(job)); return 'A brief answer.'; } });
-  assert.equal(free.source, 'browser'); assert.equal(npcJobs.length, 1);
+  const free = await npc.chat('cached-history', request('rin', 'ko', 'Uncached probe for this test.', 'free'), { character: state.profile.character! });
+  assert.equal(free.source, 'local'); assert.equal(npcJobs.length, 1);
   assert.ok(npcJobs[0].messages.some(message => message.role === 'assistant' && message.content === cached.text));
   const gmCached = await gm.chat('cached-history', { requestId: 'prepared-gm-history', locale: 'ko', text: '안녕하세요' }, state);
-  const gmFree = await gm.chat('cached-history', { requestId: 'prepared-gm-free', locale: 'ko', text: 'Uncached probe for this test.' }, { ...state, browserGenerate: async job => { gmJobs.push(structuredClone(job)); return 'A brief answer.'; } });
-  assert.equal(gmFree.source, 'browser'); assert.equal(gmJobs.length, 1);
+  const gmFree = await gm.chat('cached-history', { requestId: 'prepared-gm-free', locale: 'ko', text: 'Uncached probe for this test.' }, { ...state });
+  assert.equal(gmFree.source, 'local'); assert.equal(gmJobs.length, 1);
   assert.ok(gmJobs[0].messages.some(message => message.role === 'assistant' && message.content === gmCached.reply.text));
 });
 
@@ -193,7 +193,7 @@ test('first introductions stay short and non-greeting social replies keep their 
 
 test('a successful prior conversation suppresses repeat introductions without raising the player relationship', async () => {
   let calls = 0;
-  const npc = new NpcChat({ fetch: (async () => { calls++; throw new Error('A greeting needs no inference'); }) as typeof fetch });
+  const npc = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { calls++; throw new Error('A greeting needs no inference'); }) as typeof fetch });
   for (const locale of locales) for (const id of ['rin', 'borin', 'hearth-mira', 'hearth-alia', 'hearth-iona', 'hearth-daren', 'redweave-voss']) {
     const hello = PREWRITTEN_QUESTIONS.greeting[locale][0], person = NPC_PUBLIC.find(person => person.id === id)!;
     const user = `repeat-introduction-${locale}-${id}`;

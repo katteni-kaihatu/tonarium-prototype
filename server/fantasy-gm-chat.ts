@@ -4,12 +4,9 @@ import { FANTASY_GM_TEXT_MAX, fantasyGmCanAnswer, fantasyGmReply, type FantasyGm
 import { fantasyConversationPlan, fantasyGmContext, fantasyGmTokenEstimate } from '../shared/fantasy-gm-context.ts';
 import { canInspectFood } from '../shared/fantasy-life.ts';
 import type { NpcLocale } from '../shared/npc.ts';
-import { npcEndpoint } from './npc.ts';
-import { localInferenceFetch } from './local-inference.ts';
-import { resolveLocalInferenceUrl } from './local-inference-config.ts';
-import { BROWSER_AI_MODEL, type BrowserAiGenerate, type BrowserAiMessage } from '../shared/ai-support.ts';
-import { browserAiText } from './browser-ai.ts';
-import { browserAiPeerRequest } from './browser-ai-peer-context.ts';
+import { dialogueFetch } from './dialogue-request-queue.ts';
+import { resolveDialogueBackend, dialogueErrorReporter } from './kokoa-ai-config.ts';
+import type { DialogueMessage } from '../shared/dialogue.ts';
 import { readDialogueResponse } from './dialogue-stream.ts';
 import { fantasyGmSpokenText } from './fantasy-gm-speech.ts';
 import { preparedGmReply } from './dialogue-prewritten.ts';
@@ -17,11 +14,12 @@ import { groundedGmDefinition } from './dialogue-knowledge.ts';
 import { dynamicGmReply, dialogueDynamicPremises, type DialogueDynamicContext } from './dialogue-dynamic.ts';
 
 interface Options {
+  env?: NodeJS.ProcessEnv;
   url?: string; model?: string; fetch?: typeof fetch; timeoutMs?: number; now?: () => number; onError?: (error: unknown) => void;
 }
 export interface FantasyGmContext {
   session: string | null; world?: string; profile: FantasyProfile; communityFacts?: readonly string[];
-  browserGenerate?: BrowserAiGenerate; isCurrent?: () => boolean;
+  isCurrent?: () => boolean;
   onProgress?: (text: string) => void;
   dynamicFacts?: DialogueDynamicContext;
 }
@@ -30,13 +28,14 @@ const LANGUAGE = { ko: 'Korean', en: 'English', ja: 'Japanese' };
 const ERROR_TEXT: Record<NonNullable<FantasyGmChatResponse['error']>, Record<NpcLocale, string>> = {
   invalid: { ko: '이 세계에 참가한 뒤 500자 이내로 질문해 주세요.', en: 'Join this world and ask a question of at most 500 characters.', ja: 'この世界に参加してから500文字以内で質問してください。' },
   busy: { ko: '이전 답변을 마치고 있습니다. 잠시 뒤 다시 질문해 주세요.', en: 'A reply is still being prepared. Please try again shortly.', ja: '返答の準備中です。少し待ってから質問してください。' },
-  unavailable: { ko: '로컬 AI에 연결할 수 없습니다. 현재 위치·직업·의뢰·스킬 등 규칙 질문은 계속할 수 있습니다.', en: 'The local AI is unavailable. Rule questions about your location, profession, quests or skills still work.', ja: 'ローカルAIに接続できません。現在地・職業・依頼・スキルなどのルール質問は引き続き使えます。' },
-  timeout: { ko: '로컬 AI 응답 시간이 초과되었습니다. 다시 질문해 주세요.', en: 'The local AI reply timed out. Please ask again.', ja: 'ローカルAIの応答が時間切れになりました。もう一度質問してください。' },
+  unavailable: { ko: '대화 AI에 연결할 수 없습니다. 현재 위치·직업·의뢰·스킬 등 규칙 질문은 계속할 수 있습니다.', en: 'The dialogue AI is unavailable. Rule questions about your location, profession, quests or skills still work.', ja: '会話AIに接続できません。現在地・職業・依頼・スキルなどのルール質問は引き続き使えます。' },
+  timeout: { ko: '대화 AI 응답 시간이 초과되었습니다. 다시 질문해 주세요.', en: 'The dialogue AI reply timed out. Please ask again.', ja: '会話AIの応答が時間切れになりました。もう一度質問してください。' },
 };
 
 export class FantasyGmChat {
   private endpoint: string | null;
   private model: string;
+  private apiKey?: string;
   private fetch: typeof fetch;
   private now: () => number;
   private timeoutMs: number;
@@ -47,12 +46,13 @@ export class FantasyGmChat {
   private active = 0;
 
   constructor(options: Options = {}) {
-    this.endpoint = npcEndpoint(options.url ?? resolveLocalInferenceUrl());
-    this.model = options.model ?? process.env.NPC_LLM_MODEL ?? 'qwen3-1.7b';
-    this.fetch = options.fetch ?? localInferenceFetch;
+    const backend = resolveDialogueBackend(options, options.env ?? process.env);
+    this.endpoint = backend.endpoint; this.model = backend.model;
+    this.apiKey = backend.apiKey;
+    this.fetch = options.fetch ?? dialogueFetch;
     this.now = options.now ?? Date.now;
     this.timeoutMs = options.timeoutMs ?? 45_000;
-    this.onError = options.onError ?? (error => console.error('[fantasy-gm] local AI failed', error));
+    this.onError = dialogueErrorReporter(options.onError ?? (error => console.error('[fantasy-gm] dialogue AI failed', error)));
   }
 
   async chat(user: string, request: FantasyGmChatRequest, context: FantasyGmContext): Promise<FantasyGmChatResponse> {
@@ -102,10 +102,10 @@ export class FantasyGmChat {
       }[locale], suggestions: [{ label: { ko: '소지품 확인', en: 'Check inventory', ja: '持ち物を確認' }[locale], tab: 'inventory' }] } };
     }
     const now = this.now();
-    if (this.pending.has(user) || !context.browserGenerate && this.active >= 2 || now - (this.lastRequest.get(user) ?? -Infinity) < 1500) return fail('busy');
-    if (!this.endpoint && !context.browserGenerate) return fail('unavailable');
+    if (this.pending.has(user) || this.active >= 2 || now - (this.lastRequest.get(user) ?? -Infinity) < 1500) return fail('busy');
+    if (!this.endpoint) return fail('unavailable');
     this.lastRequest.set(user, now);
-    this.pending.add(user); let localActive = false;
+    this.pending.add(user); let transportActive = false;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
@@ -122,34 +122,22 @@ export class FantasyGmChat {
       const selected = fantasyGmContext(context.profile, locale, text, this.histories.get(user)?.[locale] ?? [], { budget });
       const shared = /공동|기여|community|project|cooperat|共同|協力/.test(text.toLowerCase()) ? (context.communityFacts ?? []).filter(line => fantasyGmTokenEstimate(line) < 180).slice(0, 2).join('\n') : '';
       const extra = shared && fantasyGmTokenEstimate(shared) + fantasyGmTokenEstimate(selected.knowledge) < budget ? `\n${shared}` : '';
-      const messages: BrowserAiMessage[] = [{ role: 'system', content: header + selected.knowledge + extra + (current ? `\n${current}` : '')+'\n'+direction }, ...selected.history, { role: 'user', content: text }];
-      if (messages.reduce((sum, message) => sum + fantasyGmTokenEstimate(message.content) + 8, 0) > 3400) throw new Error('Local GM context exceeded its bounded input budget');
-      if (context.browserGenerate) {
-        let generated: string | undefined;
-        try { generated = await context.browserGenerate({ requestId, kind: 'gm', messages: structuredClone(messages), maxTokens: Math.min(plan.maxTokens,160), temperature: .7 }, controller.signal, browserAiPeerRequest({ requestId, kind: 'gm', locale, text }), part => { if (context.isCurrent?.() !== false) context.onProgress?.(fantasyGmSpokenText(part)); }); }
-        catch { /* ブラウザ側の失敗は既存のサーバーモデルへ引き継ぐ。 */ }
-        if (context.isCurrent?.() === false) return fail('invalid');
-        if (controller.signal.aborted) return fail('timeout');
-        const raw = browserAiText(generated, 2400), spoken = raw && fantasyGmSpokenText(raw);
-        if (spoken) {
-          remember(spoken);
-          return { requestId, locale, source: 'browser', model: BROWSER_AI_MODEL, reply: { text: spoken, suggestions: [] } };
-        }
-      }
+      const messages: DialogueMessage[] = [{ role: 'system', content: header + selected.knowledge + extra + (current ? `\n${current}` : '')+'\n'+direction }, ...selected.history, { role: 'user', content: text }];
+      if (messages.reduce((sum, message) => sum + fantasyGmTokenEstimate(message.content) + 8, 0) > 3400) throw new Error('GM context exceeded its bounded input budget');
       if (context.isCurrent?.() === false) return fail('invalid');
       if (!this.endpoint) return fail('unavailable');
       if (this.active >= 2) return fail('busy');
-      this.active++; localActive = true;
+      this.active++; transportActive = true;
       context.onProgress?.('');
       const response = await this.fetch(this.endpoint, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, redirect: 'error', signal: controller.signal,
-        body: JSON.stringify({ model: this.model, messages, stream: !!context.onProgress, cache_prompt: true, max_tokens: plan.maxTokens, temperature: 0.7, chat_template_kwargs: { enable_thinking: false } }),
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}) }, redirect: 'error', signal: controller.signal,
+        body: JSON.stringify({ model: this.model, messages, stream: !!context.onProgress, max_tokens: 1536, temperature: 0.7, chat_template_kwargs: { enable_thinking: true } }),
       });
       if (response.status === 429) return fail('busy');
-      if (!response.ok) throw new Error(`Local GM HTTP ${response.status}`);
+      if (!response.ok) throw new Error(`KokoaAI HTTP ${response.status}`);
       const value = await readDialogueResponse(response, part => { if (context.isCurrent?.() !== false) context.onProgress?.(fantasyGmSpokenText(part)); });
       const content = value.text;
-      if (typeof content !== 'string' || !fantasyGmSpokenText(content)) throw new Error('Local GM returned no spoken answer');
+      if (typeof content !== 'string' || !fantasyGmSpokenText(content)) throw new Error('KokoaAI returned no spoken answer');
       const spoken = fantasyGmSpokenText(content);
       if (context.isCurrent?.() === false) return fail('invalid');
       remember(spoken);
@@ -159,7 +147,7 @@ export class FantasyGmChat {
       this.onError(error);
       return fail(controller.signal.aborted ? 'timeout' : 'unavailable');
     } finally {
-      clearTimeout(timeout); this.pending.delete(user); if (localActive) this.active--;
+      clearTimeout(timeout); this.pending.delete(user); if (transportActive) this.active--;
     }
   }
 }

@@ -16,10 +16,9 @@ services:
       # HTTPS 終端プロキシの実アドレスだけを信頼する。未設定では転送ヘッダーを信頼しない。
       - FANTASY_TRUST_PROXY=${FANTASY_TRUST_PROXY:-0}
       - FANTASY_TRUSTED_PROXY_IPS=${FANTASY_TRUSTED_PROXY_IPS:-}
-      - NPC_LLM_URL=${NPC_LLM_URL:-http://fantasy-ai:8080/v1}
-      - NPC_LLM_MODEL=${NPC_LLM_MODEL:-qwen3-1.7b}
-      # 旧開発用ループバック設定も、同梱推論サービスへ移行する。
-      - NPC_LLM_BUNDLED_URL=http://fantasy-ai:8080/v1
+      - KOKOAAI_BASEURL=${KOKOAAI_BASEURL:-https://chat.kokoa.dev/v1}
+      - KOKOAAI_MODEL=${KOKOAAI_MODEL:-lfm3-1.7b}
+      - KOKOAAI_APIKEY=${KOKOAAI_APIKEY:-}
       # - SESSIONS_FILE=/config/sessions.json
     expose:
       - "3001"
@@ -32,74 +31,6 @@ services:
       timeout: 5s
       start_period: 10s
       retries: 3
-
-  fantasy-ai-model:
-    build:
-      context: .
-      dockerfile: Dockerfile.fantasy-ai-model
-    restart: "on-failure:3"
-    environment:
-      - MODEL_DIRECTORY=/models
-      - NPC_AI_MIN_AVAILABLE_MB=${NPC_AI_MIN_AVAILABLE_MB:-2304}
-    volumes:
-      - fantasy-ai-models:/models
-    mem_limit: 256m
-    cpus: 1.0
-
-  fantasy-ai:
-    image: ghcr.io/ggml-org/llama.cpp:server@sha256:8ee4ec7ce58a921313d07390c6699af13aa5ec083f3cdf67e5f4155767047373
-    restart: "on-failure:3"
-    depends_on:
-      fantasy-ai-model:
-        condition: service_completed_successfully
-    command:
-      - --model
-      - /models/Qwen3-1.7B-Q8_0.gguf
-      - --alias
-      - qwen3-1.7b
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8080"
-      - --ctx-size
-      - "8192"
-      - --parallel
-      - "2"
-      - --threads
-      - "${NPC_AI_THREADS:-2}"
-      - --threads-batch
-      - "${NPC_AI_THREADS:-2}"
-      - --cache-type-k
-      - q8_0
-      - --cache-type-v
-      - q8_0
-      - --flash-attn
-      - "on"
-      - --n-predict
-      - "256"
-      - --jinja
-      - --reasoning
-      - "off"
-    expose:
-      - "8080"
-    volumes:
-      - fantasy-ai-models:/models:ro
-    mem_limit: ${NPC_AI_MEMORY_LIMIT:-3g}
-    cpus: ${NPC_AI_CPU_LIMIT:-2.0}
-    user: "1000:1000"
-    read_only: true
-    tmpfs:
-      - /tmp:size=64m,mode=1777
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "5", "http://127.0.0.1:8080/health"]
-      interval: 10s
-      timeout: 6s
-      start_period: 45s
-      retries: 12
 
   # 自前の LiveKit（通話・画面共有・ライブ）。シグナリング（wss）は Coolify のドメイン経由で 7880 番へ、
   # 音声・映像は下の ports でサーバーに直接届く
@@ -133,4 +64,3 @@ services:
 
 volumes:
   tonarium-data:
-  fantasy-ai-models:

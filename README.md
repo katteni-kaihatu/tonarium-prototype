@@ -97,7 +97,7 @@ http://localhost:5173 を開く。同じブラウザで別人として入るに�
 - 職業の専門分野（一般145・司祭4、取得条件は非公開）→ [専門分野の規則](docs/fantasy-job-paths.md)、[全149分野の一覧](docs/fantasy-job-advancement-candidates.md)
 - 悠久の旅路の直接交換・有限共有在庫・中古品 → [交易の規則](docs/fantasy-economy.md)。住民の日課・関係・勢力・同意制の略奪・裁判と拘禁 → [住民と役所](docs/fantasy-civics.md)
 - 悠久の旅路の賃貸・共有名義・設計改築・税・有限の雇用営業・遺産競売 → [不動産](docs/fantasy-property-plan.md)。独立した荷車を守る戦場 → [護衛戦術](docs/fantasy-escort-tactics.md)
-- ローカル NPC・GM 会話（モデルの起動、容量、待ち行列、測定値）→ [docs/local-npc.md](docs/local-npc.md)
+- NPC・GM の KokoaAI 会話（外部 API 接続、設定、検証）→ [docs/local-npc.md](docs/local-npc.md)
 - 悠久の旅路の祈り・状態別の売却価格 → [docs/fantasy-prayer-sales.md](docs/fantasy-prayer-sales.md)、仕事中の判定と途中経過 → [docs/fantasy-work-progress.md](docs/fantasy-work-progress.md)
 - 悠久の旅路のスキル説明・行動制限・操作案内 → [docs/fantasy-interface.md](docs/fantasy-interface.md)、非公開の検証用操作 → [docs/fantasy-test-tools.md](docs/fantasy-test-tools.md)
 - 距離で変わる声、ブロードキャストモード、ついていく → [docs/audio.md](docs/audio.md)
@@ -112,5 +112,5 @@ http://localhost:5173 を開く。同じブラウザで別人として入るに�
 - 配信の音声: タブ共有ならタブ音声、Windows で画面全体を共有すると PC の音声も流れる（ウィンドウ単位の共有では音声なし）
 - サーバーを再起動するとセッション内のチャットは消える（アイテム・DM・チャンネルのメッセージは残る）
 
-- ファンタジーワールド専用の言語選択・ブラウザAI支援（新しい共有同意・Qwen3 1.7B・余裕のある参加者の支援・サーバー復帰）: [docs/browser-ai-support.md](docs/browser-ai-support.md)
+- ファンタジーワールド専用の言語選択と廃止したブラウザAIの整理: [docs/browser-ai-support.md](docs/browser-ai-support.md)
 - NPC別の上半身イラストと制作記録: [docs/npc-portraits.md](docs/npc-portraits.md)
