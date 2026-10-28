@@ -1,4 +1,4 @@
-import { t as tr } from '../i18n/index.ts';
+import { t as tr, useLanguage } from '../i18n/index.ts';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
@@ -78,6 +78,7 @@ function NoteBody({ note }: { note: Item & { kind: 'note' } }) {
 
 /** 開けなくなったもの（アイテムが片付けられた、配信が終わった等）は null */
 function useResolved(key: string, compact: boolean): Resolved | null {
+  useLanguage();
   const { sharer, camFeeds, participants, selfId, items, users, survivor, speaking } = useStore(useShallow((s) => ({
     sharer: s.sharer,
     camFeeds: s.camFeeds,
@@ -154,9 +155,9 @@ function useResolved(key: string, compact: boolean): Resolved | null {
       : <TelephoneBody item={item} interactive /> };
   // 入口だけのアイテム。開くのはワールド版と同じ自分の AD パネル
   if (item.kind === 'antimatter') return {
-    kind: 'survivor', dark: true, item, title: 'AD 研究所', sub, width: 720, aspect: 1.2,
+    kind: 'survivor', dark: true, item, title: tr('mergeAdLab'), sub, width: 720, aspect: 1.2,
     body: compact
-      ? <div style={{ padding: 16, color: '#e9e5f5' }}>AD 研究所 — クリックで大きく表示</div>
+      ? <div style={{ padding: 16, color: '#e9e5f5' }}>{tr('adItemEntrance')}</div>
       : <AntimatterWindowBody />,
   };
   if (item.kind === 'bike') return { kind: 'panel', dark: false, item, title: ITEM_INFO.bike.name, sub, width: 360, body: <p>{ITEM_INFO.bike.desc}</p> };

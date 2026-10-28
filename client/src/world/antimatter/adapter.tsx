@@ -1,4 +1,4 @@
-import { t, getLanguage, useLanguage } from '../../i18n/index.ts';
+import { msg, getLanguage, useLanguage } from '../../i18n/index.ts';
 import {
   bigGte, canAntimatterGalaxy, canDimensionalBoost, canInfinity, canSacrifice,
   getAntimatterPerSecond, getDimensionalBoostRequirement, getDimensionCost,
@@ -62,7 +62,7 @@ export interface AdaptOptions {
 export function adaptAdSlice(slice: AdSlice, options: AdaptOptions = {}): AntimatterSlice | null {
   const game = slice.adGame;
   if (!game) return null;
-  const serverStatus = slice.adSync === 'loading' ? t('adSyncLoading') : slice.adSync === 'choice' ? t('adSyncChoice') : slice.adSync === 'error' ? t('adSyncError') : null;
+  const serverStatus = slice.adSync === 'loading' ? msg('adSyncLoading') : slice.adSync === 'choice' ? msg('adSyncChoice') : slice.adSync === 'error' ? msg('adSyncError') : null;
   const offline = slice.adOffline && !dismissedOffline.has(offlineKey(slice.adOffline)) ? slice.adOffline : null;
 
   return {
@@ -116,13 +116,13 @@ export function adaptAdSlice(slice: AdSlice, options: AdaptOptions = {}): Antima
         bundle = parseImportBundle(text);
       } catch {
         emitAdFeedback({ kind: 'error' });
-        return { ok: false, message: t('adImportFailed') };
+        return { ok: false, message: msg('adImportFailed') };
       }
       try {
         const profile = slice.adImport(bundle, confirmLegacy);
-        return { ok: true, message: t('adImportDone', profile.name) };
+        return { ok: true, message: msg('adImportDone', profile.name) };
       } catch {
-        return { ok: false, message: t('adImportFailed') };
+        return { ok: false, message: msg('adImportFailed') };
       }
     },
     dismissOffline: () => {

@@ -8,6 +8,35 @@ import {
 } from './engine.mjs';
 import { buildAdActions, buildAdLabSnapshot } from './labView.ts';
 import { createAdSlice, type AdSlice } from './slice.ts';
+import { getLanguage, setLanguage, t } from '../i18n/core.ts';
+
+test('3D Crunch confirmation follows language, and cancellation preserves progress', () => {
+  const previous = getLanguage();
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      for (const accepted of [false, true]) {
+        const game = createNewGame(0);
+        game.antimatter = bigFromNumber(1.79e308);
+        const slice = harness(game);
+        const before = structuredClone(game);
+        let confirmations = 0;
+        Object.defineProperty(globalThis, 'window', { configurable: true, value: {
+          confirm(text: string) { confirmations++; assert.equal(text, t('adLabText132')); return accepted; },
+        } });
+        buildAdActions(slice).prestigeInfinity();
+        assert.equal(confirmations, 1);
+        if (accepted) assert.equal(slice.adGame!.infinities, before.infinities + 1);
+        else assert.deepEqual(slice.adGame, before);
+      }
+    }
+  } finally {
+    setLanguage(previous);
+    if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+    else Reflect.deleteProperty(globalThis, 'window');
+  }
+});
 
 function harness(game: GameState) {
   let slice: AdSlice;
@@ -16,116 +45,128 @@ function harness(game: GameState) {
   return slice;
 }
 
-for (const kind of ['boost', 'galaxy'] as const) {
-  for (const mode of ['single', 'ten', 'max'] as const) {
-    test(`${kind}: ${mode} のスライス購入・リセット直後にスナップショットを更新`, () => {
-      const game = createNewGame(0);
-      game.dimensionalBoosts = 6;
-      const slice = harness(game);
-      const actions = buildAdActions(slice);
-      for (let reset = 0; reset < 2; reset++) {
-        if (kind === 'galaxy') game.dimensionalBoosts = 4;
-        const req = kind === 'boost' ? getDimensionalBoostRequirement(game) : getGalaxyRequirement(game);
-        const buy = (count: number) => {
+for (const language of ['ja', 'en', 'ko'] as const) {
+  for (const kind of ['boost', 'galaxy'] as const) {
+    for (const mode of ['single', 'ten', 'max'] as const) {
+      test(`${language}: ${kind}: ${mode} のスライス購入・リセット直後にスナップショットを更新`, (context) => {
+        const previous = getLanguage();
+        setLanguage(language);
+        context.after(() => setLanguage(previous));
+        const game = createNewGame(0);
+        game.dimensionalBoosts = 6;
+        const slice = harness(game);
+        const actions = buildAdActions(slice);
+        for (let reset = 0; reset < 2; reset++) {
+          if (kind === 'galaxy') game.dimensionalBoosts = 4;
+          const req = kind === 'boost' ? getDimensionalBoostRequirement(game) : getGalaxyRequirement(game);
+          const buy = (count: number) => {
+            const version = slice.adVersion;
+            game.antimatter = bigFromLog10(1000);
+            if (mode === 'max') {
+              for (let i = 0; i < count; i++) {
+                game.antimatter = getDimensionCost(game, req.tier);
+                actions.buyDimensionMax(req.tier);
+              }
+            } else if (mode === 'ten') {
+              while (count > 0) {
+                const batch = Math.min(count, 10 - game.dimensions[req.tier - 1].bought % 10);
+                actions.buyDimensionUpTo(req.tier, batch);
+                count -= batch;
+              }
+            } else {
+              for (let i = 0; i < count; i++) actions.buyDimension(req.tier);
+            }
+            assert.ok(slice.adVersion > version);
+          };
+          buy(req.amount - 1);
+          for (const offset of [-1, 0, 1]) {
+            if (offset !== -1) buy(1);
+            const snapshot = buildAdLabSnapshot(slice.adGame!);
+            assert.equal(snapshot.canBoost, canDimensionalBoost(game));
+            assert.equal(snapshot.canGalaxy, canAntimatterGalaxy(game));
+            assert.equal(kind === 'boost' ? snapshot.canBoost : snapshot.canGalaxy, offset >= 0);
+            assert.equal(kind === 'boost' ? snapshot.boostCurrentAmountText : snapshot.galaxyCurrentAmountText, String(req.amount + offset));
+            assert.equal(kind === 'boost' ? snapshot.boostRequirementText : snapshot.galaxyRequirementText, kind === 'boost' ? t('adLabText130', req.tier, req.amount) : t('adLabText131', req.amount));
+            const copy = structuredClone(game);
+            const clonedSlice = harness(copy);
+            const beforeVersion = clonedSlice.adVersion;
+            assert.equal(kind === 'boost' ? clonedSlice.adBoost() : clonedSlice.adGalaxy(), offset >= 0);
+            if (offset < 0) {
+              assert.deepEqual(copy, game);
+              assert.equal(clonedSlice.adVersion, beforeVersion);
+            }
+          }
           const version = slice.adVersion;
-          game.antimatter = bigFromLog10(1000);
-          if (mode === 'max') {
-            for (let i = 0; i < count; i++) {
-              game.antimatter = getDimensionCost(game, req.tier);
-              actions.buyDimensionMax(req.tier);
-            }
-          } else if (mode === 'ten') {
-            while (count > 0) {
-              const batch = Math.min(count, 10 - game.dimensions[req.tier - 1].bought % 10);
-              actions.buyDimensionUpTo(req.tier, batch);
-              count -= batch;
-            }
-          } else {
-            for (let i = 0; i < count; i++) actions.buyDimension(req.tier);
-          }
-          assert.ok(slice.adVersion > version);
-        };
-        buy(req.amount - 1);
-        for (const offset of [-1, 0, 1]) {
-          if (offset !== -1) buy(1);
-          const snapshot = buildAdLabSnapshot(slice.adGame!);
-          assert.equal(snapshot.canBoost, canDimensionalBoost(game));
-          assert.equal(snapshot.canGalaxy, canAntimatterGalaxy(game));
-          assert.equal(kind === 'boost' ? snapshot.canBoost : snapshot.canGalaxy, offset >= 0);
-          assert.equal(kind === 'boost' ? snapshot.boostCurrentAmountText : snapshot.galaxyCurrentAmountText, String(req.amount + offset));
-          assert.match(kind === 'boost' ? snapshot.boostRequirementText : snapshot.galaxyRequirementText, new RegExp(`${req.amount}個`));
-          const copy = structuredClone(game);
-          const clonedSlice = harness(copy);
-          const beforeVersion = clonedSlice.adVersion;
-          assert.equal(kind === 'boost' ? clonedSlice.adBoost() : clonedSlice.adGalaxy(), offset >= 0);
-          if (offset < 0) {
-            assert.deepEqual(copy, game);
-            assert.equal(clonedSlice.adVersion, beforeVersion);
-          }
+          if (kind === 'boost') actions.dimensionalBoost(); else actions.antimatterGalaxy();
+          assert.equal(slice.adVersion, version + 1);
+          const after = buildAdLabSnapshot(slice.adGame!);
+          assert.equal(after.canBoost, false);
+          assert.equal(after.canGalaxy, false);
+          assert.equal(after.boostCurrentAmountText, '0');
+          assert.equal(after.galaxyCurrentAmountText, '0');
         }
-        const version = slice.adVersion;
-        if (kind === 'boost') actions.dimensionalBoost(); else actions.antimatterGalaxy();
-        assert.equal(slice.adVersion, version + 1);
-        const after = buildAdLabSnapshot(slice.adGame!);
-        assert.equal(after.canBoost, false);
-        assert.equal(after.canGalaxy, false);
-        assert.equal(after.boostCurrentAmountText, '0');
-        assert.equal(after.galaxyCurrentAmountText, '0');
-      }
-      // 古い操作口でも、その時点でスライスが持つ最新のゲームを使う。
-      const oldGame = structuredClone(game);
-      slice.adGame = createNewGame(1);
-      slice.adGame.antimatter = bigFromNumber(10);
-      actions.buyDimension(1);
-      assert.equal(slice.adGame.dimensions[0].bought, 1);
-      assert.deepEqual(game, oldGame);
-    });
-  }
-}
-
-test('実際に不足している小数では Boost・銀河を許可しない', () => {
-  for (const shortage of [1, 0.1, 0.001, 1e-10]) {
-    const game = createNewGame(0);
-    game.dimensionalBoosts = 7;
-    game.dimensions[7].amount = bigSub(bigFromNumber(80), bigFromNumber(shortage));
-    const snapshot = buildAdLabSnapshot(game);
-    assert.equal(snapshot.canBoost, false);
-    assert.equal(snapshot.canGalaxy, false);
-    const slice = harness(game);
-    const before = structuredClone(game);
-    assert.equal(slice.adBoost(), false);
-    assert.equal(slice.adGalaxy(), false);
-    assert.deepEqual(game, before);
-  }
-});
-
-test('Sacrifice の解放と倍率改善、Crunch の Infinity 閾値を表示と実行で照合', () => {
-  for (const boosts of [4, 5]) {
-    for (const improved of [false, true]) {
-      const game = createNewGame(0);
-      game.dimensionalBoosts = boosts;
-      game.dimensions[0].amount = bigFromLog10(100);
-      if (!improved) game.sacrificeBoost = getSacrificeCandidate(game);
-      const before = structuredClone(game);
-      const snapshot = buildAdLabSnapshot(game);
-      assert.equal(snapshot.sacrificeUnlocked, boosts >= 5);
-      assert.equal(snapshot.canSacrifice, canSacrifice(game));
-      assert.equal(snapshot.canSacrifice, boosts >= 5 && improved);
-      const slice = harness(game);
-      assert.equal(slice.adSacrifice(), snapshot.canSacrifice);
-      if (!snapshot.canSacrifice) assert.deepEqual(game, before);
-      assert.equal(buildAdLabSnapshot(game).canSacrifice, false);
+        // 古い操作口でも、その時点でスライスが持つ最新のゲームを使う。
+        const oldGame = structuredClone(game);
+        slice.adGame = createNewGame(1);
+        slice.adGame.antimatter = bigFromNumber(10);
+        actions.buyDimension(1);
+        assert.equal(slice.adGame.dimensions[0].bought, 1);
+        assert.deepEqual(game, oldGame);
+      });
     }
   }
-  for (const antimatter of [1.78e308, 1.79e308, 1.795e308]) {
-    const game = createNewGame(0);
-    game.antimatter = bigFromNumber(antimatter);
-    const before = structuredClone(game);
-    const snapshot = buildAdLabSnapshot(game);
-    assert.equal(snapshot.canCrunch, canInfinity(game));
-    assert.equal(snapshot.canCrunch, antimatter >= 1.79e308);
-    assert.equal(harness(game).adPrestige(), snapshot.canCrunch);
-    if (!snapshot.canCrunch) assert.deepEqual(game, before);
-    assert.equal(buildAdLabSnapshot(game).canCrunch, false);
-  }
-});
+
+  test(`${language}: 実際に不足している小数では Boost・銀河を許可しない`, (context) => {
+    const previous = getLanguage();
+    setLanguage(language);
+    context.after(() => setLanguage(previous));
+    for (const shortage of [1, 0.1, 0.001, 1e-10]) {
+      const game = createNewGame(0);
+      game.dimensionalBoosts = 7;
+      game.dimensions[7].amount = bigSub(bigFromNumber(80), bigFromNumber(shortage));
+      const snapshot = buildAdLabSnapshot(game);
+      assert.equal(snapshot.canBoost, false);
+      assert.equal(snapshot.canGalaxy, false);
+      const slice = harness(game);
+      const before = structuredClone(game);
+      assert.equal(slice.adBoost(), false);
+      assert.equal(slice.adGalaxy(), false);
+      assert.deepEqual(game, before);
+    }
+  });
+
+  test(`${language}: Sacrifice の解放と倍率改善、Crunch の Infinity 閾値を表示と実行で照合`, (context) => {
+    const previous = getLanguage();
+    setLanguage(language);
+    context.after(() => setLanguage(previous));
+    for (const boosts of [4, 5]) {
+      for (const improved of [false, true]) {
+        const game = createNewGame(0);
+        game.dimensionalBoosts = boosts;
+        game.dimensions[0].amount = bigFromLog10(100);
+        if (!improved) game.sacrificeBoost = getSacrificeCandidate(game);
+        const before = structuredClone(game);
+        const snapshot = buildAdLabSnapshot(game);
+        assert.equal(snapshot.sacrificeUnlocked, boosts >= 5);
+        assert.equal(snapshot.canSacrifice, canSacrifice(game));
+        assert.equal(snapshot.canSacrifice, boosts >= 5 && improved);
+        const slice = harness(game);
+        assert.equal(slice.adSacrifice(), snapshot.canSacrifice);
+        if (!snapshot.canSacrifice) assert.deepEqual(game, before);
+        assert.equal(buildAdLabSnapshot(game).canSacrifice, false);
+      }
+    }
+    for (const antimatter of [1.78e308, 1.79e308, 1.795e308]) {
+      const game = createNewGame(0);
+      game.antimatter = bigFromNumber(antimatter);
+      const before = structuredClone(game);
+      const snapshot = buildAdLabSnapshot(game);
+      assert.equal(snapshot.canCrunch, canInfinity(game));
+      assert.equal(snapshot.canCrunch, antimatter >= 1.79e308);
+      assert.equal(harness(game).adPrestige(), snapshot.canCrunch);
+      if (!snapshot.canCrunch) assert.deepEqual(game, before);
+      assert.equal(buildAdLabSnapshot(game).canCrunch, false);
+    }
+  });
+
+}

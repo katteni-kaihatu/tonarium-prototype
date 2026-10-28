@@ -11,7 +11,37 @@ import type { AdPanelTarget } from '../../../../shared/antimatterLayout.ts';
 import { ProfilePanel } from './ProfilePanel.tsx';
 import { ProgressPicker } from './ProgressPicker.tsx';
 import { StatsPanel } from './StatsPanel.tsx';
-import { getLanguage, setLanguage, t } from '../../i18n/core.ts';
+import { getLanguage, setLanguage, systemText, t } from '../../i18n/core.ts';
+import { DimensionList } from './DimensionList.tsx';
+import { LayerTabs } from './LayerTabs.tsx';
+import { serialize } from '../../ad/engine.mjs';
+
+test('2D tabs and 3D exhibits render in three languages without changing saves or names', () => {
+  const previous = getLanguage();
+  const slice = harness(createNewGame(0));
+  slice.adProfile = { id: 'same-profile', name: '名前 {0} 플레이어', createdAt: null };
+  const before = serialize(slice.adGame!);
+  try {
+    for (const language of ['ja', 'en', 'ko', 'ja'] as const) {
+      setLanguage(language);
+      const ad = adaptAdSlice(slice)!;
+      const dimensions = renderToStaticMarkup(<DimensionList ad={ad} />);
+      assert.ok(dimensions.includes(t('adLabText23', 1)));
+      assert.ok(dimensions.includes(t('adLabText14')));
+      const layers = renderToStaticMarkup(<LayerTabs ad={ad} />);
+      assert.ok(layers.includes(t('adLabText147')));
+      const stats = renderToStaticMarkup(<StatsPanel ad={ad} notice={() => {}} />);
+      assert.ok(stats.includes(t('adLabText133')));
+      assert.ok(stats.includes('名前 {0} 플레이어'));
+      for (const target of ['core', 'tickspeed', 'boost', 'galaxy', 'sacrifice', 'crunch', 'dimension-1', 'dimension-8', 'exhibit-infinity', 'exhibit-eternity', 'exhibit-reality', 'exhibit-celestials'] as const) {
+        const space = panels(slice, target).space;
+        if (language !== 'ja') assert.doesNotMatch(space, /[ぁ-んァ-ヶ一-龠]/);
+      }
+      assert.equal(serialize(slice.adGame!), before);
+      assert.equal(slice.adProfile.name, '名前 {0} 플레이어');
+    }
+  } finally { setLanguage(previous); }
+});
 import { formatDuration } from './format.ts';
 
 function harness(game: GameState) {
@@ -89,7 +119,7 @@ test('共通プロフィール・ランキングの同期案内とv3形式は三
         assert.ok(profile.includes('value="recent-record"'));
         assert.ok(stats.includes(t('adRankingRefresh')));
         assert.ok(!profile.includes('Tonarium サーバーに保存しています'));
-        assert.equal(ad.serverStatus, status === 'ready' ? null : t(status === 'loading' ? 'adSyncLoading' : status === 'choice' ? 'adSyncChoice' : 'adSyncError'));
+        assert.equal(ad.serverStatus && systemText(ad.serverStatus), status === 'ready' ? null : t(status === 'loading' ? 'adSyncLoading' : status === 'choice' ? 'adSyncChoice' : 'adSyncError'));
       }
     }
   } finally { setLanguage(previous); }
@@ -132,75 +162,84 @@ function panels(slice: AdSlice, target: AdPanelTarget, isOwn = true) {
   };
 }
 
-for (const [target, boosts] of [['boost', 0], ['boost', 6], ['boost', 7], ['galaxy', 4]] as const) {
-  for (const mode of ['single', 'ten', 'max'] as const) {
-    test(`${target} Boost=${boosts}: ${mode} 購入で2D・3Dの表示とボタンが一致`, () => {
-      const game = createNewGame(0);
-      game.dimensionalBoosts = boosts;
-      const slice = harness(game);
-      for (let reset = 0; reset < 2; reset++) {
-        if (target === 'galaxy') game.dimensionalBoosts = 4;
-        const req = target === 'boost' ? getDimensionalBoostRequirement(game) : getGalaxyRequirement(game);
-        const buy = (count: number) => {
-          const requested = count;
-          const before = game.dimensions[req.tier - 1].bought;
-          game.antimatter = bigFromLog10(1000);
-          if (mode === 'ten') {
-            while (count > 0) {
-              const batch = Math.min(count, 10 - game.dimensions[req.tier - 1].bought % 10);
-              game.antimatter = bigMulNumber(getDimensionCostForBulk(game, req.tier, batch), 1.001);
-              adaptAdSlice(slice)!.buyUntilNextTen(req.tier);
-              count -= batch;
+for (const language of ['ja', 'en', 'ko'] as const) {
+  for (const [target, boosts] of [['boost', 0], ['boost', 6], ['boost', 7], ['galaxy', 4]] as const) {
+    for (const mode of ['single', 'ten', 'max'] as const) {
+      test(`${language}: ${target} Boost=${boosts}: ${mode} 購入で2D・3Dの表示とボタンが一致`, (context) => {
+        const previous = getLanguage();
+        setLanguage(language);
+        context.after(() => setLanguage(previous));
+        const game = createNewGame(0);
+        game.dimensionalBoosts = boosts;
+        const slice = harness(game);
+        for (let reset = 0; reset < 2; reset++) {
+          if (target === 'galaxy') game.dimensionalBoosts = 4;
+          const req = target === 'boost' ? getDimensionalBoostRequirement(game) : getGalaxyRequirement(game);
+          const buy = (count: number) => {
+            const requested = count;
+            const before = game.dimensions[req.tier - 1].bought;
+            game.antimatter = bigFromLog10(1000);
+            if (mode === 'ten') {
+              while (count > 0) {
+                const batch = Math.min(count, 10 - game.dimensions[req.tier - 1].bought % 10);
+                game.antimatter = bigMulNumber(getDimensionCostForBulk(game, req.tier, batch), 1.001);
+                adaptAdSlice(slice)!.buyUntilNextTen(req.tier);
+                count -= batch;
+              }
+            } else if (mode === 'max') {
+              game.antimatter = bigMulNumber(getDimensionCostForBulk(game, req.tier, count), 1.001);
+              buildAdActions(slice).buyDimensionMax(req.tier);
+            } else {
+              for (let i = 0; i < count; i++) slice.adBuyDimension(req.tier);
             }
-          } else if (mode === 'max') {
-            game.antimatter = bigMulNumber(getDimensionCostForBulk(game, req.tier, count), 1.001);
-            buildAdActions(slice).buyDimensionMax(req.tier);
-          } else {
-            for (let i = 0; i < count; i++) slice.adBuyDimension(req.tier);
+            assert.equal(game.dimensions[req.tier - 1].bought - before, requested);
+          };
+          buy(req.amount - 1);
+          for (const offset of [-1, 0, 1]) {
+            if (offset !== -1) buy(1);
+            const { flat, space, ad } = panels(slice, target);
+            const expected = offset < 0;
+            assert.equal(disabled(flat, target === 'boost' ? t('adLabText26') : t('adLabText28')), expected);
+            assert.equal(disabled(space, target === 'boost' ? t('adLabText115') : t('adLabText119')), expected);
+            assert.equal(target === 'boost' ? ad.derived.boost.can : ad.derived.galaxy.can, !expected);
+            assert.ok(flat.includes(t(target === 'boost' ? 'adLabText25' : 'adLabText27', req.tier, String(req.amount), req.tier, String(req.amount + offset), target === 'boost' ? game.dimensionalBoosts : game.galaxies)));
+            assert.ok(space.includes(t('adRequirementCurrentAmount', String(req.amount + offset))));
+            assert.equal(disabled(panels(slice, target, false).space, target === 'boost' ? t('adLabText115') : t('adLabText119')), true);
           }
-          assert.equal(game.dimensions[req.tier - 1].bought - before, requested);
-        };
-        buy(req.amount - 1);
-        for (const offset of [-1, 0, 1]) {
-          if (offset !== -1) buy(1);
-          const { flat, space, ad } = panels(slice, target);
-          const expected = offset < 0;
-          assert.equal(disabled(flat, target === 'boost' ? 'Boost する' : 'Galaxy を作る'), expected);
-          assert.equal(disabled(space, target === 'boost' ? 'Boost を実行' : 'Galaxy を実行'), expected);
-          assert.equal(target === 'boost' ? ad.derived.boost.can : ad.derived.galaxy.can, !expected);
-          assert.ok(flat.includes(`現在: 第${req.tier}次元 ${req.amount + offset} 個`));
-          assert.ok(space.includes(`対象次元の現在個数：${req.amount + offset} 個`));
-          assert.equal(disabled(panels(slice, target, false).space, target === 'boost' ? 'Boost を実行' : 'Galaxy を実行'), true);
+          if (target === 'boost') assert.equal(slice.adBoost(), true); else assert.equal(slice.adGalaxy(), true);
+          const after = panels(slice, target);
+          assert.equal(disabled(after.space, target === 'boost' ? t('adLabText115') : t('adLabText119')), true);
         }
-        if (target === 'boost') assert.equal(slice.adBoost(), true); else assert.equal(slice.adGalaxy(), true);
-        const after = panels(slice, target);
-        assert.equal(disabled(after.space, target === 'boost' ? 'Boost を実行' : 'Galaxy を実行'), true);
-      }
-    });
-  }
-}
-
-test('Sacrifice・Crunch は共通条件と所有者条件を両パネルで守る', () => {
-  for (const boosts of [4, 5]) {
-    for (const improved of [false, true]) {
-      const game = createNewGame(0);
-      game.dimensionalBoosts = boosts;
-      game.dimensions[0].amount = bigFromLog10(100);
-      if (!improved) game.sacrificeBoost = getSacrificeCandidate(game);
-      const slice = harness(game);
-      const { flat, space } = panels(slice, 'sacrifice');
-      assert.equal(disabled(flat, 'Sacrifice する'), boosts < 5 || !improved);
-      assert.equal(disabled(space, 'Sacrifice を実行'), boosts < 5 || !improved);
-      assert.equal(disabled(panels(slice, 'sacrifice', false).space, 'Sacrifice を実行'), true);
+      });
     }
   }
-  for (const amount of [1.78e308, 1.79e308, 1.795e308]) {
-    const game = createNewGame(0);
-    game.antimatter = bigFromNumber(amount);
-    const slice = harness(game);
-    const { flat, space } = panels(slice, 'crunch');
-    assert.equal(disabled(flat, 'Big Crunch する'), amount < 1.79e308);
-    assert.equal(disabled(space, 'Big Crunch を実行'), amount < 1.79e308);
-    assert.equal(disabled(panels(slice, 'crunch', false).space, 'Big Crunch を実行'), true);
-  }
-});
+
+  test(`${language}: Sacrifice・Crunch は共通条件と所有者条件を両パネルで守る`, (context) => {
+    const previous = getLanguage();
+    setLanguage(language);
+    context.after(() => setLanguage(previous));
+    for (const boosts of [4, 5]) {
+      for (const improved of [false, true]) {
+        const game = createNewGame(0);
+        game.dimensionalBoosts = boosts;
+        game.dimensions[0].amount = bigFromLog10(100);
+        if (!improved) game.sacrificeBoost = getSacrificeCandidate(game);
+        const slice = harness(game);
+        const { flat, space } = panels(slice, 'sacrifice');
+        assert.equal(disabled(flat, t('adLabText30')), boosts < 5 || !improved);
+        assert.equal(disabled(space, t('adLabText118')), boosts < 5 || !improved);
+        assert.equal(disabled(panels(slice, 'sacrifice', false).space, t('adLabText118')), true);
+      }
+    }
+    for (const amount of [1.78e308, 1.79e308, 1.795e308]) {
+      const game = createNewGame(0);
+      game.antimatter = bigFromNumber(amount);
+      const slice = harness(game);
+      const { flat, space } = panels(slice, 'crunch');
+      assert.equal(disabled(flat, t('adLabText31')), amount < 1.79e308);
+      assert.equal(disabled(space, t('adLabText122')), amount < 1.79e308);
+      assert.equal(disabled(panels(slice, 'crunch', false).space, t('adLabText122')), true);
+    }
+  });
+
+}
