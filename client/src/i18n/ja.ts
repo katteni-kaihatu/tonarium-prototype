@@ -1,4 +1,5 @@
 export default {
+  adRequirementCurrentAmount: '対象次元の現在個数：{0} 個',
   xrPendingHelp: 'VRの開始を待っています。',
   modeSwitchingHelp: "モードを切り替えています。",
   xrPrepareLabel: "VR",

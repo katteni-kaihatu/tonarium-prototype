@@ -9,6 +9,7 @@ import { ANTIMATTER_EXHIBITS, type AdLabSnapshot, type AdPanelTarget } from '../
 import { drawText, makeCanvasTexture } from './textTexture.ts';
 import { emitAdFeedback } from '../ad/feedback.ts';
 import { uprightQuaternion } from '../xr/pose.ts';
+import { t } from '../i18n/core.ts';
 
 /** 親が engine へ結ぶ操作口。3D 側は数値計算もセーブもしない */
 export interface AdActions {
@@ -131,7 +132,8 @@ export function AntimatterSpacePanel({ target, snapshot, actions, isOwn, onClose
         <h3>Dimension Boost / Shift</h3>
         <p>現在の Boost：{snapshot.boosts} 回</p>
         <p>要件：{snapshot.boostRequirementText}</p>
-        <Btn label="Boost を実行" onClick={actions.dimensionalBoost} disabled={!own} />
+        <p>{t('adRequirementCurrentAmount', snapshot.boostCurrentAmountText)}</p>
+        <Btn label="Boost を実行" onClick={actions.dimensionalBoost} disabled={!own || !snapshot.canBoost} />
         <Foot onClose={onClose} />
       </div>
     );
@@ -141,7 +143,7 @@ export function AntimatterSpacePanel({ target, snapshot, actions, isOwn, onClose
       <div style={panelStyle}>
         <h3>Dimensional Sacrifice</h3>
         <p>{snapshot.sacrificeUnlocked ? `現在の倍率：${snapshot.sacrificeText}` : 'Boost 5 回で解放されます'}</p>
-        <Btn label="Sacrifice を実行" onClick={actions.sacrifice} disabled={!own || !snapshot.sacrificeUnlocked} />
+        <Btn label="Sacrifice を実行" onClick={actions.sacrifice} disabled={!own || !snapshot.canSacrifice} />
         <Foot onClose={onClose} />
       </div>
     );
@@ -152,7 +154,8 @@ export function AntimatterSpacePanel({ target, snapshot, actions, isOwn, onClose
         <h3>Antimatter Galaxy</h3>
         <p>現在の銀河：{snapshot.galaxies} 個</p>
         <p>要件：{snapshot.galaxyRequirementText}</p>
-        <Btn label="Galaxy を実行" onClick={actions.antimatterGalaxy} disabled={!own} />
+        <p>{t('adRequirementCurrentAmount', snapshot.galaxyCurrentAmountText)}</p>
+        <Btn label="Galaxy を実行" onClick={actions.antimatterGalaxy} disabled={!own || !snapshot.canGalaxy} />
         <Foot onClose={onClose} />
       </div>
     );

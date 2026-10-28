@@ -1,4 +1,5 @@
 export default {
+  adRequirementCurrentAmount: 'Current amount of the required dimension: {0}',
   xrPendingHelp: 'Waiting for VR to start.',
   modeSwitchingHelp: "Switching modes.",
   xrPrepareLabel: "VR",
