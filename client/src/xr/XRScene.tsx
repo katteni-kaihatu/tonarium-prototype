@@ -3,10 +3,12 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PlayerCamera } from '../view3d/playerCamera.ts';
 import { useEyeHeight } from '../view3d/eyeHeight.ts';
-import { stick, turnStep } from './input.ts';
+import { movementAllowed, stick, turnStep } from './input.ts';
+import { uvToDOM } from './layout.ts';
+import { ControllerInput } from './controllerInput.ts';
 import { TerminalPointer } from './domInput.ts';
 import { PanelSurfaces } from './panelSurfaces.ts';
-import { avatarTrackingPose, calibratedOrigin, controllerRay } from './pose.ts';
+import { avatarTrackingPose, calibratedOrigin, controllerRay, validTracking } from './pose.ts';
 import type { TrackedPose } from '../../../shared/xr-pose.ts';
 import { endVR, resetXRInput, useXR, xr, xrPatch, xrState } from './runtime.ts';
 
@@ -48,7 +50,7 @@ export function XRScene({ rig }: { rig: PlayerCamera }) {
     });
     let initial: THREE.Vector3 | null = null, lastDraw = -Infinity, latch = false;
     let selecting: THREE.Group | null = null, selectedPanel: HTMLElement | null = null, carryController: THREE.Group | null = null;
-    const buttons = new Map<XRInputSource, boolean[]>();
+    const input = new ControllerInput(), tracked = input.tracked;
     const controllerFor = (source: XRInputSource) => controllers.find(c => c.userData.inputSource === source);
     const rayFor = (controller: THREE.Group) => {
       const ray = rays[controllers.findIndex(c => c === controller)];
@@ -65,8 +67,8 @@ export function XRScene({ rig }: { rig: PlayerCamera }) {
         hit.panel.group.getWorldQuaternion(mark.quaternion);
         if (move && (!selectedPanel || selectedPanel === hit.panel.root)) {
           pointer.root = hit.panel.root;
-          const rect = hit.panel.root.getBoundingClientRect();
-          pointer.move(rect.left + hit.hit.uv.x * rect.width, rect.top + (1 - hit.hit.uv.y) * rect.height);
+          const p = uvToDOM(hit.panel.root, hit.hit.uv);
+          pointer.move(p.x, p.y);
         }
       }
       if (move && selectedPanel && (!hit || hit.panel.root !== selectedPanel)) pointer.move(-100, -100);
@@ -75,8 +77,9 @@ export function XRScene({ rig }: { rig: PlayerCamera }) {
     const start = (event: XRInputSourceEvent) => {
       if (session.visibilityState !== 'visible' || selecting) return;
       const controller = controllerFor(event.inputSource);
-      if (!controller) return;
+      if (!controller || !tracked.has(controller) || panels.isHeld(controller)) return;
       selecting = controller;
+      if (panels.beginResize(controller, rayFor(controller))) return;
       const hit = point(controller, true);
       selectedPanel = hit?.panel.root ?? null;
       if (hit) { pointer.button = document.body.dataset.xrMiddle === 'true' ? 1 : 0; pointer.press(); }
@@ -84,14 +87,20 @@ export function XRScene({ rig }: { rig: PlayerCamera }) {
     };
     const end = (event: XRInputSourceEvent) => {
       if (controllerFor(event.inputSource) !== selecting) return;
+      if (panels.isResizing(selecting!)) { panels.endResize(selecting!); selecting = null; return; }
+      panels.endResize(selecting!);
       if (selectedPanel) pointer.release(); else xr.release?.();
       selecting = null; selectedPanel = null;
     };
     const squeeze = (event: XRInputSourceEvent) => {
       if (session.visibilityState !== 'visible') return;
       const controller = controllerFor(event.inputSource);
-      if (!controller) return;
+      if (!controller || !tracked.has(controller) || selecting === controller) return;
       const ray = rayFor(controller);
+      if (carryController === controller) {
+        xr.ray = ray.ray.clone(); carryController = xr.carry?.() ? controller : null;
+        xr.carryRay = carryController ? ray.ray.clone() : null; return;
+      }
       if (panels.grab(controller, ray)) return;
       // パネル上のグリップを背後の物体の保持へ通さない。
       if (panels.hit(ray)) return;
@@ -101,11 +110,11 @@ export function XRScene({ rig }: { rig: PlayerCamera }) {
       xr.carryRay = carryController ? ray.ray.clone() : null;
     };
     const unsqueeze = (event: XRInputSourceEvent) => { const controller = controllerFor(event.inputSource); if (controller) panels.release(controller); };
-    xr.clearControllers = () => {
+    xr.clearControllers = (preserveTracking = false) => {
       pointer.release(true); selectedPanel = null; selecting = null; carryController = null;
-      panels.release(); buttons.clear(); latch = false; marks.forEach(m => { m.visible = false; });
+      panels.cancel(); if (!preserveTracking) input.clear(); latch = false; marks.forEach(m => { m.visible = false; });
     };
-    const clear = () => resetXRInput();
+    const clear = () => { tracked.clear(); panels.update(undefined); resetXRInput(); };
     session.addEventListener('selectstart', start); session.addEventListener('selectend', end);
     session.addEventListener('squeezestart', squeeze); session.addEventListener('squeezeend', unsqueeze);
     session.addEventListener('inputsourceschange', clear); session.addEventListener('visibilitychange', clear);
@@ -113,7 +122,8 @@ export function XRScene({ rig }: { rig: PlayerCamera }) {
       if (session.visibilityState !== 'visible') return;
       controllers.forEach(controller => {
         const source = controller.userData.inputSource as XRInputSource | undefined;
-        if (!source) return;
+        if (!source || !tracked.has(controller)) { marks[controllers.indexOf(controller)].visible = false; return; }
+        if (panels.isResizing(controller)) { panels.updateResize(controller, rayFor(controller)); return; }
         const active = selecting ?? controllers.find(c => c.userData.inputSource?.handedness === 'right') ?? controller;
         const hit = point(controller, active === controller);
         if (controller === active && !hit) xr.ray = rayFor(controller).ray.clone();
@@ -124,7 +134,15 @@ export function XRScene({ rig }: { rig: PlayerCamera }) {
       xr.move = [0, 0]; xr.turn = 0;
       if (session.visibilityState !== 'visible') return;
       const reference = gl.xr.getReferenceSpace(), pose = reference && frame?.getViewerPose(reference);
-      if (!pose) return;
+      if (!pose || !validTracking(pose.transform)) { tracked.clear(); panels.update(undefined); resetXRInput(); return; }
+      const trackingStates = controllers.map(controller => {
+        const source = controller.userData.inputSource as XRInputSource | undefined;
+        const target = source && reference && frame?.getPose(source.targetRaySpace, reference);
+        const grip = source?.gripSpace && reference && frame?.getPose(source.gripSpace, reference);
+        return { controller, source, target: target?.transform, grip: grip?.transform };
+      });
+      input.sync(trackingStates, () => resetXRInput());
+      for (const controller of controllers) if (!tracked.has(controller)) panels.cancel(controller);
       const head = pose.transform;
       const headPosition = new THREE.Vector3(head.position.x, head.position.y, head.position.z);
       if (!initial) initial = headPosition.clone();
@@ -137,18 +155,21 @@ export function XRScene({ rig }: { rig: PlayerCamera }) {
       };
       xr.pose = { head: tracking(head) };
       for (const source of session.inputSources) {
+        const controller = controllerFor(source);
+        if (!controller || !tracked.has(controller)) continue;
         if (source.gripSpace && reference) {
           const grip = frame?.getPose(source.gripSpace, reference);
-          if (grip && (source.handedness === 'left' || source.handedness === 'right')) xr.pose[source.handedness] = tracking(grip.transform);
+          if (grip && validTracking(grip.transform) && (source.handedness === 'left' || source.handedness === 'right')) xr.pose[source.handedness] = tracking(grip.transform);
         }
         const pad = source.gamepad;
-        if (!pad || pad.mapping !== 'xr-standard') continue;
-        const axes = stick(pad.axes), old = buttons.get(source) ?? [], current = pad.buttons.map(b => b.pressed);
+        const pressed = input.poll(controller, source);
+        if (!pad || !pressed) continue;
+        const axes = stick(pad.axes), { old, current } = pressed;
         if (current[5] && !old[5]) { resetXRInput(true); xrPatch({ open: !xrState().open }); }
         if (current[4] !== !!old[4]) window.dispatchEvent(new KeyboardEvent(current[4] ? 'keydown' : 'keyup', { code: 'Space', key: ' ' }));
-        buttons.set(source, current);
-        const controller = controllerFor(source), hit = controller && point(controller, false);
-        if (source.handedness === 'left') { if (!hit && !selecting) xr.move = axes; }
+        const hit = point(controller, false);
+        if (panels.distance(controller, axes[1], dt) || panels.isResizing(controller)) { if (source.handedness === 'right') latch = false; continue; }
+        if (source.handedness === 'left') { if (movementAllowed(false, !!hit, !!selecting, xr.settings)) xr.move = axes; }
         else if (source.handedness === 'right') {
           if (hit) { if (!selecting || selecting === controller) { point(controller!, true); pointer.scroll(axes[1] * dt * 500, axes[0] * dt * 500); } latch = false; }
           else { const turn = turnStep(axes[0], dt, xr.settings, latch); xr.turn = turn.radians; latch = turn.latched; }
@@ -161,7 +182,7 @@ export function XRScene({ rig }: { rig: PlayerCamera }) {
       origin.rotation.set(0, rig.yaw, 0); camera.position.set(0, 0, 0); camera.quaternion.identity(); origin.updateMatrixWorld(true);
       if (camera instanceof THREE.PerspectiveCamera) gl.xr.updateCamera(camera);
       const left = controllers.findIndex(c => c.userData.inputSource?.handedness === 'left');
-      panels.update(left < 0 ? undefined : grips[left]);
+      panels.update(left < 0 || !tracked.has(controllers[left]) || !xr.pose?.left ? undefined : grips[left]);
       if (performance.now() - lastDraw > 200) {
         lastDraw = performance.now();
         try { panels.refresh(); } catch { xrPatch({ error: 'VRパネルの描画に失敗したためVRを終了しました。通常画面をご利用ください。' }); void endVR(); }

@@ -1,5 +1,10 @@
 import * as THREE from 'three';
 import type { TrackedPose } from '../../../shared/xr-pose.ts';
+export function validTracking(transform: { position: { x: number; y: number; z: number }; orientation: { x: number; y: number; z: number; w: number } } | undefined) {
+  if (!transform) return false;
+  const p = transform.position, q = transform.orientation;
+  return [p.x, p.y, p.z, q.x, q.y, q.z, q.w].every(Number.isFinite) && Math.hypot(q.x, q.y, q.z, q.w) > .001;
+}
 
 /** 初期の立ち位置をアバターの目へ合わせ、以後の実移動は消さない。 */
 export function calibratedOrigin(base: THREE.Vector3, yaw: number, initial: THREE.Vector3, eye: number, out = new THREE.Vector3()) {

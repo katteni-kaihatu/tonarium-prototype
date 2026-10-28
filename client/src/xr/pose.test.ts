@@ -1,12 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { applyTrackedPose, avatarTrackingPose, calibratedOrigin, carryPosition, controllerRay, renderedQuaternion, uprightQuaternion } from './pose.ts';
+import { applyTrackedPose, avatarTrackingPose, calibratedOrigin, carryPosition, controllerRay, renderedQuaternion, uprightQuaternion, validTracking } from './pose.ts';
 import { clampAvatar } from '../../../shared/places.ts';
 import { validAvatarXR, type AvatarXR } from '../../../shared/xr-pose.ts';
 
 const near = (a: THREE.Vector3, b: THREE.Vector3) => assert.ok(a.distanceTo(b) < 1e-8, `${a.toArray()} != ${b.toArray()}`);
 const sameRotation = (a: THREE.Quaternion, b: THREE.Quaternion) => assert.ok(1 - Math.abs(a.dot(b)) < 1e-8);
+test('lost, nonfinite and degenerate tracking cannot drive panel holds', () => {
+  const position = { x: 0, y: 1, z: -.5 }, orientation = { x: 0, y: 0, z: 0, w: 1 };
+  assert.equal(validTracking({ position, orientation }), true);
+  assert.equal(validTracking(undefined), false);
+  assert.equal(validTracking({ position: { ...position, x: NaN }, orientation }), false);
+  assert.equal(validTracking({ position, orientation: { ...orientation, w: 0 } }), false);
+});
 
 test('reading an XR render camera preserves its supplied world and inverse matrices', () => {
   for (const yaw of [0, .8, -1.2, Math.PI]) {

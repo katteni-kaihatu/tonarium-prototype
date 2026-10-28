@@ -48,15 +48,17 @@ export function XRLaunch() {
 }
 
 export function XRSettings() {
+  useLanguage();
   const [value, setValue] = useState(xr.settings);
   const update = (patch: Partial<typeof DEFAULT_TURN>) => {
     xr.settings = turnSettings({ ...value, ...patch }); setValue(xr.settings);
     try { localStorage.setItem('tonarium.xr.turn', JSON.stringify(xr.settings)); } catch { /* 保存不可でもその場で反映する */ }
   };
-  return <fieldset className="xr-settings"><legend>VRの旋回</legend>
-    <label>方式 <select value={value.mode} onChange={e => update({ mode: e.target.value as typeof value.mode })}><option value="snap">スナップターン</option><option value="smooth">スムースターン</option></select></label>
-    <label>速度 {value.speed}°/秒 <input aria-label="VR旋回速度" type="range" min="15" max="180" step="15" value={value.speed} onChange={e => update({ speed: Number(e.target.value) })} /></label>
-    <label>角度 {value.angle}° <input aria-label="VR旋回角度" type="range" min="15" max="90" step="15" value={value.angle} onChange={e => update({ angle: Number(e.target.value) })} /></label>
+  return <fieldset className="xr-settings"><legend>{tr('xrSettings')}</legend>
+    <label>{tr('xrTurnMode')} <select value={value.mode} onChange={e => update({ mode: e.target.value as typeof value.mode })}><option value="snap">{tr('xrSnap')}</option><option value="smooth">{tr('xrSmooth')}</option></select></label>
+    <label>{tr('xrTurnSpeed', value.speed)} <input aria-label={tr('xrTurnSpeedName')} type="range" min="15" max="180" step="15" value={value.speed} onChange={e => update({ speed: Number(e.target.value) })} /></label>
+    <label>{tr('xrTurnAngle', value.angle)} <input aria-label={tr('xrTurnAngleName')} type="range" min="15" max="90" step="15" value={value.angle} onChange={e => update({ angle: Number(e.target.value) })} /></label>
+    <label><input type="checkbox" checked={value.restrictMovementWhileAiming} onChange={e => update({ restrictMovementWhileAiming: e.target.checked })} />{tr('xrRestrictMovement')}</label>
   </fieldset>;
 }
 
@@ -64,6 +66,7 @@ const LETTERS = '1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.
 const KANA = 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんぁぃぅぇぉゃゅょっー、。゛゜';
 const KEY_COMMANDS = [['Space', 'ジャンプ / 上昇'], ['ShiftLeft', '下降'], ['KeyE', '乗降 / 右リーン'], ['KeyQ', '道具を置く / 左リーン'], ['KeyX', '片付け'], ['KeyL', 'カメラ配信'], ['KeyC', 'カメラ撮影'], ['KeyT', '一人称 / 三人称'], ['Tab', '左右パネル'], ['Escape', '閉じる'], ['ArrowUp', '↑'], ['ArrowDown', '↓'], ['ArrowLeft', '←'], ['ArrowRight', '→']] as const;
 export function XRControls() {
+  useLanguage();
   const state = useXR();
   const session = useStore(s => s.session);
   const mode = useStore(s => s.mode);
@@ -116,7 +119,7 @@ export function XRControls() {
   ];
   return createPortal(<div className={`xr-tools ${state.open ? '' : 'folded'}`}>
     <div className="xr-wrist" data-xr-surface="wrist" data-xr-utility="true" data-xr-title="左腕のパネル一覧">
-      <h2>パネル一覧</h2><p>トリガーで開閉。グリップを押したままパネルを配置。</p>
+      <h2>{tr('xrPanelList')}</h2><p>{tr('xrPanelHint')}</p>
       <button onClick={() => { xrPatch({ open: true }); set({ hubOpen: true }); }}>ホーム・クライアントモード</button>
       <button onClick={() => { xrPatch({ open: true }); set(s => ({ folded: { ...s.folded, left: false, right: false } })); }}>近くの一覧・チャットを用意</button>
       {candidates.map(entry => {
@@ -128,15 +131,15 @@ export function XRControls() {
       })}
       {state.panels.filter(p => !candidates.some(c => c.key === p.id)).map(panel => <button key={panel.id} aria-pressed={panel.open} onClick={() => { xrPatch({ open: true }); xr.togglePanel?.(panel.id); }}>{panel.open ? '閉じる' : '開く'} · {panel.title}</button>)}
     </div>
-    <div className="xr-toolbar" data-xr-surface="tools" data-xr-utility="true" data-xr-title="VR操作">
-      <button onClick={() => { resetXRInput(true); xrPatch({ open: !state.open }); }}>仮想端末を{state.open ? '閉じる' : '開く'} (B/Y)</button>
-      <button onClick={() => void endVR()}>VR終了</button>
+    <div className="xr-toolbar" data-xr-surface="tools" data-xr-utility="true" data-xr-persistent="true" data-xr-title={tr('xrSettings')}>
+      <button onClick={() => { resetXRInput(true); xrPatch({ open: !state.open }); }}>{tr(state.open ? 'xrHidePanels' : 'xrShowPanels')} (B/Y)</button>
+      <button onClick={() => void endVR()}>{tr('xrEndLabel')}</button>
       <button onClick={() => void endVR()}>ファイル・外部画面をブラウザで操作</button>
       <button onClick={() => { void endVR().then(() => { if (get().session) switchMode('2d'); }); }}>2Dへ戻る</button>
       <button onClick={() => setCommands(!commands)}>操作キー</button><button onClick={() => { field.current?.focus(); setEditing(!editing); }}>文字入力</button>
     </div>
     <>
-      <p data-xr-surface="help" data-xr-utility="true" data-xr-title="操作説明">左スティック: 移動 / 右: 旋回 / トリガー: レイ選択・ドラッグ / グリップ: 運ぶ（再押下で置く）、パネル上では押したまま配置 / A・X: ジャンプ / B・Y: 端末開閉。パネルを指して右スティックでスクロール。</p>
+      <p data-xr-surface="help" data-xr-utility="true" data-xr-title={tr('xrHelpName')}>{tr('xrControlsHelp')}</p>
       {commands && <div className="xr-command-panel" data-xr-surface="commands" data-xr-utility="true" data-xr-title="操作キー"><XRSettings />
         {KEY_COMMANDS.map(([code, label]) => <button key={code} onPointerDown={e => { e.preventDefault(); key(code, true); }} onPointerUp={() => key(code, false)} onPointerCancel={() => key(code, false)} onPointerLeave={() => key(code, false)}>{label}</button>)}
         <button aria-pressed={middle} onClick={() => { setMiddle(!middle); document.body.dataset.xrMiddle = String(!middle); }}>地図ドラッグ: {middle ? '移動' : '通常'}</button>

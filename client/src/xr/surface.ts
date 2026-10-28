@@ -1,11 +1,17 @@
 import { HTMLMesh } from 'three/addons/interactive/HTMLMesh.js';
 import type { CanvasTexture } from 'three';
+import { PlaneGeometry } from 'three';
 
 type HTMLMap = CanvasTexture & { update(): void; observer: MutationObserver; _scheduleUpdate: EventListener };
 
 // HTMLMesh の簡易 HTML 描画を使い、ゲームの Canvas と同じ DOM を操作する。
 export class TerminalSurface {
-  constructor(readonly root: HTMLElement = document.body, readonly width = 1.25) {}
+  constructor(readonly root: HTMLElement = document.body, private readonly nominalWidth = 1.25) {}
+  private initialWidth = 0;
+  private imageWidth = 0;
+  private imageHeight = 0;
+  get width() { return this.nominalWidth * (this.initialWidth ? this.imageWidth / this.initialWidth : 1); }
+  get height() { return this.width * this.imageHeight / Math.max(1, this.imageWidth); }
   mesh: HTMLMesh | null = null;
   private vectors = new WeakMap<SVGSVGElement, { source: string; image: HTMLImageElement }>();
   private imgOrigins = new WeakMap<HTMLImageElement, { src: string; crossOrigin: boolean }>();
@@ -43,6 +49,9 @@ export class TerminalSurface {
       } else (this.mesh.material.map as HTMLMap).update();
       const texture = this.mesh.material.map as HTMLMap;
       const canvas = texture.image as HTMLCanvasElement;
+      this.imageWidth = canvas.width;
+      this.imageHeight = canvas.height;
+      this.initialWidth ||= Math.max(1, canvas.width);
       const ctx = canvas.getContext('2d')!;
       const offset = this.root.getBoundingClientRect();
       const label = (el: Element, text: string) => {
@@ -91,8 +100,13 @@ export class TerminalSurface {
       this.root.querySelectorAll('iframe').forEach(el => label(el, '外部プレーヤー: VR終了後にブラウザで操作'));
       texture.needsUpdate = true;
       const aspect = canvas.width / Math.max(1, canvas.height);
+      const geometry = this.mesh.geometry;
+      if (geometry.parameters.width !== canvas.width * .001 || geometry.parameters.height !== canvas.height * .001) {
+        this.mesh.geometry = new PlaneGeometry(canvas.width * .001, canvas.height * .001);
+        geometry.dispose();
+      }
       this.mesh.scale.set(this.width / Math.max(.001, canvas.width * .001), this.width / aspect / Math.max(.001, canvas.height * .001), 1);
     } finally { hidden.reverse().forEach(([el, display]) => { el.style.display = display; }); }
   }
-  dispose() { this.mesh?.removeFromParent(); this.mesh?.dispose(); this.mesh = null; this.vectors = new WeakMap(); this.imgOrigins = new WeakMap(); }
+  dispose() { this.mesh?.removeFromParent(); this.mesh?.geometry.dispose(); this.mesh?.dispose(); this.mesh = null; this.vectors = new WeakMap(); this.imgOrigins = new WeakMap(); }
 }

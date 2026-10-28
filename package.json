@@ -38,7 +38,7 @@
     "test:movement": "tsx --test client/src/movementSettings.test.ts client/src/view3d/movement.test.ts client/src/view3d/movementAbilities.test.ts client/src/view3d/crouch.test.ts client/src/view3d/jumpPad.test.ts shared/walking.test.ts",
     "test:camera": "tsx --test client/src/view3d/playerCamera.test.ts client/src/view3d/cityPhysics.test.ts client/src/view3d/cameraPlacement.test.ts",
     "test:camera-recording": "tsx --test client/src/view3d/cameraRecording.test.ts",
-    "test:xr": "tsx --test client/src/xr/input.test.ts client/src/xr/pose.test.ts",
+    "test:xr": "tsx --test client/src/xr/input.test.ts client/src/xr/pose.test.ts client/src/xr/controllerInput.test.ts",
     "test:mirror": "tsx --test client/src/view3d/mirrorReflection.test.ts",
     "test:gif": "tsx --test client/src/view3d/gifPlayback.test.ts client/src/view3d/imageTexture.test.ts",
     "check:changelog": "node scripts/check-changelog.mjs",

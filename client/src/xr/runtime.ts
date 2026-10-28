@@ -5,8 +5,12 @@ import type { AvatarXR } from '../../../shared/xr-pose.ts';
 
 let snapshot = { active: false, open: true, ready: false, pending: false, error: '', panels: [] as { id: string; title: string; open: boolean }[] };
 const listeners = new Set<() => void>();
+export function subscribeXR(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; }
 export const xrState = () => snapshot;
-export function xrPatch(patch: Partial<typeof snapshot>) { snapshot = { ...snapshot, ...patch }; listeners.forEach(fn => fn()); }
+export function xrPatch(patch: Partial<typeof snapshot>) {
+  if (patch.open === false && snapshot.open) resetXRInput(true);
+  snapshot = { ...snapshot, ...patch }; listeners.forEach(fn => fn());
+}
 export const useXR = () => useSyncExternalStore(fn => { listeners.add(fn); return () => { listeners.delete(fn); }; }, xrState);
 function loadTurn() { try { return turnSettings(JSON.parse(localStorage.getItem('tonarium.xr.turn') ?? 'null')); } catch { return DEFAULT_TURN; } }
 export const xr = {
@@ -17,13 +21,13 @@ export const xr = {
   pose: undefined as AvatarXR | undefined,
   carryRay: null as THREE.Ray | null,
   togglePanel: null as null | ((id: string) => void),
-  clearControllers: null as null | (() => void),
+  clearControllers: null as null | ((preserveTracking?: boolean) => void),
   settings: loadTurn(),
   use: null as null | (() => void), release: null as null | (() => void), carry: null as null | (() => boolean),
   cancel: null as null | (() => void),
 };
 export function resetXRInput(preserveTracking = false) {
-  xr.clearControllers?.();
+  xr.clearControllers?.(preserveTracking);
   if (!preserveTracking) { xr.pose = undefined; xr.headYaw = 0; xr.headPitch = 0; }
   xr.carryRay = null;
   xr.move = [0, 0]; xr.turn = 0; xr.ray = null;
