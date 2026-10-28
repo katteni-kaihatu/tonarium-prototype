@@ -45,8 +45,16 @@ test('exchange is single use even for simultaneous requests and remains consumed
   const grant = results.find(r => r.status === 'fulfilled');
   assert.ok(grant?.status === 'fulfilled');
   assert.equal(grant.value.id, a.id);
+  store.save(a.id, a.token, 0, { progress: 'issuer' });
+  assert.deepEqual(store.load(a.id, grant.value.token), { save: { progress: 'issuer' }, revision: 1 });
+  store.save(a.id, grant.value.token, 1, { progress: 'receiver' });
+  assert.throws(() => store.save(a.id, a.token, 1, {}), rejected(409));
   const restarted = new AdStore(file);
   assert.equal(restarted.owner(grant.value.token), a.id);
+  assert.equal(restarted.owner(a.token), a.id);
+  assert.deepEqual(restarted.load(a.id, a.token), { save: { progress: 'receiver' }, revision: 2 });
+  restarted.save(a.id, a.token, 2, { progress: 'issuer continues' });
+  assert.deepEqual(restarted.load(a.id, grant.value.token), { save: { progress: 'issuer continues' }, revision: 3 });
   assert.throws(() => restarted.exchange(code, 'peer'), rejected(400));
   const raw = fs.readFileSync(file, 'utf8');
   assert.ok(!raw.includes(code) && !raw.includes(grant.value.token) && !raw.includes(a.token));

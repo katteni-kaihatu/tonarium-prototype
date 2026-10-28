@@ -1,4 +1,5 @@
 import { validateSave } from './sync.mjs';
+import { createNewGame } from './engine.mjs';
 /**
  * user.mjs — Antimatter Dimensions ユーザー分離 / 認証差し替え / export・import
  *
@@ -223,6 +224,11 @@ export function getActiveProfile(storage) {
 export function ensureDefaultProfile(storage) {
   assertStorage(storage);
   const profiles = readProfilesRaw(storage);
+  const selected = readProgressSelection(storage);
+  if (selected?.confirmed) {
+    const profile = profiles.find(p => p.id === selected.profileId);
+    if (profile) return clonePlain(profile);
+  }
   if (profiles.length === 0) {
     return createProfile(storage, DEFAULT_PROFILE_NAME);
   }
@@ -520,10 +526,82 @@ export function listRecoveryRecords(storage, profileId) {
 export function retainSyncSources(storage, profileId, local, remote) {
   const records = listRecoveryRecords(storage, profileId);
   const key = 'ad:v3:recovery:' + profileId + ':' + generateUserId();
-  storage.setItem(key, JSON.stringify({ local, remote }));
+  storage.setItem(key, JSON.stringify({ local, remote, connection: readConnection(storage, profileId) }));
   storage.setItem('ad:v3:recoveryIndex:' + profileId, JSON.stringify([{ key, createdAt: new Date().toISOString() }, ...records]));
   storage.setItem('ad:v3:lastRecovery:' + profileId, key);
   return key;
+}
+
+const SELECTION_KEY = 'ad:v4:selection';
+const PENDING_CONNECTION_KEY = 'ad:v4:pendingConnection';
+function finishPendingConnection(storage) {
+  const raw = storage.getItem(PENDING_CONNECTION_KEY);
+  if (!raw) return null;
+  const pending = JSON.parse(raw);
+  const profiles = readProfilesRaw(storage);
+  if (!profiles.some(p => p.id === pending.profile.id)) writeProfilesRaw(storage, [...profiles, pending.profile]);
+  writeConnection(storage, pending.profile.id, pending.connection);
+  const profile = selectProgress(storage, pending.profile.id);
+  storage.removeItem(PENDING_CONNECTION_KEY);
+  return profile;
+}
+export function adoptConnection(storage, name, connection) {
+  const profile = { id: generateUserId(), name: normalizeProfileName(name), createdAt: new Date().toISOString() };
+  storage.setItem(PENDING_CONNECTION_KEY, JSON.stringify({ profile, connection: { ...connection, adoptRemote: true } }));
+  return finishPendingConnection(storage);
+}
+export function readProgressSelection(storage) {
+  const raw = storage.getItem(SELECTION_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+export function selectProgress(storage, profileId) {
+  const profile = listProfiles(storage).find(p => p.id === profileId);
+  if (!profile) throw new Error('Progress not found');
+  storage.setItem(SELECTION_KEY, JSON.stringify({ profileId, confirmed: true }));
+  return profile;
+}
+export function prepareProgressSelection(storage) {
+  finishPendingConnection(storage);
+  const selected = readProgressSelection(storage);
+  if (selected?.confirmed && listProfiles(storage).some(p => p.id === selected.profileId)) return selected;
+  // 古いゲストセーブはコピーだけを行い、再実行時にも元のキーを残す。
+  const guest = storage.getItem('ad-save-v1');
+  if (guest) {
+    const save = JSON.parse(guest);
+    validateSave(save);
+    let id = storage.getItem('ad:v4:guestProfile');
+    if (!id) {
+      id = generateUserId();
+      storage.setItem('ad:v4:guestProfile', id);
+    }
+    if (!readSaveRaw(storage, id)) writeSave(storage, id, guest);
+    const profiles = readProfilesRaw(storage);
+    if (!profiles.some(p => p.id === id)) writeProfilesRaw(storage, [...profiles, { id, name: DEFAULT_PROFILE_NAME, createdAt: null }]);
+  }
+  const profile = ensureDefaultProfile(storage);
+  const candidates = listProfiles(storage).filter(p => readSaveRaw(storage, p.id) || readConnection(storage, p.id));
+  const profileId = candidates.some(p => p.id === profile.id) ? profile.id : candidates[0]?.id ?? profile.id;
+  const selection = { profileId, confirmed: candidates.length <= 1 };
+  storage.setItem(SELECTION_KEY, JSON.stringify(selection));
+  return selection;
+}
+
+export function listProgressSources(storage) {
+  return listProfiles(storage).flatMap(profile => {
+    const raw = readSaveRaw(storage, profile.id);
+    const own = raw || readConnection(storage, profile.id) ? [{
+      key: 'profile:' + profile.id, profileId: profile.id, name: profile.name,
+      createdAt: profile.createdAt,
+      save: raw ? JSON.parse(raw) : createNewGame(Date.parse(profile.createdAt) || 0),
+    }] : [];
+    return [...own, ...listRecoveryRecords(storage, profile.id).flatMap(record => {
+      const recovery = JSON.parse(storage.getItem(record.key));
+      return ['local', 'remote'].flatMap(source => recovery?.[source] ? [{
+        key: record.key + ':' + source, profileId: profile.id, name: profile.name,
+        save: recovery[source], createdAt: record.createdAt, source,
+      }] : []);
+    })];
+  });
 }
 export default {
   AUTH_MODES,

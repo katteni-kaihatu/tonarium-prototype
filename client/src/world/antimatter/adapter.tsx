@@ -6,8 +6,7 @@ import {
   getInfinityGain, getMaxUnlockedTier, getTickspeedCost, getTickspeedPerPurchase,
   type GameState,
 } from '../../ad/engine.mjs';
-import { deleteProfile, listProfiles, parseImportBundle, type StorageLike } from '../../ad/user.mjs';
-import { safeStorage } from '../../ad/storage.ts';
+import { parseImportBundle, type StorageLike } from '../../ad/user.mjs';
 import type { AdSlice } from '../../ad/slice.ts';
 import type { AntimatterSlice, DerivedSnapshot, OfflineNotice } from './types.ts';
 import { AntimatterPanel } from './AntimatterPanel.tsx';
@@ -63,7 +62,6 @@ export interface AdaptOptions {
 export function adaptAdSlice(slice: AdSlice, options: AdaptOptions = {}): AntimatterSlice | null {
   const game = slice.adGame;
   if (!game) return null;
-  const storage = options.storage ?? safeStorage();
   const serverStatus = slice.adSync === 'loading' ? t('adSyncLoading') : slice.adSync === 'choice' ? t('adSyncChoice') : slice.adSync === 'error' ? t('adSyncError') : null;
   const offline = slice.adOffline && !dismissedOffline.has(offlineKey(slice.adOffline)) ? slice.adOffline : null;
 
@@ -71,7 +69,12 @@ export function adaptAdSlice(slice: AdSlice, options: AdaptOptions = {}): Antima
     game,
     derived: derivedFrom(game),
     tickVersion: slice.adVersion,
-    profiles: (() => { try { return listProfiles(storage); } catch { return slice.adProfile ? [slice.adProfile] : []; } })(),
+    migration: slice.adMigration,
+    syncSources: slice.adSyncSources,
+    progressSources: slice.adProgressSources(),
+    selectProgress: slice.adSelectProgress,
+    restoreProgress: slice.adRestoreProgress,
+    exportProgress: key => { const bundle = slice.adExportProgress(key); return bundle ? JSON.stringify(bundle, null, 2) : ''; },
     activeProfile: slice.adProfile,
     offlineNotice: offline,
     leaderboard: slice.adLeaderboard,
@@ -99,28 +102,6 @@ export function adaptAdSlice(slice: AdSlice, options: AdaptOptions = {}): Antima
     prestigeInfinity: () => {
       const gain = getInfinityGain(game);
       return slice.adPrestige() ? gain : 0;
-    },
-    switchProfile: (userId) => slice.adSwitchProfile(userId),
-    createProfile: (name) => { void slice.adCreateProfile(name); },
-    deleteProfile: (userId) => {
-      let switching = false;
-      try {
-        const profiles = listProfiles(storage);
-        const rest = profiles.filter((p) => p.id !== userId);
-        if (rest.length === profiles.length) return;
-        const wasActive = slice.adProfile?.id === userId;
-        if (wasActive && !rest[0]) { emitAdFeedback({ kind: 'error' }); return; }
-
-        if (wasActive && rest[0]) {
-          switching = true;
-          slice.adSwitchProfile(rest[0].id);
-        }
-        deleteProfile(storage, userId);
-        if (!wasActive) emitAdFeedback({ kind: 'profile' });
-      } catch {
-        if (!switching) emitAdFeedback({ kind: 'error' });
-        // 削除に失敗してもパネル側は続行する
-      }
     },
     resetGame: slice.adResetGame,
     recoveryRecords: slice.adListRecovery(),

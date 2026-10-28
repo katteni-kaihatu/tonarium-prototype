@@ -184,7 +184,7 @@ test('プロフィール・入出力の失敗は成功通知なしでエラー�
     assert.deepEqual(events.splice(0), [{ kind: 'error' }]);
     assert.throws(() => slice.adSwitchProfile(profile.id), /Local save failed/);
     assert.deepEqual(events.splice(0), [{ kind: 'error' }]);
-    assert.throws(() => slice.adImport(bundle), /quota exceeded/);
+    assert.throws(() => slice.adImport(bundle), /Local save failed/);
     assert.deepEqual(events.splice(0), [{ kind: 'error' }]);
     Object.defineProperty(slice.adGame, 'antimatter', {
       configurable: true,
