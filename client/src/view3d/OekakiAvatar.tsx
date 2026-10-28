@@ -52,7 +52,8 @@ function baseAnimation(p: AvatarParams) {
 
 /** モデルは +Z 向きなので、こちらの「前 = -Z」に合わせて回してある */
 /** look は顔の上下の向き（ラジアン、上向きが正）を返す */
-export function OekakiAvatar({ name, version, speaking, look, walking, seated, crouching, userId, previewEmote, onEyeHeight, onSeatOffset, textureUrl, tracked, trackingRoot, handsOnly }: { name: string; version: string | null; speaking: boolean; look?: () => number; walking?: () => boolean; seated?: () => boolean; crouching?: () => boolean; userId?: string; previewEmote?: ActiveEmote | null; onEyeHeight?: (height: number) => void; onSeatOffset?: (offset: number) => void; textureUrl?: string; tracked?: () => AvatarXR | undefined; trackingRoot?: () => THREE.Object3D | null; handsOnly?: () => boolean }) {
+/** avatarId はアバターの持ち主のアカウント ID（画像と調整値をそこから読む） */
+export function OekakiAvatar({ avatarId, version, speaking, look, walking, seated, crouching, userId, previewEmote, onEyeHeight, onSeatOffset, textureUrl, tracked, trackingRoot, handsOnly }: { avatarId: string; version: string | null; speaking: boolean; look?: () => number; walking?: () => boolean; seated?: () => boolean; crouching?: () => boolean; userId?: string; previewEmote?: ActiveEmote | null; onEyeHeight?: (height: number) => void; onSeatOffset?: (offset: number) => void; textureUrl?: string; tracked?: () => AvatarXR | undefined; trackingRoot?: () => THREE.Object3D | null; handsOnly?: () => boolean }) {
   const { scene, animations } = useGLTF(MODEL);
   const clone = useMemo(() => scene.clone(), [scene]);
   const { nodes } = useGraph(clone);
@@ -80,20 +81,20 @@ export function OekakiAvatar({ name, version, speaking, look, walking, seated, c
     setTexture(null);
     setParamsReady(!version);
     onEyeHeight?.(DEFAULT_EYE_HEIGHT);
-    void new THREE.TextureLoader().loadAsync(textureUrl ?? avatarTextureUrl(name, version)).then((t) => {
+    void new THREE.TextureLoader().loadAsync(textureUrl ?? avatarTextureUrl(avatarId, version)).then((t) => {
       t.flipY = false;
       t.colorSpace = THREE.SRGBColorSpace;
       if (alive) setTexture(t); else t.dispose();
     }).catch(() => { /* 読み込み失敗時は標準の高さを保つ。 */ });
     setParams(DEFAULT_PARAMS);
     if (version) {
-      void fetch(avatarParamsUrl(name, version))
+      void fetch(avatarParamsUrl(avatarId, version))
         .then((r) => (r.ok ? r.json() : null))
         .then((p) => { if (alive) { setParams(sanitizeParams(p)); setParamsReady(true); } })
         .catch(() => { if (alive) setParamsReady(true); });
     }
     return () => { alive = false; };
-  }, [name, version, onEyeHeight, textureUrl]);
+  }, [avatarId, version, onEyeHeight, textureUrl]);
 
   useEffect(() => { notified.current = false; }, [params, texture, paramsReady, onEyeHeight]);
 

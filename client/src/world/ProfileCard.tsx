@@ -1,4 +1,5 @@
 import { t as tr, msg, systemText, type UiMessage } from '../i18n/index.ts';
+import { GuestMark } from './GuestMark.tsx';
 import { useState } from 'react';
 import { FollowButton } from '../home/common.tsx';
 import { useStore, set, colorOf } from '../store.ts';
@@ -26,11 +27,11 @@ export function ProfileCard() {
   const run = (f: () => void) => () => { f(); close(); };
   const canFollow = me?.mode === '2d' && u.mode === '3d' && !self;
   const following = me?.follow === u.id;
-  const isFriend = friends.includes(u.name);
-  const isBlocked = blocked.includes(u.name);
+  const isFriend = friends.includes(u.id);
+  const isBlocked = blocked.includes(u.id);
   const status = tr("ui665", u.mode === '3d' ? '3D' : '2D', u.sharing ? tr("ui666") : '', !u.micOn ? tr("ui667") : '', isFriend ? tr("ui668") : '');
   const sendReport = async () => {
-    const ok = await report(u.name, reason);
+    const ok = await report(u.id, reason);
     setDone(ok ? msg("ui669") : msg("ui670"));
     setReporting(false);
     setReason('');
@@ -44,7 +45,8 @@ export function ProfileCard() {
         <div className="pcbody">
           <Face id={u.id} name={u.name} size={80} ring="0 0 0 4px #FFFDF9" />
           <div className="pcname">
-            <h2>{u.name}</h2>
+            <h2>{u.name}<GuestMark guest={u.guest} /></h2>
+            {u.username && <span className="sub">@{u.username}</span>}
             <span className="sub">{status} · <ProfileDistance id={u.id} /></span>
           </div>
           <p className="bio">{u.bio || tr("ui671")}</p>
@@ -59,9 +61,10 @@ export function ProfileCard() {
           )}
           {!self && (
             <div className="pcfoot">
-              <FollowButton name={u.name} />
+              {/* ゲストはフォローできない（人に残るものを持たないため） */}
+              {!u.guest && <FollowButton id={u.id} />}
               <span className="spacer" />
-              <button className="ib" onClick={() => toggleBlock(u.name)}>{isBlocked ? tr("ui675") : tr("ui676")}</button>
+              <button className="ib" onClick={() => toggleBlock(u.id)}>{isBlocked ? tr("ui675") : tr("ui676")}</button>
               <button className="ib danger" onClick={() => setReporting(!reporting)}>{tr("ui677")}</button>
             </div>
           )}

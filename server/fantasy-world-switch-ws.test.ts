@@ -11,6 +11,7 @@ import { COMPAT_VERSION, type User, type SessionSnapshot } from '../shared/proto
 import { WORLD_COUNTDOWN_MS } from '../shared/worlds.ts';
 import type { FantasyAccountResponse } from '../shared/fantasy-account.ts';
 import type { FantasyProfile } from '../shared/fantasy.ts';
+import { testServerEnv } from './test-db.ts';
 
 interface Message {
   t: string; list?: User[]; account?: FantasyAccountResponse['account']; activeId?: string; homeId?: string;
@@ -83,7 +84,7 @@ async function fixture(t: TestContext) {
   await new Promise<void>(resolve => probe.close(() => resolve()));
   const origin = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ['--import', 'tsx', '--import', pathToFileURL(loader).href, 'server/index.ts', '--dev'], {
-    env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '0', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
+    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '0', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
       LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = '';

@@ -1,5 +1,4 @@
 import { useUpdateDraft } from '../updateDraft.ts';
-import { useVoiceRecorder } from '../updateRecording.ts';
 import { t as tr, systemText } from '../i18n/index.ts';
 import { TranslatedText } from '../TranslatedText.tsx';
 import { useEffect, useRef, useState } from 'react';
@@ -14,7 +13,7 @@ import { uploadMedia } from '../media.ts';
 import { ChatImage } from '../world/common.tsx';
 import { Icon } from '../world/Icon.tsx';
 import { openWindow } from '../world/windows.ts';
-import { NameFace, timeLabel } from './common.tsx';
+import { PersonFace, PersonName, timeLabel } from './common.tsx';
 
 const NONE: Message[] = [];
 const RSVPS = Object.keys(RSVP_LABEL) as Rsvp[];
@@ -42,6 +41,7 @@ const CONTINUE_ORDER: ItemKind[] = ['chess', 'chessAi', 'g2048', 'canvas', 'note
 function RecapCard({ r }: { r: Recap }) {
   const visible = useStore((s) => s.guild.sessions.some((d) => d.id === r.session));
   const world = useStore((s) => s.worldBy[r.session] ?? 'room');
+  const directory = useStore((s) => s.directory);
   const [log, setLog] = useState(false);
   const target = CONTINUE_ORDER.map((k) => r.items.find((it) => it.kind === k)).find(Boolean);
   const min = Math.max(1, Math.round((r.to - r.from) / 60_000));
@@ -56,8 +56,8 @@ function RecapCard({ r }: { r: Recap }) {
       </div>
       <div className="rbody">
         <div className="row">
-          <span className="stack">{r.people.slice(0, 6).map((n) => <NameFace key={n} name={n} size={22} />)}</span>
-          <span className="sub">{r.people.join(tr("ui236"))} · {span}</span>
+          <span className="stack">{r.people.slice(0, 6).map((p) => <PersonFace key={p.id} id={p.id} size={22} />)}</span>
+          <span className="sub">{r.people.map((p) => (directory[p.id]?.name ?? p.name)).join(tr("ui236"))} · {span}</span>
         </div>
         {r.items.length > 0 && <div className="rtiles">{r.items.map((it) => <ItemTile key={it.id} kind={it.kind} summary={it.summary} image={it.image} />)}</div>}
         <div className="row wrap">
@@ -82,9 +82,9 @@ const WORLD_TINT: Record<string, string> = { room: '#DCE6F3', cafe: '#F3E6C6', g
 
 function PlanCard({ conv, m }: { conv: string; m: Message }) {
   const plan = m.plan!;
-  const selfName = useStore((s) => s.selfName);
+  const selfId = useStore((s) => s.selfId);
   const session = useStore((s) => s.guild.sessions.find((d) => d.id === plan.session));
-  const mine = plan.answers[selfName];
+  const mine = plan.answers[selfId];
   const count = (a: Rsvp) => Object.values(plan.answers).filter((x) => x === a).length;
   const yes = count('yes');
   return (
@@ -138,13 +138,11 @@ export function MessageView({ conv, m }: { conv: string; m: Message }) {
   if (m.recap) return <div className="msg sys"><RecapCard r={m.recap} /></div>;
   return (
     <div className="msg">
-      <NameFace name={m.from} size={32} />
+      <PersonFace id={m.from} size={32} />
       <div className="msgbody">
-        <span className="mhead"><b>{m.from}</b><span className="sub">{timeLabel(m.at)}</span></span>
+        <span className="mhead"><b><PersonName id={m.from} /></b><span className="sub">{timeLabel(m.at)}</span></span>
         {m.text && <p className="mtext"><TranslatedText text={m.text} /></p>}
-        {m.voice && <audio className="mvoice" src={m.voice.url} controls preload="metadata" aria-label={tr("ui247", m.voice.sec)} />}
         {m.media?.kind === 'image' && <ChatImage src={m.media.url} />}
-        {m.media?.kind === 'video' && <video className="chatvideo" src={m.media.url} controls preload="metadata" playsInline />}
         {m.plan && <PlanCard conv={conv} m={m} />}
         {m.invite && <InviteCard sid={m.invite} />}
         {m.item && <ItemRefCard item={m.item} />}
@@ -156,7 +154,7 @@ export function MessageView({ conv, m }: { conv: string; m: Message }) {
 /** 会話。開いている間は読んだことにし、開いた時点の未読の頭に線を引く */
 export function Thread({ conv, empty }: { conv: string; empty: string }) {
   const list = useStore((s) => s.inbox[conv]) ?? NONE;
-  const selfName = useStore((s) => s.selfName);
+  const selfId = useStore((s) => s.selfId);
   const [since] = useState(() => useStore.getState().reads[conv] ?? 0);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -164,7 +162,7 @@ export function Thread({ conv, empty }: { conv: string; empty: string }) {
     if (el) el.scrollTop = el.scrollHeight;
     markRead(conv);
   }, [conv, list.length]);
-  const firstUnread = list.find((m) => m.at > since && m.from !== selfName)?.id;
+  const firstUnread = list.find((m) => m.at > since && m.from !== selfId)?.id;
   return (
     <div className="thread" ref={ref}>
       {list.length === 0 && <p className="hempty">{empty}</p>}
@@ -190,7 +188,6 @@ export function Composer({ conv, placeholder, allowPlan, extra }: { conv: string
   const [text, setText] = useUpdateDraft(`message.${conv}`, '');
   const [plan, setPlan] = useUpdateDraft<{ at: string; session: string } | null>(`plan.${conv}`, null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const voice = useVoiceRecorder(conv);
   const planAt = plan ? new Date(plan.at).getTime() : NaN;
   const submit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -223,11 +220,11 @@ export function Composer({ conv, placeholder, allowPlan, extra }: { conv: string
         </div>
       )}
       <div className="mbar">
-        <input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm" hidden onChange={(e) => { void attach(e.target.files?.[0]); e.target.value = ''; }} />
+        <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { void attach(e.target.files?.[0]); e.target.value = ''; }} />
         <label className="sr" htmlFor={`m-${conv}`}>{tr("ui181")}</label>
         <input
-          id={`m-${conv}`} value={text} placeholder={voice.recording ? tr("ui251", voice.sec) : plan ? tr("ui252") : placeholder}
-          disabled={voice.recording} onChange={(e) => setText(e.target.value)}
+          id={`m-${conv}`} value={text} placeholder={plan ? tr("ui252") : placeholder}
+          onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && e.nativeEvent.isComposing) e.preventDefault(); }}
         />
         {extra}
@@ -237,10 +234,7 @@ export function Composer({ conv, placeholder, allowPlan, extra }: { conv: string
           </button>
         )}
         <button type="button" className="ib square" aria-label={tr("ui255")} onClick={() => fileRef.current?.click()}><Icon name="attach" size={17} /></button>
-        <button type="button" className={`ib square ${voice.recording ? 'rec' : ''}`} aria-label={voice.recording ? tr("ui256") : tr("ui257")} aria-pressed={voice.recording} onClick={voice.toggle}>
-          <Icon name="mic" size={17} />
-        </button>
-        <button type="submit" className="primary square" aria-label={tr("ui258")} disabled={voice.recording}><Icon name="send" size={17} /></button>
+        <button type="submit" className="primary square" aria-label={tr("ui258")}><Icon name="send" size={17} /></button>
       </div>
     </form>
   );

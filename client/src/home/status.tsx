@@ -10,9 +10,9 @@ import { Icon } from '../world/Icon.tsx';
 export interface StatusOf { online: boolean; status: StatusKind; text: string; lastSeen: number | null }
 
 /** オンラインならユーザーから、オフラインなら届いている people から */
-export function useStatusOf(name: string): StatusOf {
-  const u = useStore((s) => s.users.find((x) => x.name === name));
-  const p = useStore((s) => s.people[name]);
+export function useStatusOf(id: string): StatusOf {
+  const u = useStore((s) => s.users.find((x) => x.id === id));
+  const p = useStore((s) => s.people[id]);
   if (u) return { online: true, status: u.status, text: u.statusText, lastSeen: null };
   return { online: false, status: p?.status ?? 'online', text: p?.statusText ?? '', lastSeen: p?.lastSeen ?? null };
 }

@@ -15,7 +15,7 @@ import { createPortal } from 'react-dom';
 import { CHANGELOG } from '../../../shared/changelog.ts';
 import { localized } from '../i18n/core.ts';
 import { filterChangelog, markChangelogSeen } from './changelog.ts';
-import { save, set, unreadOf, useStore, type HomePage } from '../store.ts';
+import { nameOf, save, set, unreadOf, useStore, type HomePage } from '../store.ts';
 import { dmKey, type EventDef, type Group, type User } from '../../../shared/protocol.ts';
 import { sortForHome } from '../../../shared/home.ts';
 import { WORLDS } from '../i18n/static.ts';
@@ -27,7 +27,7 @@ import { Face } from '../world/common.tsx';
 import { Icon } from '../world/Icon.tsx';
 import { SessionCard } from './SessionCard.tsx';
 import { CreateEventDialog, CreateGroupDialog, CreateSessionDialog, InviteFriendDialog, InviteToGroupDialog } from './dialogs.tsx';
-import { Chip, Empty, EventAnswer, EventHost, FollowButton, ModeIcon, NameFace, Tabs, match, dateKey, timeLabel, uniqueByName, WEEKDAYS } from './common.tsx';
+import { Chip, Empty, EventAnswer, EventHost, FollowButton, ModeIcon, PersonFace, PersonName, Tabs, match, dateKey, timeLabel, WEEKDAYS } from './common.tsx';
 import { Composer, Thread } from './messages.tsx';
 import { StatusDot, StatusText, useStatusOf } from './status.tsx';
 
@@ -57,7 +57,7 @@ type FriendLike = { id: string; name: string; session?: string | null; mode?: '2
 
 /** フレンドのステータスに合わせた「参加する」「行ってもいい？」 */
 function JoinButton({ u }: { u: FriendLike }) {
-  const st = useStatusOf(u.name);
+  const st = useStatusOf(u.id);
   const sess = useStore((s) => (u.session ? s.guild.sessions.find((d) => d.id === u.session) : undefined));
   if (!st.online || !sess || st.status === 'busy') return null;
   if (st.status === 'askMe') return <button className="finvite" onClick={() => askJoin(u.id)}>{tr("ui261")}</button>;
@@ -66,7 +66,7 @@ function JoinButton({ u }: { u: FriendLike }) {
 
 export function FriendTile({ u, children }: { u: FriendLike; children?: React.ReactNode }) {
   const [inv, setInv] = useState(false);
-  const st = useStatusOf(u.name);
+  const st = useStatusOf(u.id);
   const sess = useStore((s) => (u.session ? s.guild.sessions.find((d) => d.id === u.session) : undefined));
   const where = u.session ? (sess ? tr("ui262", sess.name) : tr("ui263")) : '';
   return (
@@ -81,18 +81,18 @@ export function FriendTile({ u, children }: { u: FriendLike; children?: React.Re
       {children}
       <JoinButton u={u} />
       {st.online && st.status !== 'busy' && <button className="finvite" onClick={() => setInv(true)}>{tr("ui264")}</button>}
-      <button className="ib square" aria-label={tr("ui265", u.name)} title={tr("ui181")} onClick={() => openDm(u.name)}><Icon name="chat" size={16} /></button>
+      <button className="ib square" aria-label={tr("ui265", u.name)} title={tr("ui181")} onClick={() => openDm(u.id)}><Icon name="chat" size={16} /></button>
       {inv && <InviteFriendDialog to={u} onClose={() => setInv(false)} />}
     </div>
   );
 }
 
 function FriendRow({ u, on }: { u: FriendLike; on: boolean }) {
-  const st = useStatusOf(u.name);
-  const unread = useStore((s) => unreadOf(s, dmKey(s.selfName, u.name)));
+  const st = useStatusOf(u.id);
+  const unread = useStore((s) => unreadOf(s, dmKey(s.selfId, u.id)));
   const sess = useStore((s) => (u.session ? s.guild.sessions.find((d) => d.id === u.session) : undefined));
   return (
-    <button className={`ib frow ${on ? 'on' : ''}`} aria-current={on} onClick={() => set({ dmWith: u.name })}>
+    <button className={`ib frow ${on ? 'on' : ''}`} aria-current={on} onClick={() => set({ dmWith: u.id })}>
       <span className="fface"><Face id={u.id} name={u.name} size={36} /><StatusDot st={st} /></span>
       <span className="finfo">
         <b>{u.name}</b>
@@ -105,11 +105,11 @@ function FriendRow({ u, on }: { u: FriendLike; on: boolean }) {
 }
 
 function DmPane({ u }: { u: FriendLike }) {
-  const selfName = useStore((s) => s.selfName);
-  const watching = useStore((s) => s.watching.includes(u.name));
-  const st = useStatusOf(u.name);
-  const groups = useStore((s) => s.groups).filter((g) => g.members.includes(u.name) && g.members.includes(selfName));
-  const conv = dmKey(selfName, u.name);
+  const selfId = useStore((s) => s.selfId);
+  const watching = useStore((s) => s.watching.includes(u.id));
+  const st = useStatusOf(u.id);
+  const groups = useStore((s) => s.groups).filter((g) => g.members.includes(u.id) && g.members.includes(selfId));
+  const conv = dmKey(selfId, u.id);
   return (
     <aside className="dmpane" aria-label={tr("ui267", u.name)}>
       <div className="dmhead">
@@ -122,7 +122,7 @@ function DmPane({ u }: { u: FriendLike }) {
         <span className="spacer" />
         <JoinButton u={u} />
         {!st.online && (
-          <button className={watching ? 'on' : ''} aria-pressed={watching} title={tr("ui269")} onClick={() => watchFriend(u.name, !watching)}>
+          <button className={watching ? 'on' : ''} aria-pressed={watching} title={tr("ui269")} onClick={() => watchFriend(u.id, !watching)}>
             <Icon name="bell" size={14} />{watching ? tr("ui270") : tr("ui271")}
           </button>
         )}
@@ -134,17 +134,21 @@ function DmPane({ u }: { u: FriendLike }) {
 }
 
 function FollowList({ kind, q }: { kind: 'followers' | 'following'; q: string }) {
-  const names = useStore((s) => s[kind]).filter((n) => match(q, n));
+  // 選び出しの中で配列を作り直すと、毎回違う値になって描き直しが止まらない。元の配列だけを選び、絞り込みは外でする
+  const all = useStore((s) => s[kind]);
+  const users = useStore((s) => s.users);
+  const directory = useStore((s) => s.directory);
+  const ids = all.filter((id) => match(q, nameOf(id, { users, directory })));
   const friends = useStore((s) => s.friends);
   return (
     <section className="hsec">
       <p className="sub wrap">{tr(kind === 'followers' ? 'followFollowersDesc' : 'followFollowingDesc')}</p>
-      {names.length === 0 && <Empty>{tr(kind === 'followers' ? 'followNoFollowers' : 'followNoFollowing')}</Empty>}
-      {names.map((name) => (
-        <div key={name} className="ftile">
-          <NameFace name={name} size={36} />
-          <span className="finfo"><b>{name}</b>{friends.includes(name) && <span className="sub">{tr('ui153')}</span>}</span>
-          <FollowButton name={name} />
+      {ids.length === 0 && <Empty>{tr(kind === 'followers' ? 'followNoFollowers' : 'followNoFollowing')}</Empty>}
+      {ids.map((id) => (
+        <div key={id} className="ftile">
+          <PersonFace id={id} size={36} />
+          <span className="finfo"><b><PersonName id={id} /></b>{friends.includes(id) && <span className="sub">{tr('ui153')}</span>}</span>
+          <FollowButton id={id} />
         </div>
       ))}
     </section>
@@ -157,11 +161,11 @@ function BlockedList() {
     <section className="hsec">
       <p className="sub wrap">{tr("ui278")}</p>
       {blocked.length === 0 && <Empty>{tr("ui279")}</Empty>}
-      {blocked.map((name) => (
-        <div key={name} className="ftile">
-          <NameFace name={name} size={36} />
-          <span className="finfo"><b>{name}</b></span>
-          <button onClick={() => toggleBlock(name)}>{tr("ui280")}</button>
+      {blocked.map((id) => (
+        <div key={id} className="ftile">
+          <PersonFace id={id} size={36} />
+          <span className="finfo"><b><PersonName id={id} /></b></span>
+          <button onClick={() => toggleBlock(id)}>{tr("ui280")}</button>
         </div>
       ))}
     </section>
@@ -178,10 +182,11 @@ export function FriendsPage({ q }: { q: string }) {
   const setTab = (friendsTab: typeof tab) => set({ friendsTab });
   const sessions = useStore((s) => s.guild.sessions);
   const withFriends = sortForHome(sessions.filter((d) => match(q, d.name, d.topic)), friends, users).filter((d) => friendsIn(d.id, friends, users).length > 0);
-  const online: FriendLike[] = uniqueByName(users.filter((u) => friends.includes(u.name))).map((u) => ({ id: u.id, name: u.name, session: u.session, mode: u.mode, sharing: u.sharing }));
-  const offline: FriendLike[] = friends.filter((n) => !online.some((u) => u.name === n)).map((n) => ({ id: n, name: n }));
+  const directory = useStore((s) => s.directory);
+  const online: FriendLike[] = users.filter((u) => friends.includes(u.id)).map((u) => ({ id: u.id, name: u.name, session: u.session, mode: u.mode, sharing: u.sharing }));
+  const offline: FriendLike[] = friends.filter((id) => !online.some((u) => u.id === id)).map((id) => ({ id, name: nameOf(id, { users, directory }) }));
   const shown = (l: FriendLike[]) => l.filter((u) => match(q, u.name));
-  const selected = [...online, ...offline].find((u) => u.name === dmWith) ?? online[0] ?? offline[0];
+  const selected = [...online, ...offline].find((u) => u.id === dmWith) ?? online[0] ?? offline[0];
   return (
     <>
       <Tabs value={tab} onChange={setTab} items={[{ id: 'all', label: tr("ui281") }, { id: 'now', label: tr("ui198") }, { id: 'followers', label: tr('followFollowers'), badge: notBack }, { id: 'following', label: tr('followFollowingTab') }, { id: 'block', label: tr("ui283") }]} />
@@ -195,12 +200,12 @@ export function FriendsPage({ q }: { q: string }) {
         <div className="fpage">
           <section className="flist" aria-label={tr("ui285")}>
             {shown(online).length > 0 && <span className="hlabel">{tr("ui129")}</span>}
-            {shown(online).map((u) => <FriendRow key={u.name} u={u} on={u.name === selected?.name} />)}
+            {shown(online).map((u) => <FriendRow key={u.id} u={u} on={u.id === selected?.id} />)}
             {shown(offline).length > 0 && <span className="hlabel">{tr("ui130")}</span>}
-            {shown(offline).map((u) => <FriendRow key={u.name} u={u} on={u.name === selected?.name} />)}
+            {shown(offline).map((u) => <FriendRow key={u.id} u={u} on={u.id === selected?.id} />)}
             {shown(online).length + shown(offline).length === 0 && <Empty>{tr("ui223")}</Empty>}
           </section>
-          {selected && <DmPane key={selected.name} u={selected} />}
+          {selected && <DmPane key={selected.id} u={selected} />}
         </div>
       )}
     </>
@@ -243,7 +248,7 @@ export function SessionsPage({ q }: { q: string }) {
 }
 
 function EventRow({ ev }: { ev: EventDef }) {
-  const selfName = useStore((s) => s.selfName);
+  const selfId = useStore((s) => s.selfId);
   const friends = useStore((s) => s.friends);
   const group = useStore((s) => s.groups.find((g) => g.id === ev.group));
   const session = useStore((s) => s.guild.sessions.find((d) => d.id === ev.session));
@@ -259,14 +264,14 @@ function EventRow({ ev }: { ev: EventDef }) {
         </span>
         <EventHost ev={ev} />
         <span className="evfaces">
-          {ev.attendees.slice(0, 8).map((n) => <NameFace key={n} name={n} size={20} />)}
+          {ev.attendees.slice(0, 8).map((n) => <PersonFace key={n} id={n} size={20} />)}
           <span className="sub">{tr("ui134")}{ev.attendees.length} {tr("ui135")}{ev.maybe.length}{ev.attendees.some((n) => friends.includes(n)) && tr("ui289", ev.attendees.filter((n) => friends.includes(n)).length)}</span>
         </span>
       </span>
       <span className="row">
         {session && !past && <button className="primary" onClick={() => joinSession(session.id)}>{tr("ui206")}</button>}
         <EventAnswer ev={ev} />
-        {ev.owner === selfName && <button className="ib" title={tr("ui290")} onClick={() => deleteEvent(ev.id)}><Icon name="trash" size={14} /></button>}
+        {ev.owner === selfId && <button className="ib" title={tr("ui290")} onClick={() => deleteEvent(ev.id)}><Icon name="trash" size={14} /></button>}
       </span>
     </div>
   );
@@ -344,22 +349,22 @@ export function EventsPage({ q }: { q: string }) {
 }
 
 function GroupRow({ g }: { g: Group }) {
-  const selfName = useStore((s) => s.selfName);
+  const selfId = useStore((s) => s.selfId);
   const sessions = useStore((s) => s.guild.sessions).filter((d) => d.group === g.id);
   const [inv, setInv] = useState(false);
-  const member = g.members.includes(selfName);
+  const member = g.members.includes(selfId);
   return (
     <div className="grow">
       <GroupAvatar group={g} />
       <span className="ginfo">
         <button className="ib glink" onClick={() => openGroup(g.id)}><b>{g.name}</b><Icon name="right" size={13} /></button>
-        <span className="sub">{g.members.length} {tr("ui141")}{sessions.length} {tr("ui142")}{g.owner} {tr("ui143")}</span>
-        <span className="evfaces">{g.members.slice(0, 10).map((n) => <NameFace key={n} name={n} size={20} />)}{g.members.length > 10 && <span className="sub">{tr("ui295")}{g.members.length - 10} {tr("ui125")}</span>}</span>
+        <span className="sub">{g.members.length} {tr("ui141")}{sessions.length} {tr("ui142")}<PersonName id={g.owner} /> {tr("ui143")}</span>
+        <span className="evfaces">{g.members.slice(0, 10).map((n) => <PersonFace key={n} id={n} size={20} />)}{g.members.length > 10 && <span className="sub">{tr("ui295")}{g.members.length - 10} {tr("ui125")}</span>}</span>
       </span>
       <span className="row">
         {member && <button onClick={() => setInv(true)}>{tr("ui144")}</button>}
         {member ? <button onClick={() => leaveGroup(g.id)}>{tr("ui145")}</button> : <button className="dark" onClick={() => joinGroup(g.id)}>{tr("ui146")}</button>}
-        {g.owner === selfName && <button className="ib" title={tr("ui147")} onClick={() => deleteGroup(g.id)}><Icon name="trash" size={14} /></button>}
+        {g.owner === selfId && <button className="ib" title={tr("ui147")} onClick={() => deleteGroup(g.id)}><Icon name="trash" size={14} /></button>}
       </span>
       {inv && <InviteToGroupDialog group={g} onClose={() => setInv(false)} />}
     </div>
@@ -368,10 +373,10 @@ function GroupRow({ g }: { g: Group }) {
 
 export function GroupsPage({ q }: { q: string }) {
   const groups = useStore((s) => s.groups);
-  const selfName = useStore((s) => s.selfName);
+  const selfId = useStore((s) => s.selfId);
   const [create, setCreate] = useState(false);
-  const mine = groups.filter((g) => g.members.includes(selfName) && match(q, g.name));
-  const others = groups.filter((g) => !g.members.includes(selfName) && match(q, g.name));
+  const mine = groups.filter((g) => g.members.includes(selfId) && match(q, g.name));
+  const others = groups.filter((g) => !g.members.includes(selfId) && match(q, g.name));
   return (
     <section className="hsec">
       <h2>{tr("ui108")}<span className="sub">{tr("ui300")}{mine.length} / {groups.length}</span><span className="spacer" /><button className="dark" onClick={() => setCreate(true)}><Icon name="plus" size={14} />{tr("ui111")}</button></h2>
@@ -485,7 +490,7 @@ export function ItemsPage({ q }: { q: string }) {
 }
 
 /** セッションにいるフレンド（同じ名前の複数タブは 1 人） */
-export const friendsIn = (sid: string, friends: string[], users: User[]) => uniqueByName(users.filter((u) => u.session === sid && friends.includes(u.name)));
+export const friendsIn = (sid: string, friends: string[], users: User[]) => users.filter((u) => u.session === sid && friends.includes(u.id));
 
 export function goHome(homePage: HomePage, friendsTab?: 'all' | 'now') {
   if (location.hash.startsWith('#/market/')) {

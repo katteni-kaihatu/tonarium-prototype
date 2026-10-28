@@ -63,6 +63,11 @@
 .join label { font-size: 12px; font-weight: 700; color: var(--muted); }
 .join button.primary { height: 44px; margin-top: 6px; }
 .join small { color: var(--muted); text-align: center; font-size: 12px; }
+.join button:not(.primary):not(.avbtn) { height: 40px; }
+.join small.err { color: #B4342C; }
+/* Misskey とゲストの間の区切り */
+.joinor { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; margin: 6px 0 2px; }
+.joinor::before, .joinor::after { content: ''; flex: 1; height: 1px; background: var(--line, rgba(38, 38, 46, .15)); }
 .join-download { color: var(--accent); text-align: center; font-size: 12px; text-underline-offset: 3px; }
 .join-download:hover { color: #2752AB; }
 .join-download:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
@@ -77,4 +82,5 @@ img.av { object-fit: cover; display: block; }
 
 .stack { display: flex; }
 .stack .face + .face { margin-left: -6px; }
-
+/* Electron で別のブラウザにログインを任せている間に出す確認コード */
+.logincode { display: block; text-align: center; font-size: 22px; letter-spacing: 4px; font-family: ui-monospace, monospace; }

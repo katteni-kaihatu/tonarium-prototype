@@ -48,7 +48,6 @@
 .mtime { font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ytbox, .ytbox iframe { width: 100%; height: 100%; display: block; border: 0; pointer-events: none; }
 .yt3d { background: #000; pointer-events: none; }
-.chatvideo { display: block; max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 4px; background: #000; }
 .itemize { align-self: flex-start; height: 24px; margin-top: 4px; padding: 0 8px; font-size: 11px; color: var(--muted2); border-radius: 7px; gap: 4px; }
 .drophint { position: fixed; inset: 12px; z-index: 49; border: 3px dashed var(--accent); border-radius: 24px; background: rgba(47, 95, 196, .12); display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .drophint > div { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 28px; border-radius: 18px; background: var(--paper); box-shadow: var(--pop); color: var(--ink); }

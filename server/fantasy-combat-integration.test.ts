@@ -24,6 +24,7 @@ import { createFantasyGear, fantasyEquipGear } from '../shared/fantasy-equipment
 import { foodMeta, reconcileFoodLots } from '../shared/fantasy-life.ts';
 import { fantasySpellCapacity } from '../shared/fantasy-specializations.ts';
 import type { FantasyProfile } from '../shared/fantasy.ts';
+import { testServerEnv } from './test-db.ts';
 
 function player(name: string, level = 12, location = 'greenwood', job = 'warrior'): FantasyProfile {
   const p = applyFantasyAction(newFantasyProfile(), { type: 'create', name, source: 'human', gender: 'female' }, () => .5).profile, c = p.character!;
@@ -363,7 +364,7 @@ test('real combat WebSockets enforce party consent, session ownership, turn slot
   fs.writeFileSync(path.join(directory, 'fantasy.json'), JSON.stringify(profiles)); fs.writeFileSync(path.join(directory, 'fantasy-clock.json'), JSON.stringify({ version: 1, hour: 12, wallTime: Date.now() + 3600000 }));
   const sessions = path.join(directory, 'sessions.json'); fs.writeFileSync(sessions, JSON.stringify({ name: 'Combat integration', sessions: [{ id: 'one', name: 'One', world: 'fantasy' }, { id: 'two', name: 'Two', world: 'fantasy' }] }));
   const listener = net.createServer(); await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve)); const port = (listener.address() as net.AddressInfo).port; await new Promise<void>(resolve => listener.close(() => resolve()));
-  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], { env: { ...process.env, NODE_ENV:'test',FANTASY_ACCOUNT_TEST_BYPASS:'1',SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], { env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV:'test',FANTASY_ACCOUNT_TEST_BYPASS:'1',SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = ''; child.stdout.on('data', chunk => { output += String(chunk); }); child.stderr.on('data', chunk => { output += String(chunk); }); const sockets: WebSocket[] = [];
   t.after(async () => { for (const socket of sockets) socket.terminate(); child.kill(); if (child.exitCode === null && !child.signalCode) await new Promise<void>(resolve => { const timer = setTimeout(() => { child.kill('SIGKILL'); resolve(); }, 3000); child.once('exit', () => { clearTimeout(timer); resolve(); }); }); assert.equal(path.dirname(path.resolve(directory)), path.resolve(os.tmpdir())); assert.ok(path.basename(directory).startsWith('fantasy-combat-ws-')); fs.rmSync(directory, { recursive: true, force: true }); });
   async function until<T>(read: () => T | undefined | null | false): Promise<T> { const deadline = Date.now() + 15000; while (Date.now() < deadline) { const value = read(); if (value) return value; if (child.exitCode !== null) throw new Error(output); await new Promise(resolve => setTimeout(resolve, 20)); } throw new Error(`Combat WS timeout: ${output}`); }

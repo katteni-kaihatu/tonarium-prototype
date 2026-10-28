@@ -10,6 +10,7 @@ import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
 import { COMPAT_VERSION } from '../shared/protocol.ts';
 import { applyFantasyAction, newFantasyProfile } from '../shared/fantasy-engine.ts';
+import { testServerEnv } from './test-db.ts';
 
 test('live NPC and GM sockets use authenticated external HTTPS and ignore retired device AI messages', { timeout: 30_000 }, async t => {
   const directory = await mkdtemp(join(tmpdir(), 'tonarium-kokoa-ws-'));
@@ -34,7 +35,7 @@ test('live NPC and GM sockets use authenticated external HTTPS and ignore retire
   const upstreamPort = (upstream.address() as net.AddressInfo).port;
   const listener = net.createServer(); await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve));
   const port = (listener.address() as net.AddressInfo).port; await new Promise<void>(resolve => listener.close(() => resolve()));
-  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], { env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, KOKOAAI_BASEURL: `https://127.0.0.1:${upstreamPort}/v1`, KOKOAAI_MODEL: 'lfm3-1.7b', KOKOAAI_APIKEY: 'websocket-test-only', NODE_EXTRA_CA_CERTS: fileURLToPath(new URL('./fixtures/kokoa-test-cert.pem', import.meta.url)), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], { env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, KOKOAAI_BASEURL: `https://127.0.0.1:${upstreamPort}/v1`, KOKOAAI_MODEL: 'lfm3-1.7b', KOKOAAI_APIKEY: 'websocket-test-only', NODE_EXTRA_CA_CERTS: fileURLToPath(new URL('./fixtures/kokoa-test-cert.pem', import.meta.url)), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
   let logs = ''; child.stdout.on('data', data => { logs += String(data); }); child.stderr.on('data', data => { logs += String(data); });
   const sockets: WebSocket[] = [];
   t.after(async () => {

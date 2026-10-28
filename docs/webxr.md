@@ -62,7 +62,7 @@ VRセッション開始後、設定画面の「VRの旋回」で、スナップ�
 | プレイヤー一覧、プロフィール、そばに行く、追従・解除、つんつん | 端末の一覧・メニューを選択 | NearList / ProfileCard / actions |
 | マイク、音量、ブロードキャスト、音声再接続、配信開始・停止・視聴 | 端末のドック・設定を選択。画面共有の権限・共有元選択はブラウザ。非対応ブラウザの共有送信は既存どおり不可 | VolumeMenus / livekit / spatial |
 | チャットの範囲切替、発言・DM・通知返信、翻訳・言語 | 端末選択＋文字。添付・クリップボードはブラウザ | NoticeLog / SessionMessages / i18n / translation |
-| 画像・動画・YouTube追加、写真の表示・保存 | URLは文字、添付・保存はブラウザ。Lightboxは端末選択 | media / youtube / common / items/actions |
+| 画像・YouTube追加、写真の表示・保存 | URLは文字、添付・保存はブラウザ。Lightboxは端末選択 | media / youtube / common / items/actions |
 | 音・エモート、通知一時停止、軽量表示ほか共通設定 | 端末選択・select選択・range調整 | Emotes / WorldScreen / Home |
 | ウィンドウの開閉・前面化・最大化・移動・サイズ変更、簡易／自由配置 | 端末のボタンと押したままのレイドラッグ | WindowLayer / windows |
 | 地図の位置指定・ズーム・パン・リセット、マップ方式・音声ヒートマップ | 2D切替後の通常ブラウザ。中ボタン相当のドラッグとwheelも端末入力に用意 | MapLayer / Map3D / mapShared |

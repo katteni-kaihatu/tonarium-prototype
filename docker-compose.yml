@@ -13,6 +13,19 @@ services:
       - KOKOSYNC_USERNAME=${KOKOSYNC_USERNAME}
       - KOKOSYNC_PASSWORD=${KOKOSYNC_PASSWORD}
       - SERVER_PORT=3001
+      # パスワードは URL にそのまま入れるので、記号を含まないもの（例: openssl rand -hex 24）にする
+      - DATABASE_URL=postgres://tonarium:${POSTGRES_PASSWORD}@postgres:5432/tonarium
+      # 画像の置き場（Cloudflare R2）。docs/deploy.md を参照。
+      # 既定値は compose の ${:-} ではなくアプリ側で決める（Coolify では既定値付きの変数が空のまま渡ることがあったため）
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_REGION=${S3_REGION}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - S3_PUBLIC_URL=${S3_PUBLIC_URL}
+      - S3_PREFIX=${S3_PREFIX}
+      # ログインに使う Misskey。空なら https://misskey.resonite.love
+      - MISSKEY_URL=${MISSKEY_URL}
       # HTTPS 終端プロキシの実アドレスだけを信頼する。未設定では転送ヘッダーを信頼しない。
       - FANTASY_TRUST_PROXY=${FANTASY_TRUST_PROXY:-0}
       - FANTASY_TRUSTED_PROXY_IPS=${FANTASY_TRUSTED_PROXY_IPS:-}
@@ -20,6 +33,9 @@ services:
       - KOKOAAI_MODEL=${KOKOAAI_MODEL:-lfm3-1.7b}
       - KOKOAAI_APIKEY=${KOKOAAI_APIKEY:-}
       # - SESSIONS_FILE=/config/sessions.json
+    depends_on:
+      postgres:
+        condition: service_healthy
     expose:
       - "3001"
     volumes:
@@ -31,6 +47,54 @@ services:
       timeout: 5s
       start_period: 10s
       retries: 3
+
+  postgres:
+    image: postgres:17.10-alpine3.23
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=tonarium
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=tonarium
+    volumes:
+      - tonarium-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "tonarium"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # 1 日 1 回、DB を丸ごと R2 へ送る。古いバックアップの削除は R2 のライフサイクルルールで行う（docs/deploy.md）
+  db-backup:
+    image: postgres:17.10-alpine3.23
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - PGHOST=postgres
+      - PGUSER=tonarium
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+      - PGDATABASE=tonarium
+      # 画像と同じ R2 の認証情報で、別のバケット（公開しない）へ送る
+      - BACKUP_S3_ENDPOINT=${S3_ENDPOINT}
+      - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET}
+      - AWS_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=auto
+      - BACKUP_INTERVAL_SECONDS=${BACKUP_INTERVAL_SECONDS}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # 入れられなければ終わり、restart で入れ直す（入らないまま失敗を繰り返さない）
+        apk add --no-cache aws-cli > /dev/null || exit 1
+        if [ -z "$$BACKUP_S3_BUCKET" ]; then echo "BACKUP_S3_BUCKET が未設定のため DB のバックアップは止めています"; exec sleep infinity; fi
+        while true; do
+          f="db/tonarium-$$(date -u +%Y%m%dT%H%M%SZ).dump"
+          # パイプでつなぐと pg_dump が途中で失敗しても成功扱いになるので、一度ファイルに書き切ってから送る
+          if pg_dump -Fc -f /tmp/backup.dump && aws s3 cp /tmp/backup.dump "s3://$$BACKUP_S3_BUCKET/$$f" --endpoint-url "$$BACKUP_S3_ENDPOINT"; then echo "backup: $$f"; else echo "backup failed: $$f"; fi
+          rm -f /tmp/backup.dump
+          sleep "$${BACKUP_INTERVAL_SECONDS:-86400}"
+        done
 
   # 自前の LiveKit（通話・画面共有・ライブ）。シグナリング（wss）は Coolify のドメイン経由で 7880 番へ、
   # 音声・映像は下の ports でサーバーに直接届く
@@ -64,3 +128,4 @@ services:
 
 volumes:
   tonarium-data:
+  tonarium-db:

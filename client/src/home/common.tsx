@@ -1,6 +1,6 @@
 import { sourceText as uiSource } from '../i18n/core.ts';
 import { localized, t as tr } from '../i18n/index.ts';
-import { get, useStore } from '../store.ts';
+import { get, nameOf, useStore } from '../store.ts';
 import { RSVP_LABEL } from '../i18n/static.ts';
 import { type EventDef, type Mode, type Rsvp, type User } from '../../../shared/protocol.ts';
 import { answerEvent, followUser } from '../actions.ts';
@@ -9,24 +9,18 @@ import { Icon } from '../world/Icon.tsx';
 
 export const WEEKDAYS = localized([uiSource('ui75'), uiSource('ui76'), uiSource('ui77'), uiSource('ui78'), uiSource('ui79'), uiSource('ui80'), uiSource('ui81')]);
 
-/** 同じ名前で複数タブを開いていても 1 人として扱う */
-export function uniqueByName(users: User[]) {
-  const seen = new Set<string>();
-  return users.filter((u) => !seen.has(u.name) && seen.add(u.name));
-}
-
-/** オンラインのフレンド（自分の名前は除く） */
+/** オンラインのフレンド（自分は除く） */
 export function useOnlineFriends() {
   const users = useStore((s) => s.users);
   const friends = useStore((s) => s.friends);
-  const selfName = useStore((s) => s.selfName);
-  return uniqueByName(users.filter((u) => u.name !== selfName && friends.includes(u.name)));
+  const selfId = useStore((s) => s.selfId);
+  return users.filter((u) => u.id !== selfId && friends.includes(u.id));
 }
 
 export function useMyGroups() {
   const groups = useStore((s) => s.groups);
-  const selfName = useStore((s) => s.selfName);
-  return groups.filter((g) => g.members.includes(selfName));
+  const selfId = useStore((s) => s.selfId);
+  return groups.filter((g) => g.members.includes(selfId));
 }
 
 export function ModeIcon({ mode, sharing }: { mode: Mode; sharing: boolean }) {
@@ -34,40 +28,47 @@ export function ModeIcon({ mode, sharing }: { mode: Mode; sharing: boolean }) {
   return <span className="modeic" title={mode === '3d' ? '3D' : '2D'}><Icon name={mode === '3d' ? 'cube' : 'flat'} size={13} /></span>;
 }
 
-/** 名前だけ分かっている人（オフラインかもしれない）の顔 */
-export function NameFace({ name, size = 22 }: { name: string; size?: number }) {
-  const id = useStore((s) => s.users.find((u) => u.name === name)?.id);
-  return <Face id={id ?? name} name={name} size={size} />;
+/** アカウント ID だけ分かっている人（オフラインかもしれない）の名前。名簿が変わったら引き直す */
+export const usePersonName = (id: string) => useStore((s) => nameOf(id, s));
+
+export function PersonName({ id }: { id: string }) {
+  return <>{usePersonName(id)}</>;
+}
+
+/** アカウント ID だけ分かっている人（オフラインかもしれない）の顔 */
+export function PersonFace({ id, size = 22 }: { id: string; size?: number }) {
+  return <Face id={id} name={usePersonName(id)} size={size} />;
 }
 
 /** イベントの主催者。自分なら「あなた」と出す */
 export function EventHost({ ev }: { ev: EventDef }) {
-  const selfName = useStore((s) => s.selfName);
+  const selfId = useStore((s) => s.selfId);
+  const owner = usePersonName(ev.owner);
   return (
-    <span className="evhost"><NameFace name={ev.owner} size={18} /><span className="sub">{tr("ui83")}<b>{ev.owner === selfName ? tr("ui84") : ev.owner}</b></span></span>
+    <span className="evhost"><PersonFace id={ev.owner} size={18} /><span className="sub">{tr("ui83")}<b>{ev.owner === selfId ? tr("ui84") : owner}</b></span></span>
   );
 }
 
 export const match = (q: string, ...texts: (string | undefined)[]) => !q || texts.some((t) => t?.toLowerCase().includes(q.toLowerCase()));
 
 /** フレンドのフォローを外すと DM も見えなくなるので、外す前に確かめる */
-export function toggleFollow(name: string, on: boolean) {
-  if (!on && get().friends.includes(name) && !confirm(tr('followUnfollowFriendConfirm', name))) return;
-  followUser(name, on);
+export function toggleFollow(id: string, on: boolean) {
+  if (!on && get().friends.includes(id) && !confirm(tr('followUnfollowFriendConfirm', nameOf(id)))) return;
+  followUser(id, on);
 }
 
 /** フォローのボタン。お互いにフォローするとフレンドになる */
-export function FollowButton({ name }: { name: string }) {
-  const following = useStore((s) => s.following.includes(name));
-  const followsMe = useStore((s) => s.followers.includes(name));
+export function FollowButton({ id }: { id: string }) {
+  const following = useStore((s) => s.following.includes(id));
+  const followsMe = useStore((s) => s.followers.includes(id));
   if (following) {
     return (
-      <button className={followsMe ? 'on' : ''} aria-pressed title={tr('followUnfollowHint')} onClick={() => toggleFollow(name, false)}>
+      <button className={followsMe ? 'on' : ''} aria-pressed title={tr('followUnfollowHint')} onClick={() => toggleFollow(id, false)}>
         <Icon name="check" size={14} />{followsMe ? tr('ui153') : tr('followFollowing')}
       </button>
     );
   }
-  return <button className="primary" onClick={() => followUser(name, true)}>{followsMe ? tr('followBack') : tr('followFollow')}</button>;
+  return <button className="primary" onClick={() => followUser(id, true)}>{followsMe ? tr('followBack') : tr('followFollow')}</button>;
 }
 
 export function Chip({ kind, children }: { kind: string; children: React.ReactNode }) {
@@ -97,8 +98,8 @@ const ANSWER_OF: Record<Rsvp, 'attendees' | 'maybe' | 'declined'> = { yes: 'atte
 
 /** イベントへの返事。押し直すと取り消す */
 export function EventAnswer({ ev }: { ev: EventDef }) {
-  const selfName = useStore((s) => s.selfName);
-  const mine = (Object.keys(ANSWER_OF) as Rsvp[]).find((a) => ev[ANSWER_OF[a]].includes(selfName));
+  const selfId = useStore((s) => s.selfId);
+  const mine = (Object.keys(ANSWER_OF) as Rsvp[]).find((a) => ev[ANSWER_OF[a]].includes(selfId));
   return (
     <span className="planbtns" role="group" aria-label={tr("ui88")}>
       {(Object.keys(RSVP_LABEL) as Rsvp[]).map((a) => (

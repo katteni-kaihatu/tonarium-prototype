@@ -7,6 +7,8 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
+import { testServerEnv } from './test-db.ts';
+import { devLogin } from './test-auth.ts';
 import { WebSocket } from 'ws';
 import { KokosyncClient } from '../vendor/kokosync/index.js';
 import { importKey, open, PACKET_TOPIC, receiveBlob, seal, sendPacket, type Envelope, type SyncConfig } from '../shared/session-wire.ts';
@@ -28,6 +30,7 @@ type InputCommand = Exclude<SystemCommand, { kind: 'map' }>;
 type InputOperation = { kind: 'interact'; objectId: string } | { kind: 'input'; instanceId: string; input: string; payload: Record<string, SystemValue> };
 
 test('live shared systems: code-map load, late snapshots, native items, occupied seats and reconnect converge', { skip: process.env.KOKOSYNC_INTEGRATION !== '1', timeout: 150_000 }, async t => {
+  const dbEnv = await testServerEnv(t);
   const began = Date.now(), listener = net.createServer();
   await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve));
   const port = (listener.address() as net.AddressInfo).port;
@@ -36,7 +39,7 @@ test('live shared systems: code-map load, late snapshots, native items, occupied
   const data = await mkdtemp(path.join(os.tmpdir(), 'tonarium-live-systems-'));
   await writeFile(path.join(data, 'sessions.json'), JSON.stringify({ name: 'System integration', sessions: [{ id: sid, name: 'System integration' }, { id: otherSid, name: 'Independent integration' }] }));
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
-    env: { ...process.env, SERVER_PORT: String(port), DATA_DIR: data, SESSIONS_FILE: path.join(data, 'sessions.json'), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', LIVEKIT_ROOM_PREFIX: `systems-integration-${crypto.randomUUID()}`, CHAT_TRANSLATION_PROVIDER: 'mock' },
+    env: { ...process.env, ...dbEnv, SERVER_PORT: String(port), DATA_DIR: data, SESSIONS_FILE: path.join(data, 'sessions.json'), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', LIVEKIT_ROOM_PREFIX: `systems-integration-${crypto.randomUUID()}`, CHAT_TRANSLATION_PROVIDER: 'mock' },
     windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = '';
@@ -72,14 +75,15 @@ test('live shared systems: code-map load, late snapshots, native items, occupied
     assert.equal(entry.manifest.id, entry.id); assert.equal(entry.manifest.version, entry.version);
   }
 
-  async function peer(name: string, room = sid, previous?: { home: WebSocket; id: string }) {
-    const home = previous?.home ?? new WebSocket(base.replace('http', 'ws') + '/ws'); homes.add(home);
+  async function peer(name: string, room = sid, previous?: { home: WebSocket; id: string; login: Awaited<ReturnType<typeof devLogin>> }) {
+    const login = previous?.login ?? await devLogin(base, name);
+    const home = previous?.home ?? new WebSocket(base.replace('http', 'ws') + '/ws', { headers: login.headers }); homes.add(home);
     const homeMessages: any[] = [];
     home.on('message', bytes => { homeMessages.push(JSON.parse(bytes.toString())); if (homeMessages.length > 200) homeMessages.shift(); });
     if (!previous) await new Promise<void>((resolve, reject) => { home.once('open', resolve); home.once('error', reject); });
-    const id = previous?.id ?? crypto.randomUUID();
+    const id = login.id;
     if (!previous) {
-      home.send(JSON.stringify({ t: 'hello', id, name, compat: COMPAT_VERSION }));
+      home.send(JSON.stringify({ t: 'hello', compat: COMPAT_VERSION }));
       home.send(JSON.stringify({ t: 'join', sid: room }));
     }
     const requestId = crypto.randomUUID();
@@ -131,7 +135,7 @@ test('live shared systems: code-map load, late snapshots, native items, occupied
       error(message) { failures.push(message); },
     });
     queues.add(queue);
-    return { id, home, homeMessages, client, config, frames, failures, items, send, queue, sentCommands, forceNextTickConflict() { holdNextCommand = true; }, get view() { return view!; }, get snapshot() { return snapshot!; }, get ordinal() { return ordinal; } };
+    return { id, login, home, homeMessages, client, config, frames, failures, items, send, queue, sentCommands, forceNextTickConflict() { holdNextCommand = true; }, get view() { return view!; }, get snapshot() { return snapshot!; }, get ordinal() { return ordinal; } };
   }
   type Peer = Awaited<ReturnType<typeof peer>>;
   const timer = (p: Peer) => p.view.systems.find(system => system.instanceId === 'countdown')!;

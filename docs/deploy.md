@@ -21,7 +21,7 @@ cloudflared 以外（ngrok など）を使う場合は、`.env` の `ALLOWED_HOS
 ## Coolify にデプロイする
 リポジトリに `Dockerfile` と `docker-compose.yml` があるので、Coolify でそのまま動く。
 
-アプリ（`tonarium`）と LiveKit（`livekit`）の2サービスを定義する。NPC・GM は外部 KokoaAI に接続し、モデル取得・推論コンテナは起動しない。設定は下の「RPG のサーバー AI」を参照。
+アプリ（`tonarium`）・LiveKit（`livekit`）・PostgreSQL（`postgres`）・DB のバックアップ（`db-backup`）の 4 サービスを定義する。NPC・GM は外部 KokoaAI に接続し、モデル取得・推論コンテナは起動しない。設定は下の「RPG のサーバー AI」を参照。
 
 1. サーバーのファイアウォール（VPS のセキュリティグループなど）で **TCP 7881・UDP 7882・UDP 3478** を開ける（LiveKit の音声・映像と TURN。Coolify の外の設定）
 2. DNS で LiveKit 用のサブドメイン（例: `livekit.example.com`）をサーバーに向ける
@@ -33,10 +33,25 @@ cloudflared 以外（ngrok など）を使う場合は、`.env` の `ALLOWED_HOS
    - `LIVEKIT_RTC_TCP_PORT` / `LIVEKIT_RTC_UDP_PORT` / `LIVEKIT_TURN_UDP_PORT`: 任意。LiveKit がホストに公開し、クライアントへ案内するポート（既定は 7881 / 7882 / 3478）。同じサーバーに 2 つ以上のインスタンスを立てるときだけ、インスタンスごとに別の値（例: 17881 / 17882 / 13478）にして、手順 1 のファイアウォールもその番号を開ける。ドメイン（手順 5）もインスタンスごとに分けること
    - `KOKOSYNC_URL`: データ同期先（既定は `https://45.77.130.146`）
    - `KOKOSYNC_USERNAME` / `KOKOSYNC_PASSWORD`: 同梱のプロトタイプ用認証情報を上書きする場合に設定する。両方とも空なら既定の接続先に限り同梱の値を使う
+   - `POSTGRES_PASSWORD`: DB のパスワード。`DATABASE_URL` にそのまま入るので記号を含まないもの（例: `openssl rand -hex 24` の結果）
+   - `S3_ENDPOINT` / `S3_BUCKET` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_PUBLIC_URL`: 画像の置き場（Cloudflare R2）。下の「R2 の準備」を参照。`S3_REGION` は既定の `auto` のまま
+   - `BACKUP_S3_BUCKET`: DB のバックアップを送るバケット（公開しない）。空ならバックアップは止まったままになる
+   - `MISSKEY_URL`: 任意。ログインに使う Misskey（既定は `https://misskey.resonite.love`）。OAuth の戻り先はアプリのドメインの `/auth/misskey/callback` になる（[login.md](login.md)）
 5. ドメインを設定する
    - `tonarium` サービス: アプリのドメイン（`SERVICE_FQDN_TONARIUM_3001` によりポート 3001 に転送。自動で付かなければ `https://<ドメイン>:3001` の形で指定）
    - `livekit` サービス: `https://<LIVEKIT_DOMAIN>:7880`（シグナリングの wss がここを通る）
 6. デプロイ。`/healthz` がヘルスチェックに使われる。通話に入れないときは、ドックの上に出る理由と `livekit` サービスのログを見る
+
+R2 の準備（Cloudflare のダッシュボード）:
+1. バケットを 2 つ作る。画像用（例: `tonarium`）と、DB のバックアップ用（例: `tonarium-backup`）
+2. 画像用のバケットに公開用のカスタムドメイン（例: `media.example.com`）を付ける。これを `S3_PUBLIC_URL`（`https://media.example.com`）にする。バックアップ用のバケットは公開しない
+3. 画像用のバケットの CORS で、アプリのオリジン（例: `https://tonarium.example.com`）からの `GET` と `HEAD` を許す。3D の板・アバター・GIF はブラウザが CORS 付きで読むので、無いと表示されない（`<img>` の表示は通る）
+4. 「R2 API トークン」で、2 つのバケットにオブジェクトの読み書きができるトークンを作る。アクセスキー ID とシークレットを `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`、エンドポイント（`https://<アカウント ID>.r2.cloudflarestorage.com`）を `S3_ENDPOINT` にする
+5. バックアップ用のバケットにライフサイクルルールを付け、`db/` の下を 14 日などで消す（`db-backup` は送るだけで古いものを消さない）
+
+DB のバックアップと戻し方:
+- `db-backup` は起動時と、その後 1 日ごと（`BACKUP_INTERVAL_SECONDS`）に `pg_dump -Fc` を `s3://<BACKUP_S3_BUCKET>/db/tonarium-<日時>.dump` へ送る。結果は `db-backup` のログに `backup:` / `backup failed:` と出る
+- 戻すときは、ダンプを手元に落として `postgres` コンテナへコピーし、`pg_restore --clean --if-exists -U tonarium -d tonarium <ファイル>` を流す。戻している間は `tonarium` サービスを止めておく
 
 デプロイ中と更新の案内:
 - 開いている人は、ホーム用 WebSocket が 5 秒以上切れていて、インターネットにはつながっているのに `/healthz` が通らない間、全面に「メンテナンス中です」が出る。つながり直すと自動で消える（`client/src/world/ServerNotices.tsx`）
@@ -44,7 +59,7 @@ cloudflared 以外（ngrok など）を使う場合は、`.env` の `ALLOWED_HOS
 
 メモ:
 - HTTP・ホーム用 WebSocket（`/ws`）・同期シグナリング（`/sync/offer`）・同期用 WebSocket（`/sync/ws`）・LiveKit トークン（`/token`）は同じポート。HTTPS は Coolify（Traefik）が付ける。`/sync/ws` も WebSocket Upgrade を許可する
-- アイコン・3D アバター・自己紹介・フレンド・通報は `tonarium-data` ボリューム（`/app/data`）に保存されるので再デプロイしても残る。作ったセッション・グループ・イベント、アイテム、DM とチャンネルのメッセージ、ステータス、サバイバーズのプロフィール（ポイント・強化・成績、`data/survivors.json`）、マーケットのいいね（`data/market-likes.json`）も同じボリュームに残る。セッション内のチャットはメモリ内だけなので、再デプロイ・再起動で消える。インスタンスは 1 つで動かすこと（複数にすると部屋が分かれる）
+- フォロー・作ったセッション・グループ・イベント・DM とチャンネルのメッセージ・既読・ステータス・自己紹介・タイムライン・アイテム・サバイバーズのプロフィール・マーケットのいいね・通報は DB（`tonarium-db` ボリューム）に残る。アイコン・3D アバター・写真などの画像は R2 に置く（[storage.md](storage.md)）。`tonarium-data` ボリューム（`/app/data`）には、AD のセーブとランキング（`ad-access.json`）・ファンタジー RPG のデータ・共有アセット・共有システム・翻訳のキャッシュが残る。セッション内のチャットはメモリ内だけなので、再デプロイ・再起動で消える。インスタンスは 1 つで動かすこと（複数にすると部屋が分かれる）
 - LiveKit の設定は `docker-compose.yml` の `LIVEKIT_CONFIG` にある。サーバーの外向きの IP は自動で調べる（`use_external_ip`）。社内ネットワークなど UDP が通らない人向けには TURN（既定 UDP 3478、`LIVEKIT_TURN_UDP_PORT` で変更可）も動く
 - Tonarium サーバーは `KOKOSYNC_URL` の HTTPS/WSS に外向き接続する。ブラウザの WebRTC は kokosync サーバーの公開 UDP ポートにも届く必要がある。UDP が通らなければ同一オリジンの WebSocket 経由に切り替わる
 - LiveKit Cloud に戻すときは、`livekit` サービスを消して `tonarium` の `LIVEKIT_URL` を Cloud の URL にする。データ同期には影響しない
@@ -52,9 +67,9 @@ cloudflared 以外（ngrok など）を使う場合は、`.env` の `ALLOWED_HOS
 - Dockerfile だけで使う場合（Coolify の Dockerfile ビルドパックや手元）:
   ```bash
   docker build -t tonarium .
-  docker run --rm -p 3001:3001 -e LIVEKIT_URL=... -e LIVEKIT_API_KEY=... -e LIVEKIT_API_SECRET=... tonarium
+  docker run --rm -p 3001:3001 -e DATABASE_URL=... -e LIVEKIT_URL=... -e LIVEKIT_API_KEY=... -e LIVEKIT_API_SECRET=... tonarium
   ```
-  （この場合 LiveKit は別に用意する）
+  （この場合 LiveKit と PostgreSQL は別に用意する）
 
 ## RPG アカウントが HTTPS でも「安全な接続」を要求する場合
 
@@ -62,7 +77,7 @@ cloudflared 以外（ngrok など）を使う場合は、`.env` の `ALLOWED_HOS
 
 Coolify の Docker Compose では、`tonarium` の環境変数に次を設定して再デプロイする。今回追加した Compose の参照で値をコンテナへ渡す。
 
-- `FANTASY_TRUSTED_PROXY_IPS`: **アプリの接続元として見える実際のプロキシ IP、または CIDR 表記の帯域**。複数ならカンマ区切り。プロキシの IP がコンテナの再作成で変わる環境では、プロキシが接続する Docker ネットワークの帯域（例: `172.18.0.0/16`）を指定すれば、IP が変わっても設定を更新しなくてよい。帯域はプロキシが実際に使うプライベート帯域だけに絞り、`*` は指定しない。`0.0.0.0/0` のような全域指定は無効として扱われる。
+- `FANTASY_TRUSTED_PROXY_IPS`: **アプリの接続元として見える実際のプロキシ IP、または CIDR 表記の帯域**。複数ならカンマ区切り。プロキシの IP がコンテナの再作成で変わる環境では、プロキシが接続する Docker ネットワークの帯域（例: `172.18.0.0/16`）を指定すれば、IP が変わっても設定を更新しなくてよい。帯域はプロキシが実際に使うプライベート帯域だけに絞り、`*` は指定しない。`0.0.0.0/0` のような全域指定は無効として扱われる。ゲストを作れる数の上限（[login.md](login.md)）も、この設定で決まる接続元で数える。設定しないと、前段を通る全員がまとめて 1 つの接続元になり、10 分に 20 人までしかゲストを作れない。
 - `FANTASY_TRUST_PROXY=1`: プロキシがアプリへループバックで接続する場合だけ使用する。この値だけでは Docker ブリッジを信頼しない。通常の別コンテナ構成では前項を設定する。
 
 プロキシは外部の `Host` を維持し、信頼できる HTTPS 終端からの `X-Forwarded-Proto: https` をアプリへ渡す。任意のクライアントが送った転送ヘッダーをそのまま採用しない。Cloudflare など複数段の経路でも、実際の TLS 終端とアプリ直前のヘッダーを運営側で確認する。

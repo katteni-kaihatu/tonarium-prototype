@@ -1,22 +1,12 @@
 import { t as tr } from './i18n/index.ts';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { clockTime, type Item } from '../../shared/items.ts';
 import { useStore, get, set, serverNow } from './store.ts';
 import { itemAction } from './items/actions.ts';
 import { volumeAt } from './spatial.ts';
 import { Icon } from './world/Icon.tsx';
 
-type VideoItem = Item & { kind: 'video' };
-type ClockItem = Item & { kind: 'video' | 'youtube' };
-
-/** 動画アイテムごとに <video> は 1 つ。ウィンドウと 3D の板（VideoTexture）で使い回す */
-export const videoEls = new Map<string, HTMLVideoElement>();
-const holder = document.createElement('div');
-Object.assign(holder.style, { position: 'fixed', left: '0', bottom: '0', width: '2px', height: '2px', opacity: '0', pointerEvents: 'none' });
-document.body.appendChild(holder);
-
-/** 他の人とずれていたら合わせる許容量（秒） */
-const DRIFT = 0.8;
+type ClockItem = Item & { kind: 'youtube' };
 
 const windowOpen = (id: string) => get().windows.some((w) => w.key === `item:${id}`);
 
@@ -45,74 +35,6 @@ function VolumeControl({ id }: { id: string }) {
       <input type="range" min={0} max={1} step={0.05} value={vol} aria-label={tr("ui37")} onChange={(e) => setUserVolume(id, Number(e.target.value))} />
     </span>
   );
-}
-
-function syncVideo(el: HTMLVideoElement, item: VideoItem) {
-  const target = clockTime(item.clock, serverNow());
-  const end = Number.isFinite(el.duration) ? el.duration : Infinity;
-  const want = Math.min(target, end);
-  if (Math.abs(el.currentTime - want) > DRIFT) el.currentTime = want;
-  if (item.clock.playing && target < end && el.paused) {
-    // 音付きの自動再生が止められたら、消音で再生だけは合わせる
-    void el.play().catch(() => { el.muted = true; void el.play().catch(() => {}); });
-  }
-  if (!item.clock.playing && !el.paused) el.pause();
-  const v = mediaVolume(item);
-  el.volume = Math.min(1, v);
-}
-
-/** ワールド内の動画アイテムの <video> を用意し、再生位置をそろえ続ける */
-export function MediaSync() {
-  const items = useStore((s) => s.items);
-  useEffect(() => {
-    const ids = new Set<string>();
-    for (const it of Object.values(items)) {
-      if (it.kind !== 'video') continue;
-      ids.add(it.id);
-      if (videoEls.has(it.id)) continue;
-      const el = document.createElement('video');
-      el.src = it.url;
-      el.playsInline = true;
-      el.preload = 'auto';
-      el.loop = false;
-      holder.appendChild(el);
-      videoEls.set(it.id, el);
-    }
-    for (const [id, el] of videoEls) {
-      if (ids.has(id)) continue;
-      el.pause();
-      el.removeAttribute('src');
-      el.load();
-      el.remove();
-      videoEls.delete(id);
-    }
-  }, [items]);
-  useEffect(() => {
-    const t = setInterval(() => {
-      for (const [id, el] of videoEls) {
-        const it = get().items[id];
-        if (it?.kind === 'video') syncVideo(el, it);
-      }
-    }, 300);
-    return () => clearInterval(t);
-  }, []);
-  useEffect(() => () => {
-    for (const el of videoEls.values()) { el.pause(); el.remove(); }
-    videoEls.clear();
-  }, []);
-  return null;
-}
-
-/** 共有の <video> をこの場所に移して見せる。外れたら隠し場所に戻す（再生は止まらない） */
-export function VideoHost({ id }: { id: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = videoEls.get(id);
-    if (!el || !ref.current) return;
-    ref.current.appendChild(el);
-    return () => { holder.appendChild(el); };
-  }, [id]);
-  return <div ref={ref} className="videohost" />;
 }
 
 const fmt = (t: number) => {

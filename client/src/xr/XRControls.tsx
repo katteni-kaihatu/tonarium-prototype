@@ -118,7 +118,7 @@ export function XRControls() {
     ...(world === 'survivors' ? [{ key: 'survivors', title: 'サバイバー' }, { key: 'survivor-library', title: 'サバイバー図鑑' }] : []),
     ...(sharer ? [{ key: 'share', title: '画面共有' }] : []),
     ...participants.map(p => ({ key: `face:${p.id}`, title: `顔: ${p.name}` })),
-    ...Object.values(items).filter(item => PANELS[item.kind] || ['image', 'video', 'youtube', 'note', 'dice', 'telephone', 'antimatter', 'bike'].includes(item.kind) || item.mapPlacement?.mode === 'system')
+    ...Object.values(items).filter(item => PANELS[item.kind] || ['image', 'youtube', 'note', 'dice', 'telephone', 'antimatter', 'bike'].includes(item.kind) || item.mapPlacement?.mode === 'system')
       .map(item => ({ key: `item:${item.id}`, title: itemLabel(item) })),
     ...Object.keys(camFeeds).map(id => ({ key: id.startsWith('view:') ? id : `cam:${id}`, title: id.startsWith('view:') ? '視点配信' : 'カメラ配信' })),
   ];

@@ -2,7 +2,8 @@ name: Web checks
 
 on:
   pull_request:
-    branches: [main, develop]
+    # feature/* は大きな作業をまとめる統合ブランチ（最後に develop へ 1 本で出す）
+    branches: [main, develop, 'feature/**']
   workflow_dispatch:
 
 permissions:
@@ -16,10 +17,26 @@ jobs:
   web:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17.10-alpine3.23
+        env:
+          POSTGRES_USER: tonarium
+          POSTGRES_PASSWORD: tonarium
+          POSTGRES_DB: tonarium
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tonarium"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
     env:
+      # integration test はここに使い捨ての DB を作る（server/test-db.ts）
+      TEST_DATABASE_URL: postgres://tonarium:tonarium@localhost:5432/tonarium
       CHANGELOG_BASE: ${{ github.event.pull_request.base.sha || format('{0}^', github.sha) }}
-      # develop 宛ての作業 PR は履歴に触れない。main 宛て（リリース・main からの同期）は既存履歴の保持と形式だけを見る
-      CHANGELOG_MODE: ${{ github.event_name == 'pull_request' && github.base_ref == 'develop' && github.head_ref != 'main' && 'develop' || 'main' }}
+      # develop・feature/* 宛ての作業 PR は履歴に触れない。main 宛て（リリース・main からの同期）は既存履歴の保持と形式だけを見る
+      CHANGELOG_MODE: ${{ github.event_name == 'pull_request' && (github.base_ref == 'develop' || startsWith(github.base_ref, 'feature/')) && github.head_ref != 'main' && 'develop' || 'main' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -47,3 +64,10 @@ jobs:
       - run: npm run test:systems-playtest
       - run: npm run test:camera-timer
       - run: npm run test:content-translations
+      - run: npm run test:storage
+      - run: npm run test:integration
+      - run: npm run test:session-actions
+      - run: npm run test:updates
+      - run: npm run test:ad
+      - run: npm run test:fantasy
+      - run: npm run test:fantasy-accounts

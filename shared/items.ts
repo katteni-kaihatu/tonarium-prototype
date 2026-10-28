@@ -5,7 +5,7 @@ import { BIKE, releaseBike, vehicleInitial, type VehicleState } from './vehicle.
 import { validItemVariant, type ItemVariant } from './item-variants.ts';
 import type { SystemView } from './system-types.ts';
 
-export type ItemKind = 'telephone' | 'note' | 'hammer' | 'chess' | 'chessAi' | 'g2048' | 'canvas' | 'camera' | 'image' | 'video' | 'youtube' | 'dice' | 'antimatter' | 'bike' | 'mirror' | 'jumpPad';
+export type ItemKind = 'telephone' | 'note' | 'hammer' | 'chess' | 'chessAi' | 'g2048' | 'canvas' | 'camera' | 'image' | 'youtube' | 'dice' | 'antimatter' | 'bike' | 'mirror' | 'jumpPad';
 
 /**
  * みんなで同じ位置を再生するための時計。at（サーバー時刻 ms）の時点で base 秒目。
@@ -14,8 +14,8 @@ export type ItemKind = 'telephone' | 'note' | 'hammer' | 'chess' | 'chessAi' | '
 export interface MediaClock { playing: boolean; base: number; at: number }
 export const clockTime = (c: MediaClock, serverNow: number) => (c.playing ? c.base + Math.max(0, serverNow - c.at) / 1000 : c.base);
 
-/** アップロードした画像・動画は /media/ に置かれる */
-export const MEDIA_URL_RE = /^\/media\/[0-9a-f-]{36}\.(jpg|png|gif|webp|mp4|webm)$/;
+/** アップロードした画像は /media/ に置かれる */
+export const MEDIA_URL_RE = /^\/media\/[0-9a-f-]{36}\.(jpg|png|gif|webp)$/;
 export const YOUTUBE_ID_RE = /^[\w-]{11}$/;
 export type MediaInit = { url: string; w: number; h: number } | { videoId: string; title: string };
 
@@ -64,7 +64,6 @@ export type Item =
   /** live 中は operator のブラウザがカメラ視点を描いて配信する */
   | (ItemBase & { kind: 'camera'; holder: string | null; pitch: number; live: boolean; operator: string | null; cameraY?: number; groundY?: number; variant?: ItemVariant; timerState?: SystemView })
   | (ItemBase & { kind: 'image'; url: string; w: number; h: number; createdByName?: string })
-  | (ItemBase & { kind: 'video'; url: string; w: number; h: number; clock: MediaClock })
   | (ItemBase & { kind: 'youtube'; videoId: string; title: string; clock: MediaClock })
   /** 結果をサーバーで検証・確定し、チャットにも残す。roll は最後に振った回 */
   | (ItemBase & { kind: 'dice'; roll: DiceRoll | null })
@@ -138,7 +137,6 @@ export const ITEM_INFO: Record<ItemKind, ItemInfo> = {
   canvas: { illustration: '/items/canvas.png', name: 'キャンバス', mark: '画', tint: '#F6E4EC', ink: '#9A3A62', desc: 'みんなで絵を描ける。ペンと消しゴム付き。', genre: 'ツール', in2d: true, in3d: true },
   camera: { illustration: '/items/camera.png', name: 'カメラ', mark: '写', tint: '#E5F0E9', ink: '#2E6E4E', desc: '3D 空間で写真を撮ったりライブ配信したりできる。ライブは 2D からも見られる。', genre: 'ツール', in2d: false, in3d: true },
   image: { name: '画像', mark: '絵', tint: '#E4EEF7', ink: '#2F5E8C', desc: '貼り付けた画像。', genre: 'メディア', in2d: true, in3d: true, media: true },
-  video: { name: '動画', mark: '動', tint: '#EFE4F6', ink: '#6A3A8C', desc: '貼り付けた動画。みんなで同じところを再生する。', genre: 'メディア', in2d: true, in3d: true, media: true },
   dice: { illustration: '/items/dice.png', name: 'サイコロ', mark: '賽', tint: '#F3E6D3', ink: '#7A4A22', desc: 'TRPG 用のサイコロ（d4〜d100、最大10個）。3D では木の器の中を転がり、結果はチャットに残る。シークレットで振ると結果は自分だけに見える。', genre: 'あそび', in2d: true, in3d: true },
   youtube: { name: 'YouTube', mark: 'YT', tint: '#FBE1DE', ink: '#B3261E', desc: 'YouTube の動画。みんなで同じところを再生する。', genre: 'メディア', in2d: true, in3d: true, media: true },
   antimatter: { name: 'AD ポータル', mark: 'AD', tint: '#E9E2F5', ink: '#5B3A8C', desc: '反物質次元への入口。開くと自分の AD 研究所パネルが開く。進行・セーブはプレイヤーごとに残り、アイテムを片付けたりワールドを切り替えたりしても消えない。', genre: 'ゲーム', in2d: true, in3d: true },
@@ -223,13 +221,8 @@ export function createItem(
   switch (kind) {
     case 'bike': return { ...b, ...vehicleInitial(b.x, b.z, b.ry), kind, rider: null, rideVersion: 0 };
     case 'image':
-    case 'video': {
       if (!media || !('url' in media) || !MEDIA_URL_RE.test(media.url)) return null;
-      const isVideo = /\.(mp4|webm)$/.test(media.url);
-      if (isVideo !== (kind === 'video')) return null;
-      const m = { url: media.url, w: size(media.w), h: size(media.h) };
-      return kind === 'image' ? { ...b, kind, ...m } : { ...b, kind, ...m, clock };
-    }
+      return { ...b, kind, url: media.url, w: size(media.w), h: size(media.h) };
     case 'youtube':
       if (!media || !('videoId' in media) || !YOUTUBE_ID_RE.test(media.videoId)) return null;
       return { ...b, kind, videoId: media.videoId, title: String(media.title ?? '').slice(0, 200), clock };
@@ -353,7 +346,6 @@ export function applyItemAction(item: Item, act: ItemAction, userId: string, rng
       }
       if (act.a === 'reset2048') { item.grid = g2048Initial(rng); item.score = 0; item.over = false; break; }
       return false;
-    case 'video':
     case 'youtube': {
       if (act.a !== 'mediaPlay' && act.a !== 'mediaPause' && act.a !== 'mediaSeek') return false;
       const pos = Math.max(0, Number(act.pos) || 0);
@@ -411,7 +403,6 @@ export function itemSummary(it: Item): string | null {
     case 'telephone': return 'お絵描き伝言';
     case 'canvas': return it.strokes.length ? 'お絵描き' : null;
     case 'image': return '写真';
-    case 'video': return '動画';
     case 'youtube': return it.title ? `YouTube「${it.title.slice(0, 20)}」` : 'YouTube';
     case 'antimatter': return 'AD ポータル';
     default: return null;

@@ -14,6 +14,7 @@ import type { FantasyGmReply } from '../shared/fantasy-gm.ts';
 import { FANTASY_DINING, FANTASY_LODGINGS } from '../shared/fantasy-life.ts';
 import { FANTASY_LIBRARY_BOOKS } from '../shared/fantasy-library.ts';
 import { fantasyLibraryHoldings } from '../shared/fantasy-town.ts';
+import { testServerEnv } from './test-db.ts';
 
 interface Message {
   t: string; requestId?: string; profile?: FantasyProfile; text?: string; source?: string;
@@ -34,7 +35,7 @@ async function isolated(t: TestContext, location = 'hearth') {
   const listener = net.createServer(); await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve));
   const port = (listener.address() as net.AddressInfo).port; await new Promise<void>(resolve => listener.close(() => resolve()));
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], {
-    env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
+    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
       LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

@@ -10,13 +10,13 @@ export function receiveEmote(msg: Extract<RoomServerMsg, { t: 'emote' }>) {
   const s = get();
   if (msg.sid !== s.session || !isEmoteId(msg.id) || !Number.isFinite(msg.at)) return;
   const user = s.participants.find((u) => u.id === msg.from);
-  if (!user || s.blocked.includes(user.name)) return;
+  if (!user || s.blocked.includes(user.id)) return;
   const age = Math.max(0, serverNow() - msg.at);
   if (age >= EMOTES[msg.id].duration || (s.emotes[msg.from]?.at ?? -Infinity) >= msg.at) return;
   const emote = { id: msg.id, at: msg.at, started: performance.now() - age };
   set({ emotes: { ...s.emotes, [msg.from]: emote } });
   // Do not replay delayed sounds after a tab wakes up or the transport reconnects.
-  if (age < 700 && !s.peerMuted.includes(user.name)) playEmoteSound(msg.id, volumeFrom(msg.from));
+  if (age < 700 && !s.peerMuted.includes(user.id)) playEmoteSound(msg.id, volumeFrom(msg.from));
   window.setTimeout(() => {
     if (get().emotes[msg.from] !== emote) return;
     set((state) => {

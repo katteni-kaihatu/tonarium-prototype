@@ -1,10 +1,10 @@
 import { t as tr, msg } from '../i18n/index.ts';
 import { useState } from 'react';
-import { showToast, unreadOf, useStore } from '../store.ts';
+import { nameOf, showToast, unreadOf, useStore } from '../store.ts';
 import { channelKey, dmKey } from '../../../shared/protocol.ts';
 import { sendMessage } from '../actions.ts';
 import { Composer, Thread } from '../home/messages.tsx';
-import { NameFace } from '../home/common.tsx';
+import { PersonFace } from '../home/common.tsx';
 import { GroupAvatar } from '../home/GroupAvatar.tsx';
 import { Icon } from './Icon.tsx';
 import { itemLabel } from './common.tsx';
@@ -15,14 +15,16 @@ interface Conv { key: string; title: string; mark: React.ReactNode }
 function useConvs(): Conv[] {
   const friends = useStore((s) => s.friends);
   const groups = useStore((s) => s.groups);
-  const selfName = useStore((s) => s.selfName);
+  const selfId = useStore((s) => s.selfId);
+  const users = useStore((s) => s.users);
+  const directory = useStore((s) => s.directory);
   const inbox = useStore((s) => s.inbox);
   const list: Conv[] = [
-    ...groups.filter((g) => g.members.includes(selfName)).flatMap((g) => g.channels.map((c) => ({
+    ...groups.filter((g) => g.members.includes(selfId)).flatMap((g) => g.channels.map((c) => ({
       key: channelKey(g.id, c.id), title: `${g.name} #${c.name}`,
       mark: <GroupAvatar group={g} size="tiny" />,
     }))),
-    ...friends.map((n) => ({ key: dmKey(selfName, n), title: n, mark: <NameFace name={n} size={26} /> })),
+    ...friends.map((n) => ({ key: dmKey(selfId, n), title: nameOf(n, { users, directory }), mark: <PersonFace id={n} size={26} /> })),
   ];
   const last = (c: string) => inbox[c]?.at(-1)?.at ?? 0;
   return list.sort((a, b) => last(b.key) - last(a.key));
@@ -74,8 +76,8 @@ export function SessionMessages({ open, onOpen }: { open: string | null; onOpen:
   const convs = useConvs();
   const inbox = useStore((st) => st.inbox);
   const reads = useStore((st) => st.reads);
-  const selfName = useStore((st) => st.selfName);
-  const s = { inbox, reads, selfName };
+  const selfId = useStore((st) => st.selfId);
+  const s = { inbox, reads, selfId };
   const cur = convs.find((c) => c.key === open);
   if (cur) return <ConvView conv={cur.key} title={cur.title} onBack={() => onOpen(null)} />;
   return (
@@ -85,11 +87,11 @@ export function SessionMessages({ open, onOpen }: { open: string | null; onOpen:
       {convs.map((c) => {
         const n = unreadOf(s, c.key);
         const last = s.inbox[c.key]?.at(-1);
-        const preview = last ? (last.recap ? tr("ui234") : last.voice ? tr("ui703") : last.plan ? tr("ui704", last.text) : last.invite ? tr("ui705") : last.item ? last.item.summary : last.text) : '';
+        const preview = last ? (last.recap ? tr("ui234") : last.plan ? tr("ui704", last.text) : last.invite ? tr("ui705") : last.item ? last.item.summary : last.text) : '';
         return (
           <button key={c.key} className={`ib convrow ${n ? 'unread' : ''}`} onClick={() => onOpen(c.key)}>
             {c.mark}
-            <span className="finfo"><b>{c.title}</b>{preview && <span className="sub">{last && last.from && !c.key.startsWith('dm:') ? `${last.from}：` : ''}{preview}</span>}</span>
+            <span className="finfo"><b>{c.title}</b>{preview && <span className="sub">{last && last.from && !c.key.startsWith('dm:') ? `${nameOf(last.from)}：` : ''}{preview}</span>}</span>
             {n > 0 && <span className="badge">{n}</span>}
           </button>
         );
@@ -102,6 +104,6 @@ export function SessionMessages({ open, onOpen }: { open: string | null; onOpen:
 export function useMessageUnread() {
   const inbox = useStore((st) => st.inbox);
   const reads = useStore((st) => st.reads);
-  const selfName = useStore((st) => st.selfName);
-  return Object.keys(inbox).reduce((n, c) => n + unreadOf({ inbox, reads, selfName }, c), 0);
+  const selfId = useStore((st) => st.selfId);
+  return Object.keys(inbox).reduce((n, c) => n + unreadOf({ inbox, reads, selfId }, c), 0);
 }

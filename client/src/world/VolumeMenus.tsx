@@ -32,18 +32,18 @@ export function MasterVolume({ anchor, onClose }: { anchor: DOMRect; onClose: ()
 }
 
 /** プレイヤーの行の右クリックで開く、その人の声の音量 */
-export function PeerVolume({ name, anchor, onClose }: { name: string; anchor: DOMRect; onClose: () => void }) {
-  const level = useStore((s) => peerLevel(name, s));
-  const muted = useStore((s) => s.peerMuted.includes(name));
+export function PeerVolume({ id, name, anchor, onClose }: { id: string; name: string; anchor: DOMRect; onClose: () => void }) {
+  const level = useStore((s) => peerLevel(id, s));
+  const muted = useStore((s) => s.peerMuted.includes(id));
   return (
     <Popover anchor={anchor} onClose={onClose} className="volume">
       <span className="menutitle">{name} {tr("ui823")}</span>
-      <Slider label={tr("ui824")} value={level} max={2} onChange={(v) => setPeerVolume(name, v)} />
+      <Slider label={tr("ui824")} value={level} max={2} onChange={(v) => setPeerVolume(id, v)} />
       <div className="volbtns">
-        <button className={`ib menuitem ${muted ? 'on' : ''}`} onClick={() => togglePeerMute(name)}>
+        <button className={`ib menuitem ${muted ? 'on' : ''}`} onClick={() => togglePeerMute(id)}>
           <Icon name={muted ? 'volumeOff' : 'volume'} />{muted ? tr("ui825") : tr("ui601")}
         </button>
-        <button className="ib menuitem" disabled={level === 1} onClick={() => setPeerVolume(name, 1)}>{tr("ui826")}</button>
+        <button className="ib menuitem" disabled={level === 1} onClick={() => setPeerVolume(id, 1)}>{tr("ui826")}</button>
       </div>
     </Popover>
   );

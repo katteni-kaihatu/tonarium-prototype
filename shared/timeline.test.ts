@@ -16,7 +16,7 @@ test('タブごとに出す人を分け、返信は一覧に出さない', () =>
 });
 
 test('リポストはした時刻で並び、同じポストは新しい方の行だけ残る', () => {
-  const posts = [post('1', 'x', 10, { reposts: [{ name: 'a', at: 30 }] }), post('2', 'a', 20)];
+  const posts = [post('1', 'x', 10, { reposts: [{ id: 'a', at: 30 }] }), post('2', 'a', 20)];
   const home = timelineEntries(posts, 'home', who);
   assert.deepEqual(home.map((e) => [e.post.id, e.repostBy]), [['1', 'a'], ['2', undefined]]);
   const global = timelineEntries(posts, 'global', who);
@@ -24,7 +24,7 @@ test('リポストはした時刻で並び、同じポストは新しい方の�
 });
 
 test('ブロックした人のポストとリポストは出さない', () => {
-  const posts = [post('1', 'b', 10), post('2', 'x', 20, { reposts: [{ name: 'b', at: 30 }] })];
+  const posts = [post('1', 'b', 10), post('2', 'x', 20, { reposts: [{ id: 'b', at: 30 }] })];
   const list = timelineEntries(posts, 'global', { ...who, blocked: ['b'] });
   assert.deepEqual(list.map((e) => [e.post.id, e.repostBy]), [['2', undefined]]);
 });

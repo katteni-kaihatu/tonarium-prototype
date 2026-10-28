@@ -1,10 +1,10 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 5173 },
+    { "name": "dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 5173, "env": { "AUTH_DEV_LOGIN": "1" } },
     {
       "name": "dev-isolated", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 5181,
-      "env": { "SERVER_PORT": "3181", "CLIENT_PORT": "5181", "DATA_DIR": "data-isolated" }
+      "env": { "AUTH_DEV_LOGIN": "1", "SERVER_PORT": "3181", "CLIENT_PORT": "5181", "DATA_DIR": "data-isolated", "DATABASE_URL": "postgres://tonarium:tonarium@localhost:5432/tonarium_isolated", "S3_PREFIX": "isolated/" }
     }
   ]
 }

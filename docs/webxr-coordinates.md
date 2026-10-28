@@ -139,7 +139,7 @@ Playerは従来どおり左スティックを`look.yaw + headYaw`で移動へ変
 | エモートのキャプション・4粒子 | Emote3D.Reaction → Label | 参加者ルート基準。通常はキャプションY=1.95、粒子Y=1.4にアニメーション。低減設定では静止。portraitは専用の縮小位置 |
 | チェス・AIチェスの状態、操作・リセット | itemModels / items3d → Label | テーブル・操作メッシュのローカル座標。状態Y=1.5、メッセージY=1.28、各ボタン上+.14 |
 | 2048・Canvas等のパネル名 | itemModels.PanelStand → Label | 盤面上端+.18。親アイテムの移動・回転に追従 |
-| 画像・動画等のボード名 | items3d → Label | `BOARD_Y + h/2 + .18`、親アイテムに追従 |
+| 画像等のボード名 | items3d → Label | `BOARD_Y + h/2 + .18`、親アイテムに追従 |
 | サイコロ結果・スタンド名 | dice3d → Label | 各ダイスの床上座標、台上`STAND_Y + .55`。結果はダイスごとの位置 |
 | お絵描き伝言の名前・進行 | telephone3d → Label | アイテム基準Y=1.2と`[0,.7,.16]` |
 | 配信者・注釈者名 | shareDisplay → Label | 配信画面上端+.16 / +.11、注釈者名は画面寸法に比例する位置。画面の移動・回転へ追従 |
@@ -160,7 +160,7 @@ DOM表示面は`PanelSurfaces.refresh`が次の全入口から登録する。共
 
 | 登録入口 | 全種別 | 位置・追従の例外 |
 | --- | --- | --- |
-| WindowLayerの`data-xr-surface` | 画面共有、視点配信、カメラ配信、参加者の顔、画像、動画、YouTube、付箋、サイコロ、お絵描き伝言、バイク、反物質、共有システム操作、チェス、AIチェス、2048、Canvas、サバイバー、図鑑、AD研究所、AD空間設定 | 共通の生成位置は`[(表示枚数%3-1)*.7,0,-1.25]`をロール除去済みの視点姿勢で回したオフセット |
+| WindowLayerの`data-xr-surface` | 画面共有、視点配信、カメラ配信、参加者の顔、画像、YouTube、付箋、サイコロ、お絵描き伝言、バイク、反物質、共有システム操作、チェス、AIチェス、2048、Canvas、サバイバー、図鑑、AD研究所、AD空間設定 | 共通の生成位置は`[(表示枚数%3-1)*.7,0,-1.25]`をロール除去済みの視点姿勢で回したオフセット |
 | SOURCES | nearlist、noticelog、worldbadge、dock、hoverlay、survivor-panel.overlay | 近くの一覧、チャット・通知、通話設定、マイク・音・エモート、ホーム、サバイバーHUD。ホーム以外は一覧から表示 |
 | 自動ダイアログ検出 | modalbg、popover、lightbox、survivor-choice-overlay | プロフィール編集・参加者プロフィール、ワールド変更、セッション作成・編集、ステータス、アイテム追加、確認・外部リンク確認、画像拡大、設定・音量・音・エモート、サバイバー選択。既に登録済みの面の内側は二重登録しない |
 | 個別の追加面 | View3D.NoteEditorのnote-editor、AntimatterPanelのad-offline | 付箋編集、ADオフライン報酬。共通の配置・B/Y規則 |

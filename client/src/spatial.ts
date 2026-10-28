@@ -164,21 +164,12 @@ export function volumeAt(x: number, z: number) {
 
 type StoreState = ReturnType<typeof get>;
 
-// 音量更新（100ms 間隔）のたびに作り直さないよう、users / blocked の参照が変わった時だけ再構築する
-let blockedCache: { users: StoreState['users']; blocked: StoreState['blocked']; set: Set<string> } | null = null;
+// 音量更新（100ms 間隔）のたびに作り直さないよう、blocked の参照が変わった時だけ再構築する
+let blockedCache: { blocked: StoreState['blocked']; set: Set<string> } | null = null;
 const blockedIds = (s = get()) => {
-  if (blockedCache && blockedCache.users === s.users && blockedCache.blocked === s.blocked) return blockedCache.set;
-  const set = new Set(s.users.filter((u) => s.blocked.includes(u.name)).map((u) => u.id));
-  blockedCache = { users: s.users, blocked: s.blocked, set };
-  return set;
-};
-
-let namesCache: { users: StoreState['users']; map: Map<string, string> } | null = null;
-const namesOf = (s = get()) => {
-  if (namesCache && namesCache.users === s.users) return namesCache.map;
-  const map = new Map(s.users.map((u) => [u.id, u.name]));
-  namesCache = { users: s.users, map };
-  return map;
+  if (blockedCache && blockedCache.blocked === s.blocked) return blockedCache.set;
+  blockedCache = { blocked: s.blocked, set: new Set(s.blocked) };
+  return blockedCache.set;
 };
 
 let ctx: AudioContext | null = null;
@@ -223,7 +214,6 @@ function update() {
   const directional = s.mode === '3d' || !!(s.participants.find((p) => p.id === s.selfId)?.follow);
   const blocked = blockedIds(s);
   const bc = isBroadcast(s);
-  const names = namesOf(s);
   for (const [id, v] of voices) {
     const p = places.get(id);
     let g = 0;
@@ -232,7 +222,7 @@ function update() {
       const dx = p.x - me.x;
       const dz = p.z - me.z;
       const d = placeDistance(p, me);
-      g = (bc ? 1 : falloff(d)) * s.audioVol.voice * peerGain(names.get(id) ?? '', s);
+      g = (bc ? 1 : falloff(d)) * s.audioVol.voice * peerGain(id, s);
       if (directional && d > 0.3) pan = ((dx * Math.cos(me.ry) - dz * Math.sin(me.ry)) / d) * 0.8;
     }
     v.gain.gain.setTargetAtTime(g, ctx.currentTime, 0.08);

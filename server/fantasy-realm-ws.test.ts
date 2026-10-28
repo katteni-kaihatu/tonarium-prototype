@@ -11,6 +11,7 @@ import { applyFantasyAction, newFantasyProfile } from '../shared/fantasy-engine.
 import type { FantasyProfile } from '../shared/fantasy.ts';
 import type { FantasyRealmState } from '../shared/fantasy-realm.ts';
 import type { FantasyPropertyState } from '../shared/fantasy-property.ts';
+import { testServerEnv } from './test-db.ts';
 
 interface Message { t: string; state?: FantasyRealmState | FantasyPropertyState | null; profile?: FantasyProfile; error?: string; list?: { id: string; session: string | null }[] }
 async function isolated(t: TestContext) {
@@ -24,13 +25,13 @@ async function isolated(t: TestContext) {
   const sessions = path.join(directory, 'sessions.json');
   fs.writeFileSync(sessions, JSON.stringify({ name: 'Realm websocket QA', sessions: [
     { id: 'realm-public', name: 'Public realm test', world: 'fantasy', visibility: 'public' },
-    { id: 'realm-private', name: 'Private realm test', world: 'fantasy', visibility: 'invite', owner: 'Outsider', invited: [] },
+    { id: 'realm-private', name: 'Private realm test', world: 'fantasy', visibility: 'invite', owner: 'outsider', invited: [] },
   ] }));
   const listener = net.createServer(); await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve));
   const port = (listener.address() as net.AddressInfo).port; await new Promise<void>(resolve => listener.close(() => resolve()));
   assert.ok(![3011, 18081, 8190, 5183, 3199, 5199].includes(port));
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], { cwd: process.cwd(),
-    env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
+    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
       LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
   let logs = ''; child.stdout.on('data', value => { logs += value; }); child.stderr.on('data', value => { logs += value; });
   const sockets: WebSocket[] = [];

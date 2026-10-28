@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { ITEM_INFO } from '../i18n/static.ts';
 import { clockTime, type Item } from '../../../shared/items.ts';
 import { useStore, get, nameOf, serverNow } from '../store.ts';
-import { videoEls, mediaVolume } from '../mediaSync.tsx';
+import { mediaVolume } from '../mediaSync.tsx';
 import { YouTubePlayer, youTubeDuration } from '../youtube.tsx';
 import { youTubeThumb } from '../media.ts';
 import { selectNote } from '../actions.ts';
@@ -202,14 +202,14 @@ function CompatPanel3D({ item }: { item: Item }) {
 
 const BOARD_Y = 1.6;
 
-type ClockItem = Item & { kind: 'video' | 'youtube' };
+type ClockItem = Item & { kind: 'youtube' };
 const playToggle = (item: ClockItem): Interactable => ({
   ...removable(item),
   hint: tr("ui522"),
   use: () => {
     const it = get().items[item.id];
-    if (it?.kind !== 'video' && it?.kind !== 'youtube') return;
-    const dur = it.kind === 'video' ? videoEls.get(it.id)?.duration ?? Infinity : youTubeDuration(it.id) || Infinity;
+    if (it?.kind !== 'youtube') return;
+    const dur = youTubeDuration(it.id) || Infinity;
     const pos = Math.min(clockTime(it.clock, serverNow()), dur);
     const ended = pos >= dur - 0.2;
     itemAction(it.id, { a: it.clock.playing && !ended ? 'mediaPause' : 'mediaPlay', pos: ended ? 0 : pos });
@@ -220,7 +220,7 @@ function Board({ item, w, h, data, children, label }: {
   item: Item; w: number; h: number; data: Interactable; children: React.ReactNode; label?: string;
 }) {
   const ref = useRef<THREE.Group>(null);
-  const floating = item.kind === 'image' || item.kind === 'video';
+  const floating = item.kind === 'image';
   const { y, scale } = floating ? mediaTransform(item) : { y: 0, scale: 1 };
   const center = floating ? 0 : BOARD_Y;
   useFollow(ref, item.id, item.x, item.z, item.ry, y, scale);
@@ -253,35 +253,6 @@ function Image3D({ item }: { item: Item & { kind: 'image' } }) {
   useFrame((_, dt) => media?.update(dt));
   const [w, h] = boardSize(item.w, item.h);
   return <Board item={item} w={w} h={h} data={removable(item)}><meshBasicMaterial map={media?.texture ?? null} toneMapped={false} /></Board>;
-}
-
-function Video3D({ item }: { item: Item & { kind: 'video' } }) {
-  // <video> は MediaSync が作るので、できるまで待つ
-  const [tex, setTex] = useState<THREE.VideoTexture | null>(null);
-  const shown = useRef(-1);
-  useFrame(() => {
-    const el = videoEls.get(item.id);
-    if (!el) return;
-    if (!tex) {
-      const t = new THREE.VideoTexture(el);
-      t.colorSpace = THREE.SRGBColorSpace;
-      setTex(t);
-      return;
-    }
-    // 新しいフレームの通知は再生中しか来ないので、止まっているときの最初の 1 枚やシーク後はここで描き直す
-    if (el.paused && el.readyState >= 2 && el.currentTime !== shown.current) {
-      shown.current = el.currentTime;
-      tex.needsUpdate = true;
-    }
-  });
-  useEffect(() => () => tex?.dispose(), [tex]);
-  const [w, h] = boardSize(item.w, item.h);
-  return (
-    <Board item={item} w={w} h={h} data={playToggle(item)} label={item.clock.playing ? tr("ui523") : tr("ui524")}>
-      {/* 同じ種類の要素だと R3F はマテリアルを使い回し、仮の暗い color が残って映像が真っ黒になるので key で作り直す */}
-      {tex ? <meshBasicMaterial key="video" map={tex} toneMapped={false} /> : <meshBasicMaterial key="empty" color="#111" />}
-    </Board>
-  );
 }
 
 /** px / m。YouTube のプレーヤーを板にぴったり重ねるための Html の倍率（distanceFactor） */
@@ -363,7 +334,6 @@ function NativeItem3D({ item }: { item: Item }) {
     case 'mirror': return <Mirror3D item={item} />;
     case 'bike': return <Bike3D item={item} />;
     case 'image': return <Image3D item={item} />;
-    case 'video': return <Video3D item={item} />;
     case 'youtube': return <YouTube3D item={item} />;
     case 'note': return <Note3D item={item} />;
     case 'hammer': return <Hammer3D item={item} />;

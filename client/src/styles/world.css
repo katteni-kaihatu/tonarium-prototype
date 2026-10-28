@@ -89,6 +89,7 @@
 .prow.menuon { background: rgba(255, 255, 255, .9); }
 .prow, .farchip { isolation: isolate; }
 .farchip { position: relative; }
+.guestmark { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 6px; background: rgba(38, 38, 46, .08); color: var(--muted); font-size: 10px; font-weight: 700; line-height: 16px; vertical-align: middle; }
 .prow::before, .farchip::before {
   content: ''; position: absolute; inset: -2px 0; z-index: -1; border-radius: 14px; pointer-events: none;
   background: radial-gradient(ellipse at 30% 50%, var(--glow, transparent), transparent 72%);

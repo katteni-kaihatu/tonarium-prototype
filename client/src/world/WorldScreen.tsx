@@ -38,7 +38,6 @@ import { PortraitCanvas } from './Portraits.tsx';
 import { MapLayer } from './MapLayer.tsx';
 import { ConfirmOpen } from './Links.tsx';
 import { shareFiles, shareYouTube, youTubeId } from '../media.ts';
-import { MediaSync } from '../mediaSync.tsx';
 import { closeWindow, openWindow, setWinMode } from './windows.ts';
 import { touchOnly, usePhone } from '../phone.ts';
 import { MasterVolume } from './VolumeMenus.tsx';
@@ -596,7 +595,6 @@ export function WorldScreen() {
         <Dock />
         {phone && <PhoneTabs />}
       </div>
-      <MediaSync />
       <AdAudio />
       <Toast />
       <NewArrivals />

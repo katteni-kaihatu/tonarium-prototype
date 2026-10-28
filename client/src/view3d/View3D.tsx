@@ -83,7 +83,7 @@ function Standee({ user }: { user: Participant }) {
     <group ref={ref} position={[pos0.x, 0, pos0.z]} userData={{ hitTarget: user.id, ...(!isSeated ? { carry: `user:${user.id}` } : {}), hint: tr("ui536", user.name) } satisfies Interactable}>
       <group ref={card}>
         <Suspense fallback={null}>
-          <OekakiAvatar userId={user.id} name={user.name} version={user.avatar} speaking={speaking} seated={() => !!seatOf(user.id)} onEyeHeight={setHeight} onSeatOffset={setSeatOffset} />
+          <OekakiAvatar userId={user.id} avatarId={user.id} version={user.avatar} speaking={speaking} seated={() => !!seatOf(user.id)} onEyeHeight={setHeight} onSeatOffset={setSeatOffset} />
         </Suspense>
       </group>
       <mesh position-y={Math.max(.7, height) / 2}>
@@ -207,7 +207,7 @@ export function Avatar3D({ id, self = false, rig }: { id: string; self?: boolean
     >
       <group ref={body}>
         <Suspense fallback={null}>
-          <OekakiAvatar userId={id} name={name} version={avatarV} speaking={speaking} look={() => pitchOf(id)}
+          <OekakiAvatar userId={id} avatarId={id} version={avatarV} speaking={speaking} look={() => pitchOf(id)}
             tracked={() => self && xrState().active ? xr.pose : get().avatars[id]?.xr} handsOnly={() => self && xrState().active}
             trackingRoot={() => ref.current}
             seated={() => !!seatOf(id)} onSeatOffset={onSeatOffset}
