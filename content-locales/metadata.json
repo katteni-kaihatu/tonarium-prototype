@@ -407,35 +407,6 @@
         }
       }
     },
-    "item/video": {
-      "sourceLanguage": "ja",
-      "fields": {
-        "name": {
-          "source": "動画",
-          "translations": {
-            "ja": "動画",
-            "en": "Video",
-            "ko": "동영상"
-          }
-        },
-        "desc": {
-          "source": "貼り付けた動画。みんなで同じところを再生する。",
-          "translations": {
-            "ja": "貼り付けた動画。みんなで同じところを再生する。",
-            "en": "A pasted video. Everyone watches in sync.",
-            "ko": "붙여넣은 동영상. 모두 같은 장면을 재생합니다."
-          }
-        },
-        "genre": {
-          "source": "メディア",
-          "translations": {
-            "ja": "メディア",
-            "en": "Media",
-            "ko": "미디어"
-          }
-        }
-      }
-    },
     "item/dice": {
       "sourceLanguage": "ja",
       "fields": {

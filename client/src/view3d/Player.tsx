@@ -92,7 +92,7 @@ function sendCarry(c: NonNullable<typeof carrying.current>) {
 
 function startCarry(id: string) {
   const item = get().items[id];
-  const media = item?.kind === 'image' || item?.kind === 'video';
+  const media = item?.kind === 'image';
   carrying.current = { id, x: item?.x ?? 0, z: item?.z ?? 0, ry: item?.ry ?? 0, last: 0,
     ...(media ? { ...mediaTransform(item), distance: MEDIA_PLACEMENT.distance } : {}) };
 }

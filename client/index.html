@@ -26,11 +26,14 @@
     <meta property="og:image:alt" content="Tonarium のロゴ" />
     <meta property="og:locale" content="ja_JP" />
     <meta name="twitter:card" content="summary_large_image" />
+    <!-- Misskey の OAuth はこのページ（client_id）を読みに来て、戻り先とアプリの名前・アイコンを確かめる -->
+    <link rel="redirect_uri" href="__ORIGIN__/auth/misskey/callback" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <div class="h-app" hidden><img class="u-logo" src="__ORIGIN__/brand/mark.png" alt="" /><a class="u-url p-name" href="__ORIGIN__/">Tonarium</a></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

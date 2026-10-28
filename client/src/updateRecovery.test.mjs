@@ -14,7 +14,6 @@ stub('./net/livekit.ts', { room: { canPlaybackAudio: true }, toggleMic: async ()
 stub('./walk.ts', { walkTo: (x, z, from) => sent.push({ walk: { x, z, from } }) });
 stub('./updateBridge.ts', { isElectron: () => electron });
 stub('./updateDraft.ts', { updateDrafts: () => draft });
-stub('./updateRecording.ts', { prepareRecordings: async () => [], restoreRecordings: async () => [], abandonRecordings: () => {} });
 stub('./i18n/core.ts', { t: (key, ...values) => [key, ...values].join(': ') });
 class MemoryStorage {
   values = new Map();
@@ -100,7 +99,7 @@ test('home-only restoration does not join a session', async () => {
 });
 
 test('invalid and expired snapshots are consumed and rejected with a reason', async () => {
-  for (const patch of [{ schema: 9 }, { at: 0 }, { avatar: { x: null, z: 2, ry: 0 } }, { camera: null }, { recordings: [null] }]) {
+  for (const patch of [{ schema: 9 }, { at: 0 }, { avatar: { x: null, z: 2, ry: 0 } }, { camera: null }]) {
     abandonPreparedUpdate(); await prepareUpdate();
     const snapshot = { ...JSON.parse(sessionStorage.getItem(KEY)), ...patch };
     sessionStorage.setItem(KEY, JSON.stringify(snapshot));

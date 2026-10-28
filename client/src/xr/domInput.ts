@@ -40,6 +40,7 @@ export class TerminalPointer {
     this.emit(this.down, 'mousedown');
   }
   release(cancel = false) {
+    if (cancel) { this.hover?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true })); this.hover = null; }
     const target = this.down;
     if (!target) return;
     this.down = null;
@@ -64,7 +65,11 @@ export class TerminalPointer {
     const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: this.x, clientY: this.y, deltaY: dy, deltaX: dx });
     if (!target?.dispatchEvent(event)) return;
     for (let el: Element | null = target; el; el = el.parentElement) {
-      if (el.scrollHeight > el.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(el).overflowY)) { el.scrollTop += dy; break; }
+      const style = getComputedStyle(el), top = el.scrollTop, left = el.scrollLeft;
+      if (/auto|scroll/.test(style.overflowY)) el.scrollTop += dy;
+      if (/auto|scroll/.test(style.overflowX)) el.scrollLeft += dx;
+      dy -= el.scrollTop - top; dx -= el.scrollLeft - left;
+      if (el === this.root || (!dy && !dx)) break;
     }
   }
   private emit(target: Element | null, type: string) {
@@ -78,7 +83,25 @@ export class TerminalPointer {
     const { pointerEvents } = root.style;
     root.style.pointerEvents = 'auto';
     try {
-      return document.elementsFromPoint(x, y).find(hit => root.contains(hit)) ?? null;
+      const visibleHit = document.elementsFromPoint(x, y).find(hit => root.contains(hit));
+      if (visibleHit) return visibleHit;
+      const contains = (el: Element) => {
+        const r = el.getBoundingClientRect(); return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+      };
+      // VR の DOM は画面外へ広がるため、viewport 外でも同じ矩形と祖先のクリップで探す。
+      return [...root.querySelectorAll('*')].reverse().find(el => {
+        const style = getComputedStyle(el);
+        if (style.pointerEvents === 'none' || style.display === 'none' || style.visibility === 'hidden' || !contains(el)) return false;
+        for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+          const s = getComputedStyle(parent), r = parent.getBoundingClientRect();
+          if (parent === root || /auto|scroll|hidden|clip/.test(s.overflowX + s.overflowY)) {
+            if ((/auto|scroll|hidden|clip/.test(s.overflowX) || parent === root) && (x < r.left || x >= r.right)) return false;
+            if ((/auto|scroll|hidden|clip/.test(s.overflowY) || parent === root) && (y < r.top || y >= r.bottom)) return false;
+          }
+          if (parent === root) break;
+        }
+        return true;
+      }) ?? (contains(root) ? root : null);
     } finally { root.style.pointerEvents = pointerEvents; }
   }
 }

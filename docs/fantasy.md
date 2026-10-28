@@ -231,7 +231,7 @@ GMが案内できる範囲は、既知の目的地や交通手段、現在の仕
 
 ローカル AI に渡すのは、本人の能力・職業・技・身体特性、所持品、観察できる食品の状態、既知の地図、利用可能な施設、条件を満たす依頼、現在の活動・事件などの記録。未知の地名、他種族限定の依頼、未鑑定の食品の正確な状態、NPC の秘密は渡さない。分からない事実は分からないと答え、新しい公式設定や未実行の出来事を作らない。生成された雑談からゲーム操作を取り出して実行することもない。
 
-GM の短い生成用履歴は仮ユーザー ID・言語ごとのサーバーメモリに保持する。NPC の会話履歴とは分け、永続保存はしない。入力は最大 500 文字、ローカル生成の待機上限は 45 秒。ルール質問はモデルの生成待ちより先に判定し、AI の返答準備中でも対応する簡単な質問を続けて送れる。NPC と GM のローカル生成は単一モデルの 2 スロットを共用し、最大 4 件を待機させる。雑談では無関係な設定を省き、通常は短い 2 文を指示する。返答全文の準備後に届ける方式で、トークン単位のストリーミングはまだない。モデルが利用できない場合もルール質問は使え、自由会話の接続失敗は明示する。準備・制限・実測値は [ローカル AI](local-npc.md) を参照。
+GM の短い生成用履歴は仮ユーザー ID・言語ごとのサーバーメモリに保持する。NPC の会話履歴とは分け、永続保存はしない。入力は最大500文字、KokoaAI 生成の期限は45秒。ルール質問はモデルの生成待ちより先に判定し、AI の返答準備中でも対応する簡単な質問を続けて送れる。NPC と GM は外部 KokoaAI への送信枠を共用し、最大4件を待機させる。雑談では無関係な設定を省き、通常は短い 2 文を指示する。SSE の途中の発言も順次表示する。モデルが利用できない場合もルール質問は使え、自由会話の接続失敗は明示する。設定・制限・検証は [KokoaAI 会話](local-npc.md) を参照。
 
 画面のGM履歴もユーザー・言語ごとに分け、ほかのメニューへ移動して戻っても残す。要求ごとにユーザーと言語を追跡し、遅れた返答を取り違えない。ページ再読み込み後まで保存する機能ではない。会話の確認待ちは **実時間2分**で失効し、記録の版（revision）・現在地・人生が変わっても使えなくなる。その場合は新しい条件で頼み直す。地図・持ち物・町メニューの通常ボタンは引き続き使う。会話だけのボタン廃止と、通常メニューの操作は区別する。
 
@@ -275,11 +275,11 @@ npm run test:emotes
 
 主なファイルは、型 `shared/fantasy.ts`、世界・種族・職業等のデータ `shared/fantasy-data.ts`、判定と行動 `shared/fantasy-engine.ts`、生存と食品 `shared/fantasy-life.ts`、建物・地図・蔵書 `shared/fantasy-town.ts`、本の本文 `shared/fantasy-library.ts`、公式設定 `shared/fantasy-lore.ts`、スキル名の 3 言語表示 `shared/fantasy-skill-names.ts`、依頼・イベントの 3 言語表示 `shared/fantasy-narrative.ts`、ルール型 GM `shared/fantasy-gm.ts`、サーバー保存 `server/fantasy-store.ts`、Web の操作画面 `client/src/world/FantasyPanel.tsx`、地図 `client/src/world/FantasyMap.tsx`。
 
-種族専用の内容は `shared/fantasy-racial-content.ts`、身体判定は `shared/fantasy-physiology.ts`、公開条件は `shared/fantasy-access.ts`、旅支度は `shared/fantasy-starting-kit.ts`。GM に許可する記録は `shared/fantasy-gm-knowledge.ts`、ローカル会話の接続は `server/fantasy-gm-chat.ts` で扱う。
+種族専用の内容は `shared/fantasy-racial-content.ts`、身体判定は `shared/fantasy-physiology.ts`、公開条件は `shared/fantasy-access.ts`、旅支度は `shared/fantasy-starting-kit.ts`。GM に許可する記録は `shared/fantasy-gm-knowledge.ts`、KokoaAI 会話の接続は `server/fantasy-gm-chat.ts` で扱う。
 
 追加職業技と解禁は `shared/fantasy-skill-expansion.ts`・`shared/fantasy-progression.ts`、メイン章と追加依頼・事件は `shared/fantasy-second-content.ts`、魔物は `shared/fantasy-monsters.ts`、資源・狩猟・釣りは `shared/fantasy-gathering.ts`、出目変形は `shared/fantasy-dice.ts`、地形行動は `shared/fantasy-terrain.ts`、誕生個体差は `shared/fantasy-birth.ts`、人生の終了と救助は `shared/fantasy-mortality.ts`、共有依頼は `shared/fantasy-contracts.ts`・`server/fantasy-contracts.ts`。制作と個別装備は `shared/fantasy-equipment.ts`、新UIは `FantasyCrafting.tsx`・`FantasyInventory.tsx` を参照する。
 
-追加の世界と文化は `shared/fantasy-world-expansion.ts`、品物と製法は `shared/fantasy-items-expansion.ts`、装備・状態異常は `shared/fantasy-effects.ts`、評判は `shared/fantasy-reputation.ts`、マナは `shared/fantasy-mana.ts`、師の技は `shared/fantasy-apprenticeship.ts`。NPC の住人一覧は `shared/npc-residents.ts`、共同準備は `server/fantasy-community.ts`、NPC・GM 共通の生成待ち行列は `server/local-inference.ts` を参照する。
+追加の世界と文化は `shared/fantasy-world-expansion.ts`、品物と製法は `shared/fantasy-items-expansion.ts`、装備・状態異常は `shared/fantasy-effects.ts`、評判は `shared/fantasy-reputation.ts`、マナは `shared/fantasy-mana.ts`、師の技は `shared/fantasy-apprenticeship.ts`。NPC の住人一覧は `shared/npc-residents.ts`、共同準備は `server/fantasy-community.ts`、NPC・GM 共通の生成待ち行列は `server/dialogue-request-queue.ts` を参照する。
 
 ## 参考資料と創作範囲
 
@@ -340,4 +340,4 @@ npm run test:emotes
 
 [호위 전술](fantasy-escort-tactics.md)에서는 계약 주인이나 지정 지휘자가 수레에 이동·정지 방어를 명령한다. 본인 영웅과 동료, 다른 플레이어의 명령은 각각 구분한다. 수레 생존·습격자 격파·출구 도착을 모두 확인하고, 호위 보수는 기존 계약의 실제 동행 도착 뒤에만 지급한다.
 
-NPC·GM 자유 대화는 운영 서버와 동의한 브라우저에서 생성되는 중간 문장을 순서대로 보여 준다. 취소·오류·자원 부족 복귀의 부분 답변은 최종 대화 기록과 구분하며 실제 행동은 말로 승인한 뒤 서버가 검증한다. 자세한 연결과 제약은 [로컬 대화](local-npc.md)와 [브라우저 지원](browser-ai-support.md)을 따른다. 후속 확장의1,143개 통합 검사와 저장 호환·빌드는 완료했으며, 이후 NPC 대화 버전5도1,189개 회귀 검사와 타입 검사·빌드를 통과했다. 이 기록은 실제 여러 PC의 AI 처리량·장기 RAM/VRAM 실측을 대신하지 않는다. 기존 실제 플레이 저장은 보존하고 게임·AI·갤러리 서버를 상시 실행하지 않는다.
+NPC·GM 자유 대화는 외부 KokoaAI가 생성하며 중간 문장을 순서대로 보여 준다. 취소·오류의 부분 답변은 최종 대화 기록과 구분하며 실제 행동은 말로 승인한 뒤 서버가 검증한다. 자세한 연결과 제약은 [KokoaAI 대화](local-npc.md)와 [기기 지원 폐기 안내](browser-ai-support.md)를 따른다. 후속 확장의1,143개 통합 검사와 저장 호환·빌드는 완료했으며, 이후 NPC 대화 버전5도1,189개 회귀 검사와 타입 검사·빌드를 통과했다. 이 기록은 실제 여러 PC의 AI 처리량·장기 RAM/VRAM 실측을 대신하지 않는다. 기존 실제 플레이 저장은 보존하고 게임·AI·갤러리 서버를 상시 실행하지 않는다.

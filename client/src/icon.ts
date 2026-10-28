@@ -1,7 +1,8 @@
 import { send } from './net/ws.ts';
 
-export const iconUrl = (name: string, v?: string | null) =>
-  `/icon?name=${encodeURIComponent(name.trim())}${v ? `&v=${v}` : `&t=${Date.now()}`}`;
+/** アカウント ID ごとのアイコン */
+export const iconUrl = (id: string, v?: string | null) =>
+  `/icon?id=${encodeURIComponent(id)}${v ? `&v=${v}` : `&t=${Date.now()}`}`;
 
 /** 画像を選ばせて中央を正方形に切り抜き、128px の JPEG として送る */
 export function pickImage(upload: (blob: Blob) => Promise<void>): Promise<boolean> {
@@ -30,10 +31,11 @@ export function pickImage(upload: (blob: Blob) => Promise<void>): Promise<boolea
   });
 }
 
-export async function pickIcon(name: string): Promise<string | null> {
+/** 自分のアイコン（サーバーはログインのセッションの本人に保存する） */
+export async function pickIcon(): Promise<string | null> {
   let version: string | null = null;
   await pickImage(async (blob) => {
-    const res = await fetch(`/icon?name=${encodeURIComponent(name.trim())}`, { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
+    const res = await fetch('/icon', { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
     if (!res.ok) throw new Error('upload');
     version = ((await res.json()) as { icon: string | null }).icon;
     send({ t: 'profileUpdated' });
@@ -41,7 +43,7 @@ export async function pickIcon(name: string): Promise<string | null> {
   return version;
 }
 
-export const pickGroupImage = (groupId: string, name: string) => pickImage(async (blob) => {
-  const res = await fetch(`/group-image/${encodeURIComponent(groupId)}?name=${encodeURIComponent(name)}`, { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
+export const pickGroupImage = (groupId: string) => pickImage(async (blob) => {
+  const res = await fetch(`/group-image/${encodeURIComponent(groupId)}`, { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
   if (!res.ok || res.status === 204) throw new Error('upload');
 });

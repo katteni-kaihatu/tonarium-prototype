@@ -3,7 +3,7 @@ import { contentAvailable, productFor } from '../../../shared/market.ts';
 import { useOwnedContent } from '../market/store.ts';
 import { OriginBadge } from '../market/OriginBadge.tsx';
 import { useState } from 'react';
-import { useStore } from '../store.ts';
+import { nameOf, useStore } from '../store.ts';
 import type { Group, Visibility } from '../../../shared/protocol.ts';
 import { VISIBILITY_INFO } from '../i18n/static.ts';
 import { isGroupVisibility } from '../../../shared/protocol.ts';
@@ -14,7 +14,7 @@ import { createEvent, createGroup, createSession, invite, updateGroup } from '..
 import { pickGroupImage } from '../icon.ts';
 import { GroupAvatar } from './GroupAvatar.tsx';
 import { Face } from '../world/common.tsx';
-import { useMyGroups, useOnlineFriends } from './common.tsx';
+import { PersonName, useMyGroups, useOnlineFriends } from './common.tsx';
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -28,16 +28,16 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 export function GroupSettingsDialog({ group: g, onClose }: { group: Group; onClose: () => void }) {
-  const selfName = useStore((s) => s.selfName);
+  const selfId = useStore((s) => s.selfId);
   const [name, setName] = useState(g.name);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(false);
-  const owner = g.owner === selfName;
+  const owner = g.owner === selfId;
   const editors = g.editors ?? [];
   const upload = async () => {
     setUploading(true);
     setError(false);
-    const ok = await pickGroupImage(g.id, selfName);
+    const ok = await pickGroupImage(g.id);
     setUploading(false);
     setError(!ok);
   };
@@ -50,9 +50,9 @@ export function GroupSettingsDialog({ group: g, onClose }: { group: Group; onClo
       </div>
       {owner && <div className="hfield">{tr("ui96")}<select aria-label={tr("ui97")} value="" onChange={(e) => { if (e.target.value) updateGroup(g.id, { editors: [...editors, e.target.value] }); }}>
           <option value="">{tr("ui98")}</option>
-          {g.members.filter((n) => n !== g.owner && !editors.includes(n)).map((n) => <option key={n} value={n}>{n}</option>)}
+          {g.members.filter((n) => n !== g.owner && !editors.includes(n)).map((n) => <option key={n} value={n}>{nameOf(n)}</option>)}
         </select>
-        {editors.map((n) => <div className="row" key={n}><span>{n}</span><button aria-label={tr("ui99", n)} onClick={() => updateGroup(g.id, { editors: editors.filter((x) => x !== n) })}>×</button></div>)}
+        {editors.map((n) => <div className="row" key={n}><span><PersonName id={n} /></span><button aria-label={tr("ui99", nameOf(n))} onClick={() => updateGroup(g.id, { editors: editors.filter((x) => x !== n) })}>×</button></div>)}
       </div>}
       <div className="row end"><button onClick={onClose}>{tr("ui73")}</button><button className="primary" disabled={!name.trim()} onClick={() => { updateGroup(g.id, { name }); onClose(); }}>{tr("ui100")}</button></div>
     </Modal>
@@ -166,7 +166,7 @@ export function InviteFriendDialog({ to, onClose }: { to: { id: string; name: st
       {myGroups.length > 0 && <>
         <h3>{tr("ui108")}</h3>
         <div className="hlist">
-          {myGroups.filter((g) => !g.members.includes(to.name)).map((g) => <button key={g.id} className="ib hpick" onClick={() => pick('group', g.id)}><i className="gdot" style={{ background: g.color }} /><b>{g.name}</b></button>)}
+          {myGroups.filter((g) => !g.members.includes(to.id)).map((g) => <button key={g.id} className="ib hpick" onClick={() => pick('group', g.id)}><i className="gdot" style={{ background: g.color }} /><b>{g.name}</b></button>)}
         </div>
       </>}
       <div className="row end"><button onClick={onClose}>{tr("ui109")}</button></div>
@@ -176,7 +176,7 @@ export function InviteFriendDialog({ to, onClose }: { to: { id: string; name: st
 
 /** グループにオンラインのフレンドを誘う */
 export function InviteToGroupDialog({ group, onClose }: { group: Group; onClose: () => void }) {
-  const friends = useOnlineFriends().filter((u) => !group.members.includes(u.name));
+  const friends = useOnlineFriends().filter((u) => !group.members.includes(u.id));
   return (
     <Modal title={tr("ui120", group.name)} onClose={onClose}>
       <div className="hlist">

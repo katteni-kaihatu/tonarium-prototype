@@ -129,7 +129,7 @@ test('merged hits become unread, obey popup conditions, and block before any upd
     assert.equal(!!state.arrivals.notice, popup);
     if (popup) assert.equal(state.arrivals.notice.at, now);
   }
-  state.blocked = ['A'];
+  state.blocked = ['a', 'b'];
   const before = state;
   pushNotice('hit', 'a', 'A');
   pushNotice('hit', 'b', 'A');

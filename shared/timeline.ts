@@ -15,6 +15,7 @@ export type PostAttach =
   | { kind: 'session'; id: string; name: string | null }
   | { kind: 'world'; id: WorldKind }
   | { kind: 'item'; id: string };
+/** 人はすべてアカウント ID（作者・リアクションした人・リポストした人） */
 export interface Post {
   id: string;
   author: string;
@@ -26,7 +27,7 @@ export interface Post {
   quote?: string;
   replyTo?: string;
   reactions: Record<string, string[]>;
-  reposts: { name: string; at: number }[];
+  reposts: { id: string; at: number }[];
 }
 
 export type TimelineTab = 'home' | 'session' | 'social' | 'global';
@@ -37,10 +38,10 @@ export interface TimelineEntry { post: Post; at: number; repostBy?: string }
 
 export interface TimelineAudience { self: string; following: string[]; friends: string[]; fof: string[]; here: string[]; blocked: string[] }
 
-export function audienceOf(tab: TimelineTab, a: TimelineAudience): ((name: string) => boolean) {
+export function audienceOf(tab: TimelineTab, a: TimelineAudience): ((id: string) => boolean) {
   if (tab === 'global') return () => true;
   const set = new Set<string>(tab === 'home' ? [a.self, ...a.following] : tab === 'social' ? [a.self, ...a.friends, ...a.fof] : a.here);
-  return (name) => set.has(name);
+  return (id) => set.has(id);
 }
 
 /** 返信を除いたポストと、対象の人のリポストを新しい順に並べる。同じポストは一番新しい行だけ残す */
@@ -52,7 +53,7 @@ export function timelineEntries(posts: readonly Post[], tab: TimelineTab, a: Tim
   for (const p of posts) {
     if (p.replyTo || blocked.has(p.author)) continue;
     if (shown(p.author)) put({ post: p, at: p.at });
-    for (const r of p.reposts) if (r.name !== p.author && shown(r.name) && !blocked.has(r.name)) put({ post: p, at: r.at, repostBy: r.name });
+    for (const r of p.reposts) if (r.id !== p.author && shown(r.id) && !blocked.has(r.id)) put({ post: p, at: r.at, repostBy: r.id });
   }
   return [...out.values()].sort((x, y) => y.at - x.at);
 }

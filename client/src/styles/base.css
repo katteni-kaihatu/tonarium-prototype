@@ -26,15 +26,19 @@ button.small { height: 30px; padding: 0 10px; font-size: 12px; border-radius: 9p
 button.big { height: 40px; }
 button.square { width: 44px; height: 44px; padding: 0; border-radius: 12px; flex: none; }
 button.swatch { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid #0002; }
-input, textarea, .language-select select {
+input, textarea, .language-select select, .settings-select {
   font: inherit; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; outline: none;
 }
-input, .language-select select { height: 44px; }
+input, .language-select select, .settings-select { height: 44px; }
 textarea { padding: 10px 12px; resize: vertical; }
-input:focus, textarea:focus, .language-select select:focus { border-color: var(--accent); }
+input:focus, textarea:focus, .language-select select:focus, .settings-select:focus { border-color: var(--accent); }
 .language-select { display: flex; flex-direction: column; gap: 10px; font-size: 12px; font-weight: 700; color: var(--muted); }
 .language-select select { width: 100%; min-width: 0; font-size: 14px; font-weight: 400; cursor: pointer; }
 .language-select select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.settings-select-row { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; padding: 6px 8px; font-size: 13px; }
+.settings-select-row > span { min-width: 0; overflow-wrap: anywhere; }
+.settings-select { width: 100%; min-width: 0; flex-shrink: 0; cursor: pointer; }
+.settings-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .spacer { flex: 1; }
 .sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sub.wrap { white-space: normal; }

@@ -36,7 +36,7 @@ export async function uploadPostImage(file: File): Promise<string | null> {
     if (blob && blob.size <= POST_IMAGE_MAX_BYTES) break;
   }
   if (!blob || blob.size > POST_IMAGE_MAX_BYTES) return null;
-  const res = await fetch(`/timeline-image?name=${encodeURIComponent(get().selfName)}`, { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
+  const res = await fetch('/timeline-image', { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
   if (!res.ok) return null;
   return ((await res.json()) as { id: string }).id;
 }

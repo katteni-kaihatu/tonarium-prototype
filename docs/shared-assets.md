@@ -6,7 +6,7 @@
 
 Node 24、依存追加なし、SHA-256 の内容アドレス、永続ボリューム上のJSONとbytesを選びました。追加の外部サービスを必要としない構成です。順序は契約・検証、原本保全、制限付きルール実行、確定と同期、編集と表示、検証コードです。
 
-中央原本は `DATA_DIR/shared-originals/objects/sha256-<hex>`、配布元commit・manifest・固定依存・マップ原本hashは `shared-originals/releases/<commit>.json`、選択中カタログは `shared-originals/current.json` に保存します。`DATA_DIR` は既存の設定を使い、既定は `data/`。mediaの容量整理対象とは分離しています。Dockerの既存 `/app/data` ボリュームを使うため、イメージの差し替えやブラウザキャッシュ消去で原本を失いません。ボリューム自体の削除にはバックアップが必要です。
+中央原本は `DATA_DIR/shared-originals/objects/sha256-<hex>`、配布元commit・manifest・固定依存・マップ原本hashは `shared-originals/releases/<commit>.json`、選択中カタログは `shared-originals/current.json` に保存します。`DATA_DIR` は既存の設定を使い、既定は `data/`。Dockerの既存 `/app/data` ボリュームを使うため、イメージの差し替えやブラウザキャッシュ消去で原本を失いません。ボリューム自体の削除にはバックアップが必要です。
 
 部屋の設定と実行状態は `shared-state/<sessionIdのSHA-256>.json` の別フィールド `map` と `values` に格納します。revisionと再送判定履歴も同じトランザクションに含め、設定だけ保存される状態を避けます。中央原本を書き換えず、マップは正確な `id/version/integrity` を参照します。配置の複製には新しい `instanceId` を割り当てます。位置・設定変更ではIDを維持します。
 

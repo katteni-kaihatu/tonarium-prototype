@@ -12,7 +12,6 @@ import { FANTASY_FOOD_META } from '../shared/fantasy-life.ts';
 import { FANTASY_MAPS } from '../shared/fantasy-town.ts';
 import { fantasyQuestEligible } from '../shared/fantasy-access.ts';
 import { fantasyGmTokenEstimate } from '../shared/fantasy-gm-context.ts';
-import { BROWSER_AI_MODEL, type BrowserAiGeneration } from '../shared/ai-support.ts';
 
 const request = (text = 'A quiet evening sounds nice.', extra: Partial<FantasyGmChatRequest> = {}): FantasyGmChatRequest => ({ requestId: crypto.randomUUID(), text, locale: 'en', ...extra });
 const context = (): FantasyGmContext => {
@@ -31,72 +30,42 @@ test('GM speech retains factual statements and omits unsolicited question senten
   ]) assert.equal(fantasyGmSpokenText(input), expected);
 });
 
-test('both browser and server GM answers remove follow-up prompts before delivery and before remembering history', async () => {
-  for (const route of ['browser', 'local'] as const) {
-    let now = 0; const bodies: Body[] = [];
-    const raw = 'The current record is available. Would you like to hear a story?\nSuggested questions: Where next?';
-    const gm = new FantasyGmChat({ now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return response(raw); }) as typeof fetch });
-    const state = context();
-    if (route === 'browser') state.browserGenerate = async job => { bodies.push({ messages: job.messages } as Body); return raw; };
-    const first = await gm.chat(route, request(), state);
-    assert.equal(first.source, route); assert.equal(first.error, undefined); assert.equal(first.reply.text, 'The current record is available.');
-    now = 2000;
-    await gm.chat(route, request('I would like a moment of quiet.'), state);
-    const remembered = bodies.at(-1)!.messages.filter(message => message.role === 'assistant').map(message => message.content).join('\n');
-    assert.ok(remembered.includes('The current record is available.')); assert.doesNotMatch(remembered, /Would you|Suggested questions/);
-  }
+test('GM answers remove follow-up prompts before delivery and before remembering history', async () => {
+  let now = 0; const bodies: Body[] = [];
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return response('The current record is available. Would you like to hear a story?\nSuggested questions: Where next?'); }) as typeof fetch });
+  const state = context(); const first = await gm.chat('gm', request(), state);
+  assert.equal(first.source, 'local'); assert.equal(first.error, undefined); assert.equal(first.reply.text, 'The current record is available.');
+  now = 2000; await gm.chat('gm', request('I would like a moment of quiet.'), state);
+  const remembered = bodies.at(-1)!.messages.filter(message => message.role === 'assistant').map(message => message.content).join('\n');
+  assert.ok(remembered.includes('The current record is available.')); assert.doesNotMatch(remembered, /Would you|Suggested questions/);
 });
 
-test('browser GM receives only the bounded allowed record and returns text without actions or repeated history', async () => {
-  let now = 0, calls = 0; const jobs: BrowserAiGeneration[] = [];
-  const gm = new FantasyGmChat({ now: () => now, fetch: (async () => { calls++; return response(); }) as typeof fetch });
+test('GM transport receives only the bounded allowed record and returns text without actions or repeated history', async () => {
+  let now = 0; const bodies: Body[] = [];
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return response('<think>reasoning</think>A quiet pause might help you decide.'); }) as typeof fetch });
   const state = context(), before = JSON.stringify(state.profile);
-  state.browserGenerate = async job => { jobs.push(structuredClone(job)); return '<think>reasoning</think>A quiet pause might help you decide.'; };
-  const result = await gm.chat('browser-gm', request(), state);
-  assert.equal(result.source, 'browser'); assert.equal(result.model, BROWSER_AI_MODEL); assert.equal(calls, 0);
-  assert.equal(result.reply.text, 'A quiet pause might help you decide.'); assert.deepEqual(result.reply.suggestions, []);
-  assert.equal(JSON.stringify(state.profile), before); assert.equal(jobs[0].kind, 'gm');
-  assert.ok(jobs[0].messages.reduce((sum, message) => sum + fantasyGmTokenEstimate(message.content) + 8, 0) <= 3400);
-  for (const definition of Object.values(NPC_SERVER)) for (const secret of definition.privateSecrets) assert.ok(!JSON.stringify(jobs).includes(secret));
-  for (const hidden of ['mooncity', 'starspire', 'deepcave']) for (const locale of ['ko', 'en', 'ja'] as const) assert.ok(!JSON.stringify(jobs).includes(fantasyTermName(hidden, locale)));
-  now = 2000; await gm.chat('browser-gm', request('I would like a moment of quiet.'), state);
-  assert.equal(jobs[1].messages.filter(message => message.role === 'assistant' && message.content === result.reply.text).length, 1);
+  const result = await gm.chat('gm', request(), state);
+  assert.equal(result.source, 'local'); assert.equal(result.reply.text, 'A quiet pause might help you decide.'); assert.deepEqual(result.reply.suggestions, []);
+  assert.equal(JSON.stringify(state.profile), before);
+  assert.ok(bodies[0].messages.reduce((sum, message) => sum + fantasyGmTokenEstimate(message.content) + 8, 0) <= 3400);
+  for (const definition of Object.values(NPC_SERVER)) for (const secret of definition.privateSecrets) assert.ok(!JSON.stringify(bodies).includes(secret));
+  for (const hidden of ['mooncity', 'starspire', 'deepcave']) for (const locale of ['ko', 'en', 'ja'] as const) assert.ok(!JSON.stringify(bodies).includes(fantasyTermName(hidden, locale)));
+  now = 2000; await gm.chat('gm', request('I would like a moment of quiet.'), state);
+  assert.equal(bodies[1].messages.filter(message => message.role === 'assistant' && message.content === result.reply.text).length, 1);
 });
 
-test('GM browser errors, structured actions, empty thinking and excessive answers fall back to the local model', async () => {
-  for (const bad of [undefined, '', '<think>only thoughts</think>', '{"suggestions":[{"action":{"type":"work"}}]}', 'a'.repeat(2401)]) {
-    let calls = 0;
-    const gm = new FantasyGmChat({ fetch: (async () => { calls++; return response('Only a local reply.'); }) as typeof fetch });
-    const result = await gm.chat('gm-fallback', request(), { ...context(), browserGenerate: async () => bad });
-    assert.equal(result.source, 'local'); assert.equal(calls, 1); assert.deepEqual(result.reply.suggestions, []);
-  }
-});
-
-test('stale GM browser generations cannot commit history or trigger a fallback after reconnection or a new life', async () => {
-  let now = 0, current = true, calls = 0; const jobs: BrowserAiGeneration[] = [];
-  const gm = new FantasyGmChat({ now: () => now, fetch: (async () => { calls++; return response(); }) as typeof fetch });
-  const state = { ...context(), isCurrent: () => current, browserGenerate: async () => { current = false; return 'Old life reply.'; } };
-  assert.equal((await gm.chat('new-life-gm', request('STALE_GM_PRIVATE_TURN'), state)).error, 'invalid'); assert.equal(calls, 0);
+test('stale GM transport results cannot commit history after a new life', async () => {
+  let now = 0, current = true; const bodies: Body[] = [];
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); if (bodies.length === 1) current = false; return response('A new conversation.'); }) as typeof fetch });
+  assert.equal((await gm.chat('life', request('STALE_GM_PRIVATE_TURN'), { ...context(), isCurrent: () => current })).error, 'invalid');
   now = 2000; current = true;
-  const fresh = await gm.chat('new-life-gm', request(), { ...context(), isCurrent: () => current, browserGenerate: async job => { jobs.push(job); return 'A new conversation.'; } });
-  assert.equal(fresh.source, 'browser'); assert.ok(!JSON.stringify(jobs).includes('STALE_GM_PRIVATE_TURN'));
-});
-
-test('browser GM inference leaves local slots available and rules still answer while browsers generate', async () => {
-  const releases: ((text: string) => void)[] = []; let calls = 0;
-  const gm = new FantasyGmChat({ fetch: (async () => { calls++; return response(); }) as typeof fetch });
-  const browserGenerate = () => new Promise<string>(resolve => releases.push(resolve));
-  const a = gm.chat('browser-a', request(), { ...context(), browserGenerate });
-  const b = gm.chat('browser-b', request(), { ...context(), browserGenerate });
-  const rule = await gm.chat('browser-a', request('현재 위치', { locale: 'ko' }), { ...context(), browserGenerate });
-  assert.equal(rule.source, 'rules'); assert.equal(releases.length, 2);
-  assert.equal((await gm.chat('local-c', request(), context())).source, 'local'); assert.equal(calls, 1);
-  releases[0]('Browser reply A.'); releases[1]('Browser reply B.'); assert.equal((await a).source, 'browser'); assert.equal((await b).source, 'browser');
+  assert.equal((await gm.chat('life', request(), { ...context(), isCurrent: () => current })).source, 'local');
+  assert.ok(!JSON.stringify(bodies[1]).includes('STALE_GM_PRIVATE_TURN'));
 });
 
 test('known rules are resolved from the server profile without calling AI or executing a proposed action', async () => {
   let calls = 0;
-  const gm = new FantasyGmChat({ fetch: (async () => { calls++; return response(); }) as typeof fetch });
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { calls++; return response(); }) as typeof fetch });
   const state = context(); const before = JSON.stringify(state.profile);
   const answer = await gm.chat('alice', request('마법을 배우고 싶어', { locale: 'ko' }), state);
   assert.equal(answer.source, 'rules');
@@ -108,7 +77,7 @@ test('known rules are resolved from the server profile without calling AI or exe
 
 test('rules and current local community records respond while free AI conversation is pending', async () => {
   let release: ((response: Response) => void) | undefined;
-  const gm = new FantasyGmChat({ fetch: (() => new Promise<Response>(resolve => { release = resolve; })) as typeof fetch });
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: (() => new Promise<Response>(resolve => { release = resolve; })) as typeof fetch });
   const state = context(); state.communityFacts = ['Local preparation: 1/3.'];
   const pending = gm.chat('alice', request(), state);
   assert.equal((await gm.chat('alice', request('현재 위치', { locale: 'ko' }), state)).source, 'rules');
@@ -120,7 +89,7 @@ test('rules and current local community records respond while free AI conversati
 });
 
 test('mana guidance is localized and never proposes retired training or changes character state', async () => {
-  const gm = new FantasyGmChat({ fetch: (async () => { throw new Error('rules only'); }) as typeof fetch });
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { throw new Error('rules only'); }) as typeof fetch });
   const state = context(); const before = JSON.stringify(state.profile);
   for (const [locale, text] of [['ko', '마나 감응을 배우고 싶어'], ['en', 'Teach me mana awareness'], ['ja', 'マナの感応を学びたい']] as const) {
     const reply = await gm.chat('mana-user', request(text, { locale }), state);
@@ -131,9 +100,9 @@ test('mana guidance is localized and never proposes retired training or changes 
   assert.equal(JSON.stringify(state.profile), before);
 });
 
-test('unknown conversation uses only the local model and returns text without any game actions', async () => {
+test('unknown conversation uses only the configured transport and returns text without any game actions', async () => {
   let body: Body | undefined;
-  const gm = new FantasyGmChat({ model: 'request-alias', fetch: (async (url, init) => {
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', model: 'request-alias', fetch: (async (url, init) => {
     assert.equal(url, 'http://127.0.0.1:18081/v1/chat/completions');
     assert.equal(init?.redirect, 'error');
     assert.deepEqual(init?.headers, { 'Content-Type': 'application/json' });
@@ -149,14 +118,14 @@ test('unknown conversation uses only the local model and returns text without an
   assert.equal(JSON.stringify(state.profile), before);
   assert.equal(body?.model, 'request-alias');
   assert.equal(body?.stream, false);
-  assert.equal(body?.max_tokens, 128);
+  assert.equal(body?.max_tokens, 1536);
   assert.equal(body?.tools, undefined);
-  assert.equal(body?.chat_template_kwargs.enable_thinking, false);
+  assert.deepEqual(body?.chat_template_kwargs, { enable_thinking: true });
 });
 
 test('GM membership and malformed payloads fail before any model call', async () => {
   let calls = 0;
-  const gm = new FantasyGmChat({ fetch: (async () => { calls++; return response(); }) as typeof fetch });
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { calls++; return response(); }) as typeof fetch });
   const state = context();
   assert.equal((await gm.chat('alice', request(), { ...state, session: null })).error, 'invalid');
   assert.equal((await gm.chat('alice', request(), { ...state, world: 'room' })).error, 'invalid');
@@ -166,7 +135,7 @@ test('GM membership and malformed payloads fail before any model call', async ()
 
 test('hidden locations, NPC secrets and uninspected food quality never enter the model prompt', async () => {
   let body: Body | undefined;
-  const gm = new FantasyGmChat({ fetch: (async (_url, init) => { body = JSON.parse(String(init?.body)); return response(); }) as typeof fetch });
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async (_url, init) => { body = JSON.parse(String(init?.body)); return response(); }) as typeof fetch });
   const state = context();
   await gm.chat('alice', request(), state);
   const system = body!.messages[0].content;
@@ -184,7 +153,7 @@ test('hidden locations, NPC secrets and uninspected food quality never enter the
 
 test('GM histories remain separated by player and locale, with a bounded successful conversation', async () => {
   let now = 0; const bodies: Body[] = [];
-  const gm = new FantasyGmChat({ now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return response(`reply-${bodies.length}`); }) as typeof fetch });
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return response(`reply-${bodies.length}`); }) as typeof fetch });
   await gm.chat('alice', request('PRIVATE_ALICE'), context());
   await gm.chat('bob', request('PRIVATE_BOB'), context());
   now = 2000;
@@ -205,7 +174,7 @@ test('GM histories remain separated by player and locale, with a bounded success
 
 test('all three selected locales receive an explicit language instruction', async () => {
   const bodies: Body[] = [];
-  const gm = new FantasyGmChat({ fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return response(); }) as typeof fetch });
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return response(); }) as typeof fetch });
   for (const [locale, language] of [['ko', 'Korean'], ['en', 'English'], ['ja', 'Japanese']] as const) {
     const answer = await gm.chat(locale, request('A quiet evening sounds nice.', { locale }), context());
     assert.equal(answer.locale, locale);
@@ -215,7 +184,7 @@ test('all three selected locales receive an explicit language instruction', asyn
 
 test('emotional clothing advice keeps the live weather record in the GM model request',async()=>{
   const bodies:Body[]=[];
-  const gm=new FantasyGmChat({fetch:(async(_url,init)=>{bodies.push(JSON.parse(String(init?.body)));return response('A considered answer.');}) as typeof fetch});
+  const gm=new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1',fetch:(async(_url,init)=>{bodies.push(JSON.parse(String(init?.body)));return response('A considered answer.');}) as typeof fetch});
   const state={...context(),dynamicFacts:{hour:480,location:'hearth',shops:[],rumors:[]}};
   for(const [locale,text] of [
     ['ko','밖에 나가려니 걱정돼. 외투를 챙기는 게 좋을까?'],
@@ -230,7 +199,7 @@ test('emotional clothing advice keeps the live weather record in the GM model re
 
 test('a follow-up about owned materials is not swallowed by the generic help phrase', async () => {
   let called = false;
-  const gm = new FantasyGmChat({ fetch: (async () => { called = true; return response(); }) as typeof fetch });
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { called = true; return response(); }) as typeof fetch });
   const answer = await gm.chat('alice', request('이 약초로 뭘 할 수 있을까?', { locale: 'ko' }), context());
   assert.equal(answer.source, 'local');
   assert.equal(called, true);
@@ -239,14 +208,14 @@ test('a follow-up about owned materials is not swallowed by the generic help phr
 
 test('GM timeout and unavailable backends report honest errors without committing failed history', async () => {
   let now = 0; const bodies: Body[] = []; let offline = true;
-  const gm = new FantasyGmChat({ now: () => now, onError: () => {}, fetch: (async (_url, init) => {
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, onError: () => {}, fetch: (async (_url, init) => {
     bodies.push(JSON.parse(String(init?.body))); if (offline) throw new Error('offline'); return response();
   }) as typeof fetch });
   assert.equal((await gm.chat('alice', request('PRIVATE_NOTE_ALPHA'), context())).error, 'unavailable');
   offline = false; now = 2000;
   assert.equal((await gm.chat('alice', request(), context())).error, undefined);
   assert.ok(!bodies.at(-1)!.messages.some(m => m.content.includes('PRIVATE_NOTE_ALPHA')));
-  const timeout = new FantasyGmChat({ timeoutMs: 10, onError: () => {}, fetch: ((_url, init) => new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true }))) as typeof fetch });
+  const timeout = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', timeoutMs: 10, onError: () => {}, fetch: ((_url, init) => new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true }))) as typeof fetch });
   assert.equal((await timeout.chat('alice', request(), context())).error, 'timeout');
   const external = new FantasyGmChat({ url: 'https://example.com/v1', fetch: (async () => { throw new Error('must not fetch'); }) as typeof fetch });
   assert.equal((await external.chat('alice', request(), context())).error, 'unavailable');
@@ -254,7 +223,7 @@ test('GM timeout and unavailable backends report honest errors without committin
 
 test('GM limits concurrent requests and short repeated bursts without a queue', async () => {
   let now = 0; const resolve: ((value: Response) => void)[] = [];
-  const gm = new FantasyGmChat({ now: () => now, fetch: (() => new Promise<Response>(done => resolve.push(done))) as typeof fetch });
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (() => new Promise<Response>(done => resolve.push(done))) as typeof fetch });
   const a = gm.chat('alice', request(), context()); const b = gm.chat('bob', request(), context());
   assert.equal((await gm.chat('alice', request(), context())).error, 'busy');
   assert.equal((await gm.chat('charlie', request(), context())).error, 'busy');
@@ -266,9 +235,9 @@ test('GM limits concurrent requests and short repeated bursts without a queue', 
   assert.equal((await c).error, undefined);
 });
 
-test('large known worlds, maximum stock and long histories fit the local context budget in every language', async () => {
+test('large known worlds, maximum stock and long histories fit the bounded context budget in every language', async () => {
   let now = 0; const bodies: Body[] = [];
-  const gm = new FantasyGmChat({ now: () => now, fetch: (async (_url, init) => {
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', now: () => now, fetch: (async (_url, init) => {
     bodies.push(JSON.parse(String(init?.body))); return response('Understood. '.repeat(20));
   }) as typeof fetch });
   const state = context(); const character = state.profile.character!;
@@ -297,7 +266,7 @@ test('large known worlds, maximum stock and long histories fit the local context
 test('ongoing activities describe the actual task while inventory and skills remain readable', async () => {
   const state = context();
   state.profile = startFantasyActivity(state.profile, { type: 'job', job: 'thief', via: 'gm' }, 8, () => 0.5).profile;
-  const gm = new FantasyGmChat({ fetch: (async () => { throw new Error('rules should not call AI'); }) as typeof fetch });
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { throw new Error('rules should not call AI'); }) as typeof fetch });
   const doing = await gm.chat('alice', request('지금 내가 뭐하고 있어?', { locale: 'ko' }), state);
   assert.ok(doing.reply.text.includes('도둑 수련'));
   assert.ok(doing.reply.text.includes('2.0'));
@@ -314,8 +283,7 @@ for(const active of [false,true]) test(`natural Korean activity questions answer
   const state=context();
   if(active) state.profile.activity={action:{type:'work'},startedAt:8,endsAt:12,seed:1};
   let modelCalls=0;
-  state.browserGenerate=async()=>{modelCalls++;return 'Browser AI fallback should not answer this state question.';};
-  const gm=new FantasyGmChat({fetch:(async()=>{modelCalls++;return response('AI fallback should not answer this state question.');}) as typeof fetch});
+  const gm=new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1',fetch:(async()=>{modelCalls++;return response('AI fallback should not answer this state question.');}) as typeof fetch});
   const before=structuredClone(state.profile);
   for(const [index,text] of ['지금 내가 뭘 하고있어?','내가 지금 뭐 하고 있어?','저는 지금 무엇을 하고 있나요?'].entries()){
     const answer=await gm.chat(`activity-${active}-${index}`,request(text,{locale:'ko'}),state);
@@ -328,19 +296,19 @@ for(const active of [false,true]) test(`natural Korean activity questions answer
   }
 });
 
-test('social fallback uses a compact current record while explicit detail requests retain a larger output allowance', async () => {
+test('social fallback uses a compact current record while explicit detail requests retain larger context', async () => {
   const bodies: Body[] = [];
-  const gm = new FantasyGmChat({ fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return response(); }) as typeof fetch });
+  const gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return response(); }) as typeof fetch });
   const state = context(); state.profile.character!.visited = FANTASY_LOCATIONS.map(place => place.id);
   state.profile.character!.inventory = Object.fromEntries(FANTASY_ITEMS.map(item => [item.id, 1]));
   assert.equal((await gm.chat('social', request('What makes a quiet conversation meaningful?'), state)).error, undefined);
   const compact = bodies.at(-1)!;
-  assert.equal(compact.max_tokens, 128);
+  assert.equal(compact.max_tokens, 1536);
   assert.ok(compact.messages.reduce((sum, message) => sum + fantasyGmTokenEstimate(message.content) + 8, 0) < 650);
   assert.ok(compact.messages[0].content.includes('HP 100/100'));
   assert.ok(!compact.messages[0].content.includes('Inventory:'));
   assert.equal((await gm.chat('detail', request('Please give detailed encouragement for a nervous traveler.'), state)).error, undefined);
-  assert.equal(bodies.at(-1)!.max_tokens, 256);
+  assert.equal(bodies.at(-1)!.max_tokens, 1536);
   assert.match(bodies.at(-1)!.messages[0].content, /Never disclose hidden places/);
   assert.match(bodies.at(-1)!.messages[0].content, /Never execute actions/);
 });

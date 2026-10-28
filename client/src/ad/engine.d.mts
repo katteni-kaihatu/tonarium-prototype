@@ -24,7 +24,6 @@ export interface OfflineResult {
   antimatterAfter: BigNum;
   antimatterGained: BigNum;
 }
-export interface SacrificeCandidate { candidate: BigNum; boost: BigNum }
 export const VERSION: number;
 export const OFFLINE_CAP_MS: number;
 export function bigNormalize(mantissa: number, exponent?: number): BigNum;
@@ -67,7 +66,7 @@ export function canAntimatterGalaxy(state: GameState): boolean;
 export function getInfinityGain(state: GameState): number;
 export function canInfinity(state: GameState): boolean;
 export function canSacrifice(state: GameState): boolean;
-export function getSacrificeCandidate(state: GameState): SacrificeCandidate;
+export function getSacrificeCandidate(state: GameState): BigNum;
 export function checkAchievements(state: GameState): string[];
 export function tick(state: GameState, dtMs: number): GameState;
 export function buyDimension(state: GameState, tier: number): boolean;

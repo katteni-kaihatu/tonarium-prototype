@@ -108,7 +108,11 @@ test('起動・生産・自動保存は無音で、手動保存と失敗だけ�
     if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow);
     else Reflect.deleteProperty(globalThis, 'window');
   });
-  const request = t.mock.method(globalThis, 'fetch', async () => new Response('{}'));
+  const fetchMock: typeof fetch = async (url, options) => new Response(JSON.stringify(
+    String(url).endsWith('/api/ad/create') ? { id: 'save', token: 'grant' }
+      : String(url).includes('/api/save/') ? { save: null, revision: options?.method === 'POST' ? 1 : 0 } : { entries: [] },
+  ));
+  const request = t.mock.method(globalThis, 'fetch', fetchMock);
   const values = new Map<string, string>();
   const storage: StorageLike = {
     getItem: (key) => values.get(key) ?? null,
@@ -140,7 +144,11 @@ test('起動・生産・自動保存は無音で、手動保存と失敗だけ�
   }
 });
 
-test('プロフィール・入出力の失敗は成功通知なしでエラーを一度だけ出す', (t) => {
+test('プロフィール・入出力の失敗は成功通知なしでエラーを一度だけ出す', async (t) => {
+  const fetchMock: typeof fetch = async (url) => new Response(JSON.stringify(
+    String(url).endsWith('/api/ad/create') ? { id: 'save', token: 'grant' } : { save: null, revision: 0 },
+  ));
+  t.mock.method(globalThis, 'fetch', fetchMock);
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
@@ -162,19 +170,21 @@ test('プロフィール・入出力の失敗は成功通知なしでエラー�
   };
   const slice = harness();
   slice.adStart({ storage });
+  await setImmediate();
   const bundle = slice.adExport()!;
   const events: AdFeedbackEvent[] = [];
   const unsubscribe = subscribeAdFeedback((event) => { events.push(event); });
   try {
     const profile = slice.adCreateProfile('new profile');
     assert.deepEqual(events, [{ kind: 'profile' }]);
+    await setImmediate();
     events.length = 0;
     failWrite = true;
-    assert.throws(() => slice.adCreateProfile('another'), /quota exceeded/);
+    assert.throws(() => slice.adCreateProfile('another'), /Local save failed/);
     assert.deepEqual(events.splice(0), [{ kind: 'error' }]);
-    assert.throws(() => slice.adSwitchProfile(profile.id), /quota exceeded/);
+    assert.throws(() => slice.adSwitchProfile(profile.id), /Local save failed/);
     assert.deepEqual(events.splice(0), [{ kind: 'error' }]);
-    assert.throws(() => slice.adImport(bundle), /quota exceeded/);
+    assert.throws(() => slice.adImport(bundle), /Local save failed/);
     assert.deepEqual(events.splice(0), [{ kind: 'error' }]);
     Object.defineProperty(slice.adGame, 'antimatter', {
       configurable: true,

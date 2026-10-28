@@ -1,9 +1,20 @@
-export interface TurnSettings { mode: 'snap' | 'smooth'; speed: number; angle: number }
-export const DEFAULT_TURN: TurnSettings = { mode: 'snap', speed: 90, angle: 30 };
+export interface TurnSettings { mode: 'snap' | 'smooth'; speed: number; angle: number; restrictMovementWhileAiming: boolean }
+export const DEFAULT_TURN: TurnSettings = { mode: 'snap', speed: 90, angle: 30, restrictMovementWhileAiming: true };
 export function turnSettings(value: unknown): TurnSettings {
   const v = value as Partial<TurnSettings> | null;
   const bounded = (n: unknown, min: number, max: number, fallback: number) => typeof n === 'number' && Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fallback;
-  return { mode: v?.mode === 'smooth' ? 'smooth' : 'snap', speed: bounded(v?.speed, 15, 180, 90), angle: bounded(v?.angle, 15, 90, 30) };
+  return { mode: v?.mode === 'smooth' ? 'smooth' : 'snap', speed: bounded(v?.speed, 15, 180, 90), angle: bounded(v?.angle, 15, 90, 30), restrictMovementWhileAiming: v?.restrictMovementWhileAiming !== false };
+}
+export function panelDistance(distance: number, axis: number, dt: number) {
+  if (![distance, axis, dt].every(Number.isFinite) || dt <= 0 || Math.abs(axis) <= .2) return distance;
+  return Math.max(.25, Math.min(3, distance - axis * Math.min(dt, .1) * .8));
+}
+export function panelScale(distance: number, baseline: number, scale: number) {
+  if (![distance, baseline, scale].every(Number.isFinite) || baseline < .03 || distance < 0) return scale;
+  return Math.max(.25, Math.min(3, scale * distance / baseline));
+}
+export function movementAllowed(holding: boolean, aiming: boolean, selecting: boolean, settings: TurnSettings) {
+  return !holding && (!settings.restrictMovementWhileAiming || (!aiming && !selecting));
 }
 export function stick(axes: readonly number[]): [number, number] {
   const offset = axes.length >= 4 ? 2 : 0;

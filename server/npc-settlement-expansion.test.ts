@@ -78,7 +78,7 @@ test('all twenty cities, villages and ports have a real innkeeper while the rese
 
 test('new innkeepers explain actual rooms and meals in three languages without invoking AI or changing the guest', async () => {
   let aiCalls = 0;
-  const service = new NpcChat({ fetch: (async () => { aiCalls++; throw Error('canonical inn knowledge expected'); }) as typeof fetch });
+  const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { aiCalls++; throw Error('canonical inn knowledge expected'); }) as typeof fetch });
   for (const npc of NPC_SETTLEMENT_EXPANSION.filter(npc => npc.building === 'inn')) for (const locale of locales) {
     const c = character(npc.homeLocation), before = structuredClone(c);
     const ask = (text: string) => service.chat(`${npc.id}-${locale}`, { requestId: crypto.randomUUID(), npcId: npc.id, locale, text }, { character: c });

@@ -140,11 +140,12 @@ test('完了処理と全 PR の CI が履歴チェックを実行し、develop �
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(pkg.scripts['check:completion'], 'npm run check:changelog && npm run check:content-locales && npm run typecheck && npm run build');
   const ci = readFileSync(new URL('../.github/workflows/web-checks.yml', import.meta.url), 'utf8');
-  assert.match(ci, /pull_request:\s+branches: \[main, develop\]/);
+  assert.match(ci, /pull_request:\s+(#.*\s+)?branches: \[main, develop, 'feature\/\*\*'\]/);
   assert.doesNotMatch(ci, /paths(?:-ignore)?:|continue-on-error:/);
   assert.match(ci, /fetch-depth: 0/);
   assert.match(ci, /CHANGELOG_BASE:.*github.event.pull_request.base.sha/);
   assert.match(ci, /CHANGELOG_MODE:.*github.base_ref == 'develop'.*'develop' \|\| 'main'/);
+  assert.match(ci, /CHANGELOG_MODE:.*startsWith\(github.base_ref, 'feature\/'\)/);
   assert.match(ci, /run: npm run test:changelog/);
   assert.match(ci, /run: npm run check:completion/);
 });

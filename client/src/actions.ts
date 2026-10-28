@@ -191,9 +191,11 @@ export function goNear(target: string) {
 
 export const poke = (to: string) => send({ t: 'poke', to });
 /** フォローはすぐ手元にも反映する（届いた follows で上書きされる） */
-export function followUser(name: string, on: boolean) {
-  send({ t: 'followUser', name, on });
-  set((s) => ({ following: on ? [...new Set([...s.following, name])] : s.following.filter((n) => n !== name) }));
+export function followUser(id: string, on: boolean) {
+  // 先に画面だけフォロー中にするので、断られると分かっているゲストは送らない
+  if (get().selfGuest) { showToast(msg('authLoginRequired')); return; }
+  send({ t: 'followUser', to: id, on });
+  set((s) => ({ following: on ? [...new Set([...s.following, id])] : s.following.filter((n) => n !== id) }));
 }
 
 export const removeNotice = (noticeId: number) => set((s) => ({ notices: s.notices.filter((n) => n.id !== noticeId) }));
@@ -217,7 +219,7 @@ export const createEvent = (title: string, at: number, group: string | null, ses
 export const answerEvent = (id: string, answer: Rsvp | null) => send({ t: 'eventAttend', id, answer });
 export const createChannel = (group: string, name: string) => send({ t: 'channelCreate', group, name });
 export const setStatus = (status: StatusKind, text: string) => send({ t: 'setStatus', status, text });
-export const watchFriend = (name: string, on: boolean) => send({ t: 'watch', name, on });
+export const watchFriend = (id: string, on: boolean) => send({ t: 'watch', to: id, on });
 export function askJoin(to: string) {
   send({ t: 'askJoin', to });
   showToast(msg("ui4", nameOf(to)));
@@ -236,8 +238,8 @@ export function markRead(conv: string) {
   set({ reads: { ...s.reads, [conv]: last } });
   send({ t: 'read', conv, at: last });
 }
-export function openDm(name: string) {
-  set({ homePage: 'friends', dmWith: name });
+export function openDm(id: string) {
+  set({ homePage: 'friends', dmWith: id });
   window.scrollTo(0, 0);
 }
 export function openGroup(id: string, channel?: string) {
@@ -250,14 +252,14 @@ export function invite(kind: 'session' | 'group', id: string, to: string) {
   showToast(msg("ui5", nameOf(to)));
 }
 
-export function toggleBlock(name: string) {
-  const blocked = get().blocked.includes(name) ? get().blocked.filter((n) => n !== name) : [...get().blocked, name];
+export function toggleBlock(id: string) {
+  const blocked = get().blocked.includes(id) ? get().blocked.filter((n) => n !== id) : [...get().blocked, id];
   set({ blocked });
-  save('tonarium.blocked', blocked);
+  save('tonarium.blockedIds', blocked);
 }
 
 export async function report(target: string, reason: string) {
-  const res = await fetch('/report', { method: 'POST', body: JSON.stringify({ from: get().selfName, target, reason }) });
+  const res = await fetch('/report', { method: 'POST', body: JSON.stringify({ target, reason }) });
   return res.ok;
 }
 
@@ -274,7 +276,7 @@ export function markNoticesRead() {
 
 let noticeSeq = 0;
 export function pushNotice(kind: Notice['kind'], from: string, fromName = nameOf(from), key?: string) {
-  if (get().blocked.includes(fromName)) return;
+  if (get().blocked.includes(from)) return;
   const now = Date.now();
   set((s) => {
     const latest = kind === 'hit' ? s.notices.find((n) => n.kind === 'hit' && n.from === from) : undefined;

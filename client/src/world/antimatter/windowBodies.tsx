@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../../i18n/index.ts';
 // WindowLayer から使う AD ウィンドウの中身。購読はここで行い、
 // WindowLayer 側が 100ms ごとに再描画されるのを避ける。
 import { useStore } from '../../store.ts';
@@ -9,15 +10,17 @@ import { closeWindow } from '../windows.ts';
 import type { AdSlice } from '../../ad/slice.ts';
 
 export function AntimatterWindowBody() {
-  // adVersion の変化でだけ再描画される（engine はインプレース更新のため）
+  useLanguage();
+  // engine はインプレース更新のため adVersion も購読する。
   const adVersion = useStore((s) => s.adVersion);
   void adVersion;
   const slice = useStore.getState() as unknown as AdSlice;
-  if (!slice.adGame) return <div>AD を読み込み中…</div>;
+  if (!slice.adGame) return <div>{t('adLabText82')}</div>;
   return <AntimatterPanelFromSlice slice={slice} />;
 }
 
 export function AntimatterSpaceWindowBody() {
+  useLanguage();
   const adVersion = useStore((s) => s.adVersion);
   const target = useStore((s) => s.adSpaceTarget);
   void adVersion;

@@ -6,7 +6,6 @@ import { NpcChat } from './NpcChat.tsx';
 import { FantasyMenuBoundary } from './FantasyMenuBoundary.tsx';
 import { useStore } from '../store.ts';
 import { clampMessengerPosition, type MessengerPoint } from './fantasy-messenger-position.ts';
-import { beginAiSupportConversation } from '../ai/support.ts';
 
 const positions = new Map<string, MessengerPoint>();
 
@@ -20,7 +19,6 @@ export function FantasyMessenger({npcId,hidden,onClose}:{npcId:NpcId;hidden:bool
   const desktop = viewport.width > 700;
   const [dragging, setDragging] = useState(false);
   const [minimized,setMinimized]=useState(false);
-  useEffect(()=>hidden||minimized?undefined:beginAiSupportConversation(),[hidden,minimized]);
   const root=useRef<HTMLElement>(null);
   const drag = useRef<{ pointer: number; offset: MessengerPoint; bar: HTMLElement } | null>(null);
   const remember = (point: MessengerPoint) => {

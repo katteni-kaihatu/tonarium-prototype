@@ -63,7 +63,7 @@ export function proposeEvent(command: RoomClientMsg, context: { sid: string; use
     if (media) {
       if (!MEDIA_URL_RE.test(media.url)) return null;
       const size = (n: number) => Math.max(1, Math.min(10000, Math.round(Number(n) || 1)));
-      media = { kind: /\.(mp4|webm)$/.test(media.url) ? 'video' : 'image', url: media.url, w: size(media.w), h: size(media.h) };
+      media = { kind: 'image', url: media.url, w: size(media.w), h: size(media.h) };
     }
     if (!text && !image && !media) return null;
     const m: ChatMessage = { id, from: context.user, fromName: context.name, text, at, scope,

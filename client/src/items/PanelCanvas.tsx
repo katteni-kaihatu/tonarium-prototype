@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import type { Item } from '../../../shared/items.ts';
 import { useStore, get, type ItemUi } from '../store.ts';
 import { PANELS } from './panels.ts';
+import { panelCoordinates } from './panelCoordinates.ts';
 
 const NO_UI = {};
 /** 拡大しても文字がつぶれないように */
@@ -29,7 +30,7 @@ export function PanelCanvas({ item, interactive }: { item: Item; interactive: bo
 
   const toPanel = (e: React.PointerEvent | React.MouseEvent) => {
     const r = e.currentTarget.getBoundingClientRect();
-    return [((e.clientX - r.left) / r.width) * panel.w, ((e.clientY - r.top) / r.height) * panel.h] as const;
+    return panelCoordinates(r, e.clientX, e.clientY, panel.w, panel.h);
   };
   // 描画中は何度も更新されるので、操作時点の最新状態を渡す
   const latest = () => [get().items[item.id] ?? item, get().itemUi[item.id] ?? {}] as const;
@@ -43,6 +44,7 @@ export function PanelCanvas({ item, interactive }: { item: Item; interactive: bo
       if (e.buttons) panel.drag!('move', ...toPanel(e), ...latest());
     },
     onPointerUp: (e: React.PointerEvent<HTMLCanvasElement>) => panel.drag!('end', ...toPanel(e), ...latest()),
+    onPointerCancel: (e: React.PointerEvent<HTMLCanvasElement>) => panel.drag!('end', ...toPanel(e), ...latest()),
   } : {
     onClick: (e: React.MouseEvent<HTMLCanvasElement>) => panel.click(...toPanel(e), ...latest()),
   };

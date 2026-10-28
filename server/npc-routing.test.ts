@@ -34,7 +34,7 @@ test('unsupported context and compound questions reach live generation with the 
     const profile=applyFantasyAction(newFantasyProfile(),{type:'create',name:'Route check',source:'human',gender:'female'},()=>.5).profile;
     profile.character!.location=person.homeLocation;
     const before=JSON.stringify(profile),bodies:{messages:{role:string;content:string}[]}[]=[];
-    const chat=new NpcChat({fetch:(async(_url,init)=>{calls++;bodies.push(JSON.parse(String(init?.body)));return new Response(JSON.stringify({choices:[{message:{content:{ko:'당신의 생각을 조금 더 들어 보고 싶어.',en:'I would like to hear a little more about your plans.',ja:'あなたの考えをもう少し聞きたいです。'}[locale]}}]}),{headers:{'Content-Type':'application/json'}});}) as typeof fetch});
+    const chat=new NpcChat({ url: 'http://127.0.0.1:18081/v1',fetch:(async(_url,init)=>{calls++;bodies.push(JSON.parse(String(init?.body)));return new Response(JSON.stringify({choices:[{message:{content:{ko:'당신의 생각을 조금 더 들어 보고 싶어.',en:'I would like to hear a little more about your plans.',ja:'あなたの考えをもう少し聞きたいです。'}[locale]}}]}),{headers:{'Content-Type':'application/json'}});}) as typeof fetch});
     assert.equal(npcCanonicalReply(locale,id,'stranger',text,{character:profile.character!}),undefined,`${id}:${locale}:${text}`);
     const reply=await chat.chat(`route-${calls}`,{requestId:crypto.randomUUID(),npcId:id,locale,text},{character:profile.character!});
     assert.equal(reply.source,'local',`${id}:${locale}:${text}`);assert.equal(reply.error,undefined);assert.equal(bodies.length,1);
@@ -47,7 +47,7 @@ test('unsupported context and compound questions reach live generation with the 
 
 test('known short facts and missing canonical names stay immediate without fabricated facts',async()=>{
   let calls=0;
-  const chat=new NpcChat({fetch:(async()=>{calls++;throw Error('No model for direct facts');}) as typeof fetch});
+  const chat=new NpcChat({ url: 'http://127.0.0.1:18081/v1',fetch:(async()=>{calls++;throw Error('No model for direct facts');}) as typeof fetch});
   for(const [locale,text]of [['ko','이름이 뭐야?'],['en','How old are you?'],['ja','カルヴェラントとは何ですか。']] as const){
     const reply=await chat.chat(`facts-${locale}`,{requestId:crypto.randomUUID(),npcId:'rin',locale,text});
     assert.equal(reply.source,'canon');assert.equal(reply.error,undefined);assert.ok(reply.text.trim());

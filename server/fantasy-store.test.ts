@@ -18,6 +18,7 @@ import { FantasyClock } from './fantasy-clock.ts';
 import { fantasyEventEligible, fantasyQuestEligible } from '../shared/fantasy-access.ts';
 import type { FantasyGmReply } from '../shared/fantasy-gm.ts';
 import type { FantasyCommunityState } from '../shared/fantasy-community.ts';
+import { testServerEnv } from './test-db.ts';
 
 test('expanded optional mana, equipment, effects, reputation and mentor state persist without resetting legacy progress', t => {
   const { file } = temporary(t);
@@ -738,7 +739,7 @@ test('home WebSocket authenticates session context and shares committed progress
   const port = (listener.address() as net.AddressInfo).port;
   await new Promise<void>((resolve) => listener.close(() => resolve()));
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], {
-    env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' },
+    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = '';

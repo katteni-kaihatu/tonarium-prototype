@@ -1,4 +1,4 @@
-import { t as tr } from '../i18n/index.ts';
+import { t as tr, useLanguage } from '../i18n/index.ts';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
@@ -18,7 +18,7 @@ import { ItemMark, Viewers, itemLabel } from './common.tsx';
 import { closeWindow, moveWindow, raiseWindow, toggleMax } from './windows.ts';
 import { AvatarView } from './Portraits.tsx';
 import { PortraitEmote } from './Emotes.tsx';
-import { MediaControls, VideoHost, mediaVolume, videoEls } from '../mediaSync.tsx';
+import { MediaControls, mediaVolume } from '../mediaSync.tsx';
 import { YouTubePlayer, youTubeDuration } from '../youtube.tsx';
 import { send } from '../net/ws.ts';
 import { DiceBody } from './DiceBody.tsx';
@@ -78,6 +78,7 @@ function NoteBody({ note }: { note: Item & { kind: 'note' } }) {
 
 /** 開けなくなったもの（アイテムが片付けられた、配信が終わった等）は null */
 function useResolved(key: string, compact: boolean): Resolved | null {
+  useLanguage();
   const { sharer, camFeeds, participants, selfId, items, users, survivor, speaking } = useStore(useShallow((s) => ({
     sharer: s.sharer,
     camFeeds: s.camFeeds,
@@ -136,12 +137,6 @@ function useResolved(key: string, compact: boolean): Resolved | null {
   if (item.kind === 'image') {
     return { kind: 'media', dark: true, item, title: tr("ui31"), sub, width: 560, aspect: item.w / item.h, body: <img className="mediaimg" src={item.url} alt="" /> };
   }
-  if (item.kind === 'video') {
-    return {
-      kind: 'media', dark: true, item, title: tr("ui30"), sub, width: 560, aspect: item.w / item.h,
-      body: <><VideoHost id={item.id} /><MediaControls item={item} duration={() => videoEls.get(item.id)?.duration ?? NaN} /></>,
-    };
-  }
   if (item.kind === 'youtube') {
     return {
       kind: 'media', dark: true, item, title: item.title || 'YouTube', sub, width: 640, aspect: 16 / 9,
@@ -154,9 +149,9 @@ function useResolved(key: string, compact: boolean): Resolved | null {
       : <TelephoneBody item={item} interactive /> };
   // 入口だけのアイテム。開くのはワールド版と同じ自分の AD パネル
   if (item.kind === 'antimatter') return {
-    kind: 'survivor', dark: true, item, title: 'AD 研究所', sub, width: 720, aspect: 1.2,
+    kind: 'survivor', dark: true, item, title: tr('mergeAdLab'), sub, width: 720, aspect: 1.2,
     body: compact
-      ? <div style={{ padding: 16, color: '#e9e5f5' }}>AD 研究所 — クリックで大きく表示</div>
+      ? <div style={{ padding: 16, color: '#e9e5f5' }}>{tr('adItemEntrance')}</div>
       : <AntimatterWindowBody />,
   };
   if (item.kind === 'bike') return { kind: 'panel', dark: false, item, title: ITEM_INFO.bike.name, sub, width: 360, body: <p>{ITEM_INFO.bike.desc}</p> };
@@ -208,6 +203,7 @@ function WindowFrame({ win, region, simple, z, compact = false }: {
     : simple ? { width, height } : { position: 'absolute', left, top, width, height, zIndex: z };
 
   const onDown = (e: React.PointerEvent) => {
+    if (immersive) return;
     raiseWindow(win.key);
     if (simple || max || (e.target as Element).closest('button')) return;
     drag.current = { sx: e.clientX, sy: e.clientY, ox: left, oy: top };
@@ -223,9 +219,10 @@ function WindowFrame({ win, region, simple, z, compact = false }: {
   // 最大化したウィンドウは前面のパネルより上に出す（ウィンドウ層の中だと重なり順で負ける）
   const frame = (
     <section
-      className={`win ${r.dark ? 'dark' : ''} k-${r.kind} ${compact ? 'compact' : ''}`} style={style} aria-label={r.title}
+      className={`win ${r.dark ? 'dark' : ''} k-${r.kind} ${compact ? 'compact' : ''}`} style={{ ...style, ...(immersive ? { '--xr-media-aspect': r.aspect } as React.CSSProperties : {}) }} aria-label={r.title}
       data-xr-surface={immersive ? win.key : undefined}
-      title={compact ? tr("ui842") : undefined} onPointerDown={() => raiseWindow(win.key)}
+      data-xr-min-width={immersive ? (r.item && PANELS[r.item.kind] ? PANELS[r.item.kind]!.w + 44 : r.width) : undefined}
+      title={compact ? tr("ui842") : undefined} onPointerDown={() => { if (!immersive) raiseWindow(win.key); }}
     >
       <div
         className={`winbar ${simple || max ? '' : 'draggable'}`} title={simple || max ? undefined : tr("ui843")}

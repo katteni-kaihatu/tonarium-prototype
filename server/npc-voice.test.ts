@@ -20,8 +20,8 @@ test('all registered residents receive authored role, personality and speech gui
     assert.ok(voice.length > 30, `${npc.id}:${locale}`);
     const prompt = npcSystemPrompt(locale, npc.id, 'stranger');
     assert.ok(prompt.includes(npc.role.en) || prompt.includes(npc.role[locale]), `Role missing from the actual prompt for ${npc.id}:${locale}`);
-    assert.ok(voice.includes(npc.personality.en.slice(0, 24)), `Authored temperament missing for ${npc.id}:${locale}`);
-    assert.ok(voice.includes(npc.speech.en.slice(0, 24)), `Authored speech missing for ${npc.id}:${locale}`);
+    assert.ok(voice.includes(npc.personality[locale]), `Localized temperament missing for ${npc.id}:${locale}`);
+    assert.ok(voice.includes(npc.speech[locale]), `Localized speech missing for ${npc.id}:${locale}`);
     assert.notEqual(voice, fantasyGmVoice(locale));
   }
 });
@@ -43,13 +43,13 @@ test('the player relationship changes speech guidance while preserving the resid
   for (const id of ['rin', 'borin', 'hearth-mira', 'redweave-voss']) for (const locale of locales) {
     const npc = NPC_PUBLIC.find(npc => npc.id === id)!, stranger = fantasyNpcVoice(id, 'stranger', locale), familiar = fantasyNpcVoice(id, 'familiar', locale), trusted = fantasyNpcVoice(id, 'trusted', locale);
     assert.equal(new Set([stranger, familiar, trusted]).size, 3, `${id}:${locale}: relationship ignored`);
-    assert.ok([stranger, familiar, trusted].every(voice => voice.includes(npc.personality.en.slice(0, 24))));
+    assert.ok([stranger, familiar, trusted].every(voice => voice.includes(npc.personality[locale])));
     assert.ok(npcSystemPrompt(locale, id, 'trusted', {}, 'Tell me about your profession.').includes(trusted));
   }
 });
 
 test('ordinary greetings already sound different for hosts, smiths, scholars, leaders and guarded residents without a model call', async () => {
-  let calls = 0; const service = new NpcChat({ fetch: (async () => { calls++; throw new Error('A greeting needs no inference'); }) as typeof fetch });
+  let calls = 0; const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { calls++; throw new Error('A greeting needs no inference'); }) as typeof fetch });
   for (const locale of locales) {
     const replies: string[] = [];
     for (const id of ['rin', 'borin', 'hearth-mira', 'hearth-daren', 'redweave-voss']) {
@@ -61,19 +61,19 @@ test('ordinary greetings already sound different for hosts, smiths, scholars, le
   assert.equal(calls, 0);
 });
 
-test('casual NPC prompts keep their compact context budget across all residents and three languages', () => {
+test('casual NPC prompts including a spoken example stay bounded across all residents and three languages', () => {
   const oversized: { id: string; locale: NpcLocale; estimate: number }[] = [];
   for (const npc of NPC_PUBLIC) for (const locale of locales) {
     assert.equal(fantasyConversationPlan(query[locale]).casual, true);
     const prompt = npcSystemPrompt(locale, npc.id, 'stranger', {}, query[locale]);
     const estimate = fantasyGmTokenEstimate(prompt) + fantasyGmTokenEstimate(query[locale]) + 16;
-    if (estimate >= 650) oversized.push({ id: npc.id, locale, estimate });
+    if (estimate >= 850) oversized.push({ id: npc.id, locale, estimate });
   }
   assert.equal(oversized.length, 0, `Oversized casual prompts: ${JSON.stringify(oversized.sort((a, b) => b.estimate - a.estimate).slice(0, 8))}`);
 });
 
 test('actual NPC model calls contain the selected voice in the requested language rather than the GM reporting voice', async () => {
-  const bodies: Body[] = [], service = new NpcChat({ fetch: (async (_input, init) => { bodies.push(JSON.parse(String(init?.body))); return response(); }) as typeof fetch });
+  const bodies: Body[] = [], service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async (_input, init) => { bodies.push(JSON.parse(String(init?.body))); return response(); }) as typeof fetch });
   const freeQuery = { ko: '작은 친절이 마음을 편안하게 하는 이유는 뭘까?', en: 'What makes a quiet conversation meaningful?', ja: '穏やかな会話の良さは何だと思いますか？' };
   for (const locale of locales) for (const id of ['rin', 'borin', 'hearth-mira', 'redweave-voss']) {
     const npc = NPC_PUBLIC.find(npc => npc.id === id)!;
@@ -86,7 +86,7 @@ test('actual NPC model calls contain the selected voice in the requested languag
 });
 
 test('GM model calls explicitly require a dry objective concise style with no comfort or conversational follow-up', async () => {
-  const bodies: Body[] = [], gm = new FantasyGmChat({ fetch: (async (_input, init) => { bodies.push(JSON.parse(String(init?.body))); return response(); }) as typeof fetch });
+  const bodies: Body[] = [], gm = new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async (_input, init) => { bodies.push(JSON.parse(String(init?.body))); return response(); }) as typeof fetch });
   const profile = applyFantasyAction(newFantasyProfile(), { type: 'create', name: 'Voice traveler', gender: 'female', source: 'human' }, () => .5).profile;
   const freeQuery = { ko: '작은 친절이 마음을 편안하게 하는 이유는 뭘까?', en: 'What makes a quiet conversation meaningful?', ja: '穏やかな会話の良さは何だと思いますか？' };
   for (const locale of locales) {
@@ -102,7 +102,7 @@ test('GM model calls explicitly require a dry objective concise style with no co
 
 test('age generation keeps a localized first-person direction after facts in the final model request',async()=>{
   const bodies:Body[]=[];
-  const service=new NpcChat({fetch:(async(_input,init)=>{bodies.push(JSON.parse(String(init?.body)));return response();}) as typeof fetch});
+  const service=new NpcChat({ url: 'http://127.0.0.1:18081/v1',fetch:(async(_input,init)=>{bodies.push(JSON.parse(String(init?.body)));return response();}) as typeof fetch});
   for(const [locale,text,direction] of [
     ['ko','네 나이가 이 여관을 운영하는 방식에 어떤 영향을 줘?',/나는.*내가/u],
     ['en','How does your age influence the way you run this inn?',/first person/u],
@@ -118,7 +118,7 @@ test('age generation keeps a localized first-person direction after facts in the
 
 test('GM request ends in the selected language with concrete concise reporting direction after the allowed record',async()=>{
   const bodies:Body[]=[];
-  const gm=new FantasyGmChat({fetch:(async(_input,init)=>{bodies.push(JSON.parse(String(init?.body)));return response();}) as typeof fetch});
+  const gm=new FantasyGmChat({ url: 'http://127.0.0.1:18081/v1',fetch:(async(_input,init)=>{bodies.push(JSON.parse(String(init?.body)));return response();}) as typeof fetch});
   const profile=applyFantasyAction(newFantasyProfile(),{type:'create',name:'Voice traveler',gender:'female',source:'human'},()=>.5).profile;
   for(const [locale,text,direction] of [
     ['ko','출발을 앞두고 긴장합니다. 마음을 가다듬는 방법을 설명해 주세요.',/행동 하나.*방법.*합니다.*하십시오/u],
@@ -163,7 +163,7 @@ test('social fallbacks never swallow compound requests, actions, private records
 });
 
 test('the actual NPC service answers strict social turns with its own public tone without any inference call', async () => {
-  let calls = 0; const service = new NpcChat({ fetch: (async () => { calls++; throw new Error('Strict social turns need no inference'); }) as typeof fetch });
+  let calls = 0; const service = new NpcChat({ url: 'http://127.0.0.1:18081/v1', fetch: (async () => { calls++; throw new Error('Strict social turns need no inference'); }) as typeof fetch });
   const cases = [{ ko: '고마워요', en: 'Thanks', ja: 'ありがとうございます' }, { ko: '피곤해', en: 'I am tired', ja: '少し疲れました' }, { ko: '어떻게 지내?', en: 'How are you?', ja: 'お元気ですか' }];
   for (const [index, input] of cases.entries()) for (const locale of locales) for (const id of ['rin', 'hearth-alia', 'borin', 'hearth-mira', 'hearth-iona', 'hearth-daren', 'redweave-voss', 'emberhall-pell']) {
     const reply = await service.chat(`strict-social-${index}-${locale}-${id}`, { requestId: `strict-${index}-${locale}-${id}`, npcId: id, locale, text: input[locale] });

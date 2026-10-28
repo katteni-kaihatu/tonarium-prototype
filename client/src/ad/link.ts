@@ -1,5 +1,5 @@
 import type { AdProfile, StorageLike } from './user.mjs';
-import { createProfile, listProfiles } from './user.mjs';
+import { ensureDefaultProfile, listProfiles, readProgressSelection } from './user.mjs';
 
 const LINK_KEY = 'ad:v2:tonariumLinks';
 
@@ -22,13 +22,14 @@ export function linkTonariumProfile(
   tonariumName: string,
 ): AdProfile {
   if (!tonariumId) throw new Error('linkTonariumProfile: tonariumId is required');
+  if (readProgressSelection(storage)?.confirmed) return ensureDefaultProfile(storage);
   const links = readLinks(storage);
   const linkedId = links[tonariumId];
   if (linkedId) {
     const found = listProfiles(storage).find((p) => p.id === linkedId);
     if (found) return found;
   }
-  const profile = createProfile(storage, tonariumName.trim() || 'Player 1');
+  const profile = ensureDefaultProfile(storage);
   links[tonariumId] = profile.id;
   storage.setItem(LINK_KEY, JSON.stringify(links));
   return profile;

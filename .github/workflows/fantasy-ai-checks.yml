@@ -1,0 +1,66 @@
+name: Fantasy dialogue checks
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '.github/workflows/fantasy-ai-checks.yml'
+      - 'docker-compose.yml'
+      - 'server/kokoa-ai*'
+      - 'server/dialogue-*'
+      - 'server/npc*'
+      - 'server/fantasy-gm-chat*'
+      - 'server/index.ts'
+      - 'shared/npc.ts'
+      - 'shared/fantasy-gm*'
+      - 'shared/protocol.ts'
+      - 'shared/fantasy-dialogue-voice.ts'
+      - 'client/src/ai-retirement*'
+      - 'scripts/check-kokoa-ai*'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fantasy-ai-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  fantasy-ai:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # NPC・KokoaAI のテストはサーバーを起動し、サーバーは PostgreSQL が無いと止まる
+    services:
+      postgres:
+        image: postgres:17.10-alpine3.23
+        env:
+          POSTGRES_USER: tonarium
+          POSTGRES_PASSWORD: tonarium
+          POSTGRES_DB: tonarium
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tonarium"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgres://tonarium:tonarium@localhost:5432/tonarium
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: npm ci
+      - name: Check KokoaAI settings and authenticated HTTPS socket flow
+        run: npm run test:kokoa-ai
+      - name: Check NPC and GM privacy, rules and streaming
+        run: |
+          npm run test:npc
+          node --import tsx --test server/fantasy-gm-chat.test.ts
+      - name: Check retired device AI cleanup
+        run: node --import tsx --test client/src/ai-retirement.test.ts
+      - name: Validate deployment without local model services
+        run: docker compose config --quiet

@@ -12,8 +12,9 @@
 }
 /* The window body clips overflow; this panel owns the bounded scroll area. */
 .ad-lab-panel > * { flex-shrink: 0; min-width: 0; }
+.ad-lab-panel input, .ad-lab-panel select, .ad-lab-panel textarea { max-width: 100%; box-sizing: border-box; }
 .ad-lab-panel:focus-visible { outline: 2px solid #7fffe3; outline-offset: -3px; }
-.ad-lab-panel button { transition: border-color .15s, background-color .15s, box-shadow .15s; }
+.ad-lab-panel button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; transition: border-color .15s, background-color .15s, box-shadow .15s; }
 .ad-lab-panel button:not(:disabled):hover { border-color: #7fffe3 !important; box-shadow: 0 0 12px #79ffe333; }
 .ad-lab-panel button:focus-visible { outline: 2px solid #fff188; outline-offset: 2px; }
 .ad-lab-panel button:disabled { opacity: .45; cursor: not-allowed !important; }
@@ -25,7 +26,7 @@
 .ad-dimension-card.is-affordable { border-color: #7fffe35c; }
 .ad-dimension-details { min-width: 0; overflow-wrap: anywhere; }
 .ad-dimension-title { font-weight: 800; }
-.ad-dimension-buy { display: flex; flex-direction: column; gap: 6px; }
+.ad-dimension-buy { display: flex; flex-direction: column; gap: 6px; max-width: 180px; min-width: 0; }
 .ad-dimension-buy button:first-child { background: linear-gradient(115deg, #455cb777, #308c7c55) !important; }
 .ad-dimension-progress { height: 4px; margin-top: 8px; background: #ffffff15; border-radius: 4px; overflow: hidden; }
 .ad-dimension-progress > span { display: block; height: 100%; background: linear-gradient(90deg, #b6a2ff, #7fffe3); }
@@ -39,9 +40,27 @@
 @keyframes ad-reactor-turn { to { transform: rotate(360deg); } }
 @container (max-width: 460px) {
   .ad-dimension-card { grid-template-columns: 60px minmax(0, 1fr); gap: 8px; padding: 10px; }
-  .ad-dimension-buy { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; }
+  .ad-dimension-buy { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ad-feedback-burst { display: none; }
   .ad-lab-panel *, .ad-lab-panel *::before, .ad-lab-panel *::after { animation: none !important; transition: none !important; }
 }
+.ad-ranking { min-width: 0; overflow-wrap: anywhere; }
+.ad-ranking-scroll { max-width: 100%; overflow-x: auto; margin-top: 8px; }
+.ad-ranking-table { min-width: 640px; }
+.ad-ranking-table th, .ad-ranking-table td { padding: 8px; vertical-align: top; border-bottom: 1px solid #ffffff18; }
+.ad-ranking-table thead { color: #b5fff2; }
+.ad-ranking-table .ad-ranking-name { text-align: left; font-weight: 400; min-width: 140px; max-width: 220px; overflow-wrap: anywhere; }
+.ad-ranking-table .ad-ranking-rank { color: #b5fff2; font-weight: 700; }
+.ad-ranking-table td { white-space: nowrap; }
+.ad-ranking-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.ad-ranking-controls button, .ad-ranking-badge { display: inline-flex; align-items: center; gap: 4px; }
+.ad-ranking-controls button { white-space: normal; text-align: left; }
+.ad-ranking-controls svg, .ad-ranking-badge svg { flex-shrink: 0; }
+.ad-ranking-badge { color: #b5fff2; font-size: 11px; margin: 4px 6px 0 0; }
+.ad-ranking-self { background: #7fffe310; font-weight: 700; }
+.ad-ranking-child { background: #ffffff04; }
+.ad-ranking-child .ad-ranking-name { padding-left: 24px; }
+.ad-ranking-self .ad-ranking-name { font-weight: 700; }
+.ad-ranking-scroll:focus-visible, .ad-ranking-controls button:focus-visible { outline: 2px solid #fff188; outline-offset: -2px; }

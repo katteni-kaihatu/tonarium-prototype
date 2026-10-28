@@ -6,7 +6,6 @@ import { send } from './net/ws.ts';
 import { spawnItem } from './items/actions.ts';
 
 const IMAGE_MAX = 10 * 1024 * 1024;
-const VIDEO_MAX = 50 * 1024 * 1024;
 const mb = (n: number) => `${Math.round(n / 1024 / 1024)}MB`;
 
 const YT_RE = /(?:youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/;
@@ -14,41 +13,20 @@ export const youTubeId = (text: string) => YT_RE.exec(text)?.[1] ?? null;
 export const youTubeUrl = (id: string) => `https://www.youtube.com/watch?v=${id}`;
 export const youTubeThumb = (id: string) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 
-async function sizeOf(file: Blob, video: boolean): Promise<{ w: number; h: number }> {
-  if (!video) {
-    const img = await createImageBitmap(file);
-    const r = { w: img.width, h: img.height };
-    img.close();
-    return r;
-  }
-  const url = URL.createObjectURL(file);
-  try {
-    return await new Promise((resolve) => {
-      const v = document.createElement('video');
-      v.preload = 'metadata';
-      v.onloadedmetadata = () => resolve({ w: v.videoWidth || 16, h: v.videoHeight || 9 });
-      v.onerror = () => resolve({ w: 16, h: 9 });
-      v.src = url;
-    });
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
 /** 大きすぎるものは送る前に断る。サーバーでも同じ上限を見る */
 export async function uploadMedia(file: Blob): Promise<ChatMedia | null> {
-  const video = file.type.startsWith('video/');
-  if (!video && !file.type.startsWith('image/')) { showToast(msg("ui28")); return null; }
-  const max = video ? VIDEO_MAX : IMAGE_MAX;
-  if (file.size > max) { showToast(msg("ui29", video ? msg("ui30") : msg("ui31"), mb(max), mb(file.size))); return null; }
-  showToast(msg("ui32", video ? msg("ui30") : msg("ui31")));
+  if (!file.type.startsWith('image/')) { showToast(msg("ui28")); return null; }
+  if (file.size > IMAGE_MAX) { showToast(msg("ui29", msg("ui31"), mb(IMAGE_MAX), mb(file.size))); return null; }
+  showToast(msg("ui32", msg("ui31")));
   try {
-    const { w, h } = await sizeOf(file, video);
+    const img = await createImageBitmap(file);
+    const { width: w, height: h } = img;
+    img.close();
     const res = await fetch('/media', { method: 'POST', body: file });
     const j = await res.json() as { url?: string; error?: string };
     if (!res.ok || !j.url) { showToast(j.error ?? msg("ui33")); return null; }
-    showToast(msg("ui34", video ? msg("ui30") : msg("ui31")));
-    return { kind: video ? 'video' : 'image', url: j.url, w, h };
+    showToast(msg("ui34", msg("ui31")));
+    return { kind: 'image', url: j.url, w, h };
   } catch {
     showToast(msg("ui33"));
     return null;
@@ -91,7 +69,7 @@ export async function shareYouTube(id: string, asItem: boolean) {
   if (asItem) await spawnYouTube(id);
 }
 
-/** チャットの画像・動画・YouTube をアイテムにする。写真などの data URL はアップロードし直す */
+/** チャットの画像・YouTube をアイテムにする。写真などの data URL はアップロードし直す */
 export async function itemizeMessage(m: ChatMessage) {
   if (!get().session) return;
   if (m.media) { spawnChatMedia(m.media); return; }

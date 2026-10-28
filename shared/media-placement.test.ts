@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MEDIA_PLACEMENT, adjustMediaPlacement, boardSize, mediaPosition, mediaTransform } from './media-placement.ts';
-import { applyItemAction, clockTime, createItem } from './items.ts';
+import { createItem } from './items.ts';
 import { pack, unpack } from './session-wire.ts';
 import type { RoomServerMsg } from './protocol.ts';
 
@@ -61,27 +61,17 @@ test('repeated wheel input saturates safely and reverses at every bound', () => 
   assert.deepEqual(mediaTransform({ y: -200, scale: -1 }), { y: -100, scale: 0.1 });
 });
 
-test('image and video transforms survive wire delivery and persistence without changing media or playback clock', () => {
-  for (const kind of ['image', 'video'] as const) {
-    const item = createItem(kind, { id: kind, x: 0, z: 0, ry: 0, createdBy: 'alice' }, () => 0,
-      { url: `/media/00000000-0000-0000-0000-000000000001.${kind === 'image' ? 'png' : 'mp4'}`, w: 1920, h: 1080 })!;
-    if (item.kind === 'video') assert.ok(applyItemAction(item, { a: 'mediaPlay', pos: 12 }, 'alice', () => 0));
-    const original = structuredClone(item);
-    const message: RoomServerMsg = { t: 'itemMove', sid: 'room', id: kind, x: 2, z: 3, ry: 1, ...mediaTransform({ y: 5, scale: 2 }) };
-    const { t, sid, id, ...transform } = unpack(pack(message)) as typeof message;
-    const clients = [structuredClone(item), structuredClone(item)];
-    for (const client of clients) Object.assign(client, transform);
-    assert.deepEqual(clients[0], clients[1]);
-    assert.deepEqual(JSON.parse(JSON.stringify(clients[0])), clients[1]);
-    assert.equal(clients[0].y, 5);
-    assert.equal(clients[0].scale, 2);
-    assert.equal('url' in clients[0] && clients[0].url, 'url' in original && original.url);
-    if (clients[0].kind === 'video' && original.kind === 'video') {
-      assert.deepEqual(clients[0].clock, original.clock);
-      assert.equal(clockTime(clients[0].clock, original.clock.at + 1000), 13);
-      assert.ok(applyItemAction(clients[0], { a: 'mediaPause', pos: 13 }, 'bob', () => 0));
-      assert.equal(clients[0].y, 5);
-      assert.equal(clients[0].scale, 2);
-    }
-  }
+test('image transforms survive wire delivery and persistence without changing media', () => {
+  const item = createItem('image', { id: 'image', x: 0, z: 0, ry: 0, createdBy: 'alice' }, () => 0,
+    { url: '/media/00000000-0000-0000-0000-000000000001.png', w: 1920, h: 1080 })!;
+  const original = structuredClone(item);
+  const message: RoomServerMsg = { t: 'itemMove', sid: 'room', id: 'image', x: 2, z: 3, ry: 1, ...mediaTransform({ y: 5, scale: 2 }) };
+  const { t, sid, id, ...transform } = unpack(pack(message)) as typeof message;
+  const clients = [structuredClone(item), structuredClone(item)];
+  for (const client of clients) Object.assign(client, transform);
+  assert.deepEqual(clients[0], clients[1]);
+  assert.deepEqual(JSON.parse(JSON.stringify(clients[0])), clients[1]);
+  assert.equal(clients[0].y, 5);
+  assert.equal(clients[0].scale, 2);
+  assert.equal('url' in clients[0] && clients[0].url, 'url' in original && original.url);
 });

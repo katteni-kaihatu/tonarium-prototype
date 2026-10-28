@@ -9,8 +9,10 @@ import { createNewGame } from '../ad/engine.mjs';
 import { openWindow } from '../world/windows.ts';
 import { emitAdFeedback } from '../ad/feedback.ts';
 import type { AdLabSnapshot, AdPanelTarget } from '../../../shared/antimatterLayout.ts';
+import { useLanguage } from '../i18n/index.ts';
 
 export function AntimatterWorld() {
+  const language = useLanguage();
   const [snapshot, setSnapshot] = useState<AdLabSnapshot | null>(null);
   useEffect(() => {
     const update = () => {
@@ -20,7 +22,7 @@ export function AntimatterWorld() {
     update();
     const id = window.setInterval(update, 250);
     return () => window.clearInterval(id);
-  }, []);
+  }, [language]);
   if (!snapshot) return null;
   const onOpenPanel = (target: AdPanelTarget) => {
     useStore.setState({ adSpaceTarget: target });

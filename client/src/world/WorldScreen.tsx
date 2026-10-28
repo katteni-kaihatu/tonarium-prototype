@@ -38,7 +38,6 @@ import { PortraitCanvas } from './Portraits.tsx';
 import { MapLayer } from './MapLayer.tsx';
 import { ConfirmOpen } from './Links.tsx';
 import { shareFiles, shareYouTube, youTubeId } from '../media.ts';
-import { MediaSync } from '../mediaSync.tsx';
 import { closeWindow, openWindow, setWinMode } from './windows.ts';
 import { touchOnly, usePhone } from '../phone.ts';
 import { MasterVolume } from './VolumeMenus.tsx';
@@ -105,7 +104,7 @@ function WorldBadge() {
           <span className="menutitle">{tr("ui856")}</span>
           <SessionRename current={world?.name ?? ''} onDone={() => setMenu(null)} />
           <span className="menusep" />
-          <label className="switchrow">
+          <label className="switchrow settings-row">
             <span><b>{tr("ui857")}</b><span className="sub wrap">{tr("ui858")}</span></span>
             <input type="checkbox" role="switch" checked={broadcast} onChange={(e) => send({ t: 'broadcast', on: e.target.checked })} />
           </label>
@@ -596,7 +595,6 @@ export function WorldScreen() {
         <Dock />
         {phone && <PhoneTabs />}
       </div>
-      <MediaSync />
       <AdAudio />
       <Toast />
       <NewArrivals />

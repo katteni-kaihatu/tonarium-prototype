@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../../i18n/index.ts';
 import { useState } from 'react';
 import type { AntimatterSlice } from './types.ts';
 import {
@@ -22,26 +23,27 @@ function MockList({ title, children }: { title: string; children: React.ReactNod
 }
 
 function LayerBody({ layerId, ad }: { layerId: string; ad: AntimatterSlice }) {
+  useLanguage();
   if (layerId === 'dimensions') {
-    return <p style={s.muted}>反物質次元の操作は「次元」タブで行います。ここは層の一覧です。</p>;
+    return <p style={s.muted}>{t('adLabText60')}</p>;
   }
   if (layerId === 'infinity') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <p style={s.muted}>Big Crunch で IP を獲得したら、ここから恒久アップグレードを買う層になります。現行は Big Crunch のみ実装済みで、以下はすべてモックです。</p>
-        <MockList title="Infinity アップグレード">
+        <p style={s.muted}>{t('adLabText61')}</p>
+        <MockList title={t('adLabText71')}>
           {INFINITY_UPGRADES.map((u) => (
-            <div key={u.id} style={s.row}><span><b>{u.name}</b> <span style={s.badgeMock}>モック</span></span><span style={s.muted}>{u.description} · 効果: {u.effect}</span><span style={{ flex: 1 }} /><MockButton>買う（{u.costIP} IP）</MockButton></div>
+            <div key={u.id} style={s.row}><span><b>{u.name}</b> <span style={s.badgeMock}>{t('ui1154')}</span></span><span style={s.muted}>{t('adEffect', u.description, u.effect)}</span><span style={{ flex: 1 }} /><MockButton>{t('adLabText62', u.costIP)}</MockButton></div>
           ))}
         </MockList>
-        <MockList title="Infinity 次元">
+        <MockList title={t('adLabText72')}>
           {INFINITY_DIMENSIONS.map((d) => (
-            <div key={d.tier} style={s.row}><span><b>{d.name}</b> <span style={s.badgeMock}>モック</span></span><span style={s.muted}>{d.produces} · 基礎コスト: {d.baseCostIP} IP</span><span style={{ flex: 1 }} /><MockButton>買う</MockButton></div>
+            <div key={d.tier} style={s.row}><span><b>{d.name}</b> <span style={s.badgeMock}>{t('ui1154')}</span></span><span style={s.muted}>{t('adBaseCost', d.produces, d.baseCostIP, 'IP')}</span><span style={{ flex: 1 }} /><MockButton>{t('adLabText63')}</MockButton></div>
           ))}
         </MockList>
-        <MockList title="チャレンジ">
+        <MockList title={t('adLabText73')}>
           {CHALLENGES.map((c) => (
-            <div key={c.id} style={s.row}><span><b>{c.name}</b> <span style={s.badgeMock}>モック</span></span><span style={s.muted}>目標: {c.goal} · 報酬: {c.reward} · 制限: {c.restriction}</span><span style={{ flex: 1 }} /><MockButton>挑戦する</MockButton></div>
+            <div key={c.id} style={s.row}><span><b>{c.name}</b> <span style={s.badgeMock}>{t('ui1154')}</span></span><span style={s.muted}>{t('adLabText64', c.goal, c.reward, c.restriction)}</span><span style={{ flex: 1 }} /><MockButton>{t('adLabText65')}</MockButton></div>
           ))}
         </MockList>
       </div>
@@ -50,19 +52,19 @@ function LayerBody({ layerId, ad }: { layerId: string; ad: AntimatterSlice }) {
   if (layerId === 'eternity') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <MockList title="Time 次元">
+        <MockList title={t('adLabText74')}>
           {TIME_DIMENSIONS.map((d) => (
-            <div key={d.tier} style={s.row}><span><b>{d.name}</b> <span style={s.badgeMock}>モック</span></span><span style={s.muted}>{d.produces} · 基礎コスト: {String(d.baseCostEP)} EP</span><span style={{ flex: 1 }} /><MockButton>買う</MockButton></div>
+            <div key={d.tier} style={s.row}><span><b>{d.name}</b> <span style={s.badgeMock}>{t('ui1154')}</span></span><span style={s.muted}>{t('adBaseCost', d.produces, String(d.baseCostEP), 'EP')}</span><span style={{ flex: 1 }} /><MockButton>{t('adLabText63')}</MockButton></div>
           ))}
         </MockList>
-        <MockList title="Time Studies（前提つきグリッド）">
-          {TIME_STUDIES.map((t) => (
-            <div key={t.id} style={s.row}><span><b>#{t.id}</b> <span style={s.badgeMock}>モック</span></span><span style={s.muted}>列 {t.col} · 行 {t.row} · {t.costTT} TT{t.requires.length ? ` · 前提: ${t.requires.join(', ')}` : ''} · {t.description}</span><span style={{ flex: 1 }} /><MockButton>取得する</MockButton></div>
+        <MockList title={t('adLabText75')}>
+          {TIME_STUDIES.map((entry) => (
+            <div key={entry.id} style={s.row}><span><b>#{entry.id}</b> <span style={s.badgeMock}>{t('ui1154')}</span></span><span style={s.muted}>{t('adLabText66', entry.col, entry.row, entry.costTT, entry.requires.length ? t('adLabText76', entry.requires.join(', ')) : '', entry.description)}</span><span style={{ flex: 1 }} /><MockButton>{t('adLabText67')}</MockButton></div>
           ))}
         </MockList>
-        <MockList title="Eternity アップグレード">
+        <MockList title={t('adLabText77')}>
           {ETERNITY_UPGRADES.map((u) => (
-            <div key={u.id} style={s.row}><span><b>{u.name}</b> <span style={s.badgeMock}>モック</span></span><span style={s.muted}>{u.description}</span><span style={{ flex: 1 }} /><MockButton>買う（{String(u.costEP)} EP）</MockButton></div>
+            <div key={u.id} style={s.row}><span><b>{u.name}</b> <span style={s.badgeMock}>{t('ui1154')}</span></span><span style={s.muted}>{u.description}</span><span style={{ flex: 1 }} /><MockButton>{t('adLabText68', String(u.costEP))}</MockButton></div>
           ))}
         </MockList>
       </div>
@@ -71,43 +73,44 @@ function LayerBody({ layerId, ad }: { layerId: string; ad: AntimatterSlice }) {
   if (layerId === 'reality') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <MockList title="Glyph（5系統・スロットはモック）">
+        <MockList title={t('adLabText78')}>
           {GLYPH_TYPES.map((g) => (
-            <div key={g.id} style={s.row}><span><b>{g.nameJa}</b> ({g.nameEn}) <span style={s.badgeMock}>モック</span></span><span style={s.muted}>{g.effectExample}</span><span style={{ flex: 1 }} /><MockButton>装備する</MockButton></div>
+            <div key={g.id} style={s.row}><span><b>{g.nameJa}</b> ({g.nameEn}) <span style={s.badgeMock}>{t('ui1154')}</span></span><span style={s.muted}>{g.effectExample}</span><span style={{ flex: 1 }} /><MockButton>{t('adLabText69')}</MockButton></div>
           ))}
         </MockList>
-        <MockList title="Reality アップグレード">
+        <MockList title={t('adLabText79')}>
           {REALITY_UPGRADES.map((u) => (
-            <div key={u.id} style={s.row}><span><b>{u.name}</b> <span style={s.badgeMock}>モック</span></span><span style={s.muted}>{u.description}</span><span style={{ flex: 1 }} /><MockButton>買う（{u.costRM} RM）</MockButton></div>
+            <div key={u.id} style={s.row}><span><b>{u.name}</b> <span style={s.badgeMock}>{t('ui1154')}</span></span><span style={s.muted}>{u.description}</span><span style={{ flex: 1 }} /><MockButton>{t('adLabText70', u.costRM)}</MockButton></div>
           ))}
         </MockList>
       </div>
     );
   }
   return (
-    <MockList title="Celestials（概要モック）">
+    <MockList title={t('adLabText80')}>
       {CELESTIALS_OVERVIEW.map((c) => (
-        <div key={c.id} style={s.row}><span><b>{c.name}</b> <span style={s.badgeMock}>モック</span></span><span style={s.muted}>{c.role}</span></div>
+        <div key={c.id} style={s.row}><span><b>{c.name}</b> <span style={s.badgeMock}>{t('ui1154')}</span></span><span style={s.muted}>{c.role}</span></div>
       ))}
     </MockList>
   );
 }
 
 export function LayerTabs({ ad }: { ad: AntimatterSlice }) {
+  useLanguage();
   const tabs = getLayerTabs(ad.game.infinities);
   const [layerId, setLayerId] = useState('dimensions');
-  const tab = tabs.find((t) => t.id === layerId) ?? tabs[0];
+  const tab = tabs.find((entry) => entry.id === layerId) ?? tabs[0];
   const layerArt: Record<string, LabArtKind> = { dimensions: 'reactor', infinity: 'singularity', eternity: 'galaxy', reality: 'explorer', celestials: 'galaxy' };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={s.tabs}>
-        {tabs.map((t) => (
-          <button key={t.id} style={t.id === layerId ? s.tabActive : s.tab} onClick={() => { if (t.id !== layerId) { setLayerId(t.id); emitAdFeedback({ kind: 'navigate' }); } }}>
-            {t.nameJa}<span style={t.status === 'mock' ? s.badgeMock : s.badge}>{t.badge}</span>{!t.unlocked && t.id !== 'dimensions' ? ' 🔒' : ''}
+        {tabs.map((entry) => (
+          <button key={entry.id} style={entry.id === layerId ? s.tabActive : s.tab} onClick={() => { if (entry.id !== layerId) { setLayerId(entry.id); emitAdFeedback({ kind: 'navigate' }); } }}>
+            {entry.nameJa}<span style={entry.status === 'mock' ? s.badgeMock : s.badge}>{entry.badge}</span>{!entry.unlocked && entry.id !== 'dimensions' ? ' 🔒' : ''}
           </button>
         ))}
       </div>
-      <LabBanner kind={layerArt[tab.id] ?? 'galaxy'} eyebrow={tab.nameEn.toUpperCase()} title={tab.nameJa} description={`${tab.tagline} · 通貨: ${tab.currencyName}`} />
+      <LabBanner kind={layerArt[tab.id] ?? 'galaxy'} eyebrow={tab.nameEn.toUpperCase()} title={tab.nameJa} description={t('adLabText81', tab.tagline, tab.currencyName)} />
       <LayerBody layerId={tab.id} ad={ad} />
     </div>
   );

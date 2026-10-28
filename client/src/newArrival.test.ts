@@ -1,11 +1,34 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { arrivalPatch, initialArrivalState, openArrivalPatch, popupSettingsFor, shouldShowArrival, type ArrivalKind, type ArrivalState } from './newArrival.ts';
+import { arrivalPatch, initialArrivalState, openArrivalPatch, popupSettingsFor, shouldShowArrival, shouldPlayChatArrival, type ArrivalKind, type ArrivalState } from './newArrival.ts';
 
 const state = (): ArrivalState & ReturnType<typeof initialArrivalState> => ({
   session: 'room', hubOpen: false, folded: { left: false, right: false, faces: false },
   phoneLayout: false, phoneTab: 'screen', rightView: 'log', rightConversation: null,
   ...initialArrivalState(),
+});
+
+test('chat sound ignores panels and checks saved preference, volume, own busy status and pause boundary', () => {
+  const s = { ...state(), chatNotificationSound: true, audioVol: { fx: 0.05 }, selfId: 'self',
+    users: [{ id: 'other', status: 'busy' }, { id: 'self', status: 'online' }] };
+  for (const hubOpen of [false, true]) for (const right of [false, true]) {
+    s.hubOpen = hubOpen; s.folded.right = right;
+    assert.equal(shouldPlayChatArrival(s, 1000), true);
+  }
+  s.rightView = 'msg'; s.rightConversation = 'dm:test'; s.phoneLayout = true;
+  assert.equal(shouldPlayChatArrival(s, 1000), true);
+  s.chatNotificationSound = false;
+  assert.equal(shouldPlayChatArrival(s, 1000), false);
+  s.chatNotificationSound = true; s.audioVol.fx = 0;
+  assert.equal(shouldPlayChatArrival(s, 1000), false);
+  s.audioVol.fx = 0.05; s.users[1].status = 'busy';
+  assert.equal(shouldPlayChatArrival(s, 1000), false);
+  s.users[1].status = 'online'; s.popupPausedUntil = 1000;
+  assert.equal(shouldPlayChatArrival(s, 999), false);
+  assert.equal(shouldPlayChatArrival(s, 1000), true);
+  assert.equal(shouldPlayChatArrival(s, 1001), true);
+  s.session = null;
+  assert.equal(shouldPlayChatArrival(s, 1001), false);
 });
 
 for (const kind of ['chat', 'notice'] as ArrivalKind[]) {

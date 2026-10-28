@@ -6,6 +6,8 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
+import { seedHomeData, testServerEnv } from './test-db.ts';
+import { devLogin } from './test-auth.ts';
 import { WebSocket } from 'ws';
 import { KokosyncClient } from '../vendor/kokosync/index.js';
 import { importKey, open, PACKET_TOPIC, receiveBlob, seal, sendPacket, unpack, type Envelope, type SyncConfig } from '../shared/session-wire.ts';
@@ -23,6 +25,7 @@ async function until<T>(read: () => T | undefined, timeout = 45_000): Promise<T>
 }
 
 test('live kokosync: initial canvas, deltas, private delivery, independent media and reconnect', { skip: process.env.KOKOSYNC_INTEGRATION !== '1', timeout: 180_000 }, async (t) => {
+  const dbEnv = await testServerEnv(t);
   const listener = net.createServer();
   await new Promise<void>((resolve) => listener.listen(0, '127.0.0.1', resolve));
   const port = (listener.address() as net.AddressInfo).port;
@@ -33,9 +36,9 @@ test('live kokosync: initial canvas, deltas, private delivery, independent media
     strokes: Array.from({ length: 600 }, (_, i) => ({ id: `line-${i}`, by: 'seed', color: '#334455', size: 3, pts: Array.from({ length: 100 }, (_, n) => (n * 3) % 400) })) };
   const sessions = [{ id: 'sync-test', name: 'Sync test' }, { id: 'other-test', name: 'Other test' }, { id: 'peer-five', name: 'Peer five' }];
   await writeFile(path.join(data, 'sessions.json'), JSON.stringify({ name: 'test', sessions }));
-  await writeFile(path.join(data, 'items.json'), JSON.stringify({ 'sync-test': [canvas] }));
+  await seedHomeData(dbEnv, { items: { 'sync-test': [canvas as unknown as Item] } });
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
-    env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: data, SESSIONS_FILE: path.join(data, 'sessions.json'), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' }, stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, ...dbEnv, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: data, SESSIONS_FILE: path.join(data, 'sessions.json'), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = '';
   child.stdout.on('data', (chunk) => { logs += chunk; });
@@ -43,15 +46,16 @@ test('live kokosync: initial canvas, deltas, private delivery, independent media
   t.after(async () => { child.kill(); await until(() => child.exitCode !== null || child.signalCode ? true : undefined, 10_000).catch(() => child.kill('SIGKILL')); await rm(data, { recursive: true, force: true }); });
   await until(() => logs.includes('server on') ? true : undefined);
 
-  async function peer(name: string, sid = 'sync-test', previous?: { home: WebSocket; id: string }, modern = false) {
-    const home = previous?.home ?? new WebSocket(base.replace('http', 'ws') + '/ws');
+  async function peer(name: string, sid = 'sync-test', previous?: { home: WebSocket; id: string; login: Awaited<ReturnType<typeof devLogin>> }, modern = false) {
+    const login = previous?.login ?? await devLogin(base, name);
+    const home = previous?.home ?? new WebSocket(base.replace('http', 'ws') + '/ws', { headers: login.headers });
     t.after(() => home.close());
     const messages: any[] = [], raw: any[] = [];
     home.on('message', (bytes) => messages.push(JSON.parse(bytes.toString())));
     if (!previous) await new Promise<void>((resolve, reject) => { home.once('open', resolve); home.once('error', reject); });
-    const id = previous?.id ?? crypto.randomUUID();
+    const id = login.id;
     if (!previous) {
-      home.send(JSON.stringify({ t: 'hello', id, name, compat: COMPAT_VERSION }));
+      home.send(JSON.stringify({ t: 'hello', compat: COMPAT_VERSION }));
       home.send(JSON.stringify({ t: 'join', sid }));
     }
     const requestId = crypto.randomUUID();
@@ -120,17 +124,17 @@ test('live kokosync: initial canvas, deltas, private delivery, independent media
     };
     await send({ t: 'sync' });
     const snapshot = await until(() => received.find((v) => v.kind === 'snapshot'));
-    return { id, home, homeMessages: messages, client, cfg, key, received, raw, send, positions, events, localItems, pauseNextBlob, snapshot: snapshot.snapshot };
+    return { id, login, home, homeMessages: messages, client, cfg, key, received, raw, send, positions, events, localItems, pauseNextBlob, snapshot: snapshot.snapshot };
   }
   const a = await peer('sync-a');
   assert.equal(a.snapshot.items[0].strokes.length, 600);
   assert.ok(JSON.stringify(a.snapshot).length > 100_000);
   const b = await peer('sync-b');
   assert.deepEqual(b.snapshot.items[0], canvas);
-  a.home.send(JSON.stringify({ t: 'followUser', name: 'sync-b', on: true }));
+  a.home.send(JSON.stringify({ t: 'followUser', to: b.id, on: true }));
   await until(() => b.homeMessages.find((m) => m.t === 'followed' && m.from === a.id));
-  b.home.send(JSON.stringify({ t: 'followUser', name: 'sync-a', on: true }));
-  await until(() => a.homeMessages.find((m) => m.t === 'friends' && m.names.includes('sync-b')));
+  b.home.send(JSON.stringify({ t: 'followUser', to: a.id, on: true }));
+  await until(() => a.homeMessages.find((m) => m.t === 'friends' && m.ids.includes(b.id)));
   a.home.send(JSON.stringify({ t: 'postCreate', text: 'timeline hello', withPlace: true }));
   const posted = await until(() => b.homeMessages.find((m) => m.t === 'post' && m.p.text === 'timeline hello'));
   assert.equal(posted.p.author, 'sync-a');
@@ -169,7 +173,7 @@ test('live kokosync: initial canvas, deltas, private delivery, independent media
   await until(() => b.received.find((v) => v.message?.m?.image === image));
   await a.send({ t: 'sync' });
   await until(() => a.received.find((v) => v.kind === 'snapshot' && v.snapshot.chats.some((c: any) => c.text === 'large attachment')));
-  const media = await (await fetch(`${base}/token?id=${a.id}&session=sync-test`)).json() as any;
+  const media = await (await fetch(`${base}/token?session=sync-test`, { headers: a.login.headers })).json() as any;
   assert.match(media.error, /LiveKit/);
   await b.send({ t: 'chat', text: 'without media', scope: 'all' });
   await until(() => a.received.find((v) => v.message?.m?.text === 'without media'));

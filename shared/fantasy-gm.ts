@@ -34,7 +34,7 @@ export interface FantasyGmReply {
 }
 export interface FantasyGmChatRequest { requestId: string; text: string; locale: NpcLocale }
 export interface FantasyGmChatResponse {
-  requestId: string; locale: NpcLocale; reply: FantasyGmReply; source: 'rules' | 'local' | 'browser'; model?: string;
+  requestId: string; locale: NpcLocale; reply: FantasyGmReply; source: 'rules' | 'local'; model?: string;
   error?: 'invalid' | 'busy' | 'unavailable' | 'timeout';
 }
 export const FANTASY_GM_TEXT_MAX = 500;

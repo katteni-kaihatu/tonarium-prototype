@@ -1,121 +1,78 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AntimatterSlice } from './types.ts';
 import { s } from './styles.ts';
 import { emitAdFeedback } from '../../ad/feedback.ts';
+import { parseImportBundle } from '../../ad/user.mjs';
+import { t, useLanguage, msg, getLanguage, type UiMessage } from '../../i18n/index.ts';
+import { ProgressPicker } from './ProgressPicker.tsx';
 
-export function ProfilePanel({ ad, notice }: { ad: AntimatterSlice; notice: (msg: string) => void }) {
-  const [newName, setNewName] = useState('');
+export function ProfilePanel({ ad, notice }: { ad: AntimatterSlice; notice: (message: UiMessage) => void }) {
+  useLanguage();
   const [exportText, setExportText] = useState('');
+  const [code, setCode] = useState('');
+  const [issued, setIssued] = useState<{ code: string; expiresAt: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const active = ad.activeProfile;
-
+  useEffect(() => { setCode(''); setIssued(null); setExportText(''); }, [active?.id]);
+  const waiting = ad.migration || ad.syncState === 'loading' || ad.syncState === 'choice';
   const download = (text: string, filename: string) => {
-    try {
-      const blob = new Blob([text], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch {
-      // テキストエリアへの出力だけでも使える
-    }
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-
   const onExport = () => {
     try {
-      const text = ad.exportBundle();
-      setExportText(text);
-      download(text, 'antimatter-dimensions-export-v2.json');
-      notice('v2 バンドルをエクスポートしました（ユーザー情報＋セーブ）');
-    } catch {
-      notice('v2 エクスポートに失敗しました');
-    }
+      const text = ad.exportBundle(); setExportText(text);
+      download(text, 'antimatter-dimensions-export-v3.json');
+      notice(msg('adExportDone'));
+    } catch { notice(msg('adExportFailed')); }
   };
-
   const onImport = () => {
-    const text = exportText.trim();
-    if (!text) {
-      emitAdFeedback({ kind: 'error' });
-      notice('インポートする JSON をテキストエリアに貼り付けてください');
-      return;
-    }
-    const result = ad.importBundle(text);
-    notice(result.message);
-  };
-
-  const onReset = () => {
-    if (!window.confirm('本当にリセットしますか？すべての進行状況が消え、元に戻せません。')) return;
-    if (!window.confirm('最終確認: 本当に最初からやり直しますか？')) return;
     try {
-      ad.resetGame();
-      setExportText('');
-      notice('リセットしました。新しいゲームを開始します');
-    } catch {
-      notice('リセットできませんでした');
-    }
+      const bundle = parseImportBundle(exportText);
+      const legacy = bundle.version === 2;
+      if (legacy && !window.confirm(t('adLegacyConfirm'))) return;
+      notice(ad.importBundle(exportText, legacy).message);
+    } catch { emitAdFeedback({ kind: 'error' }); notice(msg('adImportFailed')); }
   };
-
-  const onCreate = () => {
-    const name = newName.trim();
-    if (!name) {
-      emitAdFeedback({ kind: 'error' });
-      notice('新しいプロフィールの名前を入力してください');
-      return;
-    }
-    try {
-      ad.createProfile(name);
-      setNewName('');
-      notice(`プロフィール「${name}」を作成して切り替えました`);
-    } catch {
-      notice('プロフィールを作成できませんでした');
-    }
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div>
-        <h3 style={s.sectionTitle}>プロフィール</h3>
-        {active && <p style={s.muted}>現在: {active.name} <span>ID: {active.id}</span>{ad.lastSavedAt ? ` · 最終保存: ${ad.lastSavedAt}` : ''}</p>}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <select
-            style={s.input} value={active?.id ?? ''} aria-label="プロフィール"
-            onChange={(e) => {
-              if (!e.target.value) return;
-              try { ad.switchProfile(e.target.value); }
-              catch { notice('プロフィールを切り替えられませんでした'); }
-            }}
-          >
-            {ad.profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          <input style={s.input} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="新しいプロフィール名" aria-label="新しいプロフィール名" />
-          <button style={s.btn} onClick={onCreate}>作成して切り替え</button>
-          {active && ad.profiles.length > 1 && (
-            <button style={s.btnDanger} onClick={() => { if (window.confirm(`プロフィール「${active.name}」を削除しますか？`)) ad.deleteProfile(active.id); }}>現在のプロフィールを削除</button>
-          )}
-        </div>
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div>
+      <h3 style={s.sectionTitle}>{t('adTransfer')}</h3>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <button style={s.btn} disabled={busy || ad.syncState !== 'ready'} onClick={() => {
+          setBusy(true); setIssued(null);
+          void ad.issueTransfer().then(setIssued).catch(() => notice(msg('adTransferFailed'))).finally(() => setBusy(false));
+        }}>{t('adIssueCode')}</button>
+        <input style={s.input} value={code} onChange={e => setCode(e.target.value)} autoComplete="off" spellCheck={false} aria-label={t('adTransferCode')} placeholder={t('adTransferCode')} />
+        <button style={s.btn} disabled={busy || waiting || !code.trim()} onClick={() => {
+          const input = code; setCode(''); setBusy(true); setIssued(null);
+          void ad.exchangeTransfer(input).catch(() => notice(msg('adTransferFailed'))).finally(() => setBusy(false));
+        }}>{t('adUseCode')}</button>
+        {ad.syncState === 'error' && <button style={s.btn} onClick={() => { void ad.loadFromServer(); }}>{t('adRetry')}</button>}
       </div>
-      <div>
-        <h3 style={s.sectionTitle}>セーブ / サーバー</h3>
-        {ad.serverStatus && <p style={s.muted}>{ad.serverStatus}</p>}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <button style={s.btn} disabled={busy} onClick={() => { setBusy(true); void ad.saveToServer().finally(() => setBusy(false)); }}>サーバーに保存</button>
-          <button style={s.btn} disabled={busy} onClick={() => { if (!window.confirm('サーバーのセーブを読み込みますか？現在のローカル進行は上書きされます。')) return; setBusy(true); void ad.loadFromServer().finally(() => setBusy(false)); }}>サーバーから読込</button>
-          <button style={s.btnDanger} onClick={onReset}>最初からリセット</button>
-        </div>
-      </div>
-      <div>
-        <h3 style={s.sectionTitle}>エクスポート / インポート（v2 バンドル）</h3>
-        <p style={s.muted}>バンドルは現在のプロフィール配下へ取り込まれます。元ユーザーの ID は引き継がれません。</p>
-        <textarea style={s.textarea} value={exportText} onChange={(e) => setExportText(e.target.value)} placeholder="ここに v2 バンドル JSON を貼り付けてインポート、またはエクスポート結果が表示されます" aria-label="エクスポート / インポート用 JSON" />
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-          <button style={s.btn} onClick={onExport}>エクスポート（v2・ダウンロード付き）</button>
-          <button style={s.btn} onClick={onImport}>貼り付けた JSON をインポート</button>
-        </div>
+      {issued && <p style={s.muted}>{t('adCodeExpires', new Date(issued.expiresAt).toLocaleString(getLanguage()))}: <code>{issued.code}</code></p>}
+    </div>
+    <div>
+      <h3 style={s.sectionTitle}>{t('adExportTitle')}</h3>
+      <textarea style={s.textarea} value={exportText} onChange={e => setExportText(e.target.value)} placeholder={t('adBundlePlaceholder')} aria-label={t('adExportTitle')} />
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+        <button style={s.btn} onClick={onExport}>{t('adExport')}</button>
+        <button style={s.btn} disabled={waiting || !exportText.trim()} onClick={onImport}>{t('adImport')}</button>
       </div>
     </div>
-  );
+    <details>
+      <summary>{t('adPreviousProgress')}</summary>
+      <ProgressPicker ad={ad} notice={notice} onExport={text => {
+        if (!text) { notice(msg('adNoRecovery')); return; }
+        setExportText(text); download(text, 'antimatter-recovery-v3.json');
+      }} />
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+        <button style={s.btnDanger} disabled={waiting} onClick={() => {
+          if (!window.confirm(t('adResetConfirm')) || !window.confirm(t('adResetFinal'))) return;
+          try { ad.resetGame(); setExportText(''); } catch { notice(msg('adProfileFailed')); }
+        }}>{t('adReset')}</button>
+      </div>
+    </details>
+  </div>;
 }
