@@ -1,4 +1,5 @@
 export default {
+  adRequirementCurrentAmount: '필요한 차원의 현재 수량: {0}개',
   xrPendingHelp: 'VR 시작을 기다리고 있습니다.',
   modeSwitchingHelp: "모드를 전환하고 있습니다.",
   xrPrepareLabel: "VR",

@@ -38,10 +38,15 @@ export interface AdLabSnapshot {
   tickspeedBought: number;
   boosts: number;
   boostRequirementText: string;
+  boostCurrentAmountText: string;
+  canBoost: boolean;
   galaxies: number;
   galaxyRequirementText: string;
+  galaxyCurrentAmountText: string;
+  canGalaxy: boolean;
   sacrificeText: string;
   sacrificeUnlocked: boolean;
+  canSacrifice: boolean;
   infinityPointsText: string;
   infinities: number;
   canCrunch: boolean;

@@ -12,9 +12,6 @@ import type { AntimatterSlice, DerivedSnapshot, OfflineNotice } from './types.ts
 import { AntimatterPanel } from './AntimatterPanel.tsx';
 import { emitAdFeedback } from '../../ad/feedback.ts';
 
-// d.mts の型が実エンジンとずれている箇所だけ、実行時の形に寄せて使う。
-const galaxyRequirement = getGalaxyRequirement as unknown as (s: GameState) => { tier: number; amount: number };
-
 function derivedFrom(game: GameState): DerivedSnapshot {
   const maxUnlockedTier = getMaxUnlockedTier(game);
   return {
@@ -45,7 +42,7 @@ function derivedFrom(game: GameState): DerivedSnapshot {
       return { tier: req.tier, amount: req.amount, currentAmount: game.dimensions[req.tier - 1].amount, can: canDimensionalBoost(game) };
     })(),
     galaxy: (() => {
-      const req = galaxyRequirement(game);
+      const req = getGalaxyRequirement(game);
       return { tier: req.tier, amount: req.amount, currentAmount: game.dimensions[7].amount, can: canAntimatterGalaxy(game) };
     })(),
     sacrifice: { unlocked: game.dimensionalBoosts >= 5, can: canSacrifice(game), boost: game.sacrificeBoost, boosts: game.dimensionalBoosts },

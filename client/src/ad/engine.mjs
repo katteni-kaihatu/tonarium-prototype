@@ -152,10 +152,21 @@ export const bigLte = (a, b) => bigCompare(a, b) <= 0;
 export const bigLt = (a, b) => bigCompare(a, b) < 0;
 export const bigEq = (a, b) => bigCompare(a, b) === 0;
 
+function exactSafeInteger(value) {
+  if (value.exponent < 0 || value.exponent > 15) return null;
+  const integer = Math.round(bigToNumber(value));
+  if (!Number.isSafeInteger(integer)) return null;
+  const canonical = bigFromNumber(integer);
+  return canonical.mantissa === value.mantissa && canonical.exponent === value.exponent ? integer : null;
+}
+
 export function bigAdd(a, b) {
   const x = toBig(a); const y = toBig(b);
   if (x.mantissa === 0) return bigClone(y);
   if (y.mantissa === 0) return bigClone(x);
+  // 正確に表せる整数同士は整数で加算し、購入のたびに仮数へ誤差が蓄積するのを防ぐ。
+  const ix = exactSafeInteger(x); const iy = exactSafeInteger(y);
+  if (ix !== null && iy !== null && Number.isSafeInteger(ix + iy)) return bigFromNumber(ix + iy);
   const [big_, small] = x.exponent >= y.exponent ? [x, y] : [y, x];
   const diff = big_.exponent - small.exponent;
   if (diff > 15) return bigClone(big_); // smaller term is below double precision
@@ -494,6 +505,10 @@ export function buyDimension(state, tier) {
   const dim = state.dimensions[tier - 1];
   dim.amount = bigAdd(dim.amount, 1);
   dim.bought += 1;
+  // 第8次元は生産・Sacrificeで増減しないため、購入回数で旧セーブの加算誤差を補える。
+  if (tier === 8 && Number.isSafeInteger(dim.bought) && bigLt(dim.amount, dim.bought)) {
+    dim.amount = bigFromNumber(dim.bought);
+  }
   checkAchievements(state);
   return true;
 }
