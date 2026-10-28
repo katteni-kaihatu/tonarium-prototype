@@ -6,26 +6,27 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
-import { COMPAT_VERSION } from '../shared/protocol.ts';
+import { COMPAT_VERSION, dmKey } from '../shared/protocol.ts';
 import { applyFantasyAction, newFantasyProfile } from '../shared/fantasy-engine.ts';
 import type { FantasyProfile } from '../shared/fantasy.ts';
 import type { FantasyAccountResponse } from '../shared/fantasy-account.ts';
 import { readFantasySavedProfiles } from './fantasy-test-saved-profiles.ts';
+import { testServerEnv } from './test-db.ts';
+import { devLogin } from './test-auth.ts';
 
 interface Message {t:string;profile?:FantasyProfile;account?:FantasyAccountResponse['account'];activeId?:string;homeId?:string;user?:{id:string;name:string};error?:string;[key:string]:unknown}
 const privateTypes=new Set(['fantasyProfile','fantasyRealmState','fantasyContractBoard','fantasyPartyState','fantasyPropertyState','fantasyCombatState','fantasyLegacies','fantasyGmReply','fantasyDialogueChunk','communityState','npcReply']);
 const password='A world only password 123',newPassword='A rotated world password 456';
 
-async function isolated(t:TestContext,options:{friends?:[string,string][]}={}){
+async function isolated(t:TestContext){
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'tonarium-account-ws-')),file=path.join(directory,'fantasy.json');
   const legacy=applyFantasyAction(newFantasyProfile(),{type:'create',name:'PRIVATE_LEGACY_HERO',source:'human',gender:'female'},()=>.5).profile;
   legacy.character!.gold=98765;fs.writeFileSync(file,JSON.stringify({'legacy-browser-id':legacy}));
-  if(options.friends)fs.writeFileSync(path.join(directory,'friends.json'),JSON.stringify(options.friends));
   fs.writeFileSync(path.join(directory,'fantasy-clock.json'),JSON.stringify({version:1,hour:legacy.character!.hour,wallTime:Date.now()+3600_000}));
   const sessions=path.join(directory,'sessions.json');fs.writeFileSync(sessions,JSON.stringify({name:'Account fixture',sessions:[{id:'account-world',name:'Private fixture world',world:'fantasy'}]}));
   const probe=net.createServer();await new Promise<void>(resolve=>probe.listen(0,'127.0.0.1',resolve));
   const port=(probe.address() as net.AddressInfo).port;await new Promise<void>(resolve=>probe.close(()=>resolve()));
-  const child=spawn(process.execPath,['--import','tsx','server/index.ts','--dev'],{env:{...process.env,NODE_ENV:'test',FANTASY_ACCOUNT_TEST_BYPASS:'0',SERVER_PORT:String(port),DATA_DIR:directory,SESSIONS_FILE:sessions,LIVEKIT_URL:'',LIVEKIT_API_KEY:'',LIVEKIT_API_SECRET:'',KOKOAAI_APIKEY: ''},stdio:['ignore','pipe','pipe']});
+  const child=spawn(process.execPath,['--import','tsx','server/index.ts','--dev'],{env:{...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1',AUTH_DEV_LOGIN:'1',NODE_ENV:'test',FANTASY_ACCOUNT_TEST_BYPASS:'0',SERVER_PORT:String(port),DATA_DIR:directory,SESSIONS_FILE:sessions,LIVEKIT_URL:'',LIVEKIT_API_KEY:'',LIVEKIT_API_SECRET:'',KOKOAAI_APIKEY: ''},stdio:['ignore','pipe','pipe']});
   let logs='';child.stdout.on('data',data=>{logs+=String(data);});child.stderr.on('data',data=>{logs+=String(data);});
   const sockets:WebSocket[]=[];
   t.after(async()=>{
@@ -79,44 +80,52 @@ test('world accounts deny anonymous legacy IDs, forged reserved identities, wron
 });
 
 test('world accounts preserve separate Tonarium friends, DMs, groups, profiles and online identities for same-cookie tabs',{timeout:30000},async t=>{
+  // ホームの本人はログインで決まる。2 人が同じ fantasy のアカウントで遊んでも、フォロー・DM・グループ・プロフィールはそれぞれのアカウントに残る
   const alice='Common Alice',bob='Common Bob',friend='Common Friend',newFriend='New Friend';
-  const fixture=await isolated(t,{friends:[[alice,friend],[bob,friend]]}),observer=await fixture.peer('common-friend',{name:friend});
-  const first=await fixture.peer('home-alice',{name:alice});first.send({t:'join',sid:'account-world'});await first.barrier();
+  const fixture=await isolated(t);
+  const [aliceLogin,bobLogin,friendLogin,newLogin]=await Promise.all([alice,bob,friend,newFriend].map(name=>devLogin(fixture.origin,name)));
+  const aliceId=aliceLogin.id,bobId=bobLogin.id,friendId=friendLogin.id,newId=newLogin.id;
+  const observer=await fixture.peer(friendId,{cookie:friendLogin.headers.Cookie});
+  const first=await fixture.peer(aliceId,{cookie:aliceLogin.headers.Cookie});
+  const second=await fixture.peer(bobId,{cookie:bobLogin.headers.Cookie});
+  for(const [from,to] of [[observer,aliceId],[observer,bobId],[first,friendId],[second,friendId]] as const)from.send({t:'followUser',to,on:true});
+  await observer.wait(message=>message.t==='friends'&&Array.isArray(message.ids)&&message.ids.includes(aliceId)&&message.ids.includes(bobId));
+  first.send({t:'join',sid:'account-world'});await first.barrier();
   const registered=await fixture.http('register',{username:'common_scope',password}),principal=registered.body.account!.principal;
   first.send({t:'fantasyAccountBind',ticket:registered.body.ticket});await first.wait(message=>message.t==='fantasyAccountState'&&message.activeId===principal);
-  const second=await fixture.peer('home-bob',{name:bob}),status=await fixture.http('status',undefined,registered.cookie);
+  const status=await fixture.http('status',undefined,registered.cookie);
   second.send({t:'join',sid:'account-world'});await second.barrier();second.send({t:'fantasyAccountBind',ticket:status.body.ticket});await second.wait(message=>message.t==='fantasyAccountState'&&message.activeId===principal);await second.barrier();
   const peopleAt=observer.messages.length;second.send({t:'setStatus',status:'busy',text:'Bob only status'});
-  const people=await observer.wait(message=>message.t==='people'&&Array.isArray(message.list)&&(message.list as {name:string;status:string}[]).some(person=>person.name===bob&&person.status==='busy'),peopleAt);
-  for(const name of [alice,bob])assert.equal((people.list as {name:string;lastSeen:number|null}[]).find(person=>person.name===name)?.lastSeen,null);
-  assert.notEqual((people.list as {name:string;status:string}[]).find(person=>person.name===alice)?.status,'busy');
+  const people=await observer.wait(message=>message.t==='people'&&Array.isArray(message.list)&&(message.list as {id:string;status:string}[]).some(person=>person.id===bobId&&person.status==='busy'),peopleAt);
+  for(const id of [aliceId,bobId])assert.equal((people.list as {id:string;lastSeen:number|null}[]).find(person=>person.id===id)?.lastSeen,null);
+  assert.notEqual((people.list as {id:string;status:string}[]).find(person=>person.id===aliceId)?.status,'busy');
   const groupAt=observer.messages.length;first.send({t:'groupCreate',name:'Alice own group',color:'#abcdef'});
-  await observer.wait(message=>message.t==='groups'&&Array.isArray(message.list)&&(message.list as {name:string;owner:string}[]).some(group=>group.name==='Alice own group'&&group.owner===alice),groupAt);
+  await observer.wait(message=>message.t==='groups'&&Array.isArray(message.list)&&(message.list as {name:string;owner:string}[]).some(group=>group.name==='Alice own group'&&group.owner===aliceId),groupAt);
   second.send({t:'groupCreate',name:'Bob own group',color:'#abcdef'});
-  await observer.wait(message=>message.t==='groups'&&Array.isArray(message.list)&&(message.list as {name:string;owner:string}[]).some(group=>group.name==='Bob own group'&&group.owner===bob),groupAt);
-  const newcomer=await fixture.peer('common-new-friend',{name:newFriend});const friendAt=newcomer.messages.length;
-  first.send({t:'followUser',name:newFriend,on:true});
-  const invitation=await newcomer.wait(message=>message.t==='followed',friendAt);assert.equal(invitation.from,'home-alice');assert.equal(invitation.fromName,alice);
-  const aliceFriendsAt=first.messages.length,bobPrivateAt=second.messages.length;newcomer.send({t:'followUser',name:alice,on:true});
-  const followed=await first.wait(message=>message.t==='followed'&&message.from==='common-new-friend',aliceFriendsAt);assert.equal(followed.fromName,newFriend);
-  await first.wait(message=>message.t==='friends'&&Array.isArray(message.names)&&message.names.includes(newFriend),aliceFriendsAt);
-  await first.wait(message=>message.t==='follows'&&Array.isArray(message.following)&&message.following.includes(newFriend)&&Array.isArray(message.followers)&&message.followers.includes(newFriend),aliceFriendsAt);await second.barrier();
-  assert.ok(!second.messages.slice(bobPrivateAt).some(message=>message.t==='friends'&&Array.isArray(message.names)&&message.names.includes(newFriend)));
-  assert.ok(!second.messages.slice(bobPrivateAt).some(message=>message.t==='followed'&&message.from==='common-new-friend'));
+  await observer.wait(message=>message.t==='groups'&&Array.isArray(message.list)&&(message.list as {name:string;owner:string}[]).some(group=>group.name==='Bob own group'&&group.owner===bobId),groupAt);
+  const newcomer=await fixture.peer(newId,{cookie:newLogin.headers.Cookie});const friendAt=newcomer.messages.length;
+  first.send({t:'followUser',to:newId,on:true});
+  const invitation=await newcomer.wait(message=>message.t==='followed',friendAt);assert.equal(invitation.from,aliceId);assert.equal(invitation.fromName,alice);
+  const aliceFriendsAt=first.messages.length,bobPrivateAt=second.messages.length;newcomer.send({t:'followUser',to:aliceId,on:true});
+  const followed=await first.wait(message=>message.t==='followed'&&message.from===newId,aliceFriendsAt);assert.equal(followed.fromName,newFriend);
+  await first.wait(message=>message.t==='friends'&&Array.isArray(message.ids)&&message.ids.includes(newId),aliceFriendsAt);
+  await first.wait(message=>message.t==='follows'&&Array.isArray(message.following)&&message.following.includes(newId)&&Array.isArray(message.followers)&&message.followers.includes(newId),aliceFriendsAt);await second.barrier();
+  assert.ok(!second.messages.slice(bobPrivateAt).some(message=>message.t==='friends'&&Array.isArray(message.ids)&&message.ids.includes(newId)));
+  assert.ok(!second.messages.slice(bobPrivateAt).some(message=>message.t==='followed'&&message.from===newId));
   for(const message of second.messages.slice(bobPrivateAt).filter(message=>message.t==='follows')) {
-    assert.ok(Array.isArray(message.following)&&!message.following.includes(newFriend));
-    assert.ok(Array.isArray(message.followers)&&!message.followers.includes(newFriend));
+    assert.ok(Array.isArray(message.following)&&!message.following.includes(newId));
+    assert.ok(Array.isArray(message.followers)&&!message.followers.includes(newId));
   }
-  const conv=`dm:${[alice,newFriend].sort().join('\u0000')}`,incoming='ALICE_ONLY_PRIVATE_MESSAGE',outgoing='ALICE_ONLY_PRIVATE_REPLY';
+  const conv=dmKey(aliceId,newId),incoming='ALICE_ONLY_PRIVATE_MESSAGE',outgoing='ALICE_ONLY_PRIVATE_REPLY';
   const aliceDmAt=first.messages.length,newcomerDmAt=newcomer.messages.length;newcomer.send({t:'msg',conv,text:incoming});
   await first.wait(message=>message.t==='msg'&&(message.m as {text?:string})?.text===incoming,aliceDmAt);first.send({t:'msg',conv,text:outgoing});
-  const answer=await newcomer.wait(message=>message.t==='msg'&&(message.m as {text?:string})?.text===outgoing,newcomerDmAt);assert.equal((answer.m as {from:string}).from,alice);await second.barrier();
+  const answer=await newcomer.wait(message=>message.t==='msg'&&(message.m as {text?:string})?.text===outgoing,newcomerDmAt);assert.equal((answer.m as {from:string}).from,aliceId);await second.barrier();
   assert.ok(!JSON.stringify(second.messages.slice(bobPrivateAt)).includes(incoming));assert.ok(!JSON.stringify(second.messages.slice(bobPrivateAt)).includes(outgoing));
   assert.equal(first.messages.slice(aliceDmAt).filter(message=>message.t==='msg'&&(message.m as {text?:string})?.text===incoming).length,1);
-  const profileResponse=await fetch(`${fixture.origin}/profile?name=${encodeURIComponent(alice)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({bio:'Alice original profile'})});assert.equal(profileResponse.ok,true);
+  const profileResponse=await fetch(`${fixture.origin}/profile`,{method:'POST',headers:{'Content-Type':'application/json',...aliceLogin.headers},body:JSON.stringify({bio:'Alice original profile'})});assert.equal(profileResponse.ok,true);
   const updatedAt=first.messages.length;first.send({t:'profileUpdated'});await first.wait(message=>message.t==='users'&&Array.isArray(message.list)&&(message.list as {id:string;bio:string}[]).some(user=>user.id===principal&&user.bio==='Alice original profile'),updatedAt);
   const firstLeaveAt=first.messages.length,secondLeaveAt=second.messages.length;first.send({t:'leave'});
-  const restoredAlice=await first.wait(message=>message.t==='fantasyAccountState'&&message.activeId==='home-alice',firstLeaveAt),restoredBob=await second.wait(message=>message.t==='fantasyAccountState'&&message.activeId==='home-bob',secondLeaveAt);
+  const restoredAlice=await first.wait(message=>message.t==='fantasyAccountState'&&message.activeId===aliceId,firstLeaveAt),restoredBob=await second.wait(message=>message.t==='fantasyAccountState'&&message.activeId===bobId,secondLeaveAt);
   assert.equal(restoredAlice.user?.name,alice);assert.equal((restoredAlice.user as {bio?:string})?.bio,'Alice original profile');assert.equal(restoredBob.user?.name,bob);assert.equal((restoredBob.user as {status?:string})?.status,'busy');assert.notEqual((restoredBob.user as {bio?:string})?.bio,'Alice original profile');
 });
 

@@ -8,8 +8,10 @@ import { receiveSystemCommandResult, resetSystemCommands } from '../systems/api.
 import { COMPAT_VERSION, isRoomClientMsg, type ClientMsg, type ServerMsg, type SessionInfo, type SessionSnapshot } from '../../../shared/protocol.ts';
 import type { SurvivorState } from '../../../shared/survivor.ts';
 import { applyAvatars } from '../sessionView.ts';
-import { get, recompute, set, spawnPoint } from '../store.ts';
-import { fantasyAccountDisconnected, fantasyAccountIdentityUpdate, fantasyPrivateMessagesAllowed, fantasyReconnectIdentity } from '../world/fantasy-account-state.ts';
+import { get, recompute, set, showToast, spawnPoint } from '../store.ts';
+import { wsSessionQuery } from '../auth.ts';
+import { msg as uiMsg } from '../i18n/index.ts';
+import { fantasyAccountDisconnected, fantasyAccountIdentityUpdate, fantasyPrivateMessagesAllowed } from '../world/fantasy-account-state.ts';
 import { appendFantasyGmResponse, clearFantasyGmLife, fantasyGmRequestOwner } from '../world/fantasy-gm-history.ts';
 import { clearNpcRequests, consumeNpcRequest, npcRequestOwner } from '../world/npc-request-tracker.ts';
 
@@ -63,7 +65,7 @@ export function requestSession(msg: Extract<ClientMsg, { t: 'sessionCreate' | 'j
 }
 
 export function connectWs() {
-  const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+  const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws${wsSessionQuery()}`;
   const ws = new WebSocket(url);
   let openedAt = 0;
   g.__tonariumWs = ws;
@@ -72,7 +74,8 @@ export function connectWs() {
     retry = 0;
     set({ wsConnected: true, wsReady: false });
     const s = get();
-    send({ t: 'hello', id: fantasyReconnectIdentity(s), name: s.selfName, compat: COMPAT_VERSION });
+    // 本人はログインのセッションで決まる（fantasy のアカウントで動いていても、つなぎ直すとホームの本人に戻る）
+    send({ t: 'hello', compat: COMPAT_VERSION });
     if (s.session) {
       send({ t: 'join', sid: s.session });
       // ホームの再接続後は、参加資格と部屋の状態も取り直す。
@@ -94,6 +97,8 @@ export function connectWs() {
     if (get().gmPending) set({ gmPending: false, gmRequestId: null, gmError: 'unavailable', gmErrorLocale: null });
     if (get().communityPending) set({ communityPending: false, communityError: 'unavailable' });
     if (get().session) set({ sync: 'unavailable', syncError: uiSource('ui472') });
+    // ログインが切れた（ほかのタブでログアウトした・期限切れ）ときは、つなぎ直しても断られるので入口からやり直す
+    if (event.code === 4401) { location.reload(); return; }
     // 互換性バージョン違いで断たれた場合はつなぎ直しても結果が同じなので、再接続しない
     if (!get().incompatible) setTimeout(connectWs, Math.min(5000, 500 * 2 ** retry++));
   };
@@ -222,6 +227,9 @@ export function onMessage(msg: ServerMsg) {
     case 'incompatible':
       set({ incompatible: true });
       return;
+    case 'loginRequired':
+      showToast(uiMsg('authLoginRequired'));
+      return;
     case 'syncConfig': void configureSessionSync(msg.requestId, msg.config); return;
     case 'syncError': syncError(msg.requestId, msg.error); return;
     case 'syncReset': resetSessionSync(msg.sid); return;
@@ -245,7 +253,7 @@ export function onMessage(msg: ServerMsg) {
     case 'chat': {
       const s = get();
       const arrival = receiveChatArrival(chatScope('session', msg.sid), msg.m, s.chats[msg.sid] ?? [],
-        msg.sid === s.session && !!msg.m.from && msg.m.from !== s.selfId && !s.blocked.includes(msg.m.fromName));
+        msg.sid === s.session && !!msg.m.from && msg.m.from !== s.selfId && !s.blocked.includes(msg.m.from));
       set((s) => ({
         ...arrival,
         chats: { ...s.chats, [msg.sid]: (s.chats[msg.sid] ?? []).some((m) => m.id === msg.m.id)
@@ -273,7 +281,7 @@ export function onMessage(msg: ServerMsg) {
     case 'itemMove':
       set((s) => {
         const cur = s.itemsBy[msg.sid]?.[msg.id];
-        const transform = cur && (cur.kind === 'image' || cur.kind === 'video') ? { y: msg.y ?? cur.y, scale: msg.scale ?? cur.scale } : {};
+        const transform = cur && cur.kind === 'image' ? { y: msg.y ?? cur.y, scale: msg.scale ?? cur.scale } : {};
         return cur ? { itemsBy: { ...s.itemsBy, [msg.sid]: { ...s.itemsBy[msg.sid], [msg.id]: { ...cur, x: msg.x, z: msg.z, ry: msg.ry, ...transform } } } } : {};
       });
       break;
@@ -297,8 +305,7 @@ export function onMessage(msg: ServerMsg) {
       return;
     case 'poke': {
       if (msg.sid !== get().session) return;
-      const from = get().users.find((u) => u.id === msg.from);
-      if (from && get().blocked.includes(from.name)) return;
+      if (get().blocked.includes(msg.from)) return;
       set((s) => ({ pokes: { ...s.pokes, [msg.to]: performance.now() } }));
       // 取り込み中は音を鳴らさない
       if (msg.to === get().selfId) { pushNotice('poke', msg.from); if (!selfBusy()) playPoke(); }
@@ -309,7 +316,7 @@ export function onMessage(msg: ServerMsg) {
       return;
     case 'sound':
       if (msg.sid !== get().session) return;
-      if (!get().blocked.includes(get().users.find((u) => u.id === msg.from)?.name ?? '')) playSynth(msg.id, volumeFrom(msg.from));
+      if (!get().blocked.includes(msg.from)) playSynth(msg.id, volumeFrom(msg.from));
       return;
     case 'attention': {
       if (msg.sid !== get().session) return;
@@ -439,7 +446,7 @@ export function onMessage(msg: ServerMsg) {
       return;
     }
     case 'friends':
-      set({ friends: msg.names });
+      set({ friends: msg.ids });
       return;
     case 'sessions':
       set((s) => ({ guild: { ...s.guild, sessions: msg.list } }));
@@ -458,7 +465,7 @@ export function onMessage(msg: ServerMsg) {
         for (const [conv, messages] of Object.entries(convs)) knownChats.remember(chatScope('conversation', conv), messages);
       }
       set((s) => ({
-        inbox: msg.convs, reads: msg.reads, people: Object.fromEntries(msg.people.map((p) => [p.name, p])),
+        inbox: msg.convs, reads: msg.reads, people: Object.fromEntries(msg.people.map((p) => [p.id, p])),
         watching: msg.watching, recentStatus: msg.recentStatus,
         // 再接続やグループの出入りで届き直したときは、最初の「前回」を保つ
         lastSeen: s.lastSeen === undefined ? msg.lastSeen : s.lastSeen,
@@ -467,7 +474,7 @@ export function onMessage(msg: ServerMsg) {
     case 'msg': {
       const s = get();
       const arrival = receiveChatArrival(chatScope('conversation', msg.conv), msg.m, s.inbox[msg.conv] ?? [],
-        !!msg.m.from && msg.m.from !== s.selfName && !s.blocked.includes(msg.m.from), msg.conv);
+        !!msg.m.from && msg.m.from !== s.selfId && !s.blocked.includes(msg.m.from), msg.conv);
       set((s) => {
         const list = s.inbox[msg.conv] ?? [];
         const i = list.findIndex((m) => m.id === msg.m.id);
@@ -483,10 +490,13 @@ export function onMessage(msg: ServerMsg) {
       set((s) => ({ reads: { ...s.reads, [msg.conv]: Math.max(s.reads[msg.conv] ?? 0, msg.at) } }));
       return;
     case 'people':
-      set({ people: Object.fromEntries(msg.list.map((p) => [p.name, p])) });
+      set({ people: Object.fromEntries(msg.list.map((p) => [p.id, p])) });
       return;
     case 'watching':
-      set({ watching: msg.names, recentStatus: msg.recentStatus });
+      set({ watching: msg.ids, recentStatus: msg.recentStatus });
+      return;
+    case 'directory':
+      set((s) => ({ directory: msg.full ? Object.fromEntries(msg.list.map((e) => [e.id, e])) : { ...s.directory, ...Object.fromEntries(msg.list.map((e) => [e.id, e])) } }));
       return;
     case 'askJoin':
       pushNotice('askJoin', msg.from, msg.fromName, `session:${msg.session}`);

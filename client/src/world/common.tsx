@@ -16,9 +16,10 @@ import { popoverPosition } from './popoverPosition.ts';
 
 /** アイコンがあれば画像、無ければ頭文字 */
 export function Face({ id, name, size = 32, ring }: { id: string; name: string; size?: number; ring?: string }) {
-  const icon = useStore((s) => s.users.find((u) => u.id === id)?.icon);
+  // オフラインの人は名簿の版を使う
+  const icon = useStore((s) => s.users.find((u) => u.id === id)?.icon ?? s.directory[id]?.icon);
   const style: React.CSSProperties = { width: size, height: size, background: colorOf(id), fontSize: size * 0.44, boxShadow: ring };
-  if (icon) return <img className="face" style={style} src={iconUrl(name, icon)} alt="" />;
+  if (icon) return <img className="face" style={style} src={iconUrl(id, icon)} alt="" />;
   return <span className="face" style={style}>{name.slice(0, 1)}</span>;
 }
 

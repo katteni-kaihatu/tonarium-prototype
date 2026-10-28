@@ -8,12 +8,13 @@
 - `client/` Vite + React + TypeScript。3D は React Three Fiber。状態は zustand
   - `client/src/world/` ワールド画面（左のプレイヤー・アイテム、上の顔、右の通知・ログ、下のドック、背面のウィンドウ）
   - `client/src/home/` ホーム画面（セッション外。タイムライン・セッション・フレンド・イベント・グループ・ワールド・アイテムの一覧と作成）
-- `server/` Node + ws + kokosync。オンラインのユーザーと、セッションごとの状態（チャット・アイテム・アバター位置）を保持する。セッション内のデータ同期は kokosync、フレンド・DM・ホームは従来の WebSocket（[docs/sync.md](docs/sync.md)）。LiveKit の通話トークンも発行。画面から作ったセッション・グループ・イベントは `data/home.json`、フォローは `data/follows.json`、タイムラインのポストは `data/timeline.json` に保存
+- `server/` Node + ws + kokosync。オンラインのユーザーと、セッションごとの状態（チャット・アイテム・アバター位置）を保持する。セッション内のデータ同期は kokosync、フレンド・DM・ホームは従来の WebSocket（[docs/sync.md](docs/sync.md)）。LiveKit の通話トークンも発行。画面から作ったセッション・グループ・イベント・フォロー・DM・ステータス・自己紹介・タイムライン・アイテム・ゲームの進み具合・いいね・通報は PostgreSQL に保存（[docs/storage.md](docs/storage.md)）
 - `shared/protocol.ts` アプリのメッセージ型、`shared/session-wire.ts` MessagePack と同期パケット、`shared/session-position.ts` 位置配送、`shared/session-events.ts` P2Pでの本文配送とサーバー確定後の適用、`shared/places.ts` 位置と距離（クライアントとサーバーで共用）
-- `sessions.json` 最初からあるセッションの構成（各セッションが最初に読み込むワールド＝ 3D 空間も指定）。ホームの「セッションを作る」で増やしたものは `data/home.json`
+- `sessions.json` 最初からあるセッションの構成（各セッションが最初に読み込むワールド＝ 3D 空間も指定）。ホームの「セッションを作る」で増やしたものは DB（[docs/storage.md](docs/storage.md)）
 - `shared/worlds.ts` ワールドの種類（ホール・カフェ・ゲーム・宵闇サバイバーズ・街・ガーデン・AD 研究所・悠久の旅路）と家具の当たり判定。見た目は `client/src/view3d/worlds3d.tsx`。街の配置と電車・エレベーターは `shared/city.ts`。AD 研究所の配置は `shared/antimatterLayout.ts`、進行は `client/src/ad/`（engine そのまま＋ zustand スライス）。悠久の旅路は専用の平面地図 RPG（[docs/fantasy.md](docs/fantasy.md)）
 - `client/public/brand/` ロゴ・ファビコン・OGP 画像。OGP の絶対 URL は、サーバーが `index.html` を返すときにアクセスされたドメインで埋める（`__ORIGIN__`）
 - 音声・画面共有は LiveKit。本番は Coolify で自前の `livekit-server` を一緒に動かし、手元では Docker で開発用の LiveKit を動かす。データ同期は独立した kokosync 接続を使う
+- 保存は PostgreSQL（Drizzle ORM、`server/db/`、マイグレーションは `drizzle/`）と S3 互換のストレージ（本番は Cloudflare R2、手元は SeaweedFS、`server/storage.ts`）へ移している途中。いまはまだ `data/` の JSON が主で、DB にはログイン用の表だけがある（[docs/storage.md](docs/storage.md)）
 
 詳しい仕組みと使い方は [docs/](docs/) にある。
 
@@ -31,8 +32,9 @@ Avalonia／Unity による Windows／Linux ネイティブ版は廃止しまし�
 ```bash
 npm install
 cp .env.example .env   # 手元の LiveKit（devkey / secret）を使う設定になっている
-npm run livekit        # 開発用の LiveKit を Docker で起動（Docker Desktop が必要。止めるときは npm run livekit:stop）
+npm run services       # 開発用の LiveKit・PostgreSQL・SeaweedFS を Docker で起動（Docker Desktop が必要。止めるときは npm run services:stop）
 ```
+サーバーは起動時に `DATABASE_URL` の PostgreSQL へつなぎ、まだ流していないマイグレーションを流す。つながらなければ理由を出して止まるので、`npm run dev` の前に `npm run services` を動かしておく。
 接続先 `https://45.77.130.146` とプロトタイプ用の Basic 認証情報はサーバー側に同梱している。変更する場合は `.env` の `KOKOSYNC_URL` と `KOKOSYNC_USERNAME` / `KOKOSYNC_PASSWORD` を設定する。ブラウザには認証情報を配らず、Tonarium サーバーを経由して接続する。ローカルの認証ファイルを指定する方法と通信の上限は [docs/sync.md](docs/sync.md) を参照。
 
 LiveKit が動いていなくても、kokosync につながればチャット・アイテム・位置は同期する。通話・映像の接続状態はドックの上に別表示する。
@@ -47,10 +49,16 @@ npm run dev
 タスク完了前に `npm run check:completion` を実行する。変更履歴に触れていないことの確認、型チェック、ビルドの順で実行し、失敗したら完了にしない。履歴チェックだけなら `npm run check:changelog`、回帰テストは `npm run test:changelog`。比較元は既定で `git merge-base HEAD origin/develop`（`origin/develop` が無ければ `origin/main`）。別の比較元は `CHANGELOG_BASE`、または `npm run check:changelog -- --base <タスク開始時のコミット>` で指定できる。
 
 作業ブランチは `develop` から切って `develop` 宛てに PR を出す。`main` へはリリース担当（Tonarium Agent）が15分ごとに `develop` をまとめて反映する（差分がなければ何もしない）。`main` と `develop` 宛ての全 PR はファイル種別による除外なしで GitHub Actions の Web checks を実行する。Electron checks と Nightly configuration checks は、どの宛て先の PR でも、`main`・`develop` への push でも動く（対象のファイルが変わったときだけ）。Electron の nightly ビルド・配布（`electron/` と配布処理が変わったときだけ）と、共有アセット・共有システムの投稿の検査と配布の準備は `main` だけ。`develop` 宛てでは変更履歴に触れていないこと、`main` 宛てでは既存履歴の保持と形式、型チェック、ビルド、クライアント・同期テストを確認する。手動実行では対象コミットの親を比較元にする。Discord のフィードバックから作った PR も同じチェックを通してからマージする。
-http://localhost:5173 を開く。同じブラウザで別人として入るには `?as=b` のように付ける（名前はブラウザ共通で覚えるので、入る前に変える）。
-動作確認で作ったセッション・グループ・イベントを消したいときは `data/home.json` を消してサーバーを再起動する。
+大きな作業（何本もの PR に分けるもの）は、`develop` から `feature/<名前>` を切ってそこ宛てに PR を集め、そろったら `feature/<名前>` から `develop` へ 1 本で出す。`develop` に入ったものはそのまま `main` に反映されるため、途中の状態を `develop` に入れない。`feature/*` 宛ての PR でも Web checks が動く（`develop` 宛てと同じく、変更履歴には触れない）。
 
-別のワークツリーと同時に動かすときは、`.env` の `SERVER_PORT` と `CLIENT_PORT` をずらし（例: 3011 と 5183）、`LIVEKIT_ROOM_PREFIX` も変える（同じ LiveKit を共有するので、部屋が混ざらないように）。
+http://localhost:5173 を開く。`.env` に `AUTH_DEV_LOGIN=1` があれば（`.env.example` に入っている）、`?as=b` のように付けると、その名前の開発用アカウント（ログイン扱い）でそのタブだけ入れる（同じブラウザでも別人になる。[docs/login.md](docs/login.md)）。
+動作確認で作ったセッション・グループ・イベントなどを消したいときは、サーバーを止めて開発用の DB を作り直す（[docs/storage.md](docs/storage.md)）。
+
+別のワークツリーと同時に動かすときは、`.env` の `SERVER_PORT` と `CLIENT_PORT` をずらし（例: 3011 と 5183）、`LIVEKIT_ROOM_PREFIX` も変える（同じ LiveKit を共有するので、部屋が混ざらないように）。DB とストレージも共有するので、`DATABASE_URL` は別の DB（例: `.../tonarium_isolated`。`npm run services` が最初から作る。ほかの名前は `docker compose -f docker-compose.dev.yml exec postgres createdb -U tonarium <名前>` で作る）にし、`S3_PREFIX` も変える。`.claude/launch.json` の `dev-isolated` はそう設定してある。
+
+サーバーの integration test（`npm run test:integration` など）は、テストごとに使い捨ての DB を作って消す（`server/test-db.ts`。既定の接続先は開発用の PostgreSQL、`TEST_DATABASE_URL` で変えられる）。`npm run services` を動かしておくこと。ストレージのテストを SeaweedFS でも試すときは `S3_TEST_ENDPOINT=http://localhost:8333 npm run test:storage`。
+
+DB のテーブルを変えるときは `server/db/schema.ts` を直して `npm run db:generate` でマイグレーションの SQL を `drizzle/` に作り、一緒にコミットする（作った SQL は手で直さない）。
 
 ## セッション構成の変更
 `sessions.json` を編集する。
@@ -61,7 +69,7 @@ http://localhost:5173 を開く。同じブラウザで別人として入るに�
 - `world` は最初に読み込むワールド（`room` ＝ホール、`cafe` ＝カフェ、`game` ＝ゲーム（板わたり）、`survivors` ＝宵闇サバイバーズ、`city` ＝街、`garden` ＝ガーデン、`antimatter` ＝ AD 研究所、`fantasy` ＝悠久の旅路。省略時は `room`）
 - 既存セッションの初期ワールドはそのまま。ガーデンは設定の「ワールド」から選べる。新しいセッションの初期ワールドにする場合だけ `"world": "garden"` を指定する
 - ここに書いたセッションはパブリック（だれでも見える）。公開範囲を絞ったセッションはホームの「セッションを作る」で作る
-- `npm run dev` 中は保存するとサーバーが再起動する（セッション内のチャットは消える。アイテムは `data/items.json` から戻る）。`npm start` の場合は再起動が必要
+- `npm run dev` 中は保存するとサーバーが再起動する（セッション内のチャットは消える。アイテムは DB から戻る）。`npm start` の場合は再起動が必要
 
 ## 主な機能
 
@@ -101,8 +109,10 @@ http://localhost:5173 を開く。同じブラウザで別人として入るに�
 - 悠久の旅路の祈り・状態別の売却価格 → [docs/fantasy-prayer-sales.md](docs/fantasy-prayer-sales.md)、仕事中の判定と途中経過 → [docs/fantasy-work-progress.md](docs/fantasy-work-progress.md)
 - 悠久の旅路のスキル説明・行動制限・操作案内 → [docs/fantasy-interface.md](docs/fantasy-interface.md)、非公開の検証用操作 → [docs/fantasy-test-tools.md](docs/fantasy-test-tools.md)
 - 距離で変わる声、ブロードキャストモード、ついていく → [docs/audio.md](docs/audio.md)
-- アイテム（付箋・ハンマー・チェス・サイコロ・キャンバス・お絵描き伝言・カメラ・鏡・ジャンプ台・2048・AD ポータル・バイク）と画像・動画・YouTube の共有 → [docs/items.md](docs/items.md)。バイクの未完了項目は [検証記録](docs/bike-verification.md)、効果音の出典と取得状況は [素材記録](docs/assets.md)
+- アイテム（付箋・ハンマー・チェス・サイコロ・キャンバス・お絵描き伝言・カメラ・鏡・ジャンプ台・2048・AD ポータル・バイク）と画像・YouTube の共有 → [docs/items.md](docs/items.md)。バイクの未完了項目は [検証記録](docs/bike-verification.md)、効果音の出典と取得状況は [素材記録](docs/assets.md)
 - 外から試す（cloudflared）・Coolify へのデプロイ → [docs/deploy.md](docs/deploy.md)
+- 保存の仕組み（PostgreSQL・S3 互換ストレージ・マイグレーション・テスト用 DB）→ [docs/storage.md](docs/storage.md)
+- ログインとゲスト（Misskey の OAuth 2.0、Electron でのログイン、ゲストにできること、開発用の `?as=`）→ [docs/login.md](docs/login.md)
 - 同期の仕組み（kokosync、位置・チャット・キャンバス・サイコロのP2P配送、初回同期、大きいデータ、通信状態）→ [docs/sync.md](docs/sync.md)
 - セッション同期を汎用P2P通信へ広げる設計方針と段階的な実装 → [docs/peer-sync-plan.md](docs/peer-sync-plan.md)
 - 実装の設計 → [docs/architecture.md](docs/architecture.md)

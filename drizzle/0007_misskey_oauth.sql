@@ -1,0 +1,1 @@
+ALTER TABLE "login_pending" ADD COLUMN "verifier" text DEFAULT '' NOT NULL;

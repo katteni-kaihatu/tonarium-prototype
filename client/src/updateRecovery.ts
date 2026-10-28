@@ -6,7 +6,6 @@ import { walkTo } from './walk.ts';
 import { isElectron } from './updateBridge.ts';
 import { updateDrafts } from './updateDraft.ts';
 import { room, toggleMic } from './net/livekit.ts';
-import { abandonRecordings, prepareRecordings } from './updateRecording.ts';
 
 const KEY = 'tonarium.updateRecovery';
 const UI_KEYS = ['homePage', 'homeGroup', 'homeChannel', 'dmWith', 'hubOpen', 'friendsTab', 'timelineSide', 'composeQuote', 'phoneTab', 'sideWidget',
@@ -22,7 +21,6 @@ export async function prepareUpdate(restart = false) {
   applying = true;
   try {
     await Promise.all([...recoveryTasks].map(task => task()));
-    const recordings = await prepareRecordings();
     const s = get();
     const ui = Object.fromEntries(UI_KEYS.map(key => [key, s[key]])) as Ui;
     if (s.sharer === s.selfId) {
@@ -31,9 +29,9 @@ export async function prepareUpdate(restart = false) {
     }
     const drafts = updateDrafts();
     (restart ? localStorage : sessionStorage).setItem(KEY, JSON.stringify({ schema: 1, at: Date.now(), joined: s.joined, id: s.selfId, name: s.selfName,
-      session: s.session, mode: s.mode, avatar: s.selfAvatar, camera: cameraView, ui, drafts, recordings,
+      session: s.session, mode: s.mode, avatar: s.selfAvatar, camera: cameraView, ui, drafts,
       shared: s.sharer === s.selfId, world: s.session ? s.worldBy[s.session] : null }));
-  } catch (error) { applying = false; abandonRecordings(); throw error; }
+  } catch (error) { applying = false; throw error; }
 }
 
 export async function applyUpdate(apply: () => void) {
@@ -43,7 +41,6 @@ export async function applyUpdate(apply: () => void) {
 
 export function abandonPreparedUpdate() {
   applying = false;
-  abandonRecordings();
   try { sessionStorage.removeItem(KEY); if (isElectron()) localStorage.removeItem(KEY); } catch { /* 保存不可でもロックを解除する。 */ }
 }
 
@@ -57,13 +54,11 @@ export function readRecovery() {
     || !Number.isFinite(value.at) || value.at > Date.now() || Date.now() - value.at > 24 * 60 * 60 * 1000 || !value.ui || !['2d', '3d'].includes(value.mode)
     || (value.session !== null && typeof value.session !== 'string') || !value.drafts || typeof value.drafts !== 'object'
     || typeof value.camera?.thirdPerson !== 'boolean' || !Number.isFinite(value.camera?.distance)
-    || (value.recordings !== undefined && (!Array.isArray(value.recordings) || value.recordings.some((recording: { id?: unknown; conv?: unknown } | null) =>
-      !recording || typeof recording.id !== 'string' || typeof recording.conv !== 'string')))
     || !Array.isArray(value.ui.windows) || !value.ui.folded || typeof value.ui.micEnabled !== 'boolean'
     || ![value.avatar?.x, value.avatar?.z, value.avatar?.ry].every(Number.isFinite)) throw new Error(t('updateInvalidRecovery'));
   return value as { joined: boolean; id: string; name: string; session: string | null; mode: '2d' | '3d';
     avatar: ReturnType<typeof get>['selfAvatar']; camera: typeof cameraView; ui: Ui; drafts: Record<string, string>;
-    recordings?: Awaited<ReturnType<typeof prepareRecordings>>; shared: boolean; world: string | null };
+    shared: boolean; world: string | null };
 }
 
 export async function restoreUpdate(snapshot: NonNullable<ReturnType<typeof readRecovery>>) {

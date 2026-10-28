@@ -5,6 +5,8 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
+import { markIdData, seedDevAccounts, seedHomeData, testServerEnv } from './test-db.ts';
+import { devLogin } from './test-auth.ts';
 import { WebSocket } from 'ws';
 import { COMPAT_VERSION, type ServerMsg, type SessionDef } from '../shared/protocol.ts';
 
@@ -20,21 +22,24 @@ async function until<T>(read: () => T | undefined): Promise<T> {
 }
 
 test('shared targets use filtered lists and server join authorization', { timeout: 35_000 }, async (t) => {
+  const dbEnv = await testServerEnv(t);
   const data = await mkdtemp(path.join(os.tmpdir(), 'tonarium-links-'));
   t.after(() => rm(data, { recursive: true, force: true }));
+  const ids = await seedDevAccounts(dbEnv, ['stranger', 'owner', 'invited', 'member']);
+  await markIdData(data);
   const sessions: SessionDef[] = ['public', 'friends', 'group', 'groupPlus', 'invite'].map((visibility) => ({
-    id: visibility, name: visibility, visibility: visibility as SessionDef['visibility'], owner: 'owner', group: 'team', invited: ['invited'],
+    id: visibility, name: visibility, visibility: visibility as SessionDef['visibility'], owner: ids.owner, group: 'team', invited: [ids.invited],
   }));
   await writeFile(path.join(data, 'sessions.json'), JSON.stringify({ name: 'Test', sessions }));
-  await writeFile(path.join(data, 'home.json'), JSON.stringify({ sessions: [], events: [], renamed: {}, groups: [
-    { id: 'team', name: 'Team', color: '#000', owner: 'member', members: ['member'], channels: [] },
-  ] }));
+  await seedHomeData(dbEnv, { home: { groups: [
+    { id: 'team', name: 'Team', color: '#000', owner: ids.member, members: [ids.member], channels: [] },
+  ] } });
   const listener = net.createServer();
   await new Promise<void>((resolve) => listener.listen(0, '127.0.0.1', resolve));
   const port = (listener.address() as net.AddressInfo).port;
   await new Promise<void>((resolve) => listener.close(() => resolve()));
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
-    env: { ...process.env, SERVER_PORT: String(port), DATA_DIR: data, SESSIONS_FILE: path.join(data, 'sessions.json'), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' },
+    env: { ...process.env, ...dbEnv, SERVER_PORT: String(port), DATA_DIR: data, SESSIONS_FILE: path.join(data, 'sessions.json'), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let ready = false;
@@ -46,12 +51,13 @@ test('shared targets use filtered lists and server join authorization', { timeou
   });
   await until(() => ready ? true : undefined);
   for (const name of ['stranger', 'owner', 'invited', 'member']) {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+    const login = await devLogin(`http://127.0.0.1:${port}`, name);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { headers: login.headers });
     t.after(() => ws.terminate());
     const messages: ServerMsg[] = [];
     ws.on('message', (raw) => messages.push(JSON.parse(raw.toString())));
     await new Promise<void>((resolve) => ws.once('open', resolve));
-    ws.send(JSON.stringify({ t: 'hello', id: name, name, compat: COMPAT_VERSION }));
+    ws.send(JSON.stringify({ t: 'hello', compat: COMPAT_VERSION }));
     const snapshot = await until(() => messages.find((m) => m.t === 'snapshot'));
     assert.equal(snapshot.t, 'snapshot');
     if (snapshot.t !== 'snapshot') throw new Error('Expected snapshot');

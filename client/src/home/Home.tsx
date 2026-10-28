@@ -27,7 +27,7 @@ import { ChangelogPage, EventsPage, FriendTile, FriendsPage, GroupsPage, ItemsPa
 import { GroupActions, GroupPage, GroupTitle } from './GroupPage.tsx';
 import { GroupAvatar } from './GroupAvatar.tsx';
 import { StatusDialog, StatusDot, StatusText, useStatusOf } from './status.tsx';
-import { Chip, Empty, EventAnswer, EventHost, NameFace, WEEKDAYS, dateKey, match, timeLabel, useMyGroups, useOnlineFriends } from './common.tsx';
+import { Chip, Empty, EventAnswer, EventHost, PersonFace, WEEKDAYS, dateKey, match, timeLabel, useMyGroups, useOnlineFriends } from './common.tsx';
 import { touchOnly, usePhone } from '../phone.ts';
 import { FEEDBACK_URL } from '../feedback.ts';
 import { CHANGELOG } from '../i18n/static.ts';
@@ -99,7 +99,7 @@ export function Sidebar({ inSession, onPick }: { inSession?: boolean; onPick?: (
   const homeGroup = useStore((s) => s.homeGroup);
   const unread = useUnreadConvs();
   const unreadDm = unread.filter((c) => c.startsWith('dm:')).length;
-  const st = useStatusOf(selfName);
+  const st = useStatusOf(selfId);
   const [profile, setProfile] = useUpdateDraft('profile.home', false);
   const [status, setStatus] = useUpdateDraft('status.home', false);
   // スマホでは下のバーに主なページだけ並べ、残りは「その他」で全部を下から出す
@@ -166,7 +166,7 @@ export function Sidebar({ inSession, onPick }: { inSession?: boolean; onPick?: (
 
 function NoticeItem({ n }: { n: Notice }) {
   const target = useStore((s) => inviteTarget(s, n));
-  const followingBack = useStore((s) => s.following.includes(n.fromName));
+  const followingBack = useStore((s) => s.following.includes(n.from));
   const isGroup = n.key?.startsWith('group:');
   return (
     <div className="hnotice">
@@ -175,9 +175,9 @@ function NoticeItem({ n }: { n: Notice }) {
         <span><b>{n.fromName}</b>{n.kind === 'follow' ? tr('followNotice') : n.kind === 'online' ? tr("ui176") : tr("ui177", target ? `「${target.name}」` : tr("ui178"))}</span>
         <span className="sub">{timeLabel(n.at)}</span>
       </span>
-      {n.kind === 'follow' && !followingBack && <button className="primary" onClick={() => { followUser(n.fromName, true); removeNotice(n.id); }}>{tr('followBack')}</button>}
+      {n.kind === 'follow' && !followingBack && <button className="primary" onClick={() => { followUser(n.from, true); removeNotice(n.id); }}>{tr('followBack')}</button>}
       {n.kind === 'invite' && <button className="primary" disabled={!target} onClick={() => acceptInvite(n)}>{isGroup ? tr("ui146") : tr("ui180")}</button>}
-      {n.kind === 'online' && <button className="primary" onClick={() => { openDm(n.fromName); removeNotice(n.id); }}>{tr("ui181")}</button>}
+      {n.kind === 'online' && <button className="primary" onClick={() => { openDm(n.from); removeNotice(n.id); }}>{tr("ui181")}</button>}
       <button className="ib" aria-label={tr("ui182")} onClick={() => removeNotice(n.id)}><Icon name="close" size={14} /></button>
     </div>
   );
@@ -223,7 +223,7 @@ function EventCard({ ev }: { ev: EventDef }) {
       <b>{ev.title}</b>
       <EventHost ev={ev} />
       <span className="evfaces">
-        {ev.attendees.slice(0, 4).map((n) => <NameFace key={n} name={n} size={20} />)}
+        {ev.attendees.slice(0, 4).map((n) => <PersonFace key={n} id={n} size={20} />)}
         <span className="sub">{nf ? tr("ui186", nf) : tr("ui187", ev.attendees.length)}</span>
       </span>
     </button>
@@ -267,7 +267,7 @@ function SessionRows({ onlyFriends }: { onlyFriends: boolean }) {
   const rows = sortForHome(sessions, friends, users)
     .map((d) => {
       const here = users.filter((u) => u.session === d.id);
-      return { d, here, nf: here.filter((u) => friends.includes(u.name)).length, world: worldBy[d.id] ?? d.world ?? 'room' };
+      return { d, here, nf: here.filter((u) => friends.includes(u.id)).length, world: worldBy[d.id] ?? d.world ?? 'room' };
     })
     .filter((r) => !onlyFriends || r.nf > 0);
   if (!rows.length) return <Empty>{onlyFriends ? tr("ui190") : tr("ui191")}</Empty>;
@@ -376,7 +376,7 @@ function RowSection({ title, sub, onMore, empty, children }: { title: string; su
 /** セッションのカードと同じ形のイベントのカード */
 function EventTile({ ev }: { ev: EventDef }) {
   const friends = useStore((s) => s.friends);
-  const selfName = useStore((s) => s.selfName);
+  const selfId = useStore((s) => s.selfId);
   const g = useStore((s) => s.groups.find((x) => x.id === ev.group));
   const venue = useStore((s) => s.guild.sessions.find((d) => d.id === ev.session));
   const current = useStore((s) => s.session);
@@ -395,13 +395,13 @@ function EventTile({ ev }: { ev: EventDef }) {
       <div className="scbody">
         <div className="sctitle">
           <h3 title={ev.title}>{ev.title}</h3>
-          {ev.attendees.includes(selfName) && <Chip kind="friends">{tr("ui207")}</Chip>}
+          {ev.attendees.includes(selfId) && <Chip kind="friends">{tr("ui207")}</Chip>}
         </div>
         <span className="sub">{g && <><i className="gdot" style={{ background: g.color }} />{g.name} · </>}{venue ? tr("ui208", venue.name) : tr("ui209")}</span>
         <EventHost ev={ev} />
         <div className="scpeople">
           <b className={nf ? 'acc' : ''}>{nf ? tr("ui210", nf) : tr("ui211", ev.attendees.length)} {tr("ui135")}{ev.maybe.length}</b>
-          {ev.attendees.length > 0 && <span className="evfaces">{ev.attendees.slice(0, 6).map((n) => <NameFace key={n} name={n} size={22} />)}</span>}
+          {ev.attendees.length > 0 && <span className="evfaces">{ev.attendees.slice(0, 6).map((n) => <PersonFace key={n} id={n} size={22} />)}</span>}
         </div>
         <EventAnswer ev={ev} />
       </div>
@@ -436,7 +436,7 @@ function HomePageView({ q }: { q: string }) {
   const sessions = useStore((s) => s.guild.sessions);
   const users = useStore((s) => s.users);
   const friends = useStore((s) => s.friends);
-  const selfName = useStore((s) => s.selfName);
+  const selfId = useStore((s) => s.selfId);
   const events = useStore((s) => s.events);
   const onlineFriends = useOnlineFriends();
   const found = sortForHome(sessions.filter((d) => match(q, d.name, d.topic)), friends, users);
@@ -447,7 +447,7 @@ function HomePageView({ q }: { q: string }) {
     .filter((e) => match(q, e.title) && (isLive(e) || (e.at > Date.now() && e.at < Date.now() + WEEK)))
     .sort((a, b) => Number(isLive(b)) - Number(isLive(a)) || a.at - b.at);
   // 24 時間以内に「来る」と答えたイベントがあれば、イベントを一番上に出す
-  const mineSoon = soon.some((e) => e.attendees.includes(selfName) && e.at < Date.now() + DAY);
+  const mineSoon = soon.some((e) => e.attendees.includes(selfId) && e.at < Date.now() + DAY);
   const worlds = WORLD_KINDS.filter((k) => contentAvailable(owned, 'worlds', k)).filter((k) => match(q, WORLDS[k].name, WORLDS[k].desc));
   // 参加できるセッションの中にいないフレンド
   const idle = onlineFriends.filter((u) => !sessions.some((d) => d.id === u.session) && match(q, u.name));

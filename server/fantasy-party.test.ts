@@ -12,6 +12,7 @@ import { FantasyStore, type FantasyGroupInvestigationPlan } from './fantasy-stor
 import { applyFantasyAction, fantasyStats, newFantasyProfile } from '../shared/fantasy-engine.ts';
 import { FANTASY_PARTY_MAX_MEMBERS, FANTASY_PARTY_TTL_MS, fantasyPartyErrorText, isFantasyPartyCommand, type FantasyPartyState } from '../shared/fantasy-party.ts';
 import type { FantasyProfile } from '../shared/fantasy.ts';
+import { testServerEnv } from './test-db.ts';
 
 const quest = 'main-night-01';
 function player(name: string, weak = false): FantasyProfile {
@@ -144,7 +145,7 @@ test('real WebSocket party requests enforce session boundaries, individual conse
   fs.writeFileSync(path.join(directory,'fantasy.json'),JSON.stringify(profiles));fs.writeFileSync(path.join(directory,'fantasy-clock.json'),JSON.stringify({version:1,hour:8,wallTime:Date.now()+3600000}));
   const sessions=path.join(directory,'sessions.json');fs.writeFileSync(sessions,JSON.stringify({name:'Party integration',sessions:[{id:'one',name:'One',world:'fantasy'},{id:'two',name:'Two',world:'fantasy'}]}));
   const listener=net.createServer();await new Promise<void>(resolve=>listener.listen(0,'127.0.0.1',resolve));const port=(listener.address() as net.AddressInfo).port;await new Promise<void>(resolve=>listener.close(()=>resolve()));
-  const child=spawn(process.execPath,['--import','tsx','server/index.ts','--dev'],{env:{...process.env,NODE_ENV:'test',FANTASY_ACCOUNT_TEST_BYPASS:'1',SERVER_PORT:String(port),DATA_DIR:directory,SESSIONS_FILE:sessions,LIVEKIT_URL:'',LIVEKIT_API_KEY:'',LIVEKIT_API_SECRET:'',KOKOAAI_APIKEY: ''},stdio:['ignore','pipe','pipe']});
+  const child=spawn(process.execPath,['--import','tsx','server/index.ts','--dev'],{env:{...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1',NODE_ENV:'test',FANTASY_ACCOUNT_TEST_BYPASS:'1',SERVER_PORT:String(port),DATA_DIR:directory,SESSIONS_FILE:sessions,LIVEKIT_URL:'',LIVEKIT_API_KEY:'',LIVEKIT_API_SECRET:'',KOKOAAI_APIKEY: ''},stdio:['ignore','pipe','pipe']});
   let output='';child.stdout.on('data',data=>{output+=String(data);});child.stderr.on('data',data=>{output+=String(data);});const sockets:WebSocket[]=[];
   t.after(async()=>{for(const socket of sockets)socket.terminate();child.kill();if(child.exitCode===null&&!child.signalCode)await new Promise<void>(resolve=>{const timer=setTimeout(()=>{child.kill('SIGKILL');resolve();},3000);child.once('exit',()=>{clearTimeout(timer);resolve();});});assert.equal(path.dirname(path.resolve(directory)),path.resolve(os.tmpdir()));assert.ok(path.basename(directory).startsWith('fantasy-party-ws-'));fs.rmSync(directory,{recursive:true,force:true});});
   async function until<T>(read:()=>T|undefined):Promise<T>{const deadline=Date.now()+12000;while(Date.now()<deadline){const value=read();if(value!==undefined)return value;if(child.exitCode!==null)throw Error(output);await new Promise(resolve=>setTimeout(resolve,15));}throw Error(`Party WS timeout: ${output}`);}

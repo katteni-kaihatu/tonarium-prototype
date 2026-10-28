@@ -5,7 +5,7 @@ import { EMPTY_PRESENCE, type AvatarState, type Participant } from '../../shared
 import { placesFromInputs, type PlacesInputs } from './placesMemo.ts';
 
 const user = (id: string, mode: '2d' | '3d', extra: Partial<Participant> = {}): Participant => ({
-  id, name: id, session: 's1', mode, sharing: false, icon: null, avatar: null, bio: '', status: 'online', statusText: '',
+  id, name: id, session: 's1', mode, sharing: false, icon: null, avatar: null, bio: '', status: 'online', statusText: '', guest: false, username: null,
   ...EMPTY_PRESENCE, ...extra,
 });
 

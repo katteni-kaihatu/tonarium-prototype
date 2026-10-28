@@ -221,10 +221,14 @@ export class FantasyAccounts {
     try { this.save(this.file, JSON.stringify(next)); this.ledger = next; }
     catch { this.onError(new Error('World account storage could not be saved')); throw new AccountFailure('unavailable',503); }
   }
+  /** 接続元。信頼するプロキシからの接続だけ、そのプロキシが X-Forwarded-For の末尾に足したアドレスを使う（先頭は送り手が選べる） */
+  clientAddress(req: IncomingMessage): string {
+    const forwarded=this.trustedProxy(req)&&typeof req.headers['x-forwarded-for']==='string'?req.headers['x-forwarded-for'].split(',').at(-1)?.trim():undefined;
+    return normalizeAddress(forwarded)??normalizeAddress(req.socket.remoteAddress)??'unknown';
+  }
   private rate(req: IncomingMessage, action: string, username = ''): void {
     const now=this.now(); for(const [key,value] of this.attempts) if(value.until<=now)this.attempts.delete(key);
-    const forwarded=this.trustedProxy(req)&&typeof req.headers['x-forwarded-for']==='string'?req.headers['x-forwarded-for'].split(',').at(-1)?.trim():undefined;
-    const address=normalizeAddress(forwarded)??normalizeAddress(req.socket.remoteAddress)??'unknown';
+    const address=this.clientAddress(req);
     const keys=[`ip:${address}`,`${action}:ip:${address}`,`${action}:username:${username}`];
     for(const [index,key] of keys.entries()){
       const previous=this.attempts.get(key), value=previous&&previous.until>now?previous:{count:0,until:now+15*60_000};

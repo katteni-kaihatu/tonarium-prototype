@@ -1,13 +1,11 @@
 import { sampleFor } from '../../shared/avatar.ts';
 import { send } from './net/ws.ts';
 
-const q = (name: string) => encodeURIComponent(name.trim());
+/** その人（アカウント ID）のアバター画像。未設定ならサンプル */
+export const avatarTextureUrl = (id: string, v: string | null | undefined) =>
+  v ? `/avatar?id=${encodeURIComponent(id)}&v=${v}` : sampleFor(id);
 
-/** その人のアバター画像。未設定ならサンプル */
-export const avatarTextureUrl = (name: string, v: string | null | undefined) =>
-  v ? `/avatar?name=${q(name)}&v=${v}` : sampleFor(name);
-
-export const avatarParamsUrl = (name: string, v: string) => `/avatar/params?name=${q(name)}&v=${v}`;
+export const avatarParamsUrl = (id: string, v: string) => `/avatar/params?id=${encodeURIComponent(id)}&v=${v}`;
 
 function pickFile(accept: string): Promise<File | null> {
   return new Promise((resolve) => {
@@ -27,7 +25,7 @@ async function post(path: string, body: Blob | string) {
 }
 
 /** テンプレートに描いた画像を選ばせ、2048×1024 の PNG にして保存する */
-export async function uploadAvatarImage(name: string) {
+export async function uploadAvatarImage() {
   const file = await pickFile('image/*');
   if (!file) return null;
   const img = await createImageBitmap(file);
@@ -36,16 +34,16 @@ export async function uploadAvatarImage(name: string) {
   canvas.height = 1024;
   canvas.getContext('2d')!.drawImage(img, 0, 0, 2048, 1024);
   const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
-  return blob ? post(`/avatar?name=${q(name)}`, blob) : null;
+  return blob ? post('/avatar', blob) : null;
 }
 
 /** oekaki-avatar から書き出した manifest.json の調整値を保存する */
-export async function uploadAvatarManifest(name: string) {
+export async function uploadAvatarManifest() {
   const file = await pickFile('application/json,.json');
   if (!file) return null;
   try {
     const manifest = JSON.parse(await file.text());
-    return post(`/avatar/params?name=${q(name)}`, JSON.stringify(manifest.params ?? manifest));
+    return post('/avatar/params', JSON.stringify(manifest.params ?? manifest));
   } catch {
     return null;
   }

@@ -1,7 +1,7 @@
 import { t as tr } from '../i18n/index.ts';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { get, set, useStore } from '../store.ts';
+import { get, nameOf, set, useStore } from '../store.ts';
 import { useUpdateDraft } from '../updateDraft.ts';
 import { usePhone } from '../phone.ts';
 import { ITEM_INFO, WORLDS } from '../i18n/static.ts';
@@ -16,7 +16,7 @@ import { useOwnedItems } from '../market/items.ts';
 import { useOwnedContent } from '../market/store.ts';
 import { Icon, type IconName } from '../world/Icon.tsx';
 import { CreateSessionDialog } from './dialogs.tsx';
-import { Empty, NameFace, match, toggleFollow } from './common.tsx';
+import { Empty, PersonFace, PersonName, match, toggleFollow } from './common.tsx';
 import { goHome, WORLD_FACE } from './pages.tsx';
 import { agoLabel, closeTimelineSide, createPost, deletePost, offerPostImage, openCompose, openPost, postImageUrl, reactPost, repostPost, setTimelineTab, uploadPostImage } from '../timeline.ts';
 
@@ -87,15 +87,18 @@ export function TimelineTabs() {
 function useEntries(q: string) {
   const { tab } = useTabs();
   const posts = useStore((s) => s.posts);
-  const self = useStore((s) => s.selfName);
+  const self = useStore((s) => s.selfId);
   const following = useStore((s) => s.following);
   const friends = useStore((s) => s.friends);
   const fof = useStore((s) => s.fof);
   const blocked = useStore((s) => s.blocked);
   const participants = useStore((s) => s.participants);
-  const here = participants.map((u) => u.name);
+  const users = useStore((s) => s.users);
+  const directory = useStore((s) => s.directory);
+  const here = participants.map((u) => u.id);
+  const name = (id: string | undefined) => (id ? nameOf(id, { users, directory }) : undefined);
   return timelineEntries(posts, tab, { self, following, friends, fof, here, blocked })
-    .filter((e) => match(q, e.post.text, e.post.author, e.repostBy));
+    .filter((e) => match(q, e.post.text, name(e.post.author), name(e.repostBy)));
 }
 
 /** 書く欄以外の入力欄（検索・返信）に貼った物は横取りしない */
@@ -182,7 +185,7 @@ function PlaceTag({ sid, name, mode, suffix }: { sid: string; name: string | nul
 function Head({ p, small }: { p: Post; small?: boolean }) {
   return (
     <div className="tlhead">
-      <b>{p.author}</b><span className="sub">{agoLabel(p.at)}</span>
+      <b><PersonName id={p.author} /></b><span className="sub">{agoLabel(p.at)}</span>
       <span className="spacer" />
       {!small && p.place && <PlaceTag {...p.place} />}
     </div>
@@ -196,7 +199,7 @@ function SessionAttach({ a }: { a: Extract<PostAttach, { kind: 'session' }> }) {
   const here = users.filter((u) => u.session === a.id);
   const friends = useStore((s) => s.friends);
   const current = useStore((s) => s.session === a.id);
-  const nf = here.filter((u) => friends.includes(u.name)).length;
+  const nf = here.filter((u) => friends.includes(u.id)).length;
   return (
     <div className="tlattach">
       <span className="tlthumb" style={{ background: WORLD_FACE[world] }}><Icon name="headset" size={18} /></span>
@@ -204,7 +207,7 @@ function SessionAttach({ a }: { a: Extract<PostAttach, { kind: 'session' }> }) {
         <span className="tlkind">{tr('ui119')}</span>
         <b>{def?.name ?? a.name ?? tr('tlPrivateSession')}</b>
         <span className="sub">
-          {here.length > 0 && <span className="tlfaces">{here.slice(0, 4).map((u) => <NameFace key={u.id} name={u.name} size={16} />)}</span>}
+          {here.length > 0 && <span className="tlfaces">{here.slice(0, 4).map((u) => <PersonFace key={u.id} id={u.id} size={16} />)}</span>}
           {def ? `${here.length} ${tr('ui125')}${nf ? tr('ui195', nf) : ''}` : tr('tlSessionGone')}
         </span>
       </span>
@@ -262,7 +265,7 @@ function QuoteBox({ id }: { id: string }) {
   if (!p) return <div className="tlquote sub">{tr('tlQuoteGone')}</div>;
   return (
     <button className="tlquote" onClick={() => openPost(p.id)}>
-      <span className="tlqhead"><NameFace name={p.author} size={16} /><b>{p.author}</b><span className="sub">{agoLabel(p.at)}</span></span>
+      <span className="tlqhead"><PersonFace id={p.author} size={16} /><b><PersonName id={p.author} /></b><span className="sub">{agoLabel(p.at)}</span></span>
       {p.text && <span className="tlqtext">{p.text}</span>}
       {(p.image || p.attach) && <span className="sub">{p.image ? tr('tlWithPhoto') : tr('tlWithAttach')}</span>}
     </button>
@@ -275,7 +278,7 @@ function Media({ p }: { p: Post }) {
     <div className="tlmedia">
       {p.image && (
         <button className="tlphoto" onClick={() => set({ lightbox: postImageUrl(p.image!) })}>
-          <img src={postImageUrl(p.image)} alt={tr('tlPhotoAlt', p.author)} loading="lazy" />
+          <img src={postImageUrl(p.image)} alt={tr('tlPhotoAlt', nameOf(p.author))} loading="lazy" />
           {p.place && <span className="tlshot"><Icon name="camera" size={12} /><PlaceTag {...p.place} suffix={tr('tlShotAt')} /></span>}
         </button>
       )}
@@ -286,14 +289,15 @@ function Media({ p }: { p: Post }) {
 }
 
 function ReactionChips({ p }: { p: Post }) {
-  const self = useStore((s) => s.selfName);
+  const self = useStore((s) => s.selfId);
+  const names = (ids: string[]) => ids.map((id) => nameOf(id)).join(', ');
   return (
     <>
-      {Object.entries(p.reactions).map(([emoji, names]) => {
-        const on = names.includes(self);
+      {Object.entries(p.reactions).map(([emoji, ids]) => {
+        const on = ids.includes(self);
         return (
-          <button key={emoji} className={`tlrx ${on ? 'on' : ''}`} aria-pressed={on} title={names.join(', ')} onClick={() => reactPost(p.id, emoji, !on)}>
-            <span>{emoji}</span><b>{names.length}</b>
+          <button key={emoji} className={`tlrx ${on ? 'on' : ''}`} aria-pressed={on} title={names(ids)} onClick={() => reactPost(p.id, emoji, !on)}>
+            <span>{emoji}</span><b>{ids.length}</b>
           </button>
         );
       })}
@@ -302,7 +306,7 @@ function ReactionChips({ p }: { p: Post }) {
 }
 
 function ReactButton({ p, small }: { p: Post; small?: boolean }) {
-  const self = useStore((s) => s.selfName);
+  const self = useStore((s) => s.selfId);
   const pop = usePopover();
   return (
     <span className="tlpopwrap" ref={pop.ref}>
@@ -318,9 +322,9 @@ function ReactButton({ p, small }: { p: Post; small?: boolean }) {
 }
 
 function RepostButton({ p, small }: { p: Post; small?: boolean }) {
-  const self = useStore((s) => s.selfName);
+  const self = useStore((s) => s.selfId);
   const pop = usePopover();
-  const mine = p.reposts.some((r) => r.name === self);
+  const mine = p.reposts.some((r) => r.id === self);
   if (p.replyTo) return null;
   return (
     <span className="tlpopwrap" ref={pop.ref}>
@@ -336,7 +340,7 @@ function RepostButton({ p, small }: { p: Post; small?: boolean }) {
 }
 
 function MoreButton({ p, small }: { p: Post; small?: boolean }) {
-  const self = useStore((s) => s.selfName);
+  const self = useStore((s) => s.selfId);
   const following = useStore((s) => s.following.includes(p.author));
   const pop = usePopover();
   return (
@@ -345,7 +349,7 @@ function MoreButton({ p, small }: { p: Post; small?: boolean }) {
       <Popover p={pop} label={tr('tlMore')}>
         {p.author === self
           ? <button role="menuitem" className="ib danger" onClick={() => { if (confirm(tr('tlDeleteConfirm'))) deletePost(p.id); pop.setOpen(false); }}><Icon name="trash" size={15} />{tr('tlDelete')}</button>
-          : <button role="menuitem" className="ib" onClick={() => { pop.setOpen(false); toggleFollow(p.author, !following); }}><Icon name="user" size={15} />{following ? tr('followUnfollow', p.author) : tr('followDo', p.author)}</button>}
+          : <button role="menuitem" className="ib" onClick={() => { pop.setOpen(false); toggleFollow(p.author, !following); }}><Icon name="user" size={15} />{following ? tr('followUnfollow', nameOf(p.author)) : tr('followDo', nameOf(p.author))}</button>}
       </Popover>
     </span>
   );
@@ -383,10 +387,10 @@ function PostCard({ entry, detail }: { entry: TimelineEntry; detail?: boolean })
   const selected = useStore((s) => s.timelineSide === `post:${p.id}`);
   return (
     <article className={`tlpost ${selected && !detail ? 'sel' : ''}`}>
-      {!detail && <button className="tlopen" aria-label={tr('tlOpenPost', p.author)} onClick={() => openPost(p.id)} />}
-      {entry.repostBy && <div className="tlrepostby"><Icon name="repost" size={13} />{tr('tlRepostedBy', entry.repostBy)}</div>}
+      {!detail && <button className="tlopen" aria-label={tr('tlOpenPost', nameOf(p.author))} onClick={() => openPost(p.id)} />}
+      {entry.repostBy && <div className="tlrepostby"><Icon name="repost" size={13} />{tr('tlRepostedBy', nameOf(entry.repostBy))}</div>}
       <div className="tlrow">
-        <NameFace name={p.author} size={34} />
+        <PersonFace id={p.author} size={34} />
         <div className="tlbody">
           <Head p={p} small={detail} />
           {detail && p.place && <PlaceTag {...p.place} />}
@@ -403,9 +407,9 @@ function ReplyRow({ p, depth, last, onReply }: { p: Post; depth: number; last: b
   return (
     <div className="tlreply" style={{ marginLeft: Math.min(depth, 3) * 20 }}>
       {!last && <span className="tlline" aria-hidden="true" />}
-      <NameFace name={p.author} size={28} />
+      <PersonFace id={p.author} size={28} />
       <div className="tlbody">
-        <span className="tlhead"><b>{p.author}</b><span className="sub">{agoLabel(p.at)}</span></span>
+        <span className="tlhead"><b><PersonName id={p.author} /></b><span className="sub">{agoLabel(p.at)}</span></span>
         {p.text && <span className="tltext small">{p.text}</span>}
         <Media p={p} />
         <div className="tlacts small">
@@ -446,7 +450,7 @@ function PostDetail({ id }: { id: string }) {
       </div>
       <form className="tlreplybox" onSubmit={(e) => { e.preventDefault(); send(); }}>
         {target !== p && <button type="button" className="ib tlact small" aria-label={tr('tlReplyToRoot')} title={tr('tlReplyToRoot')} onClick={() => setTo(null)}><Icon name="close" size={12} /></button>}
-        <input ref={input} aria-label={tr('tlWriteReply')} placeholder={tr('tlReplyTo', target.author)} value={text} maxLength={POST_MAX_CHARS} onChange={(e) => setText(e.target.value)} />
+        <input ref={input} aria-label={tr('tlWriteReply')} placeholder={tr('tlReplyTo', nameOf(target.author))} value={text} maxLength={POST_MAX_CHARS} onChange={(e) => setText(e.target.value)} />
         <button className="primary" disabled={!text.trim()}>{tr('tlReply')}</button>
       </form>
     </div>
@@ -455,8 +459,16 @@ function PostDetail({ id }: { id: string }) {
 
 type Picker = 'session' | 'world' | 'item' | 'emoji' | null;
 
+/** ゲストは見るだけ。書く欄の代わりにログインを案内する */
 function Composer() {
+  const guest = useStore((s) => s.selfGuest);
+  if (guest) return <div className="tlside"><div className="tlsidehead"><span>{tr('tlWrite')}</span><button className="ib tlclose" aria-label={tr('tlCloseDetail')} onClick={closeTimelineSide}><Icon name="close" size={16} /></button></div><Empty>{tr('authLoginRequired')}</Empty></div>;
+  return <ComposerForm />;
+}
+
+function ComposerForm() {
   const self = useStore((s) => s.selfName);
+  const selfId = useStore((s) => s.selfId);
   const quote = useStore((s) => s.composeQuote);
   const session = useStore((s) => s.guild.sessions.find((d) => d.id === s.session));
   const mode = useStore((s) => s.mode);
@@ -517,7 +529,7 @@ function Composer() {
       <div className="tlsidehead"><span>{quote ? tr('tlQuoteWrite') : tr('tlWrite')}</span><button className="ib tlclose" aria-label={tr('tlCloseDetail')} onClick={closeTimelineSide}><Icon name="close" size={16} /></button></div>
       <div className="tlsidebody">
         <div className="tlcompose">
-          <div className="tlwho"><NameFace name={self} size={30} /><b>{self}</b><span className="spacer" /><span className="tlpublic" title={tr('tlPublicDesc')}><Icon name="globe" size={12} />{tr('tlPublic')}</span></div>
+          <div className="tlwho"><PersonFace id={selfId} size={30} /><b>{self}</b><span className="spacer" /><span className="tlpublic" title={tr('tlPublicDesc')}><Icon name="globe" size={12} />{tr('tlPublic')}</span></div>
           <textarea ref={area} aria-label={tr('tlContent')} placeholder={tr('tlPlaceholder')} rows={6} value={text} maxLength={POST_MAX_CHARS} onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submit(); }} />
           {image && (

@@ -20,6 +20,7 @@ import { FANTASY_JOBS, FANTASY_LOCATIONS, FANTASY_RACES } from '../shared/fantas
 import { fantasyBuildings } from '../shared/fantasy-town.ts';
 import { fantasyGmTokenEstimate } from '../shared/fantasy-gm-context.ts';
 import { unknownNpcInformation } from './dialogue-knowledge.ts';
+import { testServerEnv } from './test-db.ts';
 
 const answer = (text = 'Welcome to the inn.') => new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: text } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 const request = (text = 'A quiet evening sounds pleasant.', extra: Partial<NpcChatRequest> = {}): NpcChatRequest => ({ requestId: crypto.randomUUID(), text, locale: 'en', npcId: 'rin', ...extra });
@@ -595,7 +596,7 @@ test('home WebSocket NPC works after hello without joining a session and uses it
     fs.rmSync(directory, { recursive: true, force: true });
   });
   child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], {
-    env: { ...process.env, NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, KOKOAAI_BASEURL: `https://127.0.0.1:${modelPort}/v1`, KOKOAAI_MODEL: 'test-remote-model', KOKOAAI_APIKEY: 'integration-test-only', NODE_EXTRA_CA_CERTS: fileURLToPath(new URL('./fixtures/kokoa-test-cert.pem', import.meta.url)), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' },
+    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, KOKOAAI_BASEURL: `https://127.0.0.1:${modelPort}/v1`, KOKOAAI_MODEL: 'test-remote-model', KOKOAAI_APIKEY: 'integration-test-only', NODE_EXTRA_CA_CERTS: fileURLToPath(new URL('./fixtures/kokoa-test-cert.pem', import.meta.url)), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout?.on('data', chunk => { logs += String(chunk); });

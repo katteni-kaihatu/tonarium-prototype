@@ -37,7 +37,7 @@ function TestAvatar({ actor, index }: { actor: string; index: number }) {
     group.current.rotation.y = Math.PI;
   });
   return <group ref={group} position={[-2 + index * 1.5, 0, 1]}>
-    <OekakiAvatar name={ACTORS[actor as keyof typeof ACTORS] ?? actor} version={null} textureUrl="/oekaki/system-playtest.svg" speaking={false} userId={actor} seated={() => !!systemSeat(useSystems.getState().view, actor)} />
+    <OekakiAvatar avatarId={actor} version={null} textureUrl="/oekaki/system-playtest.svg" speaking={false} userId={actor} seated={() => !!systemSeat(useSystems.getState().view, actor)} />
     <Label text={ACTORS[actor as keyof typeof ACTORS] ?? actor} position={[0, 1.5, 0]} height={0.18} />
   </group>;
 }

@@ -9,7 +9,7 @@ import { type WorldKind } from '../../../shared/worlds.ts';
 import { deleteSession, joinSession } from '../actions.ts';
 import { Face } from '../world/common.tsx';
 import { Icon } from '../world/Icon.tsx';
-import { Chip, ModeIcon, timeLabel, uniqueByName } from './common.tsx';
+import { Chip, ModeIcon, PersonName, timeLabel } from './common.tsx';
 import { GroupAvatar } from './GroupAvatar.tsx';
 
 const WORLD_TINT: Record<WorldKind, string> = { room: '#DCE6F3', cafe: '#F3E6C6', game: '#E7DDF2', survivors: '#F2D5E2', city: '#D7EAD3', garden: '#DDEBCF', starlounge: '#DBE1F4', antimatter: '#D9D6F5', fantasy: '#DFD0A8' };
@@ -25,20 +25,20 @@ export function SessionCard({ s, showDelete }: { s: SessionDef; showDelete?: boo
   const menuButton = useRef<HTMLButtonElement>(null);
   const users = useStore((st) => st.users);
   const friends = useStore((st) => st.friends);
-  const selfName = useStore((st) => st.selfName);
+  const selfId = useStore((st) => st.selfId);
   const group = useStore((st) => st.groups.find((g) => g.id === s.group));
   const world = useStore((st) => st.worldBy[s.id] ?? s.world ?? 'room');
   const thumbnail = useStore((st) => st.sessionInfo[s.id]?.thumbnail);
-  const here = uniqueByName(users.filter((u) => u.session === s.id));
+  const here = users.filter((u) => u.session === s.id);
   const left = useStore((st) => st.sessionInfo[s.id]?.items ?? NO_ITEMS).map((i) => i.summary);
   const nextEvent = useStore((st) => st.events.find((e) => e.session === s.id && e.at > Date.now() - 3_600_000));
-  const friendsHere = here.filter((u) => friends.includes(u.name));
-  const others = here.filter((u) => !friends.includes(u.name));
+  const friendsHere = here.filter((u) => friends.includes(u.id));
+  const others = here.filter((u) => !friends.includes(u.id));
   // フレンドを先に並べ、いなければ中にいる人を見せる
   const shown = [...friendsHere, ...others].slice(0, 6);
   const sharing = here.some((u) => u.sharing);
   const vis = s.visibility ?? 'public';
-  const invitedByOwner = s.owner && s.owner !== selfName && s.invited?.includes(selfName);
+  const invitedByOwner = s.owner && s.owner !== selfId && s.invited?.includes(selfId);
   const current = useStore((st) => st.session);
   return (
     <article className="scard">
@@ -67,7 +67,7 @@ export function SessionCard({ s, showDelete }: { s: SessionDef; showDelete?: boo
           <Chip kind={vis}>{(vis === 'group' || vis === 'groupPlus') && group ? <GroupAvatar group={group} size="chip" /> : <Icon name={VIS_ICON[vis]} size={11} />}{(vis === 'group' || vis === 'groupPlus') && group ? `${group.name}${vis === 'groupPlus' ? '＋' : ''}` : VISIBILITY_INFO[vis].name}</Chip>
         </div>
         <span className="sub">{s.topic || tr("ui319", WORLDS[world].name)}</span>
-        {invitedByOwner && <span className="scinvited">{s.owner} {tr("ui320")}</span>}
+        {invitedByOwner && <span className="scinvited"><PersonName id={s.owner!} /> {tr("ui320")}</span>}
         <div className="scpeople">
           <b className={friendsHere.length ? 'acc' : ''}>
             {friendsHere.length ? tr("ui186", friendsHere.length) : here.length ? tr("ui321", here.length) : tr("ui322")}
@@ -91,7 +91,7 @@ export function SessionCard({ s, showDelete }: { s: SessionDef; showDelete?: boo
             {[...new Set(left)].slice(0, 3).map((t) => <span key={t} className="hchip">{t}</span>)}
           </div>
         )}
-        {showDelete && s.owner === selfName && (
+        {showDelete && s.owner === selfId && (
           <button className="ib scdel" disabled={here.length > 0} title={here.length ? tr("ui323") : tr("ui324")} onClick={() => deleteSession(s.id)}>
             <Icon name="trash" size={13} />{tr("ui182")}</button>
         )}

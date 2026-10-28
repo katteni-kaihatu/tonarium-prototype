@@ -18,7 +18,7 @@ import { ItemMark, Viewers, itemLabel } from './common.tsx';
 import { closeWindow, moveWindow, raiseWindow, toggleMax } from './windows.ts';
 import { AvatarView } from './Portraits.tsx';
 import { PortraitEmote } from './Emotes.tsx';
-import { MediaControls, VideoHost, mediaVolume, videoEls } from '../mediaSync.tsx';
+import { MediaControls, mediaVolume } from '../mediaSync.tsx';
 import { YouTubePlayer, youTubeDuration } from '../youtube.tsx';
 import { send } from '../net/ws.ts';
 import { DiceBody } from './DiceBody.tsx';
@@ -136,12 +136,6 @@ function useResolved(key: string, compact: boolean): Resolved | null {
   }
   if (item.kind === 'image') {
     return { kind: 'media', dark: true, item, title: tr("ui31"), sub, width: 560, aspect: item.w / item.h, body: <img className="mediaimg" src={item.url} alt="" /> };
-  }
-  if (item.kind === 'video') {
-    return {
-      kind: 'media', dark: true, item, title: tr("ui30"), sub, width: 560, aspect: item.w / item.h,
-      body: <><VideoHost id={item.id} /><MediaControls item={item} duration={() => videoEls.get(item.id)?.duration ?? NaN} /></>,
-    };
   }
   if (item.kind === 'youtube') {
     return {

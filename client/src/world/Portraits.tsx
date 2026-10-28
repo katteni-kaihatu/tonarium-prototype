@@ -131,7 +131,7 @@ export function AvatarView({ u, speaking, small = false, comic = false }: { u: U
       <PortraitCamera id={u.id} small={small} />
       {comic && <Emote3D id={u.id} portrait />}
       <Suspense fallback={null}>
-        <OekakiAvatar userId={u.id} name={u.name} version={u.avatar} speaking={speaking} look={() => pitchOf(u.id)} />
+        <OekakiAvatar userId={u.id} avatarId={u.id} version={u.avatar} speaking={speaking} look={() => pitchOf(u.id)} />
       </Suspense>
     </View>
   );

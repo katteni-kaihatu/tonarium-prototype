@@ -29,6 +29,23 @@ jobs:
   fantasy-ai:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # NPC・KokoaAI のテストはサーバーを起動し、サーバーは PostgreSQL が無いと止まる
+    services:
+      postgres:
+        image: postgres:17.10-alpine3.23
+        env:
+          POSTGRES_USER: tonarium
+          POSTGRES_PASSWORD: tonarium
+          POSTGRES_DB: tonarium
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tonarium"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgres://tonarium:tonarium@localhost:5432/tonarium
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:

@@ -33,7 +33,7 @@ electron/artifacts/Tonarium-Electron-0.0.8-linux-x86_64.AppImage
 初回はどちらの設定もオフで表示する。保存するまで更新確認の通信は行わない。
 
 - 「起動時に更新を確認する」: 有効なら起動時と設定保存時に更新情報を取得し、新しい版を表示する。オフでも「今すぐ確認」で手動確認できる。
-- その下の「更新を自動でダウンロードし、アプリ終了時に適用する」: 起動時確認が有効な場合に選べる。ダウンロード済みの更新は通常終了時に適用する。「今すぐ更新」から即時適用もできる。取得後の自動再起動は別の設定で、既定はオフ。オンの場合は通話・録音中も状態を保存して更新する。
+- その下の「更新を自動でダウンロードし、アプリ終了時に適用する」: 起動時確認が有効な場合に選べる。ダウンロード済みの更新は通常終了時に適用する。「今すぐ更新」から即時適用もできる。取得後の自動再起動は別の設定で、既定はオフ。オンの場合は通話中も状態を保存して更新する。
 
 Linux AppImage と Windows NSIS でインストールしたアプリが自動適用に対応する。AppImage はユーザーが書き換えられる場所に保存する。tar.gz／展開済みLinux版とWindows ZIP版は更新の確認・通知に対応し、適用は「Releasesを開く」から手動で行う。Windows ZIP利用者が自動更新を利用するにはNSIS版をインストールする。
 
@@ -93,7 +93,7 @@ Electronの「Tonarium Electron → マイク・スピーカー…」から、�
 
 設定はElectron専用のpreloadからWebの音声APIへ適用します。`client/` の変更やサーバーへの新版デプロイは不要です。remote rendererは引き続きsandbox・contextIsolation有効、NodeとホストIPC非公開です。設定保存のIPCはローカル設定ウィンドウに限定します。
 
-現在のTonarium Webでは既存LiveKit接続のデバイス切替を利用し、通話中のマイク変更を反映します。接続APIを持たないページでは次回の録音・通話開始から反映します。録音メッセージも次回録音から変更します。出力設定はWeb Audioとトップページ内の音声・動画要素に適用します。YouTube等の別オリジンiframeは対象外で、OS側で出力先を選択します。
+現在のTonarium Webでは既存LiveKit接続のデバイス切替を利用し、通話中のマイク変更を反映します。接続APIを持たないページでは次回の録音・通話開始から反映します。出力設定はWeb Audioとトップページ内の音声・動画要素に適用します。YouTube等の別オリジンiframeは対象外で、OS側で出力先を選択します。
 
 音声設定の単体検証は `npm run electron:test`。`electron/verification/audio-settings.cjs` はローカル設定画面の選択・保存・ページ再読込後の復元を検証します。`audio-virtual-devices.cjs` は専用PulseAudio仮想機器2組で、選択した入力ID・取得元・出力sink IDの一致を確認します。後者は仮想入力をexact指定し、音声を保存・送信・可聴再生しません。PlaywrightのElectron起動は `--no-sandbox` が付くため、OSのsandbox確認は別途 `launch.cjs` で行います。
 

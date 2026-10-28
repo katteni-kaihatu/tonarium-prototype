@@ -13,6 +13,7 @@ import { dropHammer, hitAndMove, itemAction, removeItem, spawnItem } from '../it
 import { requestTimedCamera } from '../items/useTimedCamera.ts';
 import { formatDistance, useTrend } from '../spatial.ts';
 import { Icon } from './Icon.tsx';
+import { GuestMark } from './GuestMark.tsx';
 import { ImageItemMark } from './ImageItemMark.tsx';
 import { imageItemCreator } from './imageItemCreator.ts';
 import {
@@ -61,7 +62,7 @@ function Equip({ id }: { id: string }) {
 
 function statusOf(u: Participant, friends: string[]) {
   const parts: string[] = [];
-  if (friends.includes(u.name)) parts.push(tr("ui153"));
+  if (friends.includes(u.id)) parts.push(tr("ui153"));
   if (!u.micOn) parts.push(tr("ui601"));
   if (u.follow) parts.push(tr("ui602", nameOf(u.follow)));
   return parts.join(' · ');
@@ -76,7 +77,7 @@ function PlayerRow({ e, onMenu, menuOpen, onVolume }: { e: PlayerEntry; onMenu: 
   const trend = useTrend(e.user.id);
   const u = e.user;
   const status = statusOf(u, friends);
-  const muted = useStore((s) => s.peerMuted.includes(u.name));
+  const muted = useStore((s) => s.peerMuted.includes(u.id));
   const context = (ev: React.MouseEvent) => { ev.preventDefault(); onVolume(new DOMRect(ev.clientX, ev.clientY, 0, 0)); };
   const ring = speaking ? SPEAK_RING : undefined;
   const menuBtn = (
@@ -88,7 +89,7 @@ function PlayerRow({ e, onMenu, menuOpen, onVolume }: { e: PlayerEntry; onMenu: 
   if (e.band === 'far') {
     return (
       <button className="farchip ib" data-uid={u.id} title={formatDistance(e.d)} onClick={() => pickUser(u.id)} onContextMenu={context} style={glowStyle(trend)}>
-        <Face id={u.id} name={u.name} size={20} />{u.name}{u.mode === '3d' && <Badge3D />}
+        <Face id={u.id} name={u.name} size={20} />{u.name}<GuestMark guest={u.guest} />{u.mode === '3d' && <Badge3D />}
         <EmoteBadge id={u.id} />
       </button>
     );
@@ -100,7 +101,7 @@ function PlayerRow({ e, onMenu, menuOpen, onVolume }: { e: PlayerEntry; onMenu: 
       <button className="pmain" onClick={() => pickUser(u.id)} aria-label={hammer ? tr("ui582", u.name) : tr("ui584", u.name)}>
         <Face id={u.id} name={u.name} size={big ? 32 : 22} ring={ring} />
         <span className="ptext">
-          <span className="pname">{u.name}{u.mode === '3d' && <Badge3D />}{!big && status && <span className="pstat">{status}</span>}</span>
+          <span className="pname">{u.name}<GuestMark guest={u.guest} />{u.mode === '3d' && <Badge3D />}{!big && status && <span className="pstat">{status}</span>}</span>
           {big && status && <span className="pstat">{status}</span>}
         </span>
         <Equip id={u.id} />
@@ -308,12 +309,12 @@ export function NearList() {
   const items = useItemsNear();
   const [menu, setMenu] = useState<Menu | null>(null);
   const [picker, setPicker] = useState<DOMRect | null>(null);
-  const [vol, setVol] = useState<{ name: string; rect: DOMRect } | null>(null);
+  const [vol, setVol] = useState<{ id: string; name: string; rect: DOMRect } | null>(null);
   const playerRow = (e: PlayerEntry) => (
     <PlayerRow
       key={e.user.id} e={e} menuOpen={menu?.kind === 'user' && menu.id === e.user.id}
       onMenu={(rect) => setMenu(menu?.id === e.user.id ? null : { kind: 'user', id: e.user.id, rect })}
-      onVolume={(rect) => { setMenu(null); setVol({ name: e.user.name, rect }); }}
+      onVolume={(rect) => { setMenu(null); setVol({ id: e.user.id, name: e.user.name, rect }); }}
     />
   );
   const fold = (left: boolean) => set((s) => { const f = { ...s.folded, left }; save('tonarium.folded', f); return { folded: f }; });
@@ -340,7 +341,7 @@ export function NearList() {
       <div className="pscroll">
         <div className="selfrow" data-uid={selfId}>
           <Face id={selfId} name={selfName} size={32} ring={selfSpeaking ? SPEAK_RING : undefined} />
-          <span className="pname">{selfName}</span>
+          <span className="pname">{selfName}<GuestMark guest={!!me?.guest} /></span>
           <EmoteBadge id={selfId} />
           {me && <LiveButton u={me} />}
           <span className="pill dark">{tr("ui84")}</span>
@@ -372,7 +373,7 @@ export function NearList() {
       <div className="session-copy-row"><SessionCopyButton /></div>
       {menu && <ActionMenu menu={menu} onClose={() => setMenu(null)} />}
       {picker && <ItemPicker anchor={picker} onClose={() => setPicker(null)} />}
-      {vol && <PeerVolume key={vol.name} name={vol.name} anchor={vol.rect} onClose={() => setVol(null)} />}
+      {vol && <PeerVolume key={vol.id} id={vol.id} name={vol.name} anchor={vol.rect} onClose={() => setVol(null)} />}
     </aside>
   );
 }

@@ -1,4 +1,4 @@
-# 手元の開発用 LiveKit（npm run livekit で起動）。キーは devkey / secret 固定
+# 手元の開発用サービス（npm run services で起動）。LiveKit のキーは devkey / secret 固定
 services:
   livekit:
     image: livekit/livekit-server:v1.13.7
@@ -8,3 +8,34 @@ services:
       - "7880:7880"
       - "7881:7881"
       - "7882:7882/udp"
+
+  postgres:
+    image: postgres:17.10-alpine3.23
+    environment:
+      - POSTGRES_USER=tonarium
+      - POSTGRES_PASSWORD=tonarium
+      - POSTGRES_DB=tonarium
+    ports:
+      - "5432:5432"
+    volumes:
+      - tonarium-dev-db:/var/lib/postgresql/data
+      # dev-isolated 用の DB も最初に作っておく
+      - ./scripts/dev-db-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "tonarium"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # S3 互換ストレージ（本番の R2 の代わり）。認証の設定を置かないので、手元ではだれでも読み書きできる
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.47
+    command: server -dir=/data -s3 -s3.port=8333
+    ports:
+      - "8333:8333"
+    volumes:
+      - tonarium-dev-objects:/data
+
+volumes:
+  tonarium-dev-db:
+  tonarium-dev-objects:
