@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, boolean, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 const at = (name: string) => timestamp(name, { withTimezone: true });
 
@@ -52,6 +52,8 @@ export const profiles = pgTable('profiles', {
   statusText: text('status_text').notNull().default(''),
   recent: jsonb('recent').$type<string[]>().notNull().default([]),
   lastSeen: ms('last_seen'),
+  /** 本人が「ボットです」と申告しているか（AI エージェント等の表示用） */
+  bot: boolean('bot').notNull().default(false),
 });
 
 /** 「来たら知らせる」。target が来たら watcher に知らせて消える */

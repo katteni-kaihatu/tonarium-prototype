@@ -7,7 +7,7 @@ import { arrangePlayers, bandOf, displayMeters, formatDistance, nearbyItems, nea
 
 const person = (id: string, follow: string | null = null): Participant => ({
   ...EMPTY_PRESENCE,
-  id, name: id, session: 'room', mode: '3d', sharing: false, icon: null, avatar: null, bio: '', status: 'online', statusText: '', guest: false, username: null,
+  id, name: id, session: 'room', mode: '3d', sharing: false, icon: null, avatar: null, bio: '', status: 'online', statusText: '', guest: false, username: null, bot: false,
   follow,
 });
 

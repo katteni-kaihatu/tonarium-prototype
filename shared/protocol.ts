@@ -197,6 +197,8 @@ export interface User {
   guest: boolean;
   /** Misskey のユーザー名（@ の後ろ）。ゲストと開発用は null */
   username: string | null;
+  /** 本人が「ボットです」と申告している（AI エージェント等）。名前の横に印を付ける */
+  bot: boolean;
 }
 
 /** セッションの中だけで使う、その人の状態。LiveKit の部屋でそのセッションの人にだけ配る */
@@ -233,6 +235,8 @@ export interface ChatMessage {
   /** null はシステムメッセージ（ログのイベント） */
   from: string | null;
   fromName: string;
+  /** 発言時にボット申告をしていた（履歴に残っても印が消えないよう、発言へ写す） */
+  fromBot?: boolean;
   text: string;
   /** data URL（写真・キャンバスの保存など） */
   image?: string;

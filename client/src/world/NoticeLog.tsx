@@ -15,6 +15,7 @@ import { ChatImage, Face, itemLabel } from './common.tsx';
 import { openWindow } from './windows.ts';
 import { canItemize, itemizeMessage, uploadMedia } from '../media.ts';
 import { OgpCard, firstUrl } from './Links.tsx';
+import { BotMark } from './BotMark.tsx';
 
 const NO_CHAT: ChatMessage[] = [];
 const time = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -156,7 +157,7 @@ function LogLine({ m, selfId }: { m: ChatMessage; selfId: string }) {
       <Face id={m.from} name={m.fromName} size={22} />
       <div className="lbody">
         <div className="lwho">
-          <b style={{ color: colorOf(m.from) }}>{m.fromName}</b>
+          <b style={{ color: colorOf(m.from) }}>{m.fromName}</b><BotMark bot={!!m.fromBot} />
           {m.scope === 'all' && <span className="scopebadge all">{tr("ui632")}</span>}
           {m.scope === 'announce' && <span className="scopebadge announce">{tr("ui634")}</span>}
           <span className="sub">{time(m.at)}</span>
@@ -247,7 +248,7 @@ export function NoticeLog() {
           <div className="announce">
             <span className="aicon"><Icon name="megaphone" /></span>
             <div>
-              <div className="ahead"><strong>{tr("ui634")}</strong>{announce.fromName} · {time(announce.at)}</div>
+              <div className="ahead"><strong>{tr("ui634")}</strong>{announce.fromName}<BotMark bot={!!announce.fromBot} /> · {time(announce.at)}</div>
               <span><TranslatedText text={announce.text} /></span>
             </div>
           </div>
