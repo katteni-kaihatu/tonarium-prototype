@@ -511,7 +511,7 @@ setInterval(saveItems, 5000);
 const people: Record<string, PersonRec> = loaded.people;
 const savePeople = debounced('people', () => writePeople(people, bios));
 function personRec(id: string) {
-  return (people[id] ??= { status: 'online', statusText: '', recent: [], lastSeen: null, watchers: [] });
+  return (people[id] ??= { status: 'online', statusText: '', recent: [], lastSeen: null, watchers: [], bot: false });
 }
 
 /** convs は会話ごとのメッセージ、reads は アカウント ID → 会話 → 読んだ時刻 */
@@ -848,7 +848,7 @@ function pushChat(sid: string, from: User | null, text: string, opt: { scope?: C
     if (existing) { roomSend(sid, { t: 'chat', sid, m: existing }, [from.id]); return; }
   }
   const m: ChatMessage = {
-    id: peerEvent?.id ?? randomUUID(), from: from?.id ?? null, fromName: from?.name ?? '', text, at: peerEvent?.at ?? Date.now(), scope: opt.scope ?? 'all',
+    id: peerEvent?.id ?? randomUUID(), from: from?.id ?? null, fromName: from?.name ?? '', ...(from?.bot ? { fromBot: true } : {}), text, at: peerEvent?.at ?? Date.now(), scope: opt.scope ?? 'all',
     ...(opt.clientRequestId ? { clientRequestId: opt.clientRequestId } : {}),
     ...(opt.image ? { image: opt.image } : {}), ...(opt.media ? { media: opt.media } : {}), ...(opt.to ? { to: opt.to } : {}), ...(opt.about ? { about: opt.about } : {}), ...(opt.dice ? { dice: opt.dice } : {}),
   };
@@ -1400,7 +1400,7 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
       users.set(account.id, {
         id: account.id, name, session: null, mode: '2d',
         micOn: false, sharing: false, follow: null, pos: null,
-        icon: iconVersion(account.id), avatar: avatarVersion(account.id), bio: bioOf(account.id), status: rec.status, statusText: rec.statusText, guest: account.kind === 'guest', username: account.kind === 'misskey' ? account.username : null,
+        icon: iconVersion(account.id), avatar: avatarVersion(account.id), bio: bioOf(account.id), status: rec.status, statusText: rec.statusText, guest: account.kind === 'guest', username: account.kind === 'misskey' ? account.username : null, bot: rec.bot,
         viewing: [], viewLive: false, display: null,
       });
     if (!sockets.has(account.id)) sockets.set(account.id, new Set());
@@ -1664,7 +1664,7 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
     return;
   }
   if (msg.t === 'profileUpdated') {
-    updateHomeUser(original.id, { icon: iconVersion(original.id), avatar: avatarVersion(original.id), bio: bioOf(original.id) });
+    updateHomeUser(original.id, { icon: iconVersion(original.id), avatar: avatarVersion(original.id), bio: bioOf(original.id), bot: personRec(original.id).bot });
     broadcastUsers();
     if (!original.guest) sendDirectory(original.id);
     return;
@@ -2590,18 +2590,25 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   if (url.pathname === '/profile') {
     res.setHeader('Content-Type', 'application/json');
     if (req.method === 'POST') {
-      // 自己紹介はログインした人だけ（ゲストが残せるのはアイコンとアバター）
       const account = await who();
-      if (!account || account.kind === 'guest') { deny(403); return; }
+      if (!account) { deny(401); return; }
       const body = await readBody(req, 10_000);
-      let bio = '';
-      try { bio = String((JSON.parse(body?.toString('utf-8') ?? '') as { bio?: unknown }).bio ?? '').slice(0, 300); } catch { res.statusCode = 400; res.end(); return; }
-      bios.set(account.id, bio);
+      let parsed: { bio?: unknown; bot?: unknown };
+      try { parsed = JSON.parse(body?.toString('utf-8') ?? '') as { bio?: unknown; bot?: unknown }; } catch { res.statusCode = 400; res.end(); return; }
+      if (typeof parsed !== 'object' || parsed === null) { res.statusCode = 400; res.end(); return; }
+      // 自己紹介はログインした人だけ（ゲストが残せるのはアイコンとアバター）。
+      // ボット申告だけは、ボット用に作られたゲストでも名乗れるようゲストにも開く
+      if ('bio' in parsed) {
+        if (account.kind === 'guest') { deny(403); return; }
+        bios.set(account.id, String(parsed.bio ?? '').slice(0, 300));
+      }
+      if ('bot' in parsed) personRec(account.id).bot = parsed.bot === true;
       savePeople();
-      res.end(JSON.stringify({ bio }));
+      res.end(JSON.stringify({ bio: bioOf(account.id), bot: personRec(account.id).bot }));
       return;
     }
-    res.end(JSON.stringify({ bio: bioOf(url.searchParams.get('id') ?? '') }));
+    const id = url.searchParams.get('id') ?? '';
+    res.end(JSON.stringify({ bio: bioOf(id), bot: people[id]?.bot ?? false }));
     return;
   }
   if (url.pathname === '/media' && req.method === 'POST') {

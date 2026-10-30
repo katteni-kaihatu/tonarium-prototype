@@ -5,7 +5,7 @@ import { EMPTY_PRESENCE, type AvatarState, type User } from '../../shared/protoc
 import { applyAvatars, deriveSession, type SessionSources } from './sessionView.ts';
 
 const user = (id: string, mode: User['mode'] = '2d'): User => ({
-  id, name: id, session: 'room', mode, sharing: false, icon: null, avatar: null, bio: '', status: 'online', statusText: '', guest: false, username: null,
+  id, name: id, session: 'room', mode, sharing: false, icon: null, avatar: null, bio: '', status: 'online', statusText: '', guest: false, username: null, bot: false,
 });
 
 const pose = (x: number): AvatarState => ({ x, z: 2, ry: 0 });

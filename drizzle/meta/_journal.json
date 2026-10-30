@@ -57,6 +57,13 @@
       "when": 1793208356701,
       "tag": "0007_misskey_oauth",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793317227945,
+      "tag": "0008_profile_bot",
+      "breakpoints": true
     }
   ]
 }

@@ -7,7 +7,7 @@ import { appendFantasyGmMessages, appendFantasyGmResponse, clearFantasyGmLife, f
 import { clearNpcRequests, consumeNpcRequest, registerNpcRequest } from './npc-request-tracker.ts';
 
 const accountA={id:'account-A',principal:'fantasy:privacy-A',username:'traveler_a'},accountB={id:'account-B',principal:'fantasy:privacy-B',username:'traveler_b'};
-const user=(id:string,session:string|null='fantasy-room'):User=>({id,name:id,session,mode:'2d',sharing:false,icon:null,avatar:null,bio:'',status:'online',statusText:'',guest:false,username:null});
+const user=(id:string,session:string|null='fantasy-room'):User=>({id,name:id,session,mode:'2d',sharing:false,icon:null,avatar:null,bio:'',status:'online',statusText:'',guest:false,username:null,bot:false});
 const identity=()=>({selfId:accountA.principal,fantasyHomeId:'browser-home',fantasyAccount:accountA,users:[user(accountA.principal),user('public-bystander')]});
 
 test('account ownership change clears private RPG records, proposals and both owners’ queued dialogue',()=>{

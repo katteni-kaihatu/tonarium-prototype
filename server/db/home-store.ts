@@ -5,7 +5,7 @@ import { db } from './index.ts';
 import { stripNul } from './persist.ts';
 import { events, follows, groups, messageReads, messages, profiles, sessionRenames, userSessions, watches } from './schema.ts';
 
-export interface PersonRec { status: StatusKind; statusText: string; recent: string[]; lastSeen: number | null; watchers: string[] }
+export interface PersonRec { status: StatusKind; statusText: string; recent: string[]; lastSeen: number | null; watchers: string[]; bot: boolean }
 export interface HomeData { sessions: SessionDef[]; groups: Group[]; events: EventDef[]; renamed: Record<string, string> }
 export interface LoadedPeopleAndHome {
   home: HomeData;
@@ -30,10 +30,10 @@ export async function loadPeopleAndHome(): Promise<LoadedPeopleAndHome> {
   const people = record<PersonRec>();
   const bios = new Map<string, string>();
   for (const p of profileRows) {
-    people[p.accountId] = { status: p.status as StatusKind, statusText: p.statusText, recent: p.recent, lastSeen: p.lastSeen, watchers: [] };
+    people[p.accountId] = { status: p.status as StatusKind, statusText: p.statusText, recent: p.recent, lastSeen: p.lastSeen, watchers: [], bot: p.bot };
     if (p.bio) bios.set(p.accountId, p.bio);
   }
-  for (const w of watchRows) (people[w.target] ??= { status: 'online', statusText: '', recent: [], lastSeen: null, watchers: [] }).watchers.push(w.watcher);
+  for (const w of watchRows) (people[w.target] ??= { status: 'online', statusText: '', recent: [], lastSeen: null, watchers: [], bot: false }).watchers.push(w.watcher);
   const convs = record<Message[]>();
   for (const m of messageRows) (convs[m.conv] ??= []).push(m.data as Message);
   const reads = record<Record<string, number>>();
@@ -100,7 +100,7 @@ export async function savePeople(rawPeople: Record<string, PersonRec>, rawBios: 
   await db().transaction(async (tx) => {
     for (const id of new Set([...Object.keys(people), ...bios.keys()])) {
       const p = people[id];
-      const row = { bio: bios.get(id) ?? '', status: p?.status ?? 'online', statusText: p?.statusText ?? '', recent: p?.recent ?? [], lastSeen: p?.lastSeen ?? null };
+      const row = { bio: bios.get(id) ?? '', status: p?.status ?? 'online', statusText: p?.statusText ?? '', recent: p?.recent ?? [], lastSeen: p?.lastSeen ?? null, bot: p?.bot ?? false };
       await tx.insert(profiles).values({ accountId: id, ...row }).onConflictDoUpdate({ target: profiles.accountId, set: row });
     }
     await tx.delete(watches);

@@ -63,6 +63,7 @@ export function ProfileDialog({ name, onClose }: { name: string; onClose: () => 
   const avatar = changedAvatar ?? avatarV;
   const [message, setMessage] = useState<string | UiMessage>('');
   const [bio, setBio] = useUpdateDraft<string | null>(`profile.bio.${id}`, null);
+  const [bot, setBot] = useState<boolean | null>(null);
   const loadScale = useStore((s) => s.loadScale);
   const lightweight = useStore((s) => s.lightweight);
   const mapMode = useStore((s) => s.mapMode);
@@ -70,11 +71,17 @@ export function ProfileDialog({ name, onClose }: { name: string; onClose: () => 
   const guest = useStore((s) => s.selfGuest);
   useEffect(() => {
     let alive = true;
-    void fetch(`/profile?id=${encodeURIComponent(id)}`).then((r) => r.json()).then((p: { bio: string }) => { if (alive) setBio(current => current ?? p.bio); });
+    void fetch(`/profile?id=${encodeURIComponent(id)}`).then((r) => r.json()).then((p: { bio: string; bot: boolean }) => { if (alive) { setBio(current => current ?? p.bio); setBot(current => current ?? p.bot); } });
     return () => { alive = false; };
   }, [id]);
   const saveBio = async () => {
     const r = await fetch('/profile', { method: 'POST', body: JSON.stringify({ bio }) });
+    if (r.ok) send({ t: 'profileUpdated' });
+    setMessage(r.ok ? msg("ui42") : msg("ui43"));
+  };
+  const saveBot = async (next: boolean) => {
+    setBot(next);
+    const r = await fetch('/profile', { method: 'POST', body: JSON.stringify({ bot: next }) });
     if (r.ok) send({ t: 'profileUpdated' });
     setMessage(r.ok ? msg("ui42") : msg("ui43"));
   };
@@ -97,6 +104,11 @@ export function ProfileDialog({ name, onClose }: { name: string; onClose: () => 
           <textarea className="biofield" value={bio ?? ''} maxLength={300} onChange={(e) => setBio(e.target.value)} placeholder={tr("ui49")} aria-label={tr("ui48")} />
           <div className="row end"><button onClick={() => void saveBio()}>{tr("ui50")}</button></div>
         </section>}
+        <section>
+          <h3>{tr('authBotMark')}</h3>
+          <label className="row"><input type="checkbox" checked={bot ?? false} onChange={(e) => void saveBot(e.target.checked)} />{tr('authBotToggle')}</label>
+          <div className="sub">{tr('authBotNote')}</div>
+        </section>
         <section>
           <h3>{tr("ui51")}</h3>
           <div className="row">
