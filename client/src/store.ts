@@ -394,7 +394,7 @@ export const useStore = create<State>((set, get) => ({
   switching: null,
   loadScale: load('tonarium.loadScale', 1),
   lightweight: load('tonarium.lightweight', false),
-  mapMode: load('tonarium.mapMode', 'none'),
+  mapMode: load('tonarium.mapMode', '2d'),
   voiceHeat: load('tonarium.voiceHeat', true),
   walk: null,
   volumes: {},
