@@ -4,7 +4,13 @@
 /* 2D の背景のマップ。前面のパネルやウィンドウの無いところを押すとここに届く */
 .map2d, .map3d { position: absolute; inset: 0; z-index: 0; touch-action: none; user-select: none; }
 .map2d { cursor: crosshair; overflow: hidden; }
-.map2d svg { position: absolute; inset: 0; }
+.map2d .mapfloor { position: absolute; left: 0; top: 0; z-index: 0; overflow: visible; transform-origin: 0 0; pointer-events: none; visibility: hidden; }
+.map2d .mapfloor[style] { visibility: visible; }
+.map2d > div { position: absolute !important; inset: 0; z-index: 1; }
+.mapmarks { pointer-events: none; }
+.mapmark { position: absolute; visibility: hidden; pointer-events: none; }
+.map2d .mname { display: block; pointer-events: none; }
+.map2d .mapname { position: absolute; transform: translate(-50%, -50%); z-index: 2; visibility: hidden; }
 .mfloor { fill: #F7F3EC; stroke: #CFC6B6; stroke-width: .08; }
 .msolid { fill: #D9CFBF; stroke: #BDB2A0; stroke-width: .04; }
 .mspawn { fill: rgba(47, 95, 196, .08); stroke: rgba(47, 95, 196, .5); stroke-width: .06; stroke-dasharray: .25 .2; }
@@ -17,17 +23,11 @@
 .mroute { stroke: #E2533F; stroke-width: .08; stroke-dasharray: .3 .2; stroke-linecap: round; }
 .mgoal circle:first-child { fill: rgba(226, 83, 63, .15); stroke: #E2533F; stroke-width: .08; }
 .mgoal circle:last-child { fill: #E2533F; }
-.mperson.smooth { transition: left .2s linear, top .2s linear; }
-.mperson, .mitem { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
-.mperson { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.mperson .face { box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(40, 30, 10, .25); }
-.mperson.self .face { box-shadow: 0 0 0 3px var(--accent), 0 2px 6px rgba(40, 30, 10, .25); }
 .mname { padding: 0 6px; border-radius: 6px; background: rgba(255, 253, 249, .9); font-size: 11px; font-weight: 700; white-space: nowrap; }
-.mperson.small .mname { display: none; }
 .mpin { position: absolute; left: 0; top: 0; visibility: hidden; display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; }
 .mpin .face { box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(0, 0, 0, .35); }
 .mpin.self .face { box-shadow: 0 0 0 3px var(--accent), 0 2px 6px rgba(0, 0, 0, .35); }
-.mitem { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; box-shadow: 0 1px 4px rgba(40, 30, 10, .25); }
+.mitem { position: absolute; transform: translate(-50%, -50%); pointer-events: none; width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; box-shadow: 0 1px 4px rgba(40, 30, 10, .25); }
 .front { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 .front > * { pointer-events: auto; }
 .world.locked .front > * { opacity: .4; pointer-events: none; }

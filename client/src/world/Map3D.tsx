@@ -1,7 +1,6 @@
 import { t as tr } from '../i18n/index.ts';
-import { Suspense, useEffect, useMemo, useRef } from 'react';
-import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { Suspense, useMemo, useRef } from 'react';
+import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { NEAR_RANGE, VOICE_RANGE } from '../../../shared/places.ts';
@@ -9,8 +8,8 @@ import type { WorldKind } from '../../../shared/worlds.ts';
 import { useStore, get } from '../store.ts';
 import { placesOf } from '../spatial.ts';
 import { HEAT_CELL_M, cellCenter } from '../voiceHeat.ts';
-import { touchOnly } from '../phone.ts';
-import { Avatar3D, Entrance } from '../view3d/View3D.tsx';
+import { Avatar3D, Entrance } from '../view3d/Participants3D.tsx';
+import { CenterInBox, ControlsHome, MapControls, MAP_FOV, mapCameraHome } from './mapCamera.tsx';
 import { Item3D } from '../view3d/items3d.tsx';
 import { ShareDisplay } from '../view3d/shareDisplay.tsx';
 import { WORLD_BG, WorldMesh } from '../view3d/worlds3d.tsx';
@@ -94,37 +93,8 @@ function PersonPins({ els }: { els: React.RefObject<Map<string, HTMLElement>> })
   );
 }
 
-/** 画面の中心ではなく、パネルに隠れない範囲の中心にワールドを映す */
-function CenterInBox({ box }: { box: ReturnType<typeof useMapBox> }) {
-  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
-  useEffect(() => {
-    const dx = (box.x0 + box.x1) / 2 - box.w / 2;
-    const dy = (box.y0 + box.y1) / 2 - box.h / 2;
-    camera.setViewOffset(box.w, box.h, -dx, -dy, box.w, box.h);
-    return () => camera.clearViewOffset();
-  }, [camera, box.w, box.h, box.x0, box.x1, box.y0, box.y1]);
-  return null;
-}
-
-const FOV = 45;
-/** 天井のある部屋だけ。ゲームの塔や街の建物は切らない */
+const FOV = MAP_FOV;
 const CLIP_Y: Partial<Record<WorldKind, number>> = { room: 3, cafe: 3 };
-
-/** 最初だけカメラを構える。窓の大きさやパネルが変わったときは、見ている角度は保ったままスペースで戻る先だけ更新する。
- * Canvas の中で OrbitControls の後に置くと、ref が付いてから動く */
-function ControlsHome({ controls, camera0, target }: { controls: React.RefObject<OrbitControlsImpl | null>; camera0: THREE.Vector3; target: [number, number, number] }) {
-  const placed = useRef(false);
-  useEffect(() => {
-    const c = controls.current;
-    if (!c) return;
-    c.position0.copy(camera0);
-    c.target0.set(...target);
-    if (placed.current) return;
-    placed.current = true;
-    c.reset();
-  }, [controls, camera0, target[0], target[1], target[2]]);
-  return null;
-}
 
 export function Map3D({ kind }: { kind: WorldKind }) {
   const box = useMapBox();
@@ -138,9 +108,7 @@ export function Map3D({ kind }: { kind: WorldKind }) {
   const pins = useRef(new Map<string, HTMLElement>());
   // パネルに隠れない範囲にワールド全体が入る距離から、斜め上に構える
   const camera0 = useMemo(() => {
-    const frac = Math.min((box.y1 - box.y0) / box.h, ((box.x1 - box.x0) / box.h));
-    const dist = (span / frac / (2 * Math.tan((FOV / 2) * (Math.PI / 180)))) * 1.1;
-    return new THREE.Vector3(cx, 0, cz).addScaledVector(new THREE.Vector3(0, 0.8, 0.6), dist);
+    return mapCameraHome(cx, cz, span, box);
   }, [cx, cz, span, box.w, box.h, box.x0, box.x1, box.y0, box.y1]);
   useSpaceReset(() => controls.current?.reset());
   const onClick = (e: ThreeEvent<MouseEvent>) => {
@@ -167,12 +135,7 @@ export function Map3D({ kind }: { kind: WorldKind }) {
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
         <Suspense fallback={null}>
-          <OrbitControls
-            ref={controls} target={[cx, 0, cz]} enabled={!touchOnly} screenSpacePanning={false} zoomSpeed={2}
-            maxPolarAngle={Math.PI / 2 - 0.08} minDistance={3} maxDistance={span * 5}
-            // 左クリックは移動に使うので、回転は右・平行移動はホイールを押してドラッグ
-            mouseButtons={{ LEFT: -1 as THREE.MOUSE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE }}
-          />
+          <MapControls controls={controls} cx={cx} cz={cz} span={span} />
           <ControlsHome controls={controls} camera0={camera0} target={[cx, 0, cz]} />
         </Suspense>
       </Canvas>

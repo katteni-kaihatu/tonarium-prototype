@@ -587,7 +587,7 @@ export default {
   "ui67": "2D map",
   "ui68": "2D map",
   "ui69": "3D map",
-  "ui70": "Show a map behind the 2D view. Click to move, scroll to zoom, drag with the wheel pressed to pan, and press Space to reset. Right-drag to rotate the 3D map. Saved only on this device.",
+  "ui70": "Show a map behind the 2D view. Left-click or tap to move, right-drag to rotate and tilt, middle-drag to pan, scroll to zoom, and press Space to reset the view. Touch devices support tap-to-move. Saved only on this device.",
   "ui71": "Voice heat (leave conversation warmth on the map)",
   "ui72": "Places where people talk glow warmly and slowly cool over several minutes. Conversation content is never recorded.",
   "ui73": "Close",
