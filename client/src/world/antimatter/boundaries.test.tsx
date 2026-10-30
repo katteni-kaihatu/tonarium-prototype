@@ -15,6 +15,31 @@ import { getLanguage, setLanguage, systemText, t } from '../../i18n/core.ts';
 import { DimensionList } from './DimensionList.tsx';
 import { LayerTabs } from './LayerTabs.tsx';
 import { serialize } from '../../ad/engine.mjs';
+import { AntimatterPanel } from './AntimatterPanel.tsx';
+
+test('personal BGM toggle is accessible in 2D and every 3D target regardless of ownership', () => {
+  const previous = getLanguage();
+  const slice = harness(createNewGame());
+  const before = serialize(slice.adGame!);
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      const views = [renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />)];
+      for (const target of ['core', 'tickspeed', 'boost', 'galaxy', 'sacrifice', 'crunch', 'dimension-1', 'exhibit-infinity', 'exhibit-eternity', 'exhibit-reality', 'exhibit-celestials'] as const) {
+        for (const own of [true, false]) views.push(panels(slice, target, own).space);
+      }
+      for (const html of views) {
+        const button = [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]).find(button => button.includes(`aria-label="${t('adBgmLabel')}"`));
+        assert.ok(button);
+        assert.match(button, /type="button"/);
+        assert.match(button, /aria-pressed="true"/);
+        assert.ok(button.includes(t('adBgmOn')));
+        assert.doesNotMatch(button, /disabled/);
+      }
+    }
+    assert.equal(serialize(slice.adGame!), before);
+  } finally { setLanguage(previous); }
+});
 
 test('2D tabs and 3D exhibits render in three languages without changing saves or names', () => {
   const previous = getLanguage();

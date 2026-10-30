@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { AdSoundPlayer } from './audio.ts';
+import { startAdAudio } from './AdAudio.tsx';
+import { get, set, setAdBgmEnabled } from '../store.ts';
+import { bigFromNumber, createNewGame, serialize } from './engine.mjs';
+import { emitAdFeedback } from './feedback.ts';
 
 class Param {
   value = 0;
@@ -78,6 +82,96 @@ function deferred<T>() {
   const promise = new Promise<T>((r) => { resolve = r; });
   return { promise, resolve };
 }
+
+test('BGM preference immediately stops music, survives sync and views, and preserves feedback and volumes', async t => {
+  const before = get();
+  const context = new Context();
+  const originals = new Map<string, PropertyDescriptor | undefined>(['window', 'document', 'fetch', 'AudioContext'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  let sync!: () => void;
+  const gestures = new Map<string, EventListener>();
+  const doc = { hidden: false, addEventListener() {}, removeEventListener() {} };
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: {
+    matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+    addEventListener: (key: string, callback: EventListener) => gestures.set(key, callback),
+    removeEventListener() {},
+    setInterval: (callback: () => void) => { sync = callback; return 1; }, clearInterval() {},
+  } });
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: doc });
+  Object.defineProperty(globalThis, 'AudioContext', { configurable: true, value: function () { return context; } });
+  globalThis.fetch = (async () => new Response(new ArrayBuffer(8))) as typeof fetch;
+  t.after(() => {
+    set(before);
+    for (const [key, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  });
+  const game = createNewGame();
+  game.dimensions[0].amount = bigFromNumber(1);
+  const saved = serialize(game);
+  set({ joined: true, session: 'lab', hubOpen: false, switching: null, worldLoading: null,
+    windows: [{ key: 'antimatter' } as typeof before.windows[number]], maxWin: null,
+    adGame: game, adBgmEnabled: true, audioVol: { voice: 0.7, fx: 0.4, media: 0.3 } });
+  const cleanup = startAdAudio();
+  try {
+    gestures.get('pointerdown')!(new Event('pointerdown'));
+    await settle();
+    assert.equal(context.sources.length, 1);
+    setAdBgmEnabled(false);
+    assert.equal(context.sources[0].stopped, true);
+    emitAdFeedback({ kind: 'save' });
+    assert.equal(context.voices.length, 2);
+    for (const mode of ['3d', '2d', '3d'] as const) {
+      set({ mode, windows: [], worldBy: { lab: 'antimatter' } });
+      sync();
+      set({ windows: [{ key: 'antimatter-space' } as typeof before.windows[number]] });
+      sync();
+    }
+    await settle();
+    assert.equal(context.sources.length, 1);
+    assert.equal(get().adBgmEnabled, false);
+    doc.hidden = true;
+    setAdBgmEnabled(true);
+    assert.equal(context.sources.length, 1);
+    doc.hidden = false;
+    sync();
+    await settle();
+    for (let i = 0; i < 10; i++) sync();
+    assert.equal(context.sources.length, 2);
+    assert.equal(context.sources.filter(source => !source.stopped).length, 1);
+    assert.equal(context.sources[1].loop, true);
+    assert.deepEqual(get().audioVol, { voice: 0.7, fx: 0.4, media: 0.3 });
+    assert.equal(serialize(game), saved);
+  } finally { cleanup(); }
+});
+
+test('BGM stop blocks late fetch, decode and resume, then resumes a single loop with feedback intact', async () => {
+  for (const stage of ['fetch', 'decode', 'resume'] as const) {
+    const fetched = deferred<Response>();
+    const decoded = deferred<AudioBuffer>();
+    const resumed = deferred<void>();
+    const { player, context } = fixture(stage === 'fetch' ? (() => fetched.promise) as typeof fetch : undefined);
+    if (stage === 'decode') context.decodeAudioData = () => decoded.promise;
+    if (stage === 'resume') context.resume = () => resumed.promise.then(() => { context.state = 'running'; });
+    try {
+      player.production(1);
+      player.unlock();
+      await settle();
+      player.stopProduction();
+      fetched.resolve(new Response(new ArrayBuffer(8)));
+      decoded.resolve({ duration: 53.333 } as AudioBuffer);
+      resumed.resolve();
+      await settle();
+      assert.equal(context.sources.length, 0, stage);
+      player.play({ kind: 'save' });
+      assert.equal(context.voices.length, 2, stage);
+      for (let i = 0; i < 10; i++) player.production(0.5);
+      await settle();
+      assert.equal(context.sources.length, 1, stage);
+      assert.equal(context.sources[0].loop, true);
+    } finally { player.dispose(); }
+  }
+});
 
 test('only a gesture creates the context; music waits for unlock and old operation events are not replayed', async () => {
   const { player, context, requests, creations } = fixture();

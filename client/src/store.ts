@@ -215,6 +215,7 @@ interface State extends AdSlice {
   attention: Record<string, number>;
   popupPausedUntil: number;
   chatNotificationSound: boolean;
+  adBgmEnabled: boolean;
   arrivals: Partial<Record<ArrivalKind, Arrival>>;
   phoneLayout: boolean;
   rightView: 'log' | 'msg';
@@ -386,6 +387,7 @@ export const useStore = create<State>((set, get) => ({
   attention: {},
   ...initialArrivalState(),
   chatNotificationSound: load('tonarium.chatNotificationSound', true),
+  adBgmEnabled: load<unknown>('tonarium.adBgmEnabled', true) !== false,
   phoneLayout: false,
   rightView: 'log',
   rightConversation: null,
@@ -459,6 +461,11 @@ export interface ItemUi { sel?: number; chessRevision?: number; promotionTo?: nu
 
 export const set = useStore.setState;
 export const get = useStore.getState;
+
+export function setAdBgmEnabled(enabled: boolean) {
+  save('tonarium.adBgmEnabled', enabled);
+  set({ adBgmEnabled: enabled });
+}
 
 export function recompute() {
   const s = get();

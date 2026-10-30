@@ -5,11 +5,12 @@ import { Canvas, useThree } from '@react-three/fiber';
 import type { Scene, Mesh, MeshBasicMaterial } from 'three';
 import { createNewGame, bigFromLog10, serialize } from './engine.mjs';
 import { createAdSlice, type AdSlice } from './slice.ts';
-import { buildAdLabSnapshot } from './labView.ts';
+import { buildAdActions, buildAdLabSnapshot } from './labView.ts';
 import { adaptAdSlice } from '../world/antimatter/adapter.tsx';
 import { AntimatterPanel } from '../world/antimatter/AntimatterPanel.tsx';
 import { AntimatterReadout } from '../view3d/AntimatterReadout.tsx';
 import { PanelBoard, AntimatterSpacePanel, type AdActions } from '../view3d/antimatterPanels.tsx';
+import { get, setAdBgmEnabled } from '../store.ts';
 
 // Vite の開発用ページから実行する。実際の進行やサーバーには接続しない。
 function check(value: unknown, message: string): asserts value {
@@ -58,7 +59,7 @@ async function run() {
       check(JSON.stringify(slice.adProfile) === savedProfile, 'Profile ID and name unchanged');
     }
   };
-  const tab = () => host.querySelector('button[aria-pressed="true"]');
+  const tab = () => host.querySelector('button[aria-pressed="true"]:not([aria-label])');
   let scheduled = 0, cancelled = 0;
   let expire: (() => void) | undefined;
   const noticeTimer = 2147483647;
@@ -88,6 +89,28 @@ async function run() {
     setLanguage('ja');
     flushSync(() => root.render(<AntimatterPanel ad={ad} />));
     await pause();
+    const previousBgm = get().adBgmEnabled;
+    const spaceHost = document.getElementById('space')!;
+    const renderSpace = () => space.render(<AntimatterSpacePanel target="core" snapshot={buildAdLabSnapshot(slice.adGame!)} actions={buildAdActions(slice)} isOwn={false} />);
+    try {
+      flushSync(() => { setAdBgmEnabled(true); renderSpace(); });
+      await click(t('adBgmOn'));
+      await cycle(() => {
+        for (const scope of [host, spaceHost]) {
+          const button = scope.querySelector(`button[aria-label="${t('adBgmLabel')}"]`);
+          check(button?.getAttribute('aria-pressed') === 'false', 'Personal BGM off in both views');
+          check(button?.textContent === t('adBgmOff'), 'BGM label follows language');
+          check(button?.getAttribute('type') === 'button', 'Native keyboard button');
+        }
+      });
+      flushSync(() => space.render(null));
+      flushSync(renderSpace);
+      check(spaceHost.querySelector('button[aria-pressed="false"]'), 'BGM remains off after reopening');
+      await click(t('adBgmOff'), spaceHost);
+      check(host.querySelector(`button[aria-label="${t('adBgmLabel')}"]`)?.getAttribute('aria-pressed') === 'true', '3D updates 2D');
+    } finally {
+      flushSync(() => { setAdBgmEnabled(previousBgm); space.render(null); });
+    }
     const panel = host.firstElementChild;
     await cycle(() => {
       check(host.firstElementChild === panel, 'Panel retained');

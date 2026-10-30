@@ -1,4 +1,7 @@
 export default {
+  adBgmLabel: '내 AD 연구소 BGM',
+  adBgmOn: 'BGM: 켜짐',
+  adBgmOff: 'BGM: 꺼짐',
   adLabText1: "반물질",
   adLabText2: "Boost: {0} · 은하: {1}",
   adLabText3: "돌아오신 것을 환영합니다",

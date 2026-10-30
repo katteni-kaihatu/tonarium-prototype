@@ -11,6 +11,7 @@ import { makeCanvasTexture } from './textTexture.ts';
 import { drawAdBoard } from './antimatterText.ts';
 import { adExhibitTitle } from '../ad/labView.ts';
 import { emitAdFeedback } from '../ad/feedback.ts';
+import { AdBgmToggle } from '../ad/AdBgmToggle.tsx';
 import { uprightQuaternion } from '../xr/pose.ts';
 
 
@@ -109,6 +110,12 @@ function Foot({ onClose }: { onClose?: () => void }) {
 //  3D 側の use() が開くと同時に exitPointerLock し、親がこのパネルを前面に出す。
 //  Big Crunch の確認ダイアログはここでは出さず、親が action 呼び出し前に確認する責務とする */
 export function AntimatterSpacePanel({ target, snapshot, actions, isOwn, onClose }: {
+  target: AdPanelTarget; snapshot: AdLabSnapshot; actions: AdActions; isOwn: boolean; onClose?: () => void;
+}) {
+  return <><AdBgmToggle /><AntimatterSpaceContent target={target} snapshot={snapshot} actions={actions} isOwn={isOwn} onClose={onClose} /></>;
+}
+
+function AntimatterSpaceContent({ target, snapshot, actions, isOwn, onClose }: {
   target: AdPanelTarget; snapshot: AdLabSnapshot; actions: AdActions; isOwn: boolean; onClose?: () => void;
 }) {
   useLanguage();
