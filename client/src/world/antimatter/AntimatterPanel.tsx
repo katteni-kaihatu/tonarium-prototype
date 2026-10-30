@@ -13,6 +13,7 @@ import './antimatter-panel.css';
 import { LabBanner } from './LabArt.tsx';
 import { emitAdFeedback } from '../../ad/feedback.ts';
 import { AdPurchaseParticles } from './AdPurchaseParticles.tsx';
+import { AdBgmToggle } from '../../ad/AdBgmToggle.tsx';
 import { t, useLanguage, msg, systemText, type UiMessage } from '../../i18n/index.ts';
 
 type TabId = 'dimensions' | 'actions' | 'stats' | 'profiles' | 'layers';
@@ -52,6 +53,7 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
         <span style={s.muted}>IP: {formatNumber(game.infinityPoints)}</span>
         <span style={s.muted}>{t('adLabText2', game.dimensionalBoosts, game.galaxies)}</span>
         <span style={{ flex: 1 }} />
+        <AdBgmToggle />
         {ad.activeProfile && <span style={s.muted}>{ad.activeProfile.name}</span>}
       </div>
       <div style={s.tabs} aria-label={t('adLabText10')}>

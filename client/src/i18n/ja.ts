@@ -1,4 +1,7 @@
 export default {
+  adBgmLabel: '自分のAD研究所BGM',
+  adBgmOn: 'BGM: オン',
+  adBgmOff: 'BGM: オフ',
   adLabText1: "ANTIMATTER / 反物質",
   adLabText2: "Boost: {0} · 銀河: {1}",
   adLabText3: "おかえりなさい",

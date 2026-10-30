@@ -1,4 +1,7 @@
 export default {
+  adBgmLabel: 'AD lab BGM for you',
+  adBgmOn: 'BGM: On',
+  adBgmOff: 'BGM: Off',
   adLabText1: "ANTIMATTER",
   adLabText2: "Boost: {0} · Galaxies: {1}",
   adLabText3: "Welcome back",
