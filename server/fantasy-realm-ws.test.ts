@@ -1,3 +1,4 @@
+import { markFantasyPlatformDataCurrent } from './fantasy-platform-reset.ts';
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,6 +19,7 @@ async function isolated(t: TestContext) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'tonarium-realm-ws-')), file = path.join(directory, 'fantasy.json');
   const players = Object.fromEntries(['alice', 'bob', 'outsider'].map(id => {
     const p = applyFantasyAction(newFantasyProfile(), { type: 'create', name: id === 'outsider' ? 'Outsider' : id === 'alice' ? 'Alice' : 'Bob', source: 'human', gender: 'female' }, () => .5).profile;
+    p.character!.inventory['arcane-bag-3']=1;p.character!.bag='arcane-bag-3';
     p.character!.gold = 2000; p.character!.inventory.herb = 20; p.character!.inventory.ore = 10; return [id, p];
   }));
   fs.writeFileSync(file, JSON.stringify(players));
@@ -30,8 +32,9 @@ async function isolated(t: TestContext) {
   const listener = net.createServer(); await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve));
   const port = (listener.address() as net.AddressInfo).port; await new Promise<void>(resolve => listener.close(() => resolve()));
   assert.ok(![3011, 18081, 8190, 5183, 3199, 5199].includes(port));
+  markFantasyPlatformDataCurrent(directory);
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], { cwd: process.cwd(),
-    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
+    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
       LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
   let logs = ''; child.stdout.on('data', value => { logs += value; }); child.stderr.on('data', value => { logs += value; });
   const sockets: WebSocket[] = [];
@@ -61,8 +64,8 @@ async function isolated(t: TestContext) {
     await new Promise<void>((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject); });
     const send = (message: unknown) => socket.send(JSON.stringify(message));
     send({ t: 'hello', compat: COMPAT_VERSION, id, name: id === 'outsider' ? 'Outsider' : id === 'alice' ? 'Alice' : 'Bob' });
-    await until(() => messages.find(message => message.t === 'fantasyProfile'));
-    if (session) { const start = messages.length; send({ t: 'join', sid: session }); await until(() => messages.slice(start).find(message => message.t === 'users' && message.list?.some(user => user.id === id && user.session === session))); }
+    await until(() => messages.find(message => message.t === 'snapshot'));
+    if (session) { const start = messages.length; send({ t: 'join', sid: session }); await until(() => messages.slice(start).find(message => message.t === 'users' && message.list?.some(user => user.id === id && user.session === session))); await until(() => messages.slice(start).find(message => message.t === 'fantasyProfile'));  }
     const state = () => (messages.filter(message => message.t === 'fantasyRealmState' && message.state).at(-1)?.state as FantasyRealmState | undefined);
     const realm = async (domain: 'economy' | 'civic', command: unknown, expected?: (state: FantasyRealmState) => boolean, denied = false, extras: Record<string, unknown> = {}) => {
       const start = messages.length; send({ t: 'fantasyRealmRequest', domain, command, ...extras });

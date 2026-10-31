@@ -42,6 +42,7 @@ test('crafting records one quality instance per output and consumes a real gem f
 
 test('trusted hunt contracts use authoritative progress, do not consume placeholder items and reward only once', () => {
   const p = player(), c = p.character!, quest = FANTASY_QUESTS.find(quest => quest.id === 'group-goblin-raiders')!;
+  c.guildProgress={version:1,grade:1,completedAtGrade:0,creditedQuests:[]};
   const grant: FantasyContractGrant = { offerId: 'offer-test-hunt', issuer: 'rin', boardLocation: c.location, acceptedAt: c.hour, expiresAt: c.hour + 48, progress: 0, gold: quest.gold + 10 };
   const action = { type: 'accept', quest: quest.id, offer: grant.offerId } as const;
   assert.equal(applyFantasyAction(p, action, high).changed, false);

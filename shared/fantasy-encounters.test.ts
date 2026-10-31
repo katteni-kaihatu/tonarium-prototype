@@ -6,7 +6,7 @@ import path from 'node:path';
 import type { FantasyAction, FantasyProfile } from './fantasy.ts';
 import { applyFantasyAction, advanceFantasyWorld, fantasyActionHours, newFantasyProfile, startFantasyActivity } from './fantasy-engine.ts';
 import { FANTASY_EVENTS, FANTASY_LOCATIONS } from './fantasy-data.ts';
-import { FANTASY_HOSTILE_ENCOUNTERS, fantasyCovertWork, fantasyEncounterChoiceStat, fantasyEncounterFor, fantasyEncounterLogText, fantasyFailedEventPursuit, fantasyHostileEncounter } from './fantasy-encounters.ts';
+import { FANTASY_ESCORT_AMBUSH_ENCOUNTER, FANTASY_HOSTILE_ENCOUNTERS, fantasyCovertWork, fantasyEncounterChoiceStat, fantasyEncounterFor, fantasyEncounterLogText, fantasyFailedEventPursuit, fantasyHostileEncounter } from './fantasy-encounters.ts';
 import { fantasyTerrainAllowed } from './fantasy-terrain.ts';
 import { FantasyStore } from '../server/fantasy-store.ts';
 
@@ -20,8 +20,8 @@ function player(location = 'greenwood', job = 'unassigned'): FantasyProfile {
 const pending = (id = 'encounter-woodland-wolf', location = 'greenwood') => { const profile = player(location); profile.event = id; return profile; };
 const eventAction = (profile: FantasyProfile, choice: string, rng = () => .999) => applyFantasyAction(profile, { type: 'event', choice }, rng);
 
-test('six explicit encounters are registered once, localized and offer speech only to people', () => {
-  assert.equal(FANTASY_HOSTILE_ENCOUNTERS.length, 6);
+test('seven explicit encounters are registered once, localized and offer speech only to people', () => {
+  assert.equal(FANTASY_HOSTILE_ENCOUNTERS.length, 7);
   for (const event of FANTASY_HOSTILE_ENCOUNTERS) {
     assert.equal(FANTASY_EVENTS.filter(value => value.id === event.id).length, 1);
     assert.equal(event.choices.some(choice => choice.id === 'talk'), event.opponent === 'person');
@@ -40,6 +40,8 @@ test('six explicit encounters are registered once, localized and offer speech on
   assert.equal(fantasyEncounterFor('ruin', 'escape-failed').id, 'encounter-ruin-skeleton');
   assert.equal(fantasyEncounterFor('island', 'escape-failed').id, 'encounter-reef-beast');
   assert.equal(fantasyEncounterFor('city', 'stealth-failed', true).id, 'encounter-watch');
+  for (const kind of ['city', 'forest', 'cave', 'coast'] as const) assert.equal(fantasyEncounterFor(kind, 'escort-ambush').id, FANTASY_ESCORT_AMBUSH_ENCOUNTER);
+  for (const locale of ['ko', 'en', 'ja'] as const) assert.ok(fantasyEncounterLogText('遭遇の発端［escort-ambush］。', locale));
 });
 
 test('failed exploration escape opens a pending encounter instead of resolving an invisible fight', () => {

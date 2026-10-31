@@ -8,13 +8,18 @@ import { FANTASY_JOBS } from '../../../shared/fantasy-data.ts';
 import { FANTASY_READABLE_LIBRARY_BOOKS } from '../../../shared/fantasy-library.ts';
 import { applyFantasyAction, fantasySkills, newFantasyProfile } from '../../../shared/fantasy-engine.ts';
 import { FANTASY_JOB_PATHS, fantasyJobPathError, fantasyJobPathSkills } from '../../../shared/fantasy-job-paths.ts';
-import { FANTASY_PRIEST_BRANCHES, FANTASY_PRIEST_PATH_SKILLS, fantasyPriestActionError, syncFantasyPriestGrowth, validFantasyPriestGrowth, type FantasyPriestBranch } from '../../../shared/fantasy-priest-growth.ts';
+import { FANTASY_PRIEST_BRANCHES, FANTASY_PRIEST_PATH_SKILLS, fantasyPriestActionError, syncFantasyPriestGrowth, validFantasyPriestGrowth } from '../../../shared/fantasy-priest-growth.ts';
 import { applyFantasyPrayer } from '../../../shared/fantasy-prayer.ts';
 import { fantasyCombatPlayer } from '../../../server/fantasy-combat-adapter.ts';
 import { createFantasyCombat } from '../../../shared/fantasy-combat.ts';
 import { FANTASY_JOB_DISCOVERY_BOOKS, fantasyJobPathDiscovered } from '../../../shared/fantasy-job-discovery.ts';
 import { fantasyGmKnowledge } from '../../../shared/fantasy-gm-knowledge.ts';
 import { FantasyCareerPanel } from './FantasyCareerPanel.tsx';
+import { FantasyGuildAssessment } from './FantasyGuildAssessment.tsx';
+import { FantasyRankBenefits } from './FantasyRankBenefits.tsx';
+import { fantasyIsLifeJob } from '../../../shared/fantasy-careers.ts';
+import { FantasyFishingPanel } from './FantasyFieldActions.tsx';
+import { FantasyInteriorMapSurvey } from './FantasyInteriorMaps.tsx';
 import { FantasyPriestPanel } from './FantasyPriestPanel.tsx';
 import { FantasyCombatPanel } from './FantasyCombatPanel.tsx';
 import { setLocale } from '../locale.ts';
@@ -44,19 +49,25 @@ function experienced(job = 'mage') {
   return p;
 }
 function readyPriest() {
-  let p = player('priest'); const c = p.character!; c.hour = 0; c.jobXp.priest = 30;
+  let p = player('priest'); const c = p.character!; c.hour = 12; c.jobXp.priest = 30;
   c.visited = ['hearth', 'suncourt', 'greenwood']; c.readBooks = ['traveler-guide', 'remedies-and-rites', 'quiet-sword', 'words-and-promises']; c.quests = ['quest-herbalist']; c.inventory.herb = 3;
   p = applyFantasyAction(p, { type: 'priestVow', quest: 'quest-herbalist' }).profile; p = applyFantasyAction(p, { type: 'complete', quest: 'quest-herbalist' }).profile;
   for (let day = 1; day <= 4; day++) { p.character!.hour = day * 24; applyFantasyPrayer(p.character!); }
-  return p;
+  p.character!.hour+=12;return p;
 }
 const forbiddenHelp = /숙련\s*30|신앙\s*45|성소\s*2곳|이행한 서약\s*1건|같은 봉사·책·성소|기도만으로는 분기|Requires priest practice|practice 30|faith 45|2 sanctuaries|Each service, book, sanctuary|司祭熟練30|信仰45|聖所2か所|同じ奉仕・本・聖所/;
 
-test('all 37 existing professions initially omit the other base-job list in all three languages', () => {
+function slotMarkup(html: string, slot: 'combat' | 'life') {
+  const start = html.indexOf(`data-career-slot="${slot}"`);
+  return slot === 'combat' ? html.slice(start, html.indexOf('data-career-slot="life"')) : html.slice(start);
+}
+test('each existing profession hides alternatives in its own slot while the second career can be chosen independently', () => {
   for (const locale of locales) for (const job of FANTASY_JOBS.filter(job => job.category !== 'none')) {
     const html = render(player(job.id), locale);
     assert.ok(html.includes(job.names[locale]), `${locale}/${job.id} is not the current profession`);
-    assert.ok(!html.includes('fr-career-offers'), `${locale}/${job.id} renders other base professions before opt-in`);
+    const own = slotMarkup(html, fantasyIsLifeJob(job.id) ? 'life' : 'combat');
+    assert.ok(!own.includes('fr-career-offers'), `${locale}/${job.id} renders alternatives before opt-in`);
+    assert.ok(html.includes('fr-career-offers'), `${locale}/${job.id} must allow choosing the second career`);
     assert.ok(html.includes('fr-career-change'));
     assert.ok(!forbiddenHelp.test(html), `${locale}/${job.id} exposes advancement requirements`);
   }
@@ -70,21 +81,48 @@ test('an unassigned traveler sees base-job choices immediately and no profession
   }
 });
 
-test('the bottom profession-change toggle reveals other base jobs only in its expanded state', () => {
+test('profession-change controls expand the matching slot without replacing the other career', () => {
   for (const locale of locales) {
-    const closed = render(player('mage'), locale), open = render(player('mage'), locale, true);
+    const p = player('mage'); p.character!.lifeJob = 'cook';
+    const closed = render(p, locale), open = render(p, locale, true);
     assert.ok(!closed.includes('fr-career-offers')); assert.ok(open.includes('fr-career-offers'));
     assert.ok(open.indexOf('fr-career-offers') < open.indexOf('fr-career-change'));
     assert.ok(open.includes(FANTASY_JOBS.find(job => job.id === 'cook')!.names[locale]));
-    const buttons = [...open.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g)];
-    assert.ok(buttons.at(-1)![1].includes({ ko: '직업 변경 닫기', en: 'Close profession change', ja: '職業変更を閉じる' }[locale]));
+    assert.ok(slotMarkup(open, 'combat').includes({ ko: '직업 변경 닫기', en: 'Close profession change', ja: '職業変更を閉じる' }[locale]));
+    assert.ok(!slotMarkup(open, 'life').includes('fr-career-offers'));
+    assert.ok(slotMarkup(closed, 'life').includes({ ko: '서브직업으로 일하기', en: 'Work in your secondary profession', ja: '副職で働く' }[locale]));
   }
 });
 
 test('blocked career controls remain disabled and reveal no different profession through disabled markup', () => {
   for (const locale of locales) {
-    const html = render(player('mage'), locale, false, true), buttons = [...html.matchAll(/<button\b([^>]*)>/g)];
+    const p = player('mage'); p.character!.lifeJob = 'cook';
+    const html = render(p, locale, false, true), buttons = [...html.matchAll(/<button\b([^>]*)>/g)];
     assert.ok(buttons.length > 0); assert.ok(buttons.every(button => /\bdisabled/.test(button[1]))); assert.ok(!html.includes('fr-career-offers'));
+  }
+});
+
+test('combat and life specializations use their own records and the life work control remains available', () => {
+  for (const locale of locales) {
+    const p = experienced('warrior'), c = p.character!; c.lifeJob = 'tailor'; c.jobXp.tailor = 1000;
+    const html = render(p, locale), combat = slotMarkup(html, 'combat'), life = slotMarkup(html, 'life');
+    assert.ok(combat.includes(FANTASY_JOBS.find(job => job.id === 'warrior')!.names[locale]));
+    assert.ok(life.includes(FANTASY_JOBS.find(job => job.id === 'tailor')!.names[locale]));
+    for (const path of FANTASY_JOB_PATHS.filter(path => path.job === 'tailor')) assert.ok(life.includes(path.names[locale]));
+    assert.ok(life.includes({ ko: '서브직업으로 일하기', en: 'Work in your secondary profession', ja: '副職で働く' }[locale]));
+    assert.ok(!combat.includes('data-career-slot="life"'));
+  }
+});
+
+test('fishing and scribe survey controls remain visible with an independent combat profession', () => {
+  for (const locale of locales) {
+    const p = player('warrior'), c = p.character!; c.lifeJob = 'fisher'; c.location = 'tidehaven';
+    setLocale(locale); set({ fantasyProfile: p, wsConnected: true }); stateOverrides = [];
+    const fishing = renderToStaticMarkup(createElement(FantasyFishingPanel, { c, blocked: false, onAction: () => {} }));
+    assert.ok(fishing.includes({ ko: '부두 낚시', en: 'Pier fishing', ja: '桟橋釣り' }[locale]));
+    c.lifeJob = 'scribe'; c.jobPaths = { scribe: { path: 'scribe-maps', hour: c.hour } };
+    const survey = renderToStaticMarkup(createElement(FantasyInteriorMapSurvey, { c, blocked: false, onAction: () => {} }));
+    assert.ok(survey.includes({ ko: '내부 지도 기록', en: 'Record an interior map', ja: '内部図を記録' }[locale]));
   }
 });
 
@@ -103,7 +141,7 @@ test('locked specialization descriptions and errors never reveal exact mastery o
   for (const locale of locales) for (const job of FANTASY_JOBS.filter(job => job.category !== 'none' && job.id !== 'priest')) {
     const p = player(job.id); p.character!.readBooks = FANTASY_READABLE_LIBRARY_BOOKS.map(book => book.id); const html = render(p, locale);
     for (const path of FANTASY_JOB_PATHS.filter(path => path.job === job.id)) {
-      assert.ok(html.includes(path.names[locale]));
+      assert.equal(html.includes(path.names[locale]),path.id!=='mage-star');
       const error = fantasyJobPathError(p.character!, path.id, locale)!; assert.ok(error); assert.ok(!/\d/.test(error));
     }
     assert.ok(!/requiredSkill|threshold|REQUIREMENTS|job-[a-z]+-advanced-[0-9]|숙련\s*100|practice 100|熟練100/.test(html));
@@ -134,9 +172,9 @@ test('GM knowledge reports only personal path skills and never imports secret ad
   }
 });
 
-test('all four priest branches show only their learned combat art in Korean, English and Japanese', () => {
+test('all four base priest branches show only their learned combat arts in Korean, English and Japanese', () => {
   const active = { care: 'priest-care-mercy', ward: 'priest-ward-aegis', oath: 'priest-oath-clarity', pilgrim: 'priest-pilgrim-lantern' } as const;
-  for (const locale of locales) for (const branch of Object.keys(active) as FantasyPriestBranch[]) {
+  for (const locale of locales) for (const branch of Object.keys(active) as (keyof typeof active)[]) {
     let p = readyPriest(); const result = applyFantasyAction(p, { type: 'priestBranch', branch }); assert.equal(result.error, undefined); p = result.profile;
     const state = createFantasyCombat({ id: 'priest-career-ui', source: 'hunt:monster-forest-wolf', location: 'greenwood', players: [fantasyCombatPlayer(p, 'priest')], enemies: [{ id: 'enemy', template: 'monster-forest-wolf' }], seed: 1, hour: p.character!.hour, tactical: true });
     setLocale(locale); set({ selfId: 'priest', fantasyProfile: p, fantasyCombat: state, fantasyCombatPending: false, fantasyPending: false, fantasyCombatError: null, wsConnected: true });
@@ -144,7 +182,13 @@ test('all four priest branches show only their learned combat art in Korean, Eng
     const html = renderToStaticMarkup(createElement(FantasyCombatPanel, { profile: p })); stateOverrides = [];
     const current = FANTASY_PRIEST_PATH_SKILLS.find(skill => skill.id === active[branch])!;
     assert.ok(html.includes(current.names![locale]));
-    for (const skill of FANTASY_PRIEST_PATH_SKILLS.filter(skill => skill.kind === 'active' && skill.id !== active[branch])) assert.ok(!html.includes(skill.names![locale]));
+    const learned = FANTASY_PRIEST_PATH_SKILLS.filter(skill => skill.kind === 'active' && skill.id.startsWith(`priest-${branch}-`));
+    const combatSkills = state.fighters.find(fighter => fighter.userId === 'priest')!.skills;
+    assert.deepEqual(combatSkills.filter(skill => FANTASY_PRIEST_PATH_SKILLS.some(pathSkill => pathSkill.id === skill.id)).map(skill => skill.id).sort(), learned.map(skill => skill.id).sort());
+    for (const skill of FANTASY_PRIEST_PATH_SKILLS.filter(skill => skill.kind === 'active')) {
+      if (learned.some(entry => entry.id === skill.id)) assert.ok(html.includes(`<b>${skill.names![locale]}</b>`), `${locale}/${branch} omits ${skill.id}`);
+      else assert.ok(!html.includes(skill.names![locale]), `${locale}/${branch} exposes ${skill.id}`);
+    }
     assert.ok(!forbiddenHelp.test(html));
   }
 });
@@ -176,6 +220,18 @@ test('generic career discovery omits unread specialties from the DOM and reveals
     html = render(old, locale); assert.ok(html.includes(paths[0].names[locale])); for (const path of paths.slice(1)) assert.ok(!html.includes(path.names[locale]));
     assert.ok(!/requiredSkill|threshold\s*[:=]\s*\d|job-mage-advanced-[0-9]/.test(html));
   }
+});
+
+test('priests and criminals have no adventurer rank panels but can return a former guild loan in every locale',()=>{
+ for(const locale of locales)for(const job of ['priest',...FANTASY_JOBS.filter(job=>job.category==='crime').map(job=>job.id)]){
+  const p=player(job),c=p.character!;c.guildProgress={version:1,grade:8,completedAtGrade:5,creditedQuests:[]};
+  setLocale(locale);set({fantasyProfile:p,fantasyPending:false,wsConnected:true});stateOverrides=[];
+  assert.equal(renderToStaticMarkup(createElement(FantasyGuildAssessment,{c,blocked:false,onAction:()=>{}})),'');
+  assert.equal(renderToStaticMarkup(createElement(FantasyRankBenefits,{c,source:'adventurer',blocked:false,onAction:()=>{}})),'');
+  c.rankBenefits={claims:{},loans:{'guild-rental':{deposit:30,claimedAt:c.hour}}};c.inventory['guild-loan-lantern']=1;c.inventory['guild-loan-bedroll']=1;
+  const html=renderToStaticMarkup(createElement(FantasyRankBenefits,{c,source:'adventurer',blocked:false,onAction:()=>{}}));
+  assert.ok(html.includes({ko:'장비 반환',en:'Return equipment',ja:'道具を返す'}[locale]));assert.ok(!/마스터|Master|マスター/.test(html));
+ }
 });
 
 test.after(() => { react.useSyncExternalStore = originalSnapshot; react.useState = originalState; });

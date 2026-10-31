@@ -1,6 +1,8 @@
 import { FANTASY_MONSTERS, type FantasyMonster } from './fantasy-monsters.ts';
 import type { FantasyLocation } from './fantasy.ts';
 import type { NpcLocale } from './npc.ts';
+import { fantasyMonsterCombatStats, type FantasyMonsterCombatRole } from './fantasy-monster-balance.ts';
+import { FANTASY_NAVAL_COMBAT_TEMPLATES } from './fantasy-naval-catalog.ts';
 
 export type FantasyCombatText = Record<NpcLocale, string>;
 export interface FantasyCombatStats { hp: number; mp: number; attack: number; defense: number; agility: number; intelligence: number; accuracy: number; magicResist: number }
@@ -11,47 +13,30 @@ export interface FantasyCombatEnemyTemplate {
   kinds: FantasyLocation['kind'][]; minDanger: number; provocationOnly: boolean;
   reward: { xp: number; gold: number; materials: { item: string; count: number }[]; honor?: { id: string; names: FantasyCombatText } };
   humanCause?: 'banditry' | 'poaching' | 'fleet-violence' | 'crime-enforcement';
+  physicalMultiplier?: number; magicMultiplier?: number;
+  auxiliary?: true;
+  navalOnly?: true;
 }
 export interface FantasyApexProvocation {
   id: string; enemy: string; location: string; action: string; warning: FantasyCombatText; confirmation: FantasyCombatText;
 }
 type Tuple = [string, string, string];
 const text = ([ko, en, ja]: Tuple): FantasyCombatText => ({ ko, en, ja });
-const base: Record<FantasyMonster['tier'], FantasyCombatStats> = {
-  1: { hp: 24, mp: 0, attack: 8, defense: 2, agility: 6, intelligence: 3, accuracy: 65, magicResist: 0 },
-  2: { hp: 45, mp: 4, attack: 13, defense: 4, agility: 9, intelligence: 5, accuracy: 68, magicResist: 2 },
-  3: { hp: 80, mp: 8, attack: 20, defense: 7, agility: 11, intelligence: 7, accuracy: 70, magicResist: 4 },
-  4: { hp: 125, mp: 15, attack: 29, defense: 11, agility: 13, intelligence: 10, accuracy: 72, magicResist: 7 },
-  5: { hp: 195, mp: 26, attack: 40, defense: 16, agility: 15, intelligence: 14, accuracy: 75, magicResist: 11 },
-  6: { hp: 300, mp: 42, attack: 53, defense: 22, agility: 18, intelligence: 19, accuracy: 77, magicResist: 16 },
-  7: { hp: 470, mp: 65, attack: 68, defense: 29, agility: 21, intelligence: 26, accuracy: 80, magicResist: 23 },
-  8: { hp: 1000, mp: 110, attack: 92, defense: 40, agility: 24, intelligence: 35, accuracy: 83, magicResist: 32 },
-};
-type Role = 'slime' | 'swarm' | 'beast' | 'skirmisher' | 'armored' | 'undead' | 'caster' | 'flying' | 'dragon' | 'golem';
-const roleBias: Record<Role, Partial<FantasyCombatStats>> = {
-  slime: { hp: .85, attack: .8, defense: .65, agility: .7, intelligence: .7, magicResist: 1.35 },
-  swarm: { hp: .9, attack: .85, defense: .55, agility: 1.45, intelligence: .65, accuracy: 1.04 },
-  beast: { hp: 1.08, attack: 1.08, agility: 1.1, intelligence: .7 },
-  skirmisher: { hp: .9, defense: .8, agility: 1.3, accuracy: 1.04 },
-  armored: { hp: 1.15, attack: 1.02, defense: 1.3, agility: .8 },
-  undead: { hp: 1.1, agility: .75, magicResist: 1.25 },
-  caster: { hp: .82, mp: 1.5, attack: .8, defense: .75, intelligence: 1.35, magicResist: 1.3 },
-  flying: { hp: .92, defense: .85, agility: 1.35, accuracy: 1.04 },
-  dragon: { hp: 1.1, mp: 1.2, attack: 1.08, defense: 1.1, intelligence: 1.15 },
-  golem: { hp: 1.3, mp: 0, defense: 1.45, agility: .55, intelligence: .5, magicResist: 1.25 },
-};
-function stats(tier: FantasyMonster['tier'], role: Role, extra: Partial<FantasyCombatStats> = {}): FantasyCombatStats {
-  const value = { ...base[tier] };
-  for (const key of Object.keys(value) as (keyof FantasyCombatStats)[]) value[key] = Math.round(value[key] * (roleBias[role][key] ?? 1));
-  return { ...value, ...extra, accuracy: Math.min(95, extra.accuracy ?? value.accuracy) };
+type Role = FantasyMonsterCombatRole;
+function resistance(role: Role): Pick<FantasyCombatEnemyTemplate, 'physicalMultiplier' | 'magicMultiplier'> {
+  return role === 'golem' ? { physicalMultiplier: .92, magicMultiplier: 1.08 }
+    : role === 'slime' ? { physicalMultiplier: 1.06, magicMultiplier: .92 }
+      : role === 'caster' ? { physicalMultiplier: 1.06, magicMultiplier: .94 }
+        : role === 'armored' ? { physicalMultiplier: .94, magicMultiplier: 1.06 } : {};
 }
+const stats = fantasyMonsterCombatStats;
 const roleOf = (id: string): Role => /slime/.test(id) ? 'slime' : /rat|leech|beetle|bat/.test(id) ? 'swarm'
-  : /golem|guardian/.test(id) ? 'golem' : /dragon/.test(id) ? 'dragon' : /wyvern|griffin/.test(id) ? 'flying'
-    : /elemental/.test(id) ? 'caster' : /skeleton|zombie|wight|grave-knight/.test(id) ? 'undead'
+  : /golem|guardian|stone-sentinel/.test(id) ? 'golem' : /dragon/.test(id) ? 'dragon' : /wyvern|griffin/.test(id) ? 'flying'
+    : /elemental|archive-warden/.test(id) ? 'caster' : /skeleton|zombie|wight|grave-knight/.test(id) ? 'undead'
       : /armored-orc|troll|ogre/.test(id) ? 'armored' : /goblin|orc-scout|spider/.test(id) ? 'skirmisher' : 'beast';
 const patternOf = (id: string): FantasyCombatPattern => /venom|leech/.test(id) ? 'venom' : /ice|frost/.test(id) ? 'frost'
-  : /dragon|flame/.test(id) ? 'breath' : /golem|guardian|beetle|armored|grave-knight/.test(id) ? 'guard'
-    : /hydra|troll/.test(id) ? 'regen' : /wight|zombie/.test(id) ? 'drain' : /elemental|void/.test(id) ? 'arcane' : /rat|bat/.test(id) ? 'swarm' : 'strike';
+  : /dragon|flame/.test(id) ? 'breath' : /golem|guardian|stone-sentinel|beetle|armored|grave-knight/.test(id) ? 'guard'
+    : /hydra|troll/.test(id) ? 'regen' : /wight|zombie/.test(id) ? 'drain' : /elemental|void|archive-warden/.test(id) ? 'arcane' : /rat|bat/.test(id) ? 'swarm' : 'strike';
 const apexRewards: Record<string, FantasyCombatEnemyTemplate['reward']> = {
   'monster-elder-dragon': { xp: 320, gold: 0, materials: [{ item: 'elder-dragon-scale', count: 2 }], honor: { id: 'honor-ember-oath', names: text(['잿불의 맹세를 지킨 자', 'Keeper of the Ember Oath', '燠火の誓いを守る者']) } },
   'monster-ancient-frost-dragon': { xp: 320, gold: 0, materials: [{ item: 'ancient-frostheart', count: 1 }], honor: { id: 'honor-frost-silence', names: text(['백무의 침묵을 넘은 자', 'Beyond the White-Mist Silence', '白霧の静寂を越える者']) } },
@@ -59,33 +44,45 @@ const apexRewards: Record<string, FantasyCombatEnemyTemplate['reward']> = {
   'monster-void-chimera': { xp: 320, gold: 0, materials: [{ item: 'void-chimera-prism', count: 1 }], honor: { id: 'honor-void-witness', names: text(['공허의 경계를 기록한 자', 'Witness to the Void Boundary', '虚の境を記す者']) } },
 };
 function fromMonster(monster: FantasyMonster): FantasyCombatEnemyTemplate {
-  const extra = monster.id === 'monster-elder-dragon' ? { hp: 1700 } : {};
   return { id: monster.id, kind: 'monster', tier: monster.tier, rank: monster.tier >= 7 ? 'boss' : monster.tier >= 5 ? 'elite' : 'normal',
-    names: { ...monster.names }, descriptions: { ...monster.descriptions }, stats: stats(monster.tier, roleOf(monster.id), extra), pattern: patternOf(monster.id),
-    kinds: [...monster.kinds], minDanger: monster.minDanger ?? 0, provocationOnly: monster.tier === 8,
+    names: { ...monster.names }, descriptions: { ...monster.descriptions }, stats: stats(monster.tier, roleOf(monster.id), monster.id), pattern: patternOf(monster.id),
+    kinds: [...monster.kinds], minDanger: monster.minDanger ?? 0, provocationOnly: monster.tier === 8, ...resistance(roleOf(monster.id)),
     reward: apexRewards[monster.id] ?? { xp: 8 + monster.tier * 7, gold: monster.tier * 2, materials: monster.loot.slice(0, 1).map(value => ({ item: value.item, count: 1 })) },
   };
 }
 function added(id: string, names: Tuple, descriptions: Tuple, tier: FantasyMonster['tier'], kinds: FantasyLocation['kind'][], role: Role, pattern: FantasyCombatPattern, material: string): FantasyCombatEnemyTemplate {
   return { id: `monster-${id}`, kind: 'monster', tier, rank: tier >= 7 ? 'boss' : tier >= 5 ? 'elite' : 'normal', names: text(names), descriptions: text(descriptions),
-    stats: stats(tier, role), pattern, kinds, minDanger: Math.max(0, tier - 3), provocationOnly: false,
+    stats: stats(tier, role, `monster-${id}`), pattern, kinds, minDanger: Math.max(0, tier - 3), provocationOnly: false, ...resistance(role),
     reward: { xp: 8 + tier * 7, gold: tier * 2, materials: [{ item: material, count: 1 }] } };
 }
 const additions: FantasyCombatEnemyTemplate[] = [
   added('mimic', ['금고 미믹', 'Coffer Mimic', '金庫ミミック'], ['버려진 금고를 흉내 내다가 다가온 이를 덮치는 위장 포식자.', 'A disguised predator imitating an abandoned coffer.', '捨てた金庫に擬態して近づく者を襲う捕食者。'], 3, ['ruin', 'cave'], 'armored', 'guard', 'relic'),
   added('kobold-ambusher', ['코볼트 매복병', 'Kobold Ambusher', 'コボルト伏兵'], ['갱도 통행료를 빼앗는 무장단의 매복병. 코볼트 전체를 뜻하지 않는다.', 'An ambusher in an armed mine-road extortion gang, not all kobolds.', '坑道の通行料を奪う武装団の伏兵。全コボルトを指さない。'], 2, ['cave', 'mountain'], 'skirmisher', 'strike', 'ore'),
   added('harpy', ['절벽 하피', 'Cliff Harpy', '崖ハーピー'], ['돌풍을 타고 급강하해 짐을 노리는 날개 달린 포식자.', 'A winged predator diving on gusts to seize supplies.', '突風に乗り急降下して荷を狙う翼ある捕食者。'], 4, ['mountain', 'island'], 'flying', 'strike', 'silk'),
-  added('basilisk', ['동굴 바실리스크', 'Cavern Basilisk', '洞窟バジリスク'], ['독이 밴 입김으로 좁은 통로를 지키는 단단한 비늘의 괴수.', 'A hard-scaled beast guarding narrow passages with venomous breath.', '毒の息で狭い通路を守る堅鱗の魔獣。'], 5, ['cave', 'ruin', 'desert'], 'armored', 'venom', 'crystal'),
-  added('manticore', ['황야 만티코어', 'Wildland Manticore', '荒野マンティコア'], ['맹수의 몸과 독꼬리를 갖춰 바위 그늘에서 뛰쳐나오는 괴수.', 'A beast with a venomous tail springing from rocky shade.', '獣の体と毒尾を持ち、岩陰から飛び出す魔獣。'], 5, ['mountain', 'desert'], 'beast', 'venom', 'gem'),
+  added('cavern-basilisk', ['동굴 바실리스크', 'Cavern Basilisk', '洞窟バジリスク'], ['독이 밴 입김으로 좁은 통로를 지키는 단단한 비늘의 괴수.', 'A hard-scaled beast guarding narrow passages with venomous breath.', '毒の息で狭い通路を守る堅鱗の魔獣。'], 5, ['cave', 'ruin', 'desert'], 'armored', 'venom', 'crystal'),
+  added('venom-manticore', ['황야 만티코어', 'Wildland Manticore', '荒野マンティコア'], ['맹수의 몸과 독꼬리를 갖춰 바위 그늘에서 뛰쳐나오는 괴수.', 'A beast with a venomous tail springing from rocky shade.', '獣の体と毒尾を持ち、岩陰から飛び出す魔獣。'], 5, ['mountain', 'desert'], 'beast', 'venom', 'gem'),
   added('gargoyle', ['회랑 가고일', 'Gallery Gargoyle', '回廊ガーゴイル'], ['회랑 조각상 사이에서 날개를 접고 기다리는 돌 괴수.', 'A stone creature waiting with folded wings among gallery statues.', '回廊の彫像に紛れ翼を畳んで待つ石の魔獣。'], 4, ['ruin', 'tower'], 'golem', 'guard', 'ore'),
   added('dullahan', ['길 잃은 듀라한', 'Wayward Dullahan', '迷いのデュラハン'], ['끊어진 옛 길목을 배회하며 생기를 빼앗는 갑옷 망자.', 'An armored revenant draining life along a broken old road.', '途切れた古道を巡り生命力を奪う鎧の亡者。'], 6, ['ruin', 'snow'], 'undead', 'drain', 'relic'),
   added('lich', ['봉인묘의 리치', 'Sealed-Tomb Lich', '封墓のリッチ'], ['묘실에 모은 마나를 죽음의 주문으로 바꾸는 강대한 망자.', 'A powerful undead caster turning stored tomb mana into deadly spells.', '墓室に蓄えたマナを死の術に変える強大な亡者。'], 7, ['ruin', 'cave', 'tower'], 'caster', 'arcane', 'pure-crystal'),
   added('phoenix', ['잿불 불사조', 'Ember Phoenix', '燠火の不死鳥'], ['뜨거운 기류 속에서 상처를 추스르며 불꽃을 뿜는 거대한 새.', 'An immense bird recovering in hot updrafts while breathing flame.', '熱い上昇気流で傷を癒やし炎を放つ巨鳥。'], 7, ['volcano', 'island'], 'flying', 'regen', 'fire-crystal'),
   added('treant', ['뒤틀린 고목정령', 'Twisted Treant', '歪みの古木精'], ['상처 난 뿌리에서 마나가 흘러 길을 휘감는 거대한 고목 형체.', 'A massive old-tree form whose wounded roots spill mana across a path.', '傷ついた根からマナが流れ道を巻く巨大な古木の形。'], 5, ['forest', 'swamp'], 'golem', 'regen', 'worldtree-branch'),
 ];
-function human(id: string, names: Tuple, descriptions: Tuple, tier: FantasyMonster['tier'], role: Role, humanCause: NonNullable<FantasyCombatEnemyTemplate['humanCause']>, kinds: FantasyLocation['kind'][]): FantasyCombatEnemyTemplate {
+// 今回の魔物調整で人間の敵や衛兵の難度を変えない。
+const humanBase: Record<2 | 3 | 4 | 6, FantasyCombatStats> = {
+  2: { hp: 45, mp: 4, attack: 13, defense: 4, agility: 9, intelligence: 5, accuracy: 68, magicResist: 2 },
+  3: { hp: 80, mp: 8, attack: 20, defense: 7, agility: 11, intelligence: 7, accuracy: 70, magicResist: 4 },
+  4: { hp: 125, mp: 15, attack: 29, defense: 11, agility: 13, intelligence: 10, accuracy: 72, magicResist: 7 },
+  6: { hp: 300, mp: 42, attack: 53, defense: 22, agility: 18, intelligence: 19, accuracy: 77, magicResist: 16 },
+};
+function humanStats(tier: keyof typeof humanBase, role: 'skirmisher' | 'armored'): FantasyCombatStats {
+  const value = { ...humanBase[tier] }, bias: Partial<FantasyCombatStats> = role === 'armored'
+    ? { hp: 1.15, attack: 1.02, defense: 1.3, agility: .8 } : { hp: .9, defense: .8, agility: 1.3, accuracy: 1.04 };
+  for (const key of Object.keys(value) as (keyof FantasyCombatStats)[]) value[key] = Math.round(value[key] * (bias[key] ?? 1));
+  return value;
+}
+function human(id: string, names: Tuple, descriptions: Tuple, tier: keyof typeof humanBase, role: 'skirmisher' | 'armored', humanCause: NonNullable<FantasyCombatEnemyTemplate['humanCause']>, kinds: FantasyLocation['kind'][]): FantasyCombatEnemyTemplate {
   const law = humanCause === 'crime-enforcement';
-  return { id: `human-${id}`, kind: 'human', tier, rank: tier >= 5 ? 'elite' : 'normal', names: text(names), descriptions: text(descriptions), stats: stats(tier, role),
+  return { id: `human-${id}`, kind: 'human', tier, rank: tier >= 5 ? 'elite' : 'normal', names: text(names), descriptions: text(descriptions), stats: humanStats(tier, role),
     pattern: role === 'armored' ? 'guard' : 'strike', kinds, minDanger: 0, provocationOnly: false, humanCause,
     reward: { xp: tier * 8, gold: law ? 0 : tier * 3, materials: law ? [] : [{ item: 'ore', count: 1 }] } };
 }
@@ -96,7 +93,7 @@ const humans: FantasyCombatEnemyTemplate[] = [
   human('watch-patrol', ['단속 경비병', 'Watch Patrol', '取締りの衛兵'], ['실제로 드러난 범행을 단속하는 경비병. 직업만으로 상대를 공격하지 않는다.', 'A guard responding to an exposed offense, not attacking someone merely for a profession.', '実際に露見した犯行を取り締まる衛兵。職業だけで相手を襲わない。'], 3, 'armored', 'crime-enforcement', ['city', 'coast', 'forest']),
   human('order-knight', ['서약 기사', 'Oathbound Knight', '誓いの騎士'], ['위법한 습격이나 명시적 도전에 대응하는 기사. 선량한 여행자의 무작위 적이 아니다.', 'A knight responding to unlawful violence or an explicit challenge, not a random foe of peaceful travelers.', '違法な襲撃や明示した挑戦に応じる騎士。平穏な旅人の無作為な敵ではない。'], 6, 'armored', 'crime-enforcement', ['city', 'coast', 'mountain']),
 ];
-export const FANTASY_COMBAT_ENEMIES: FantasyCombatEnemyTemplate[] = [...FANTASY_MONSTERS.map(fromMonster), ...additions, ...humans];
+export const FANTASY_COMBAT_ENEMIES: FantasyCombatEnemyTemplate[] = [...FANTASY_MONSTERS.filter(monster => !FANTASY_NAVAL_COMBAT_TEMPLATES.some(enemy => enemy.id === monster.id)).map(fromMonster), ...additions, ...humans, ...FANTASY_NAVAL_COMBAT_TEMPLATES];
 export const fantasyCombatEnemy = (id: string): FantasyCombatEnemyTemplate | undefined => FANTASY_COMBAT_ENEMIES.find(enemy => enemy.id === id);
 export function createFantasyCombatEnemyStats(id: string, rng: () => number = Math.random): { stats: FantasyCombatStats; variation: number } {
   const enemy = fantasyCombatEnemy(id); if (!enemy) throw new RangeError('Unknown combat enemy');
@@ -123,4 +120,32 @@ export const FANTASY_APEX_PROVOCATIONS: FantasyApexProvocation[] = [
     '닫힌 경계 화로에 불을 붙이면 공허빛 키메라가 도전자를 찾아온다. 화로를 건드리지 않으면 일반 유적 조사를 계속할 수 있다. 최고급 무기·방어구와 마력 방호가 없다면 싸움을 버티기 어렵다.',
     'Lighting the sealed boundary brazier calls the void-lit chimera to its challenger. Leaving it alone permits ordinary ruin investigations. Without top-grade arms, armor and magical protection, this fight is difficult to survive.',
     '閉じた境界火鉢に火を灯すと虚光のキマイラが挑戦者を訪れる。触れなければ通常の遺跡調査を続けられる。最高級の武具と魔力の守りがなければ戦いを耐え難い。']), confirmation: text(['위험을 알고 경계 화로에 불을 붙인다', 'Accept the risk and light the boundary brazier', '危険を承知で境界火鉢に火を灯す']) },
+  { id: 'apex-site-red-dragon', enemy: 'monster-red-dragon', location: 'ashpeak', action: 'strike-lava-lair-gong', warning: text([
+    '비밀 지도가 가리킨 용암 둥지의 종을 치면 7등급 붉은용이 나타난다. 종을 그대로 두면 전투는 시작되지 않는다. 강한 장비와 화염에 대한 대비가 필요하다.',
+    'Sounding the gong at the lava lair marked on the secret map calls a rank 7 red dragon. Leaving it alone starts no battle. Prepare strong equipment and protection from flame.',
+    '秘密の地図が示す溶岩の巣の鐘を鳴らすと7級の赤竜が現れる。触れなければ戦闘は始まらない。強い装備と炎への備えが必要だ。']), confirmation: text(['위험을 알고 붉은용의 둥지 종을 울린다', 'Accept the risk and sound the red dragon’s lair gong', '危険を承知で赤竜の巣の鐘を鳴らす']) },
+  { id: 'apex-site-frost-dragon', enemy: 'monster-frost-dragon', location: 'frostpass', action: 'open-icewall-lair', warning: text([
+    '비밀 지도가 가리킨 빙벽 둥지의 빗장을 열면 7등급 서리용에게 도전하게 된다. 빗장을 건드리지 않으면 전투는 시작되지 않는다. 냉기와 강한 비늘에 대비해야 한다.',
+    'Opening the latch at the icewall lair marked on the secret map challenges a rank 7 frost dragon. Leaving it untouched starts no battle. Prepare for cold and heavy scales.',
+    '秘密の地図が示す氷壁の巣の閂を開くと7級の霜竜への挑戦になる。触れなければ戦闘は始まらない。冷気と堅い鱗への備えが要る。']), confirmation: text(['위험을 알고 서리용 둥지의 빗장을 연다', 'Accept the risk and open the frost dragon’s lair', '危険を承知で霜竜の巣の閂を開く']) },
+  { id: 'apex-site-storm-dragon', enemy: 'monster-storm-dragon', location: 'storm-isle', action: 'raise-cliff-lair-standard', warning: text([
+    '비밀 지도가 가리킨 절벽 둥지에 결투 깃발을 세우면 7등급 폭풍용이 내려온다. 깃발을 세우지 않으면 전투는 시작되지 않는다. 바람과 낙뢰에 대비해야 한다.',
+    'Raising the duel standard at the cliff lair marked on the secret map brings down a rank 7 storm dragon. Leaving the standard lowered starts no battle. Prepare for wind and lightning.',
+    '秘密の地図が示す断崖の巣で決闘旗を掲げると7級の嵐竜が降りる。掲げなければ戦闘は始まらない。風と落雷への備えが要る。']), confirmation: text(['위험을 알고 폭풍용 둥지의 결투 깃발을 세운다', 'Accept the risk and raise the storm dragon’s duel standard', '危険を承知で嵐竜の巣に決闘旗を掲げる']) },
+  { id: 'apex-site-abyss-hydra', enemy: 'monster-abyss-hydra', location: 'eclipsevault', action: 'open-flooded-ruin-sluice', warning: text([
+    '비밀 지도가 가리킨 침수 유적의 수문을 열면 7등급 깊은늪히드라가 어두운 수로에서 나온다. 수문을 건드리지 않으면 전투는 시작되지 않는다. 여러 목과 재생력에 대비해야 한다.',
+    'Opening the sluice at the flooded ruins marked on the secret map draws a rank 7 deep-marsh hydra from the dark channels. Leaving it untouched starts no battle. Prepare for many heads and regeneration.',
+    '秘密の地図が示す水没遺跡の水門を開くと7級の深沼ヒドラが暗い水路から出る。触れなければ戦闘は始まらない。複数の首と再生への備えが要る。']), confirmation: text(['위험을 알고 침수 유적의 수문을 연다', 'Accept the risk and open the flooded ruins’ sluice', '危険を承知で水没遺跡の水門を開く']) },
+  { id: 'apex-site-obsidian-guardian', enemy: 'monster-obsidian-guardian', location: 'ashpeak', action: 'turn-foundry-ruin-keystone', warning: text([
+    '비밀 지도가 가리킨 제련 유적의 중심석을 돌리면 7등급 흑요석 수호상이 깨어난다. 중심석을 그대로 두면 전투는 시작되지 않는다. 단단한 석체와 무거운 타격에 대비해야 한다.',
+    'Turning the keystone at the foundry ruins marked on the secret map awakens a rank 7 obsidian guardian. Leaving it untouched starts no battle. Prepare for a stone body and heavy blows.',
+    '秘密の地図が示す炉跡の要石を回すと7級の黒曜の守護像が目覚める。触れなければ戦闘は始まらない。堅い石体と重い打撃への備えが要る。']), confirmation: text(['위험을 알고 제련 유적의 중심석을 돌린다', 'Accept the risk and turn the foundry ruins’ keystone', '危険を承知で炉跡の要石を回す']) },
+  { id: 'apex-site-lich', enemy: 'monster-lich', location: 'oldwatch', action: 'break-burial-ruin-sigil', warning: text([
+    '비밀 지도가 가리킨 지하 유적의 봉인 문양을 깨면 7등급 리치가 도전자를 맞는다. 봉인을 보존하면 전투는 시작되지 않는다. 강한 마력 방호와 회복 수단이 필요하다.',
+    'Breaking the sigil at the burial ruins marked on the secret map calls a rank 7 lich to its challenger. Keeping the seal intact starts no battle. Prepare magical protection and recovery supplies.',
+    '秘密の地図が示す地下遺跡の封印紋を壊すと7級のリッチが挑戦者を迎える。封印を保てば戦闘は始まらない。魔力の守りと回復の備えが要る。']), confirmation: text(['위험을 알고 묘실 유적의 봉인 문양을 깬다', 'Accept the risk and break the burial ruins’ sigil', '危険を承知で墓室遺跡の封印紋を壊す']) },
+  { id: 'apex-site-phoenix', enemy: 'monster-phoenix', location: 'storm-isle', action: 'light-phoenix-ruin-brazier', warning: text([
+    '비밀 지도가 가리킨 화로 유적에 불을 붙이면 7등급 잿불 불사조가 내려온다. 화로를 건드리지 않으면 전투는 시작되지 않는다. 화염과 재생력에 대비해야 한다.',
+    'Lighting the brazier at the ruins marked on the secret map calls a rank 7 ember phoenix. Leaving it untouched starts no battle. Prepare for flame and regeneration.',
+    '秘密の地図が示す火壇遺跡に火を灯すと7級の燠火の不死鳥が降りる。触れなければ戦闘は始まらない。炎と再生への備えが要る。']), confirmation: text(['위험을 알고 불사조 유적의 화로에 불을 붙인다', 'Accept the risk and light the phoenix ruins’ brazier', '危険を承知で不死鳥の遺跡の火壇に火を灯す']) },
 ];

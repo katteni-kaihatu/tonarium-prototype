@@ -95,7 +95,7 @@ test('activity questions about an NPC, advice, or compound requests stay outside
 
 test('accepted quest progress omits unaccepted quest names and other issuers for NPCs',()=>{
   const p=profile(), state=facts();
-  const quest=FANTASY_QUESTS.find(q=>!q.races&&!q.families&&!q.requiresCompleted&&q.count>0)!;
+  const quest=FANTASY_QUESTS.find(q=>!q.races&&!q.families&&!q.jobs&&!q.requiresCompleted&&q.count>0)!;
   p.character!.quests=[quest.id];
   const answer=dynamicGmReply('en','my quest progress',p,state)!;
   assert.ok(answer.includes(fantasyQuestText(quest,'en').name));

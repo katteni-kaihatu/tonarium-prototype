@@ -1,9 +1,18 @@
+import { FANTASY_FRONTIER_BASE, FANTASY_FRONTIER_DUNGEONS } from './fantasy-frontier-data.ts';
+import { FANTASY_FRONTIER_SUPPLIES } from './fantasy-expedition.ts';
+import { fantasyPriestGrowthStatus } from './fantasy-priest-growth.ts';
+import { FANTASY_RETREAT_MAPS, isFantasyRetreat } from './fantasy-retreats.ts';
+import { FANTASY_GUILD_CAMP_SUPPLIES } from './fantasy-outdoor-cooking-catalog.ts';
+import { FANTASY_MIRACLES } from './fantasy-miracle-catalog.ts';
 import type { FantasyCharacter, FantasyRecipe } from './fantasy.ts';
 import { FANTASY_ITEMS, FANTASY_JOBS, FANTASY_LOCATIONS, FANTASY_ROUTES } from './fantasy-data.ts';
+import { FANTASY_DUNGEONS } from './fantasy-dungeon-catalog.ts';
 import { NPC_PUBLIC, type NpcId, type NpcLocale } from './npc.ts';
 import { FANTASY_FINAL_ISLE_ID, fantasyIsleAccess, fantasyIsleLocationVisible } from './fantasy-isle-access.ts';
+import { FANTASY_RUNE_BOOK_HOLDINGS } from './fantasy-rune-books.ts';
+import { fantasyHasJob, fantasyIsLifeJob, fantasyLifeJob } from './fantasy-careers.ts';
 
-export type FantasyBuildingId = 'market' | 'blacksmith' | 'alchemist' | 'tower' | 'inn' | 'restaurant' | 'library' | 'guild' | 'shipyard' | 'temple' | 'archaeology';
+export type FantasyBuildingId = 'market' | 'merchantGuild' | 'blacksmith' | 'alchemist' | 'tower' | 'inn' | 'restaurant' | 'library' | 'guild' | 'shipyard' | 'temple' | 'archaeology';
 export interface FantasyBuilding {
   id: FantasyBuildingId;
   name: Record<NpcLocale, string>;
@@ -12,6 +21,7 @@ export interface FantasyBuilding {
 
 const NAMES: Record<FantasyBuildingId, Record<NpcLocale, string>> = {
   market: { ko: '시장', en: 'Market', ja: '市場' },
+  merchantGuild: { ko: '상인 길드', en: 'Merchant guild', ja: '商人ギルド' },
   blacksmith: { ko: '대장간', en: 'Smithy', ja: '鍛冶屋' },
   alchemist: { ko: '연금술 공방', en: 'Alchemy workshop', ja: '錬金工房' },
   tower: { ko: '마법사의 탑', en: 'Mage tower', ja: '魔術師の塔' },
@@ -32,32 +42,33 @@ export interface FantasySettlement {
 
 export const FANTASY_SETTLEMENTS: Record<string, FantasySettlement> = {
   hearth: { kind: 'city', buildingIds: ['market', 'inn', 'restaurant', 'guild', 'library', 'temple'], libraryBookIds: ['traveler-guide', 'trades-handbook', 'lantern-fox', 'tin-pot-king', 'quiet-sword', 'mana-primer', 'one-hundred-spoons', 'small-balcony-garden'] },
-  emberhall: { kind: 'city', buildingIds: ['market', 'blacksmith', 'inn'], libraryBookIds: [] },
-  suncourt: { kind: 'city', buildingIds: ['market', 'restaurant', 'inn', 'guild', 'library', 'temple', 'archaeology'], libraryBookIds: ['traveler-guide', 'pantry-guide', 'quiet-sword', 'staff-and-footwork', 'tin-pot-king', 'argument-of-hats', 'caravan-ledger'] },
+  emberhall: { kind: 'city', buildingIds: ['market', 'blacksmith', 'inn', 'guild', 'merchantGuild'], libraryBookIds: [] },
+  suncourt: { kind: 'city', buildingIds: ['market', 'restaurant', 'inn', 'guild', 'library', 'temple', 'archaeology', 'merchantGuild'], libraryBookIds: ['traveler-guide', 'pantry-guide', 'quiet-sword', 'staff-and-footwork', 'tin-pot-king', 'argument-of-hats', 'caravan-ledger'] },
   tidehaven: { kind: 'port', buildingIds: ['market', 'inn', 'shipyard'], libraryBookIds: [] },
   dawnport: { kind: 'port', buildingIds: ['market', 'shipyard', 'inn'], libraryBookIds: [] },
-  mooncity: { kind: 'city', buildingIds: ['library', 'alchemist', 'inn', 'temple', 'archaeology'], libraryBookIds: ['traveler-guide', 'archive-records', 'borrowed-shadow', 'mender-notes', 'mana-primer', 'mana-shapes', 'weather-in-a-bottle'] },
+  mooncity: { kind: 'city', buildingIds: ['library', 'alchemist', 'inn', 'temple', 'archaeology', 'tower'], libraryBookIds: ['traveler-guide', 'archive-records', 'borrowed-shadow', 'mender-notes', 'mana-primer', 'mana-shapes', 'weather-in-a-bottle'] },
   starspire: { kind: 'tower', buildingIds: ['tower', 'library'], libraryBookIds: ['traveler-guide', 'arts-handbook', 'gate-records', 'mana-primer', 'mana-shapes', 'weather-in-a-bottle', 'mirrorwake-voyage'] },
   sunmeadow: { kind: 'village', buildingIds: ['inn'], libraryBookIds: [] },
   'verdant-quay': { kind: 'port', buildingIds: ['market', 'inn', 'restaurant', 'shipyard', 'library'], libraryBookIds: ['traveler-guide', 'rain-tailor', 'sylvara-journal', 'harbor-signals', 'small-balcony-garden', 'lantern-fox'] },
-  'loom-village': { kind: 'village', buildingIds: ['market', 'inn', 'guild', 'library'], libraryBookIds: ['trades-handbook', 'rain-tailor', 'mender-notes', 'sylvara-journal', 'one-hundred-spoons'] },
-  'saffron-port': { kind: 'port', buildingIds: ['market', 'inn', 'restaurant', 'shipyard', 'alchemist'], libraryBookIds: [] },
-  redweave: { kind: 'city', buildingIds: ['market', 'blacksmith', 'inn', 'guild', 'library', 'archaeology'], libraryBookIds: ['traveler-guide', 'caravan-ledger', 'kazaran-journal', 'staff-and-footwork', 'argument-of-hats', 'mirrorwake-voyage'] },
+  'loom-village': { kind: 'village', buildingIds: ['market', 'inn', 'guild', 'library', 'merchantGuild'], libraryBookIds: ['trades-handbook', 'rain-tailor', 'mender-notes', 'sylvara-journal', 'one-hundred-spoons'] },
+  'saffron-port': { kind: 'port', buildingIds: ['market', 'inn', 'restaurant', 'shipyard', 'alchemist', 'tower'], libraryBookIds: [] },
+  redweave: { kind: 'city', buildingIds: ['market', 'blacksmith', 'inn', 'guild', 'library', 'archaeology', 'merchantGuild'], libraryBookIds: ['traveler-guide', 'caravan-ledger', 'kazaran-journal', 'staff-and-footwork', 'argument-of-hats', 'mirrorwake-voyage'] },
   'inkstone-city': { kind: 'city', buildingIds: ['market', 'inn', 'guild', 'library', 'restaurant'], libraryBookIds: ['traveler-guide', 'archive-records', 'mana-primer', 'borrowed-shadow', 'mender-notes', 'words-and-promises'] },
-  pinewatch: { kind: 'village', buildingIds: ['market', 'inn', 'alchemist'], libraryBookIds: [] },
+  pinewatch: { kind: 'village', buildingIds: ['market', 'inn', 'alchemist', 'tower'], libraryBookIds: [] },
   reedcross: { kind: 'village', buildingIds: ['market', 'inn', 'restaurant'], libraryBookIds: [] },
   'canopy-hall': { kind: 'city', buildingIds: ['market', 'inn', 'guild', 'library', 'restaurant'], libraryBookIds: ['traveler-guide', 'sylvara-journal', 'rain-tailor', 'wood-and-hide', 'cloth-and-thread', 'lantern-fox'] },
-  mossbrook: { kind: 'village', buildingIds: ['market', 'inn', 'alchemist'], libraryBookIds: [] },
+  mossbrook: { kind: 'village', buildingIds: ['market', 'inn', 'alchemist', 'tower'], libraryBookIds: [] },
   leafshade: { kind: 'village', buildingIds: ['market', 'inn', 'restaurant'], libraryBookIds: [] },
-  sunloom: { kind: 'city', buildingIds: ['market', 'inn', 'guild', 'library', 'alchemist'], libraryBookIds: ['traveler-guide', 'kazaran-journal', 'caravan-ledger', 'weather-in-a-bottle', 'stone-and-flame', 'one-hundred-spoons'] },
+  sunloom: { kind: 'city', buildingIds: ['market', 'inn', 'guild', 'library', 'alchemist', 'merchantGuild', 'tower'], libraryBookIds: ['traveler-guide', 'kazaran-journal', 'caravan-ledger', 'weather-in-a-bottle', 'stone-and-flame', 'one-hundred-spoons'] },
   wellrest: { kind: 'village', buildingIds: ['market', 'inn', 'restaurant'], libraryBookIds: [] },
-  rockshade: { kind: 'village', buildingIds: ['market', 'inn', 'blacksmith'], libraryBookIds: [] },
+  rockshade: { kind: 'village', buildingIds: ['market', 'inn', 'blacksmith', 'guild'], libraryBookIds: [] },
 };
 
 export const FANTASY_LIBRARY_HOLDINGS: Record<string, string[]> = Object.fromEntries(FANTASY_LOCATIONS.map(location => [location.id,
   [...(FANTASY_SETTLEMENTS[location.id]?.libraryBookIds ?? [])],
 ]));
 
+for (const miracle of FANTASY_MIRACLES) { const shelf = FANTASY_LIBRARY_HOLDINGS[miracle.library]; if (shelf && !shelf.includes(miracle.book)) shelf.push(miracle.book); }
 FANTASY_LIBRARY_HOLDINGS['mooncity'].push('shadow-and-risk','remedies-and-rites','advanced-mana-forms');
 FANTASY_LIBRARY_HOLDINGS['loom-village'].push('cloth-and-thread','green-and-grain');
 FANTASY_LIBRARY_HOLDINGS['suncourt'].push('martial-practice','words-and-promises','remedies-and-rites');
@@ -65,13 +76,20 @@ FANTASY_LIBRARY_HOLDINGS['hearth'].push('martial-practice','field-signs','green-
 FANTASY_LIBRARY_HOLDINGS['verdant-quay'].push('wood-and-hide','field-signs');
 FANTASY_LIBRARY_HOLDINGS['redweave'].push('wood-and-hide','cloth-and-thread','stone-and-flame','words-and-promises');
 FANTASY_LIBRARY_HOLDINGS['starspire'].push('stone-and-flame','advanced-mana-forms');
+for (const { id, library } of FANTASY_RUNE_BOOK_HOLDINGS) FANTASY_LIBRARY_HOLDINGS[library].push(id);
 
 export function fantasyBuildings(character: Pick<FantasyCharacter, 'location'>): FantasyBuilding[] {
   const location = FANTASY_LOCATIONS.find(place => place.id === character.location);
   if (!location) return [];
+  if (location.id === FANTASY_FRONTIER_BASE) return [{id:'market',name:{ko:'베이스캠프 보급소',en:'Base camp supplies',ja:'拠点の補給所'},npcIds:NPC_PUBLIC.filter(npc=>npc.homeLocation===location.id&&npc.building==='market').map(npc=>npc.id)}];
   return (FANTASY_SETTLEMENTS[location.id]?.buildingIds ?? []).map(id => ({
     id, name: id === 'temple' && character.location === 'mooncity' ? {ko:'계약의 사당',en:'Covenant shrine',ja:'契約の祠'} : { ...NAMES[id] }, npcIds: NPC_PUBLIC.filter(npc => npc.homeLocation === location.id && npc.building === id).map(npc => npc.id),
   }));
+}
+
+export const FANTASY_TEMPLE_READING = ['temple-vigil-liturgy','temple-pilgrimage-testimonies','temple-oath-commentary'];
+export function fantasyTempleLibraryHoldings(c:FantasyCharacter):string[]{
+  return c.job==='priest'&&fantasyPriestGrowthStatus(c).clergyGrade>=4&&fantasyBuildings(c).some(building=>building.id==='temple')?[...FANTASY_TEMPLE_READING]:[];
 }
 
 export function fantasyLibraryHoldings(character: Pick<FantasyCharacter, 'location'>): string[] {
@@ -80,6 +98,8 @@ export function fantasyLibraryHoldings(character: Pick<FantasyCharacter, 'locati
 }
 
 export interface FantasyMap {
+  rare?: boolean;
+  dungeon?: string;
   item: string;
   name: Record<NpcLocale, string>;
   description: Record<NpcLocale, string>;
@@ -94,7 +114,8 @@ const localMap = (id: string, ko: string, en: string, ja: string, locationIds: s
   description: { ko: '표시된 작은 지역의 길과 지형을 기록한 지도다.', en: 'A chart of the roads and terrain in a small district.', ja: '小さな一帯の道と地形を記した地図。' },
 });
 
-export const FANTASY_MAPS: FantasyMap[] = [
+export const FANTASY_MAPS: FantasyMap[] = [...FANTASY_RETREAT_MAPS,
+  ...FANTASY_DUNGEONS.filter(site=>!FANTASY_FRONTIER_DUNGEONS.some(hidden=>hidden.id===site.id)).map((site,index)=>({item:`map-dungeon-${site.id}`,rare:true,dungeon:site.id,name:{ko:`${site.names.ko} 탐사도`,en:`${site.names.en} survey chart`,ja:`${site.names.ja}の探索図`},description:{ko:'읽으면 해당 유적의 위치와 입구를 기록한다.',en:'Read to record the location and entrance.',ja:'読むと遺跡の位置と入口を記録する。'},price:80+index*15,locationIds:[site.location]})),
   {
     item: 'map-aurelia', legacy: true, name: { ko: '아우렐리아 옛 지도', en: 'Old Aurelia map', ja: 'アウレリアの古地図' }, price: 25,
     description: { ko: '사용하면 아우렐리아의 등록 지역을 지도에 표시한다.', en: 'Use to reveal charted locations in Aurelia.', ja: '使うとアウレリアの登録地域が地図に載る。' },
@@ -132,19 +153,24 @@ export const FANTASY_MAPS: FantasyMap[] = [
 
 export function fantasyBuildingStock(character: Pick<FantasyCharacter, 'location'>, buildingId: FantasyBuildingId): string[] {
   if (!fantasyBuildings(character).some(building => building.id === buildingId)) return [];
+  if (character.location === FANTASY_FRONTIER_BASE) return buildingId === 'market' ? Object.keys(FANTASY_FRONTIER_SUPPLIES) : [];
   const maps = FANTASY_MAPS.filter(map => !map.legacy && (!map.soldAt || map.soldAt.includes(character.location))).map(map => map.item);
-  const ordinary = FANTASY_ITEMS.filter(item => !['artifact', 'relic', 'elixir', 'magic-tool'].includes(item.category ?? '') && (item.tier ?? 1) <= 2);
+  const ordinary = () => FANTASY_ITEMS.filter(item => !item.craftOnly&&item.category!=='black-market-map'&&!item.id.startsWith('arcane-bag-')&&item.id!=='preserve-magic-bag'&&!['artifact', 'relic', 'elixir', 'magic-tool'].includes(item.category ?? '') && (item.tier ?? 1) <= 2);
   const categories = (...ids: string[]) => FANTASY_ITEMS.filter(item => ids.includes(item.category ?? '') && item.category !== 'artifact').map(item => item.id);
-  const stock: Partial<Record<FantasyBuildingId, string[]>> = {
-    market: [...ordinary.map(item => item.id), ...maps], shipyard: [...maps, ...categories('ship-material')],
-    alchemist: [...categories('herb', 'potion', 'crystal'), ...(character.location === 'mooncity' ? categories('elixir') : [])],
-    blacksmith: categories('ore', 'ingot', 'weapon', 'armor', 'accessory', 'gem'),
-    tower: [...categories('magic-tool', 'crystal'), ...FANTASY_ITEMS.filter(item => item.id.startsWith('mp-potion-') || ['mana-staff', 'sacred-book'].includes(item.id)).map(item => item.id)],
-    inn: ['meal', 'bread', 'jerky'], restaurant: ['meal', 'bread', 'jerky', ...categories('food')],
-    archaeology: [],
+  const stock: Partial<Record<FantasyBuildingId, () => string[]>> = {
+    market: () => [...ordinary().map(item => item.id),...FANTASY_ITEMS.filter(item=>item.id.startsWith('canvas-bag-')).map(item=>item.id), ...maps], shipyard: () => [...maps.filter(item=>!FANTASY_MAPS.find(map=>map.item===item)?.rare), ...categories('ship-material')],
+    alchemist: () => [...categories('herb', 'potion', 'crystal'), ...(character.location === 'mooncity' ? categories('elixir') : [])],
+    blacksmith: () => categories('ore', 'ingot', 'weapon', 'armor', 'accessory', 'gem'),
+    tower: () => [...categories('magic-tool', 'crystal'), ...FANTASY_ITEMS.filter(item => item.wear&&(item.tier??1)>=3||item.id.startsWith('arcane-bag-')||item.id==='preserve-magic-bag'||item.id.startsWith('mp-potion-') || ['mana-staff', 'sacred-book'].includes(item.id)).map(item => item.id)],
+    inn: () => ['meal', 'bread', 'jerky'], restaurant: () => ['meal', 'bread', 'jerky', ...categories('food')],
+    guild: () => ['potion','jerky','wood','lantern','bedroll','fur-bedroll','camp-tarp','camp-stakes',...FANTASY_GUILD_CAMP_SUPPLIES,...FANTASY_ITEMS.filter(item=>item.category==='potion').map(item=>item.id)],
+    archaeology: () => [],
   };
   const apexOnly = new Set(['elder-dragon-scale', 'ancient-frostheart', 'ancient-storm-sinew', 'void-chimera-prism', 'ember-oath-blade', 'tempest-longbow', 'frostheart-staff', 'dragon-scale-lamellar', 'void-woven-robe', 'oathscale-bulwark']);
-  return [...new Set(stock[buildingId] ?? [])].filter(id => !apexOnly.has(id) && (FANTASY_ITEMS.some(item => item.id === id) || FANTASY_MAPS.some(map => map.item === id)));
+  const items = new Map<string, typeof FANTASY_ITEMS[number]>();
+  for (const item of FANTASY_ITEMS) if (!items.has(item.id)) items.set(item.id, item);
+  const mapIds = new Set(FANTASY_MAPS.map(map => map.item));
+  return [...new Set(stock[buildingId]?.() ?? [])].filter(id => !apexOnly.has(id) && items.get(id)?.category !== 'black-market-map' && (items.has(id) || mapIds.has(id)));
 }
 
 export function canBuyItem(character: Pick<FantasyCharacter, 'location'>, item: string): boolean {
@@ -155,6 +181,7 @@ export const canTradeItem = canBuyItem;
 
 export function canSellItem(character: Pick<FantasyCharacter, 'location'>, itemId: string): boolean {
   const item = FANTASY_ITEMS.find(entry => entry.id === itemId);
+  if(item?.category==='guild-loan')return false;
   const buildings = fantasyBuildings(character);
   if (item?.category === 'relic') return buildings.some(building => building.id === 'archaeology');
   if (item?.category === 'ship-material' && buildings.some(building => building.id === 'shipyard')) return true;
@@ -167,9 +194,9 @@ export const NPC_TRAINABLE_JOBS: Record<NpcId, string[]> = {
   rin: ['merchant', 'cook'], borin: ['blacksmith'], eris: ['mage', 'alchemist'],
 };
 
-export function canAcquireJob(character: Pick<FantasyCharacter, 'location' | 'job'>, job: string, via: 'guild' | 'npc' | 'gm' = 'guild', npcId?: string): boolean {
+export function canAcquireJob(character: Pick<FantasyCharacter, 'location' | 'job'> & Partial<Pick<FantasyCharacter, 'lifeJob'>>, job: string, via: 'guild' | 'npc' | 'gm' = 'guild', npcId?: string): boolean {
   const target = FANTASY_JOBS.find(entry => entry.id === job);
-  if (!target || target.category === 'none' || target.id === character.job) return false;
+  if (!target || target.category === 'none' || fantasyHasJob(character, target.id)) return false;
   if (target.id === 'priest' && !fantasyBuildings(character).some(building => building.id === 'temple')) return false;
   if (via === 'gm') return true;
   if (via === 'guild') return target.category === 'ordinary' && fantasyBuildings(character).some(building => building.id === 'guild');
@@ -182,30 +209,32 @@ export function canAcquireJob(character: Pick<FantasyCharacter, 'location' | 'jo
 /** 借りられる共同作業場を使い、土地や船の所有を制作条件にしない。 */
 export function fantasyCraftFacility(job: string): FantasyBuildingId | undefined {
   const facilities: Record<string, FantasyBuildingId> = {
-    blacksmith: 'blacksmith', cook: 'restaurant', alchemist: 'alchemist', priest: 'temple', mage: 'tower', hunter: 'restaurant',
-    carpenter: 'shipyard', tailor: 'market', weaver: 'market', leatherworker: 'market', gemcutter: 'blacksmith',
-    herbalist: 'alchemist', farmer: 'market', fisher: 'shipyard', baker: 'restaurant', potter: 'market', shipwright: 'shipyard', scribe: 'library',
+    blacksmith: 'guild', cook: 'restaurant', alchemist: 'tower', priest: 'temple', mage: 'tower', hunter: 'restaurant',
+    carpenter: 'guild', tailor: 'merchantGuild', weaver: 'merchantGuild', leatherworker: 'merchantGuild', gemcutter: 'merchantGuild',
+    herbalist: 'market', farmer: 'market', fisher: 'market', merchant: 'market', baker: 'restaurant', potter: 'merchantGuild', shipwright: 'shipyard', scribe: 'guild',
   };
   return Object.hasOwn(facilities, job) ? facilities[job] : undefined;
 }
 
 /** 材料や鮮度は行動側が検証する。ここでは職業・共同設備・写図の既知情報を共通に判定する。 */
-export function fantasyCanCraft(character: Pick<FantasyCharacter, 'job' | 'location' | 'visited' | 'charted'>, recipe: FantasyRecipe): boolean {
-  const facility = fantasyCraftFacility(character.job);
-  if (recipe.job !== character.job || !facility || !fantasyBuildings(character).some(building => building.id === facility)) return false;
+export function fantasyCanCraft(character: Pick<FantasyCharacter, 'job' | 'location' | 'visited' | 'charted'>&Partial<Pick<FantasyCharacter,'readBooks' | 'lifeJob'>>, recipe: FantasyRecipe, propertyWorkshop = false): boolean {
+  if(recipe.requiresBook&&!character.readBooks?.includes(recipe.requiresBook)||recipe.requiresLocations?.some(id=>!character.visited.includes(id)&&!character.charted.includes(id)))return false;
+  const job = fantasyIsLifeJob(recipe.job) ? fantasyLifeJob(character) : character.job;
+  const facility = fantasyCraftFacility(recipe.job);
+  if (recipe.job !== job || !facility || !propertyWorkshop && !fantasyBuildings(character).some(building => building.id === facility)) return false;
   const map = FANTASY_MAPS.find(map => map.item === recipe.output);
   if (map) return !map.legacy && map.locationIds.every(id => character.visited.includes(id) || character.charted.includes(id));
   return FANTASY_ITEMS.some(item => item.id === recipe.output);
 }
 
-export function fantasyKnownLocations(character: Pick<FantasyCharacter, 'visited' | 'charted'> & Partial<Pick<FantasyCharacter, 'completed'>>): string[] {
-  const known = new Set([...(character.visited ?? []), ...(character.charted ?? [])]);
+export function fantasyKnownLocations(character: Pick<FantasyCharacter, 'visited' | 'charted'> & Partial<Pick<FantasyCharacter, 'completed' | 'seen'>>): string[] {
+  const known = new Set([...(character.visited ?? []), ...(character.charted ?? []), ...(character.seen ?? [])]);
   if (fantasyIsleAccess(character)) known.add(FANTASY_FINAL_ISLE_ID);
-  return FANTASY_LOCATIONS.filter(location => known.has(location.id) && fantasyIsleLocationVisible(character, location.id)).map(location => location.id);
+  return FANTASY_LOCATIONS.filter(location => known.has(location.id) && (!isFantasyRetreat(location.id)||character.visited.includes(location.id)||character.charted.includes(location.id)) && fantasyIsleLocationVisible(character, location.id)).map(location => location.id);
 }
 
-export function fantasyFrontierLocations(character: Pick<FantasyCharacter, 'location'> & Partial<Pick<FantasyCharacter, 'completed'>>): string[] {
+export function fantasyFrontierLocations(character: Pick<FantasyCharacter, 'location'> & Partial<Pick<FantasyCharacter, 'completed' | 'visited' | 'charted'>>): string[] {
   const adjacent = new Set(FANTASY_ROUTES.filter(route => route.mode !== 'gate' && fantasyIsleLocationVisible(character, route.from) && fantasyIsleLocationVisible(character, route.to)).flatMap(route => route.from === character.location ? [route.to] : route.to === character.location ? [route.from] : []));
   adjacent.delete(character.location);
-  return FANTASY_LOCATIONS.filter(location => adjacent.has(location.id)).map(location => location.id);
+  return FANTASY_LOCATIONS.filter(location => adjacent.has(location.id)&&(!isFantasyRetreat(location.id)||character.visited?.includes(location.id)||character.charted?.includes(location.id))).map(location => location.id);
 }

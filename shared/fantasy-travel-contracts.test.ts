@@ -7,7 +7,7 @@ import type { FantasyAction, FantasyProfile } from './fantasy.ts';
 import { FANTASY_JOBS, FANTASY_LOCATIONS, FANTASY_ROUTES } from './fantasy-data.ts';
 import { applyFantasyAction, advanceFantasyWorld, fantasyTransports, newFantasyProfile, startFantasyActivity } from './fantasy-engine.ts';
 import { FANTASY_GATE_HOURS, FANTASY_GATE_SETTLEMENTS, fantasyGateFare, fantasyHasGate } from './fantasy-gates.ts';
-import { FANTASY_ESCORT_JOBS, FANTASY_ESCORT_COOLDOWN_HOURS, fantasyEscortOffers, fantasyEscortPair, fantasyEscortTransportError, validFantasyEscort } from './fantasy-escort.ts';
+import { FANTASY_ESCORT_JOBS, FANTASY_ESCORT_COOLDOWN_HOURS, fantasyEscortOffers, fantasyEscortPair, fantasyEscortPenalty, fantasyEscortTransportError, validFantasyEscort } from './fantasy-escort.ts';
 import { FANTASY_SETTLEMENTS, fantasyFrontierLocations, fantasyKnownLocations } from './fantasy-town.ts';
 import { recordFantasyDeath } from './fantasy-mortality.ts';
 import { FantasyStore, isFantasyAction } from '../server/fantasy-store.ts';
@@ -73,13 +73,13 @@ test('gates require both hubs, known destinations and server-calculated high far
   assert.equal(fantasyGateFare(2,[400]),480);
 });
 
-test('a gate trip takes a fixed quarter hour and charges once only on real arrival',()=>{
+test('a gate trip takes a fixed quarter hour and pays exactly once at departure',()=>{
   const p=fresh(),fare=transport(p,'suncourt','gate').cost;
   const started=startFantasyActivity(p,{type:'travel',destination:'suncourt',transport:'gate'},8,high);
   assert.equal(started.error,undefined);assert.equal(started.profile.activity!.endsAt,8.25);
-  assert.equal(started.profile.character!.location,'hearth');assert.equal(started.profile.character!.gold,5000);
+  assert.equal(started.profile.character!.location,'hearth');assert.equal(started.profile.character!.gold,5000-fare);
   const halfway=advanceFantasyWorld(started.profile,8.125).profile;
-  assert.equal(halfway.character!.location,'hearth');assert.equal(halfway.character!.gold,5000);
+  assert.equal(halfway.character!.location,'hearth');assert.equal(halfway.character!.gold,5000-fare);
   const arrived=advanceFantasyWorld(halfway,8.25).profile;
   assert.equal(arrived.activity,undefined);assert.equal(arrived.character!.location,'suncourt');assert.equal(arrived.character!.gold,5000-fare);
   assert.equal(advanceFantasyWorld(arrived,9).profile.character!.gold,5000-fare);
@@ -105,7 +105,7 @@ test('every real guild has bounded land escort offers for combat jobs, with no u
   const p=fresh(),c=p.character!;
   for(const id of FANTASY_ESCORT_JOBS)assert.ok(FANTASY_JOBS.some(job=>job.id===id),id);
   const guilds=Object.entries(FANTASY_SETTLEMENTS).filter(([,town])=>town.buildingIds.includes('guild'));
-  assert.equal(guilds.length,7);
+  assert.equal(guilds.length,9);
   for(const [from] of guilds){
     c.location=from;const offers=fantasyEscortOffers(c);assert.ok(offers.length>0,from);
     for(const offer of offers){
@@ -136,15 +136,20 @@ test('escort assignments require guild acceptance and cannot pay on acceptance, 
   assert.equal(accepted.character!.gold,0);assert.ok(validFantasyEscort(accepted.character!));
   assert.equal(applyFantasyAction(accepted,{type:'escortAccept',destination:'tidehaven'},high).changed,false);
   assert.equal(transport(accepted,'tidehaven','escort').available,false);
-  const offer=transport(accepted,'suncourt','escort');assert.equal(offer.cost,0);assert.equal(offer.reward,contract.reward);assert.equal(offer.hours,contract.hours);
+  const offer=transport(accepted,'suncourt','escort');assert.equal(offer.cost,0);assert.equal(offer.reward,contract.reward);
+  assert.equal(offer.hours,2.5412,'the 2.5-hour convoy adds 20% of the default 8.24% load burden');
+  assert.equal(offer.hours,offer.legs!.reduce((hours,leg)=>hours+leg.hours,0));
   const boosted=structuredClone(accepted);boosted.character!.buff={effect:'travel',power:100};
-  assert.equal(transport(boosted,'suncourt','escort').hours,contract.hours);
+  assert.equal(transport(boosted,'suncourt','escort').hours,offer.hours);
   const started=startFantasyActivity(accepted,{type:'travel',destination:'suncourt',transport:'escort'},8,high);
   assert.equal(started.error,undefined);assert.equal(started.profile.character!.gold,0);assert.equal(started.profile.character!.location,'hearth');
   assert.ok(started.profile.log.some(log=>/護衛に出発/.test(log.text)));
-  const middle=advanceFantasyWorld(started.profile,8+contract.hours/2).profile;
+  assert.equal(started.profile.activity!.endsAt,8+offer.hours);
+  const middle=advanceFantasyWorld(started.profile,8+offer.hours/2).profile;
   assert.equal(middle.character!.gold,0);assert.equal(middle.character!.location,'hearth');assert.ok(middle.activity);
-  const arrived=advanceFantasyWorld(middle,8+contract.hours).profile;
+  const almost=advanceFantasyWorld(middle,started.profile.activity!.endsAt-.001).profile;
+  assert.equal(almost.character!.gold,0);assert.ok(almost.character!.escort);assert.ok(almost.activity);
+  const arrived=advanceFantasyWorld(almost,started.profile.activity!.endsAt).profile;
   assert.equal(arrived.activity,undefined);assert.equal(arrived.character!.escort,undefined);
   assert.equal(arrived.character!.location,'suncourt');assert.equal(arrived.character!.gold,contract.reward);
   assert.equal(arrived.character!.escortHistory![fantasyEscortPair('hearth','suncourt')],arrived.character!.hour);
@@ -157,7 +162,9 @@ test('escort completion cooldown covers reverse routes, ordinary travel cannot c
   let p=apply(fresh(),{type:'escortAccept',destination:'suncourt'});const gold=p.character!.gold;
   const walked=apply(p,{type:'travel',destination:'suncourt',transport:'foot'});
   assert.equal(walked.character!.gold,gold);assert.ok(walked.character!.escort);
-  p=apply(walked,{type:'escortAbandon'});assert.equal(p.character!.gold,gold);assert.equal(p.character!.escort,undefined);
+  const reward=p.character!.escort!.reward,penalty=fantasyEscortPenalty(reward);
+  p=apply(walked,{type:'escortAbandon'});assert.equal(p.character!.gold,gold-Math.min(gold,penalty));assert.equal(p.character!.escort,undefined);
+  assert.equal(p.character!.escortPenalty!.amount,penalty);assert.equal(p.character!.escortPenalty!.paid,Math.min(gold,penalty));assert.ok(validFantasyEscort(p.character!));
   p.character!.location='hearth';
   p=apply(p,{type:'escortAccept',destination:'suncourt'});p=apply(p,{type:'travel',destination:'suncourt',transport:'escort'});
   const completedAt=p.character!.hour,paid=p.character!.gold;
@@ -170,6 +177,21 @@ test('escort completion cooldown covers reverse routes, ordinary travel cannot c
   p.character!.hour=completedAt+FANTASY_ESCORT_COOLDOWN_HOURS;
   assert.equal(fantasyEscortOffers(p.character!).find(offer=>offer.destination==='hearth')!.available,true);
   assert.equal(p.character!.gold,paid);
+});
+
+test('abandoning an escort mid-journey stops the trip and charges the same penalty',()=>{
+  let p=apply(fresh(),{type:'escortAccept',destination:'suncourt'});
+  const reward=p.character!.escort!.reward,gold=p.character!.gold,penalty=fantasyEscortPenalty(reward);
+  p=startFantasyActivity(p,{type:'travel',destination:'suncourt',transport:'escort'},p.character!.hour,high).profile;
+  assert.ok(p.activity);
+  const stopped=applyFantasyAction(p,{type:'escortAbandon'},high);
+  assert.equal(stopped.error,undefined);
+  assert.equal(stopped.profile.activity,undefined);
+  assert.equal(stopped.profile.character!.escort,undefined);
+  assert.equal(stopped.profile.character!.location,'hearth');
+  assert.equal(stopped.profile.character!.gold,gold-Math.min(gold,penalty));
+  assert.ok(stopped.profile.log.some(log=>log.text===`護衛依頼を辞退した。報酬は受け取らず、違約金${penalty}枚（支払い${Math.min(gold,penalty)}枚）を負った。`));
+  assert.ok(validFantasyEscort(stopped.profile.character!));
 });
 
 test('forged escort terms and pending duration cannot change money or pass saved-state validation',t=>{

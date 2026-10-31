@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FANTASY_JOB_PATH_CATALOG } from './fantasy-job-path-catalog.ts';
 import { FANTASY_JOB_DISCOVERY_BOOKS, fantasyJobDiscoveryInsertionIndices, fantasyJobDiscoveryPassages, fantasyJobPathDiscovered } from './fantasy-job-discovery.ts';
-import { FANTASY_READABLE_LIBRARY_BOOKS } from './fantasy-library.ts';
+import { FANTASY_READABLE_LIBRARY_BOOKS, FANTASY_TEMPLE_DOCTRINE_BOOKS } from './fantasy-library.ts';
+import { FANTASY_MIRACLE_BOOKS } from './fantasy-miracle-catalog.ts';
+import { FANTASY_RUNE_BOOKS } from './fantasy-rune-books.ts';
 import { FANTASY_LIBRARY_HOLDINGS, FANTASY_SETTLEMENTS } from './fantasy-town.ts';
 import { FANTASY_PRIEST_BRANCHES } from './fantasy-priest-growth.ts';
 import { applyFantasyJobPath, fantasyJobPathError, fantasyJobPathSkills, validFantasyJobPaths } from './fantasy-job-paths.ts';
@@ -15,9 +17,9 @@ function mage() {
   c.unlockedSkills = ['job-mage-advanced-4']; c.practice = { explore: 10 }; c.readBooks = []; c.hour = 12; c.inventory.lantern = 1;
   return p;
 }
-test('149 specialties appear in existing34 books with actual regional library access', () => {
-  const all = [...FANTASY_JOB_PATH_CATALOG, ...FANTASY_PRIEST_BRANCHES.map(branch => ({ ...branch, id: `priest-${branch.id}` }))];
-  assert.equal(all.length, 149); assert.equal(Object.keys(FANTASY_JOB_DISCOVERY_BOOKS).length, 149); assert.equal(FANTASY_READABLE_LIBRARY_BOOKS.length, 34);
+test('ordinary specialty clues remain in regional books alongside the expanded rune collection', () => {
+  const all = [...FANTASY_JOB_PATH_CATALOG, ...FANTASY_PRIEST_BRANCHES.filter(branch => ['care', 'ward', 'oath', 'pilgrim'].includes(branch.id)).map(branch => ({ ...branch, id: `priest-${branch.id}` }))];
+  assert.equal(all.length, 153); assert.equal(Object.keys(FANTASY_JOB_DISCOVERY_BOOKS).length, 153); assert.equal(FANTASY_READABLE_LIBRARY_BOOKS.length, 52);
   assert.equal(new Set(Object.values(FANTASY_JOB_DISCOVERY_BOOKS)).size, 34);
   for (const path of all) {
     const bookId = FANTASY_JOB_DISCOVERY_BOOKS[path.id], book = FANTASY_READABLE_LIBRARY_BOOKS.find(book => book.id === bookId); assert.ok(book, path.id);
@@ -35,7 +37,9 @@ test('149 specialties appear in existing34 books with actual regional library ac
 });
 test('clues stay in ordinary books and differ across neighboring paragraphs without a career guide', () => {
   const placementKinds = new Set<string>();
+  const clueBooks = new Set(Object.values(FANTASY_JOB_DISCOVERY_BOOKS)), otherBooks = new Set([...FANTASY_RUNE_BOOKS.map(book => book.id), ...FANTASY_MIRACLE_BOOKS.map(book => book.id), ...FANTASY_TEMPLE_DOCTRINE_BOOKS]);
   for (const book of FANTASY_READABLE_LIBRARY_BOOKS) {
+    if (!clueBooks.has(book.id)) { assert.ok(otherBooks.has(book.id), `${book.id}: unclassified text without career clues`); continue; }
     assert.doesNotMatch(book.title.ko, /전직|설정집/);
     const correspondingPositions: number[][] = [];
     for (const locale of ['ko', 'en', 'ja'] as const) {
@@ -58,21 +62,21 @@ test('mere skill preparation does not reveal any branch, and a completed book re
   const p = mage(), c = p.character!;
   assert.equal(FANTASY_JOB_PATH_CATALOG.filter(path => fantasyJobPathDiscovered(c, path.id)).length, 0);
   const before = structuredClone(c); assert.ok(fantasyJobPathError(c, 'mage-star')); assert.ok(applyFantasyJobPath(c, 'mage-star').error); assert.deepEqual(c, before);
-  c.readBooks = ['mirrorwake-voyage']; assert.equal(fantasyJobPathDiscovered(c, 'mage-star'), true); assert.equal(fantasyJobPathDiscovered(c, 'mage-flame'), false);
-  assert.equal(fantasyJobPathError(c, 'mage-star'), undefined); assert.equal(c.jobPaths, undefined); assert.equal(fantasyJobPathSkills(c).length, 0);
+  c.readBooks = ['mana-primer']; assert.equal(fantasyJobPathDiscovered(c, 'mage-flame'), true); assert.equal(fantasyJobPathDiscovered(c, 'mage-star'), false);
+  assert.equal(fantasyJobPathError(c, 'mage-flame'), undefined); assert.equal(c.jobPaths, undefined); assert.equal(fantasyJobPathSkills(c).length, 0);
   assert.equal(fantasyJobPathDiscovered(c, 'invented-path'), false);
 });
 test('reading must actually finish on the world clock before discovery and does not grant profession or skills', () => {
   const p = mage(); p.character!.location = 'starspire'; p.character!.visited.push('starspire');
-  const started = startFantasyActivity(p, { type: 'read', book: 'mirrorwake-voyage' }, 12, () => .999);
-  assert.equal(started.error, undefined); assert.equal(fantasyJobPathDiscovered(started.profile.character!, 'mage-star'), false);
-  assert.equal(fantasyJobPathDiscovered(advanceFantasyWorld(started.profile, 12.99).profile.character!, 'mage-star'), false);
+  const started = startFantasyActivity(p, { type: 'read', book: 'mana-primer' }, 12, () => .999);
+  assert.equal(started.error, undefined); assert.equal(fantasyJobPathDiscovered(started.profile.character!, 'mage-flame'), false);
+  assert.equal(fantasyJobPathDiscovered(advanceFantasyWorld(started.profile, 12.99).profile.character!, 'mage-flame'), false);
   const finished = advanceFantasyWorld(started.profile, 13).profile;
-  assert.equal(finished.activity, undefined); assert.equal(fantasyJobPathDiscovered(finished.character!, 'mage-star'), true);
+  assert.equal(finished.activity, undefined); assert.equal(fantasyJobPathDiscovered(finished.character!, 'mage-flame'), true);
   assert.equal(finished.character!.job, 'mage'); assert.equal(finished.character!.jobPaths, undefined); assert.equal(fantasyJobPathSkills(finished.character!).length, 0);
 });
 test('existing chosen paths remain valid and keep both learned skills without their discovery book', () => {
-  const c = mage().character!; c.readBooks = ['mirrorwake-voyage']; assert.equal(applyFantasyJobPath(c, 'mage-star').error, undefined);
+  const c = mage().character!; c.jobPaths = { mage: { path: 'mage-star', hour: c.hour } };
   const old = structuredClone(c); old.readBooks = [];
   assert.equal(fantasyJobPathDiscovered(old, 'mage-star'), true); assert.equal(validFantasyJobPaths(old), true); assert.equal(fantasyJobPathSkills(old).length, 2);
   assert.equal(fantasyJobPathDiscovered(old, 'mage-flame'), false);

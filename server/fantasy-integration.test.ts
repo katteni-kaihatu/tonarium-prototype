@@ -1,3 +1,5 @@
+import { markFantasyPlatformDataCurrent } from './fantasy-platform-reset.ts';
+import { learnFantasyMagicBook } from '../shared/fantasy-magic-discovery.ts';
 import { readFantasySavedProfiles } from './fantasy-test-saved-profiles.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -126,7 +128,8 @@ test('new action envelopes accept only exact requests and never accept supplied 
 });
 
 test('specialty reservations survive restart and finish with their result exactly once', t => {
-  const { file } = temporary(t); const mage = player('mage'), leader = player('leader'); put(file, { mage, leader });
+  const { file } = temporary(t); const mage = player('priest'), leader = player('leader');
+  learnFantasyMagicBook(mage.character!, 'remedies-and-rites'); put(file, { mage, leader });
   let hour = 8; let store = new FantasyStore(file, { worldHour: () => hour });
   const spell = store.apply('mage', mage.revision, { type: 'magicPrepare', slot: 1, element: 'tide', form: 'mend' }, high);
   const hired = store.apply('leader', leader.revision, { type: 'command', kind: 'troop', operation: 'hire', member: 'troop-guard' }, high);
@@ -173,6 +176,7 @@ test('shared contract grants are committed through the board, persist and reject
   const result = board.claim(a, { quest: offer.quest, offer: offer.id }, 8, grant => store.apply('alice', before.revision, { type: 'accept', quest: offer.quest, offer: offer.id }, high, { contract: grant }));
   assert.equal(result.error, undefined); assert.equal(result.result!.error, undefined);
   const accepted = store.profile('alice'); assert.equal(accepted.character!.contracts![offer.quest].gold, offer.gold);
+  assert.ok(Object.values(accepted.character!.contracts![offer.quest]).every(value => value !== undefined), 'Absent grant fields must remain absent across persistence');
   assert.deepEqual(new FantasyStore(file).profile('alice'), accepted);
   assert.equal(board.claim(b, { quest: offer.quest, offer: offer.id }, 8, () => { throw new Error('Must not double claim'); }).error, 'taken');
   assert.equal(handleFantasyAction(store, { id: 'bob', session: null }, before.revision, { type: 'accept', quest: offer.quest, offer: offer.id }, { contract: accepted.character!.contracts![offer.quest] }).changed, false);
@@ -204,8 +208,9 @@ test('new Home WebSocket contract routing enforces membership, exclusivity and s
   fs.writeFileSync(sessions, JSON.stringify({ name: 'Isolated integration', sessions: [{ id: 'test-world', name: 'Test', world: 'fantasy' }] }));
   const listener = net.createServer(); await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve));
   const port = (listener.address() as net.AddressInfo).port; await new Promise<void>(resolve => listener.close(() => resolve()));
+  markFantasyPlatformDataCurrent(directory);
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], {
-    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' },
+    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = ''; child.stdout.on('data', text => { logs += String(text); }); child.stderr.on('data', text => { logs += String(text); });
@@ -226,12 +231,16 @@ test('new Home WebSocket contract routing enforces membership, exclusivity and s
     const messages: Message[] = []; socket.on('message', raw => messages.push(JSON.parse(String(raw)) as Message));
     await new Promise<void>((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject); });
     const send = (msg: unknown) => socket.send(JSON.stringify(msg)); send({ t: 'hello', compat: COMPAT_VERSION, id, name: id });
-    await until(() => messages.find(msg => msg.t === 'fantasyProfile')); return { send, messages };
+    await until(() => messages.find(msg => msg.t === 'snapshot')); return { send, messages };
   };
   const alice = await peer('alice'), bob = await peer('bob'), same = await peer('alice');
   let from = bob.messages.length; bob.send({ t: 'fantasyContracts' });
-  assert.equal((await until(() => bob.messages.slice(from).find(msg => msg.t === 'fantasyContractBoard'))).board, null);
+  bob.send({ t: 'hello', compat: COMPAT_VERSION, id: 'bob', name: 'bob' });
+  await until(() => bob.messages.slice(from).find(msg => msg.t === 'snapshot'));
+  assert.equal(bob.messages.slice(from).some(msg => msg.t === 'fantasyContractBoard'), false);
   alice.send({ t: 'join', sid: 'test-world' }); bob.send({ t: 'join', sid: 'test-world' });
+  await until(() => alice.messages.find(msg => msg.t === 'fantasyProfile'));
+  await until(() => bob.messages.find(msg => msg.t === 'fantasyProfile'));
   from = alice.messages.length; alice.send({ t: 'fantasyContracts' });
   const board = (await until(() => alice.messages.slice(from).find(msg => msg.board?.offers.length))).board!;
   const offer = board.offers.find(offer => offer.available && offer.mode === 'exclusive')!; assert.ok(offer);

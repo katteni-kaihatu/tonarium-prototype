@@ -6,6 +6,7 @@ import { FANTASY_ITEMS, FANTASY_JOBS, FANTASY_LOCATIONS, FANTASY_QUESTS, FANTASY
 import { FANTASY_PROFESSION_ITEMS, FANTASY_PROFESSION_QUESTS, FANTASY_PROFESSION_RECIPES } from './fantasy-items-expansion.ts';
 import { canAcquireJob, canBuyItem, canSellItem, FANTASY_MAPS, fantasyBuildings, fantasyCanCraft, fantasyCraftFacility } from './fantasy-town.ts';
 import { foodMeta, reconcileFoodLots } from './fantasy-life.ts';
+import { fantasyHostileEncounter } from './fantasy-encounters.ts';
 
 const high = () => 0.999;
 const counts: Record<string, number> = { carpenter: 3, tailor: 3, weaver: 3, leatherworker: 3, gemcutter: 3, herbalist: 3, farmer: 1, fisher: 2, baker: 4, potter: 3, shipwright: 3, scribe: 5 };
@@ -13,6 +14,7 @@ function player(job = 'unassigned'): FantasyProfile {
   const result = applyFantasyAction(newFantasyProfile(), { type: 'create', name: '共同の職人', source: 'human', gender: 'female' }, high);
   assert.equal(result.error, undefined);
   result.profile.character!.job = job; result.profile.character!.jobXp[job] = 0;
+  const stats = fantasyStats(result.profile.character!); result.profile.character!.hp = stats.hp; result.profile.character!.mp = stats.mp;
   return result.profile;
 }
 function step(profile: FantasyProfile, action: FantasyAction, rng = high) {
@@ -133,6 +135,9 @@ test('farm work, milling, a profession change and baking form a working input-to
   p = step(p, { type: 'craft', recipe: 'farmer-flour' });
   const flour = p.character!.inventory.flour;
   p = step(p, { type: 'job', job: 'baker', via: 'guild' });
+  reject(p, { type: 'craft', recipe: 'baker-bread' });
+  const nextMorning = Math.floor(p.character!.hour / 24) * 24 + 30;
+  p = advanceFantasyWorld(p, nextMorning).profile;
   p = step(p, { type: 'craft', recipe: 'baker-bread' });
   assert.ok(p.character!.inventory.bread >= 3);
   assert.equal(p.character!.inventory.flour, flour - 2);
@@ -203,7 +208,8 @@ test('the nine approved combat professions own usable skills while skirmishes st
     assert.equal(threat.event, 'encounter-goblin', job);
     assert.equal(threat.character!.hp, rough.character!.hp, job);
     const result = step(threat, { type: 'event', choice: 'fight' }, () => 0);
-    assert.ok(result.log.some(log => log.text.includes('道を塞ぐゴブリン：立ち向かって戦う') && log.text.includes('d20=')), job);
+    const encounter = fantasyHostileEncounter(threat.event)!;
+    assert.ok(result.log.some(log => log.text.includes(`${encounter.name}：${encounter.choices.find(choice => choice.id === 'fight')!.label}`) && log.text.includes('d20=')), job);
     assert.ok(result.character!.hp < threat.character!.hp, job);
     assert.equal(fantasyActionHours(rough, { type: 'explore' }), 3);
   }
@@ -241,6 +247,10 @@ test('new materials, crafted food, equipment and copied maps survive the actual 
   fisher = step(fisher, { type: 'craft', recipe: 'fisher-preserve' });
   let tailor = supplied(FANTASY_PROFESSION_RECIPES.find(recipe => recipe.id === 'tailor-cloak')!);
   tailor = step(tailor, { type: 'craft', recipe: 'tailor-cloak' }); tailor = step(tailor, { type: 'equip', item: 'traveler-cloak' });
+  for (const profile of [scribe, fisher, tailor]) {
+    const c = profile.character!; c.lifeJob = c.job; c.job = 'unassigned';
+    c.hp = Math.min(c.hp, fantasyStats(c).hp); c.mp = Math.min(c.mp, fantasyStats(c).mp);
+  }
   const file = path.resolve('work', `profession-save-${crypto.randomUUID()}.json`);
   let serialized = JSON.stringify({ scribe, fisher, tailor });
   const read = fs.readFileSync.bind(fs);
@@ -254,7 +264,8 @@ test('new materials, crafted food, equipment and copied maps survive the actual 
   assert.equal(reloaded.loadError, undefined);
   assert.deepEqual(reloaded.profile('scribe'), sold.profile);
   assert.deepEqual(reloaded.profile('fisher'), fisher);
-  assert.equal(reloaded.profile('tailor').character!.equipment!.armor, 'traveler-cloak');
+  assert.equal(reloaded.profile('tailor').character!.equipment!.body, 'traveler-cloak');
+  assert.equal(reloaded.profile('tailor').character!.equipment!.armor, undefined);
 });
 
 test('quest delivery preserves the worn copy, allows extra copies and permits the last copy only after unequipping', () => {

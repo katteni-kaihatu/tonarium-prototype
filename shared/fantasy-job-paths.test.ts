@@ -14,12 +14,13 @@ function prepared(job = 'mage') {
   c.unlockedSkills = data.skills.filter(skill => skill.unlock?.kind === 'mentor').map(skill => skill.id);
   c.skillXp = Object.fromEntries(data.skills.map(skill => [skill.id, 30]));
   c.practice = { explore: 10, craft: 10, gather: 10, hunt: 10, fish: 10, command: 10 };
+  if (job === 'mage') c.occult = { version: 1, starObservations: [{ hour: 22, location: 'starfall-isle' }], relicClaims: [], relics: [], usedRelics: [] };
   return p;
 }
 
-test('all 36 eligible jobs have exactly their 145 translated candidate paths and priest stays separate', () => {
-  assert.equal(FANTASY_JOB_PATHS.length, 145); assert.equal(new Set(FANTASY_JOB_PATHS.map(path => path.id)).size, 145);
-  const jobs = FANTASY_JOBS.filter(job => job.id !== 'priest' && job.category !== 'none'); assert.equal(jobs.length, 36);
+test('all 37 eligible jobs have exactly their 149 translated candidate paths and priest stays separate', () => {
+  assert.equal(FANTASY_JOB_PATHS.length, 149); assert.equal(new Set(FANTASY_JOB_PATHS.map(path => path.id)).size, 149);
+  const jobs = FANTASY_JOBS.filter(job => job.id !== 'priest' && job.category !== 'none'); assert.equal(jobs.length, 37);
   for (const job of jobs) {
     const paths = FANTASY_JOB_PATHS.filter(path => path.job === job.id); assert.equal(paths.length, job.id === 'mage' ? 5 : 4);
     for (const path of paths) { assert.deepEqual(Object.keys(path).sort(), ['fields', 'id', 'job', 'names']); for (const locale of ['ko', 'en', 'ja'] as const) { assert.ok(path.names[locale]); assert.ok(path.fields[locale]); } }
@@ -48,12 +49,19 @@ test('base job and high profession practice alone never unlock the required addi
   }
 });
 test('book, real usage, field practice and mentor evidence remain distinct eligibility sources', () => {
-  const p = prepared(), c = p.character!;
-  const star = FANTASY_JOB_PATHS.find(path => path.id === 'mage-star')!, flame = FANTASY_JOB_PATHS.find(path => path.id === 'mage-flame')!, ice = FANTASY_JOB_PATHS.find(path => path.id === 'mage-ice')!, earth = FANTASY_JOB_PATHS.find(path => path.id === 'mage-earth')!;
+  const p = prepared('warrior'), c = p.character!;
+  const star = FANTASY_JOB_PATHS.find(path => path.id === 'warrior-greatsword')!, flame = FANTASY_JOB_PATHS.find(path => path.id === 'warrior-axe')!, ice = FANTASY_JOB_PATHS.find(path => path.id === 'warrior-berserker')!, earth = FANTASY_JOB_PATHS.find(path => path.id === 'warrior-arms')!;
   c.skillXp = {}; assert.ok(fantasyJobPathError(c, star.id)); assert.equal(fantasyJobPathError(c, flame.id), undefined);
-  c.readBooks = c.readBooks!.filter(book => book !== 'mana-primer'); assert.ok(fantasyJobPathError(c, flame.id)); assert.equal(fantasyJobPathError(c, ice.id), undefined);
+  c.readBooks = c.readBooks!.filter(book => book !== 'quiet-sword'); assert.ok(fantasyJobPathError(c, flame.id)); assert.equal(fantasyJobPathError(c, ice.id), undefined);
   c.practice = {}; assert.ok(fantasyJobPathError(c, ice.id)); assert.equal(fantasyJobPathError(c, earth.id), undefined);
   c.unlockedSkills = []; assert.ok(fantasyJobPathError(c, earth.id));
+});
+test('retired mage lessons cannot strand a new path while existing earned mentor records remain compatible', () => {
+  const c = prepared().character!; c.unlockedSkills = [];
+  assert.equal(fantasyJobPathError(c, 'mage-earth'), undefined);
+  c.skillXp!['job-mage-advanced-2'] = 0; assert.ok(fantasyJobPathError(c, 'mage-earth'));
+  c.unlockedSkills = ['job-mage-advanced-4']; c.jobPaths = { mage: { path: 'mage-earth', hour: c.hour } };
+  assert.equal(validFantasyJobPaths(c), true); assert.equal(fantasyJobPathSkills(c).length, 2);
 });
 test('low practice, wrong job, unknown path, priest and incapacitated characters are rejected without costs', () => {
   for (const mutate of [(c: FantasyCharacter) => { c.jobXp.mage = 99; }, (c: FantasyCharacter) => { c.hp = 0; }, (c: FantasyCharacter) => { c.job = 'warrior'; }, (c: FantasyCharacter) => { c.job = 'priest'; }]) {
@@ -109,7 +117,7 @@ test('engine reserves advancement and applies only the selected path after the s
   const done = advanceFantasyWorld(started.profile, 101).profile; assert.equal(done.activity, undefined); assert.equal(done.character!.jobPaths!.mage.path, 'mage-star'); assert.equal(done.character!.gold, gold);
   assert.equal(fantasySkills(done.character!).filter(skill => skill.id.startsWith('path-')).length, 2);
 });
-test('all 290 specialization skills have distinct characterful names in all three languages', () => {
+test('all 298 specialization skills have distinct characterful names in all three languages', () => {
   const names: Record<string, string[]> = { ko: [], en: [], ja: [] };
   for (const path of FANTASY_JOB_PATHS) {
     const c = prepared(path.job).character!; applyFantasyJobPath(c, path.id);
@@ -118,10 +126,10 @@ test('all 290 specialization skills have distinct characterful names in all thre
       names[locale].push(skill.names![locale]);
     }
   }
-  for (const [locale, values] of Object.entries(names)) assert.equal(new Set(values).size, 290, locale);
+  for (const [locale, values] of Object.entries(names)) assert.equal(new Set(values).size, 298, locale);
 });
 test('field skills use real work effects while combat metadata stays bounded and independent', () => {
-  const combatJobs = new Set(['adventurer', 'hunter', 'bard', 'mage', 'leader', 'warrior', 'knight', 'spearfighter', 'archer', 'scout', 'pugilist', 'spellblade', 'shieldbearer', 'summoner', 'thief', 'smuggler', 'assassin', 'bandit', 'spy', 'crimeboss']);
+  const combatJobs = new Set(['adventurer', 'hunter', 'ranger', 'bard', 'mage', 'leader', 'warrior', 'knight', 'spearfighter', 'archer', 'scout', 'pugilist', 'spellblade', 'shieldbearer', 'summoner', 'thief', 'smuggler', 'assassin', 'bandit', 'spy', 'crimeboss']);
   for (const path of FANTASY_JOB_PATHS) {
     const c = prepared(path.job).character!; applyFantasyJobPath(c, path.id); const [passive, active] = fantasyJobPathSkills(c);
     const meta = fantasyJobPathCombatSkill(active.id), bonus = fantasyJobPathCombatPassive(passive.id);
@@ -137,11 +145,11 @@ test('field skills use real work effects while combat metadata stays bounded and
   assert.equal(fantasyJobPathCombatSkill('path-assassin-poison-art')!.onHit!.id, 'poison');
 });
 test('preparing a field art grants no practice until its buff is actually used and cannot be spammed', () => {
-  let p = prepared('carpenter'); applyFantasyJobPath(p.character!, 'carpenter-bowyer'); const skill = fantasyJobPathSkills(p.character!)[1];
+  let p = prepared('carpenter'); p.character!.hour = 108; applyFantasyJobPath(p.character!, 'carpenter-bowyer'); const skill = fantasyJobPathSkills(p.character!)[1];
   const before = p.character!.skillXp?.[skill.id] ?? 0, started = applyFantasyAction(p, { type: 'skill', skill: skill.id });
   assert.equal(started.error, undefined); assert.equal(started.profile.character!.skillXp?.[skill.id] ?? 0, before); assert.equal(started.profile.character!.buff!.skill, skill.id);
   const duplicate = applyFantasyAction(started.profile, { type: 'skill', skill: skill.id }); assert.ok(duplicate.error); assert.equal(duplicate.changed, false);
-  p = started.profile; p.character!.location = 'tidehaven'; p.character!.inventory.lantern = 1;
+  p = started.profile; p.character!.location = 'hearth'; p.character!.inventory.lantern = 1;
   const recipe = FANTASY_RECIPES.find(recipe => recipe.job === 'carpenter')!; assert.ok(recipe);
   for (const [item, count] of Object.entries(recipe.inputs)) p.character!.inventory[item] = count + 5;
   const used = applyFantasyAction(p, { type: 'craft', recipe: recipe.id }, () => .999);

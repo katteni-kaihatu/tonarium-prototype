@@ -1,11 +1,12 @@
-import type { FantasyCharacter, FantasyGearInstance, FantasyItem, FantasyRecipe, FantasyStat, FantasyStats } from './fantasy.ts';
-import { FANTASY_ITEMS, FANTASY_JOBS, FANTASY_RACES } from './fantasy-data.ts';
+import { fantasyHasJob } from './fantasy-careers.ts';
+import type { FantasyCharacter, FantasyEquipmentSlot, FantasyGearInstance, FantasyItem, FantasyRecipe, FantasyStat, FantasyStats } from './fantasy.ts';
+import { FANTASY_RECIPES, FANTASY_ITEMS, FANTASY_JOBS, FANTASY_RACES } from './fantasy-data.ts';
 import { fantasyAvailableJobSkills, fantasyProfessionGrade, fantasySkilledPower } from './fantasy-progression.ts';
 import { fantasyLearnedSkills } from './fantasy-apprenticeship.ts';
 
 const itemOf = (id: string) => FANTASY_ITEMS.find(item => item.id === id);
 const categories = ['ore', 'ingot', 'wood', 'hide', 'cloth', 'silk'];
-const slots = ['weapon', 'offhand', 'armor', 'accessory'] as const;
+import { fantasyEquipmentEntries, fantasyActiveEquipmentEntries, fantasyOffhandEquipError, fantasyEquipmentSlot, fantasyItemEquipmentSlots, fantasyWornItemCount, migrateFantasyEquipment, validFantasyEquipment } from './fantasy-equipment-slots.ts';
 export function fantasyMaterialGrade(item: FantasyItem): number {
   if (/starsteel|adamant|orichalcum/.test(item.id)) return 4;
   if (/mithril|worldtree|moon-silk/.test(item.id)) return 3;
@@ -52,7 +53,7 @@ export function createFantasyGear(character: FantasyCharacter, itemId: string, r
   const item = itemOf(itemId);
   if (!item?.equipment) return undefined;
   const materialGrade = material && itemOf(material) ? fantasyMaterialGrade(itemOf(material)!) : 1;
-  const score = materialGrade * 10 + fantasyProfessionGrade(character) * 10 + (gem ? 12 : 0) + (Math.max(0, Math.min(0.999999, Number(rng()) || 0)) * 4 - 2);
+  const score = materialGrade * 10 + fantasyProfessionGrade(character,FANTASY_RECIPES.find(recipe=>recipe.output===itemId&&fantasyHasJob(character,recipe.job))?.job??character.job) * 10 + (gem ? 12 : 0) + (Math.max(0, Math.min(0.999999, Number(rng()) || 0)) * 4 - 2);
   const quality = (score >= 88 ? 5 : score >= 68 ? 4 : score >= 48 ? 3 : score >= 28 ? 2 : 1) as FantasyGearInstance['quality'];
   let suffix = 0; const prefix = `gear-${Math.floor(character.hour)}-${item.id}-`;
   while (character.gear?.some(gear => gear.id === `${prefix}${suffix}`)) suffix++;
@@ -61,28 +62,37 @@ export function createFantasyGear(character: FantasyCharacter, itemId: string, r
   return instance;
 }
 export function fantasyEquippedGear(character: FantasyCharacter): FantasyGearInstance[] {
-  return Object.entries(character.equippedGear ?? {}).flatMap(([slot, id]) => {
-    const gear = character.gear?.find(gear => gear.id === id);
-    return gear && character.equipment?.[slot as typeof slots[number]] === gear.item && itemOf(gear.item)?.equipment?.slot === slot && (character.inventory[gear.item] ?? 0) > 0 ? [gear] : [];
+  return fantasyActiveEquipmentEntries(character, FANTASY_ITEMS).flatMap(entry => {
+    const gear = character.gear?.find(gear => gear.id === entry.instance);
+    return gear ? [gear] : [];
   });
 }
-export function fantasyEquipGear(character: FantasyCharacter, itemId: string, instance?: string): string | undefined {
+export function fantasyEquipGear(character: FantasyCharacter, itemId: string, instance?: string, requestedSlot?: FantasyEquipmentSlot): string | undefined {
   const item = itemOf(itemId);
   if (!item?.equipment || (character.inventory[itemId] ?? 0) < 1) return '所有する装備品を選んでください。';
+  const offhandError = fantasyOffhandEquipError(character, item); if (offhandError) return offhandError;
+  const available = fantasyItemEquipmentSlots(item);
+  const slot = requestedSlot ? fantasyEquipmentSlot(requestedSlot, item) : available.find(slot => !character.equipment?.[slot]) ?? available[0];
+  if (!slot || !available.includes(slot)) return 'この部位には装備できません。';
+  const next = structuredClone(character); migrateFantasyEquipment(next, FANTASY_ITEMS);
+  const others = fantasyEquipmentEntries(next, FANTASY_ITEMS).filter(entry => entry.slot !== slot);
+  if (others.filter(entry => entry.item.id === itemId).length >= (character.inventory[itemId] ?? 0)) return '装備する数の品物を持っていません。';
+  const used = new Set(others.map(entry => entry.instance).filter(Boolean));
   const owned = (character.gear ?? []).filter(gear => gear.item === itemId);
-  const selected = instance ? owned.find(gear => gear.id === instance) : owned.sort((a, b) => b.quality - a.quality)[0];
-  if (instance && !selected) return '指定した装備の個体を持っていません。';
-  if (character.equipment?.[item.equipment.slot] === itemId && character.equippedGear?.[item.equipment.slot] === selected?.id) return 'すでに装備しています。';
-  character.equipment ??= {}; character.equippedGear ??= {};
-  character.equipment[item.equipment.slot] = itemId;
-  if (selected) character.equippedGear[item.equipment.slot] = selected.id;
-  else delete character.equippedGear[item.equipment.slot];
+  const selected = instance ? owned.find(gear => gear.id === instance) : owned.filter(gear => !used.has(gear.id)).sort((a, b) => b.quality - a.quality)[0];
+  if (instance && (!selected || used.has(instance))) return '指定した装備の個体を持っていないか、別の部位で装備中です。';
+  if (!selected && others.filter(entry => entry.item.id === itemId && !entry.instance).length >= (character.inventory[itemId] ?? 0) - owned.length) return '装備する数の品物を持っていません。';
+  if (next.equipment?.[slot] === itemId && next.equippedGear?.[slot] === selected?.id) return 'すでに装備しています。';
+  character.equipment = next.equipment ?? {}; character.equippedGear = next.equippedGear ?? {};
+  character.equipment[slot] = itemId;
+  if (selected) character.equippedGear[slot] = selected.id;
+  else delete character.equippedGear[slot];
   return undefined;
 }
 export function fantasySpendItem(character: FantasyCharacter, itemId: string, count: number, instance?: string): boolean {
   if (!Number.isSafeInteger(count) || count < 1) return false;
   const held = character.inventory[itemId] ?? 0;
-  const worn = Object.values(character.equipment ?? {}).includes(itemId) || character.outfit === itemId ? 1 : 0;
+  const worn = fantasyWornItemCount(character, itemId);
   if (held - worn < count) return false;
   const wornIds = new Set(Object.values(character.equippedGear ?? {}));
   const owned = (character.gear ?? []).filter(gear => gear.item === itemId);
@@ -91,7 +101,8 @@ export function fantasySpendItem(character: FantasyCharacter, itemId: string, co
   const removed = new Set<string>();
   if (selected) removed.add(selected.id);
   else {
-    const plain = Math.max(0, held - owned.length - (worn && !owned.some(gear => wornIds.has(gear.id)) ? 1 : 0));
+    const wornCrafted = owned.filter(gear => wornIds.has(gear.id)).length;
+    const plain = Math.max(0, held - owned.length - Math.max(0, worn - wornCrafted));
     let remaining = Math.max(0, count - plain);
     for (const gear of owned.filter(gear => !wornIds.has(gear.id)).sort((a, b) => a.quality - b.quality || a.createdAt - b.createdAt)) if (remaining > 0) { removed.add(gear.id); remaining--; }
     if (remaining > 0) return false;
@@ -105,7 +116,7 @@ export function fantasyCombatStat(character: FantasyCharacter): FantasyStat {
   if (/bow|crossbow/.test(weapon)) return 'agility';
   if (/staff|sacred-book/.test(weapon)) return 'intelligence';
   const job = FANTASY_JOBS.find(job => job.id === character.job);
-  return ['warrior', 'knight', 'spearfighter', 'archer', 'scout', 'pugilist', 'spellblade', 'shieldbearer', 'summoner', 'priest', 'hunter', 'mage', 'alchemist'].includes(character.job) ? job?.stat ?? 'strength' : 'strength';
+  return ['warrior', 'knight', 'spearfighter', 'archer', 'scout', 'pugilist', 'spellblade', 'shieldbearer', 'summoner', 'priest', 'hunter', 'ranger', 'mage', 'alchemist'].includes(character.job) ? job?.stat ?? 'strength' : 'strength';
 }
 export function validFantasyGear(character: FantasyCharacter): boolean {
   const gear = character.gear ?? [];
@@ -124,7 +135,9 @@ export function validFantasyGear(character: FantasyCharacter): boolean {
   }
   if (character.equippedGear !== undefined) {
     if (!character.equippedGear || typeof character.equippedGear !== 'object' || Array.isArray(character.equippedGear)) return false;
-    for (const [slot, id] of Object.entries(character.equippedGear)) if (!slots.includes(slot as typeof slots[number]) || !gear.some(gear => gear.id === id && gear.item === character.equipment?.[slot as typeof slots[number]] && itemOf(gear.item)?.equipment?.slot === slot)) return false;
+    const ids = Object.values(character.equippedGear);
+    if (new Set(ids).size !== ids.length) return false;
+    for (const [slot, id] of Object.entries(character.equippedGear)) if (!gear.some(gear => gear.id === id && gear.item === character.equipment?.[slot as FantasyEquipmentSlot] && fantasyItemEquipmentSlots(itemOf(gear.item)!).includes(fantasyEquipmentSlot(slot as FantasyEquipmentSlot, itemOf(gear.item))!))) return false;
   }
-  return true;
+  return validFantasyEquipment(character, FANTASY_ITEMS);
 }

@@ -94,8 +94,9 @@ test('Korean 어디 and spaced 현재 위치 both resolve current location', () 
 });
 
 test('character status shows live HP MP gold and base stats', () => {
-  const response = fantasyGmReply(player({ hp: 32, mp: 7, gold: 11 }), '내 스탯 알려줘');
-  assert.match(response.text, /HP 32\/100・MP 7\/50・金貨11枚/);
+  const p = player({ hp: 32, mp: 7, gold: 11 }), maximum = fantasyStats(p.character!);
+  const response = fantasyGmReply(p, '내 스탯 알려줘');
+  assert.ok(response.text.includes(`HP 32/${maximum.hp}・MP 7/${maximum.mp}・金貨11枚`));
   for (const name of ['力10', '敏捷10', '知力10', '運10', '体力10']) assert.ok(response.text.includes(name));
 });
 
@@ -304,6 +305,7 @@ test('active skill suggestions honor buff conflicts and healing limits', () => {
   const profile = player({ buff: { effect: 'check', power: 4, stat: 'luck' } });
   assert.ok(!fantasyGmReply(profile, 'スキル').suggestions.some(s => s.action?.type === 'skill'));
   const dryad = player({ race: 'dryad', hp: 98, mp: 71 });
+  dryad.character!.hp=fantasyStats(dryad.character!).hp;
   const response = fantasyGmReply(dryad, '스킬');
   const skills = fantasySkills(dryad.character!);
   for (const suggestion of response.suggestions.filter(s => s.action?.type === 'skill')) {
@@ -319,7 +321,7 @@ test('crafting advice matches profession, workshop and exact material shortages'
   assert.ok(crafting.length > 0);
   for (const suggestion of crafting) assert.equal(applyFantasyAction(ready, suggestion.action!, () => 0.9).error, undefined);
   const away = fantasyGmReply(player({ job: 'alchemist', location: 'greenwood' }), '調合');
-  assert.match(away.text, /現在地には錬金工房がありません/);
+  assert.match(away.text, /現在地には魔術師の塔がありません/);
   assert.ok(!away.suggestions.some(s => s.action));
   const missing = fantasyGmReply(player({ location: 'mooncity', job: 'alchemist', inventory: {} }), '조합');
   assert.match(missing.text, /不足：回復薬草2個/);
@@ -395,7 +397,7 @@ test('unknown stored event and location IDs do not invent replacements or execut
 
 test('crafted quest shortages explain actual recipes and market purchase instead of impossible gathering', () => {
   for (const item of ['ingot', 'blade']) {
-    const quest = FANTASY_QUESTS.find(q => q.item === item)!;
+    const quest = FANTASY_QUESTS.find(q => q.item === item && !q.jobs && !q.chapter && !q.races && !q.families)!;
     const profile = player({ location: quest.giver, quests: [quest.id], inventory: {}, visited: ['hearth', quest.giver, quest.destination], gold: 500 });
     const response = fantasyGmReply(profile, quest.id);
     assert.match(response.text, /指定地域の探索では自動入手できません/);
@@ -411,7 +413,7 @@ test('crafted quest shortages explain actual recipes and market purchase instead
 });
 
 test('crafted quest advice keeps the independent visit requirement and funds purchases with free work', () => {
-  const quest = FANTASY_QUESTS.find(q => q.item === 'ingot')!;
+  const quest = FANTASY_QUESTS.find(q => q.item === 'ingot' && !q.jobs && !q.chapter && !q.races && !q.families)!;
   const response = fantasyGmReply(player({ location: quest.giver, quests: [quest.id], inventory: {}, visited: ['hearth'], gold: 0 }), quest.id);
   assert.match(response.text, /指定地域が未訪問/);
   assert.match(response.text, /購入資金が足りない/);
@@ -523,8 +525,8 @@ test('recovery advice uses actual room costs and time and only offers affordable
 });
 
 test('GM crafting and profession actions respect city specialties instead of legacy services', () => {
-  const unavailable = fantasyGmReply(player({ job: 'blacksmith', inventory: { ore: 2, wood: 1 } }), '制作');
-  assert.match(unavailable.text, /現在地には鍛冶屋がありません/);
+  const unavailable = fantasyGmReply(player({ location: 'sunmeadow', job: 'blacksmith', inventory: { ore: 2, wood: 1 } }), '制作');
+  assert.match(unavailable.text, /現在地にはギルドがありません/);
   assert.ok(!unavailable.suggestions.some(s => s.action?.type === 'craft'));
   const forge = player({ location: 'emberhall', job: 'blacksmith', inventory: { ore: 2, wood: 1 } });
   const available = fantasyGmReply(forge, '制作');

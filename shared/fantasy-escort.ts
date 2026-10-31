@@ -1,11 +1,14 @@
+import { fantasyRankBenefitEscortBonus, recordFantasyRankBenefitEscortBonus } from './fantasy-rank-benefits.ts';
 import type { FantasyCharacter } from './fantasy.ts';
 import { FANTASY_LOCATIONS, FANTASY_ROUTES } from './fantasy-data.ts';
 import { FANTASY_SETTLEMENTS, fantasyBuildings, fantasyFrontierLocations, fantasyKnownLocations } from './fantasy-town.ts';
 
-export const FANTASY_ESCORT_JOBS = Object.freeze(['adventurer','warrior','knight','spearfighter','archer','scout','pugilist','spellblade','shieldbearer','mage','hunter','priest','summoner'] as const);
+export const FANTASY_ESCORT_JOBS = Object.freeze(['adventurer','warrior','knight','spearfighter','archer','scout','pugilist','spellblade','shieldbearer','mage','hunter','ranger','priest','summoner'] as const);
 export const FANTASY_ESCORT_COOLDOWN_HOURS = 12;
 export interface FantasyEscortOffer { from: string; destination: string; hours: number; reward: number; path: string[]; available: boolean; reason?: string }
 export const fantasyEscortPair = (a: string, b: string) => [a,b].sort().join('~');
+/** 辞退した護衛の違約金。報酬の半分を切り上げ、最低1枚。 */
+export const fantasyEscortPenalty = (reward: number) => Math.max(1, Math.ceil(reward * .5));
 const settlement = (id: string) => FANTASY_SETTLEMENTS[id] && FANTASY_SETTLEMENTS[id].kind !== 'tower';
 const jobAllowed = (job: string) => FANTASY_ESCORT_JOBS.some(id => id === job);
 const guild = (location: string) => fantasyBuildings({location}).some(building => building.id === 'guild');
@@ -71,20 +74,23 @@ export function fantasyEscortComplete(character: FantasyCharacter, from: string,
   if(!contract||contract.defense==='pending'||contract.from!==from||contract.destination!==destination||character.location!==destination)return 0;
   const offer=fantasyEscortTerms(from,destination);
   if(!offer||offer.reward!==contract.reward||offer.hours!==contract.hours)return 0;
-  character.gold+=offer.reward;
+  const extra=fantasyRankBenefitEscortBonus(character,offer.reward);
+  character.gold+=offer.reward+extra.bonus;
+  if(extra.bonus>0)recordFantasyRankBenefitEscortBonus(character,extra.day);
   character.escortHistory??={};character.escortHistory[fantasyEscortPair(from,destination)]=character.hour;
   delete character.escort;
-  return offer.reward;
+  return offer.reward+extra.bonus;
 }
-export function validFantasyEscort(character: Pick<FantasyCharacter,'escort'|'escortHistory'|'hour'|'lifeStartedAt'>): boolean {
+export function validFantasyEscort(character: Pick<FantasyCharacter,'escort'|'escortHistory'|'escortPenalty'|'hour'|'lifeStartedAt'>): boolean {
   const object=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
   const hour=(value:unknown):value is number=>typeof value==='number'&&Number.isFinite(value)&&value>=(character.lifeStartedAt??0)&&value<=character.hour;
   if(character.escortHistory!==undefined&&(!object(character.escortHistory)||Object.entries(character.escortHistory).some(([key,value])=>{
     const [from,to,...extra]=key.split('~');
     return !!extra.length||!from||!to||key!==fantasyEscortPair(from,to)||!hour(value)||!(fantasyEscortTerms(from,to)||fantasyEscortTerms(to,from));
   })))return false;
-  if(character.escort===undefined)return true;
-  const c=character.escort;
+  const penalty=character.escortPenalty;
+  if(penalty!==undefined&&(!object(penalty)||Object.keys(penalty).length!==4||!Object.keys(penalty).every(key=>['amount','paid','hour','destination'].includes(key))||!Number.isSafeInteger(penalty.amount)||penalty.amount<1||penalty.amount>1000||!Number.isSafeInteger(penalty.paid)||penalty.paid<0||penalty.paid>penalty.amount||!hour(penalty.hour)||typeof penalty.destination!=='string'||!FANTASY_LOCATIONS.some(place=>place.id===penalty.destination)))return false;
+  if(character.escort===undefined)return true;  const c=character.escort;
   if(!object(c)||![6,7].includes(Object.keys(c).length)||!Object.keys(c).every(key=>['id','from','destination','hours','reward','acceptedAt','defense'].includes(key))||typeof c.from!=='string'||typeof c.destination!=='string'||!hour(c.acceptedAt)||c.defense!==undefined&&!['pending','cleared'].includes(String(c.defense)))return false;
   const offer=fantasyEscortTerms(c.from,c.destination);
   const prior=character.escortHistory?.[fantasyEscortPair(c.from,c.destination)];

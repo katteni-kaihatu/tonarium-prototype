@@ -1,3 +1,6 @@
+import { FANTASY_MAP_MERCHANT_EVENT, fantasyMapMerchantDaylight } from '../shared/fantasy-map-merchant.ts';
+import type { FantasyEconomyMerchantView } from '../shared/fantasy-economy.ts';
+import { npcMapMerchantFacts } from './npc-map-merchant.ts';
 import { fantasyNpcVoice, fantasyNpcGreeting, fantasyNpcSocialReply, fantasyNpcTone, fantasyNpcConversationInstructions, FANTASY_NPC_TEMPERATURE } from '../shared/fantasy-dialogue-voice.ts';
 import { NPC_PUBLIC, NPC_TEXT_MAX, type NpcChatRequest, type NpcId, type NpcLocale, type NpcRelationship, type NpcReply } from '../shared/npc.ts';
 import { NPC_SERVER } from './npc-catalog.ts';
@@ -44,10 +47,13 @@ export interface NpcContext {
   onProgress?: (text: string) => void;
   hasMetSpeaker?: boolean;
   dynamicFacts?: DialogueDynamicContext;
+  /** Trusted server encounter state; request payloads never authorize traveling NPCs. */
+  travelEncounter?: string;
+  merchant?: FantasyEconomyMerchantView;
 }
 const npcTerms = (id: NpcId) => TERMS[id] ?? (() => {
   const npc = NPC_PUBLIC.find(npc => npc.id === id);
-  return npc ? [...new Set([npc.homeLocation, npc.race, ...npc.trainableJobs ?? [], ...FANTASY_LOCATIONS.find(place => place.id === npc.homeLocation)?.resources ?? [], 'gold', 'mana'])] : [];
+  return npc?.travelOnly ? [npc.race, 'gold'] : npc ? [...new Set([npc.homeLocation, npc.race, ...npc.trainableJobs ?? [], ...FANTASY_LOCATIONS.find(place => place.id === npc.homeLocation)?.resources ?? [], 'gold', 'mana'])] : [];
 })();
 const politeNpc = (id: NpcId) => ['trade', 'scholar', 'priest'].includes(fantasyNpcTone(id));
 const koreanEnding = (word: string) => {
@@ -118,6 +124,7 @@ export function npcCanonicalReply(locale: NpcLocale, npcId: NpcId, relationship:
   const polite = politeNpc(npcId);
   const query = text.normalize('NFKC').toLowerCase().trim();
   if (npcBreaksFourthWall(text)) return npcInWorldFallback(locale);
+  if (npc.travelOnly) { const merchantReply = npcFacilityReply(locale,npcId,text,context.character,context.contractBoard,undefined,context.merchant); if (merchantReply) return merchantReply; }
   if (npcHasMultipleRequests(text)) return undefined;
   const clue = context.character && fantasyVoyageClueReply(context.character, text, locale);
   if (clue) {
@@ -140,9 +147,9 @@ export function npcCanonicalReply(locale: NpcLocale, npcId: NpcId, relationship:
   if (prepared) return prepared.text;
   const preference = npcPreferenceReply(npcId, locale, text);
   if (preference) return preference;
-  const dynamic = dynamicNpcReply(locale, npcId, text, context.character, context.dynamicFacts);
+  const dynamic = !npc.travelOnly && dynamicNpcReply(locale, npcId, text, context.character, context.dynamicFacts);
   if (dynamic) return dynamic;
-  const facility = npcFacilityReply(locale, npcId, text, context.character, context.contractBoard, context.dynamicFacts);
+  const facility = npcFacilityReply(locale, npcId, text, context.character, context.contractBoard, context.dynamicFacts, context.merchant);
   if (facility) return facility;
   if (reaction) return reaction;
   if (/^(?:안녕(?:하세요)?|반가워(?:요)?|hello|hi|hey|こんにちは|こんばんは|おはよう)[!?.。！\s]*$/.test(query)) return fantasyNpcGreeting(npcId, relationship, locale);
@@ -185,6 +192,8 @@ export function npcCanonicalReply(locale: NpcLocale, npcId: NpcId, relationship:
 }
 
 export function npcAllowedFacts(npcId: NpcId, relationship: NpcRelationship, context: NpcContext = {}): string[] {
+  const publicNpc = NPC_PUBLIC.find(npc => npc.id === npcId)!;
+  if (publicNpc.travelOnly) return [...npcMapMerchantFacts(context.merchant,'en'), `${publicNpc.name.en} is ${publicNpc.age} years old. ${publicNpc.personality.en} ${publicNpc.speech.en}`];
   const npc = NPC_SERVER[npcId];
   const conditional = npc.conditionalFacts.filter(fact => (!fact.relationship || RANK[relationship] >= RANK[fact.relationship])
     && (!fact.completedQuest || context.completedQuests?.includes(fact.completedQuest))).map(fact => fact.fact);
@@ -217,8 +226,8 @@ export function npcSystemPrompt(locale: NpcLocale, npcId: NpcId = 'rin', relatio
   const terms = npcTerms(npcId).filter(id => query === undefined || names.some(name => name === id || name === fantasyTermName(id, 'en')) || id === npc.homeLocation || id === npc.race);
   const summoning = terms.includes('summoner') || /소환|summon|召喚/.test(query ?? '') ? ' Summoning uses registered skills; never invent beings, companions or secret knowledge for it.' : '';
   const preferences = /좋아|취미|싫어|선호|취향|\blike\b|prefer|hobb|dislike|favorite|favourite|taste|leisure|好き|嫌い|趣味|好み|苦手/iu.test(query ?? '') ? npcPreferenceFacts(npcId, locale) : [];
-  const current = context.character ? dialogueDynamicPremises(locale, { character: context.character } as import('../shared/fantasy.ts').FantasyProfile, context.dynamicFacts, npcId, query) : [];
-  const facility = npcFacilityFacts(npcId, locale, context.character, query, context.dynamicFacts);
+  const current = context.character && !npc.travelOnly ? dialogueDynamicPremises(locale, { character: context.character } as import('../shared/fantasy.ts').FantasyProfile, context.dynamicFacts, npcId, query) : [];
+  const facility = npcFacilityFacts(npcId, locale, context.character, query, context.dynamicFacts, context.merchant);
   const premises = [...preferences, ...current, ...facility];
   const tone=fantasyNpcTone(npcId),detailed=plan.maxTokens===256;
   const register=politeNpc(npcId)?'해요체':tone==='leader'?'하게체':'반말';
@@ -307,7 +316,11 @@ export class NpcChat {
     if (!text && !request.reset) return fail('invalid');
     if (state.isCurrent?.() === false) return fail('invalid');
     const npc = NPC_PUBLIC.find(entry => entry.id === npcId)!;
-    if (state.character && (state.character.location !== npc.homeLocation
+    if (npc.travelOnly) {
+      const hour = state.dynamicFacts?.hour ?? state.character?.hour;
+      if (!state.character || state.travelEncounter !== FANTASY_MAP_MERCHANT_EVENT || hour === undefined || !fantasyMapMerchantDaylight(hour)
+        || state.merchant && (state.merchant.npc !== npcId || state.merchant.day !== Math.floor(hour / 24))) return fail('invalid');
+    } else if (state.character && (state.character.location !== npc.homeLocation
       || npc.building !== 'residence' && !fantasyBuildings(state.character).some(building => building.id === npc.building && building.npcIds.includes(npcId)))) return fail('invalid');
     if (request.reset && this.pending.has(user)) return fail('busy');
     if (request.reset && !text) {
@@ -389,7 +402,7 @@ export class NpcChat {
       if (!answer || /^<think>/i.test(answer)) return fail('unavailable');
       if (state.isCurrent?.() === false) return fail('invalid');
       if (npcBreaksFourthWall(answer) || npcUnfoundedFacilitySpeech(npcId, answer)) {
-        const spoken = npcFacilityReply(locale, npcId, text, state.character, state.contractBoard) ?? npcInWorldFallback(locale);
+        const spoken = npcFacilityReply(locale, npcId, npc.travelOnly ? 'maps' : text, state.character, state.contractBoard, state.dynamicFacts, state.merchant) ?? npcInWorldFallback(locale);
         return { requestId, text: spoken, model: '', npcId, locale, relationship: commit(spoken), source: 'canon' };
       }
       const reported = (value as { model?: unknown } | null)?.model;

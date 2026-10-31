@@ -9,6 +9,7 @@ import { applyFantasyAction, fantasyStats, fantasyTransports, newFantasyProfile 
 import type { FantasyProfile } from '../shared/fantasy.ts';
 import { FANTASY_PARTY_TTL_MS, isFantasyPartyCommand } from '../shared/fantasy-party.ts';
 import { createFantasyGear } from '../shared/fantasy-equipment.ts';
+import { fantasyTestAcceptHunt, fantasyTestReadLocalMonsterMaps } from './fantasy-test-combat-access.ts';
 
 function player(id: string, location = 'hearth') {
   const p = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', name: `Private ${id}`, gender: 'female' }, () => .5).profile, c = p.character!;
@@ -19,7 +20,7 @@ function player(id: string, location = 'hearth') {
 function fixture(t: TestContext, size = 3, configure?: (profile: FantasyProfile, i: number) => void) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fantasy-party-expansion-'));
   t.after(() => { assert.equal(path.dirname(path.resolve(directory)), path.resolve(os.tmpdir())); assert.ok(path.basename(directory).startsWith('fantasy-party-expansion-')); fs.rmSync(directory, { recursive: true, force: true }); });
-  const file = path.join(directory, 'fantasy.json'); const data = Object.fromEntries(Array.from({ length: size }, (_, i) => { const p = player(`p${i}`); configure?.(p, i); return [`p${i}`, p]; }));
+  const file = path.join(directory, 'fantasy.json'); const data = Object.fromEntries(Array.from({ length: size }, (_, i) => { let p = player(`p${i}`); configure?.(p, i); if (p.character!.location === 'greenwood') p = fantasyTestAcceptHunt(p); return [`p${i}`, fantasyTestReadLocalMonsterMaps(p)]; }));
   fs.writeFileSync(file, JSON.stringify(data)); let hour = 108, wall = 1000, fail = false, writes = 0;
   const store = new FantasyStore(file, { combatEnabled: true, worldHour: () => hour, now: () => wall, onError: () => {}, save: (target, text) => { if (fail) throw new Error('Test disk full'); writes++; fs.writeFileSync(target, text); } });
   assert.equal(store.loadError, undefined);
@@ -90,14 +91,14 @@ test('shared food reaches a lagging recipient after world-time synchronization w
   assert.equal(f.store.profile('p1').character!.foodLots.find(food => food.id.startsWith('food-shared-'))!.createdAt, 105);
 });
 
-test('group travel requires each member’s own destination and transport consent before the leader starts', t => {
+test('group travel requires each member to acknowledge the leader’s immutable route before starting', t => {
   const f = fixture(t); f.create(); f.join('p1');
   assert.equal(f.request('p0', { type: 'readyTravel', destination: 'greenwood', transport: 'carriage', user: 'p1' }).error, 'invalid');
   assert.equal(f.request('p0', { type: 'readyTravel', destination: 'greenwood', transport: 'carriage' }).error, undefined);
   assert.equal(f.request('p0', { type: 'startTravel' }).error, 'not-ready');
-  assert.equal(f.request('p1', { type: 'readyTravel', destination: 'greenwood', transport: 'foot' }).error, undefined);
-  assert.equal(f.request('p0', { type: 'startTravel' }).error, 'incompatible');
-  assert.equal(f.request('p1', { type: 'readyTravel', destination: 'greenwood', transport: 'carriage' }).error, undefined);
+  assert.equal(f.request('p1', { type: 'readyTravel', destination: 'greenwood', transport: 'foot' }).error, 'leader-only');
+  const proposal = f.party.state('p1').travelProposal!;
+  assert.equal(f.request('p1', { type: 'travelDecision', proposal: proposal.id, revision: proposal.revision, accept: true }).error, undefined);
   assert.equal(f.request('p1', { type: 'startTravel' }).error, 'leader-only'); assert.equal(f.party.state('p0').canStartTravel, true);
   assert.equal(f.request('p0', { type: 'startTravel' }).error, undefined); assert.equal(f.store.profile('p2').activity, undefined);
 });
@@ -107,7 +108,7 @@ test('shared departure waits for the slowest consenting traveler while keeping p
   const a = f.store.profile('p0'), b = f.store.profile('p1'); const routes = [a, b].map(p => fantasyTransports(p.character!, 'greenwood').find(route => route.id === 'carriage')!); assert.ok(routes.every(Boolean)); assert.notEqual(routes[0].hours, routes[1].hours);
   const result = f.store.startGroupTravel([f.travelPlan('p0'), f.travelPlan('p1')]); assert.equal(result.error, undefined);
   const arrival = 108 + Math.max(...routes.map(route => route.hours));
-  for (const update of result.updates) { assert.equal(update.profile.activity!.endsAt, arrival); assert.equal(update.profile.character!.location, 'hearth'); assert.equal(update.profile.character!.gold, 1000); }
+  for (const [i, update] of result.updates.entries()) { assert.equal(update.profile.activity!.endsAt, arrival); assert.equal(update.profile.character!.location, 'hearth'); assert.equal(update.profile.character!.gold, 1000 - routes[i].cost); }
   f.setHour(arrival); f.store.tick(new Set(['p0', 'p1']));
   for (const [i, user] of ['p0', 'p1'].entries()) { const p = f.store.profile(user); assert.equal(p.activity, undefined); assert.equal(p.character!.location, 'greenwood'); assert.equal(p.character!.gold, 1000 - routes[i].cost); assert.deepEqual(p.character!.completed, [a, b][i].character!.completed); }
 });
@@ -119,9 +120,10 @@ test('a failed group-travel write starts nobody and retry preserves the common a
 });
 
 test('expired consent or changed personal route cost invalidates travel readiness without spending money', t => {
-  const f = fixture(t, 2); f.create(); f.join('p1'); for (const user of ['p0', 'p1']) assert.equal(f.request(user, { type: 'readyTravel', destination: 'greenwood', transport: 'carriage' }).error, undefined);
+  const f = fixture(t, 2); f.create(); f.join('p1');
+  const ready = () => { assert.equal(f.request('p0', { type: 'readyTravel', destination: 'greenwood', transport: 'carriage' }).error, undefined); const p = f.party.state('p1').travelProposal!; assert.equal(f.request('p1', { type: 'travelDecision', proposal: p.id, revision: p.revision, accept: true }).error, undefined); }; ready();
   f.setWall(FANTASY_PARTY_TTL_MS + 100_000); assert.equal(f.party.state('p0').canStartTravel, false);
-  for (const user of ['p0', 'p1']) f.request(user, { type: 'readyTravel', destination: 'greenwood', transport: 'carriage' });
+  ready();
   const changed = f.store.profile('p1'); changed.character!.gold = 0; f.actors.get('p1')!.override = changed;
   assert.equal(f.party.state('p0').canStartTravel, false); assert.equal(f.store.profile('p1').character!.gold, 1000); assert.equal(f.store.profile('p1').activity, undefined);
 });
@@ -134,14 +136,13 @@ test('party chat is trimmed, isolated from outsiders and removed from a player w
   assert.equal(f.party.state('p0').members.some(member => member.id === 'p1'), false);
 });
 
-test('joining an ongoing party fight requires the joining player’s request, same session and location', t => {
+test('party requests cannot bypass the proposal by joining an ongoing fight', t => {
   const f = fixture(t, 3, p => { p.character!.location = 'greenwood'; }); f.create(); f.join('p1');
   const battle = f.store.startCombat([f.combatPlan('p0')], () => .6).state!; assert.ok(battle); assert.equal(f.store.profile('p1').combatId, undefined);
   assert.equal(f.request('p2', { type: 'joinCombat', combatId: battle.id }).error, 'no-party');
   assert.equal(f.store.joinCombat('p1', 'other', battle.id).error, 'not-active'); assert.equal(f.store.profile('p1').combatId, undefined);
-  assert.equal(f.request('p1', { type: 'joinCombat', combatId: battle.id }).error, undefined); const joined = f.store.combat('p0', 'same')!;
-  assert.equal(joined.fighters.filter(fighter => fighter.side === 'players').length, 2); assert.equal(f.store.profile('p1').combatId, battle.id); assert.equal(joined.revision, battle.revision + 1);
-  assert.ok(f.request('p1', { type: 'joinCombat', combatId: battle.id }).error);
+  assert.equal(f.request('p1', { type: 'joinCombat', combatId: battle.id }).error, 'unavailable'); const joined = f.store.combat('p0', 'same')!;
+  assert.equal(joined.fighters.filter(fighter => fighter.side === 'players').length, 1); assert.equal(f.store.profile('p1').combatId, undefined); assert.equal(joined.revision, battle.revision);
 });
 
 test('mid-battle join never exceeds six players and save failure does not attach a seventh or partial new fighter', t => {
@@ -159,7 +160,8 @@ test('apex reinforcements need their own local warning and explicit confirmation
   assert.ok(f.request('p1', { type: 'joinCombat', combatId: battle.id }).error); assert.ok(f.request('p1', { type: 'joinCombat', combatId: battle.id, confirm: true }).error);
   assert.equal(f.store.profile('p1').combatId, undefined); assert.equal(f.store.inspectCombat('p1', 'apex-elder-dragon').error, undefined);
   assert.ok(f.request('p1', { type: 'joinCombat', combatId: battle.id }).error);
-  assert.equal(f.request('p1', { type: 'joinCombat', combatId: battle.id, confirm: true }).error, undefined); assert.equal(f.store.profile('p1').combatId, battle.id);
+  assert.equal(f.request('p1', { type: 'joinCombat', combatId: battle.id, confirm: true }).error, 'unavailable');
+  assert.equal(f.store.joinCombat('p1', 'same', battle.id, true).error, undefined); assert.equal(f.store.profile('p1').combatId, battle.id);
 });
 
 test('a consenting reinforcement refreshes the round and clears old orders without spending pending items', t => {
@@ -167,7 +169,8 @@ test('a consenting reinforcement refreshes the round and clears old orders witho
   const battle = f.store.startCombat([f.combatPlan('p0'), f.combatPlan('p1')], () => .6).state!, before = f.store.profile('p0').character!.inventory;
   assert.equal(f.store.combatOrder('p0', 'same', battle.id, battle.revision, { type: 'guard' }).error, undefined);
   assert.ok(f.store.combat('p0', 'same')!.orders.p0); const enemy = battle.fighters.find(fighter => fighter.side === 'enemies')!;
-  assert.equal(f.request('p2', { type: 'joinCombat', combatId: battle.id }).error, undefined);
+  assert.equal(f.request('p2', { type: 'joinCombat', combatId: battle.id }).error, 'unavailable');
+  assert.equal(f.store.joinCombat('p2', 'same', battle.id).error, undefined);
   const joined = f.store.combat('p0', 'same')!; assert.deepEqual(joined.orders, {}); assert.equal(joined.revision, battle.revision + 1);
   assert.deepEqual(f.store.profile('p0').character!.inventory, before); assert.ok(joined.fighters.find(fighter => fighter.id === enemy.id)!.stats.hp >= enemy.stats.hp);
   assert.equal(f.store.combatOrder('p0', 'same', battle.id, battle.revision, { type: 'guard' }).error, 'stale');

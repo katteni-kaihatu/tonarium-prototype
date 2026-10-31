@@ -126,8 +126,20 @@ export function npcInformationSpeech(npcId: string, locale: NpcLocale, text: str
   return text.replace(/^この土地にはまだ共同準備への協力記録がありません。$/u,'街の共同準備は、まだ誰も手伝っていないんです。').replace(/^この地の旅人の記録：/u,'この土地に立ち寄った旅人の話です。');
 }
 
+const FRONTIER_DEVICE_SPEECH: Record<string, { names: RelationshipLine; summary: RelationshipLine }> = {
+  'frontier-room-service-button': {
+    names: rel('황야의 휴식 호출패', 'Wilderness Rest Talisman', '荒野の休息呼び札'),
+    summary: rel('몸에 착용하면 야영 후 피로를 3만큼 더 덜고, 생명력도 최대치의 2.5%만큼 더 회복한다. 식사는 가져다주지 않는다.', 'When worn, it eases fatigue by an extra 3 after camping and restores an extra 2.5% of your maximum health. It does not bring meals.', '身につけると野営後の疲労をさらに3和らげ、生命力も最大値の2.5%分多く回復する。食事は運んでこない。'),
+  },
+  'frontier-weather-remote': {
+    names: rel('건전지 없는 날씨 조절기', 'Weather Remote with Missing Batteries', '電池のない天気調節器'),
+    summary: rel('몸에 착용하면 작은 비막이가 비의 부담을 1단계 덜어 준다. 대륙의 날씨 자체를 바꾸지는 못한다.', 'When worn, its little rain shield reduces rain exposure by 1. It cannot change the weather itself.', '身につけると小さな雨よけが雨の負担を1段階和らげる。大陸の天気そのものは変えられない。'),
+  },
+};
+
 function definitionSpeech(npcId: string, locale: NpcLocale, term: FantasyTerm): string {
-  const name=term.names[locale], summary=term.summary[locale].trim(), formal=polite(npcId);
+  const authored=FRONTIER_DEVICE_SPEECH[term.id];
+  const name=authored?.names[locale]??term.names[locale], summary=(authored?.summary[locale]??term.summary[locale]).trim(), formal=polite(npcId);
   if(term.id==='gold')return say(locale,formal?'여기서는 금화로 값을 치러요. G는 금화를 적을 때 쓰는 표시예요.':'여기서는 금화로 값을 치러. G는 금화를 적을 때 쓰는 표시야.','We pay for things with gold here. G is the mark we use when writing an amount in gold.','ここでは金貨で代金を払います。Gは金貨の額を書き表すときの印です。');
   if(term.id==='calendar')return say(locale,`여러 대륙에서 함께 쓰는 ${formal?'달력이에요':'달력이야'}. 연도를 적을 때는 '잔광력 312년'처럼 ${formal?'써요':'써'}.`,`The continents share this calendar. You'd write a year as 'Afterglow 312', for example.`,'各大陸で一緒に使っている暦です。「残光暦312年」のように年を書きます。');
   if(term.category==='race'){

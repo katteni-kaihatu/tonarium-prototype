@@ -1,0 +1,165 @@
+.fr-em-effect{pointer-events:none;--fr-fx-duration:1000ms;--fr-em-delay:0;animation:fr-em-presence var(--fr-fx-duration) ease-out both}
+.fr-em-element{stroke-linecap:round;stroke-linejoin:round}
+.fr-em-travel{stroke:#ecd4a4;stroke-width:3;stroke-dasharray:1;animation:fr-em-travel calc(var(--fr-fx-duration)*.42) ease-out both}
+.fr-em-fire .fr-em-travel{stroke:#efb36f;stroke-width:5}
+.fr-em-frost .fr-em-travel{stroke:#b6deeb;stroke-dasharray:.12 .06}
+.fr-em-poison .fr-em-travel{stroke:#9dbf81;stroke-width:3;opacity:.6}
+.fr-em-alchemy .fr-em-travel{stroke:#b7d7c4;stroke-dasharray:.025 .04;stroke-width:2;opacity:.65}
+.fr-em-water .fr-em-travel{stroke:#a9dce2;stroke-width:4;opacity:.7}
+.fr-em-water-ripple{transform-origin:0 20px;animation:fr-em-water-ripple calc(var(--fr-fx-duration)*.86) calc(var(--fr-fx-duration)*var(--fr-em-delay)) ease-out both}
+.fr-em-water-crest{transform-origin:0 25px;animation:fr-em-water-crest var(--fr-fx-duration) ease-out both}
+.fr-em-water-surge{animation:fr-em-water-surge var(--fr-fx-duration) ease-out both}
+.fr-em-earth-cracks path{stroke-dasharray:1;animation:fr-em-earth-cracks var(--fr-fx-duration) ease-out both}
+.fr-em-earth-spire{transform-origin:0 25px;animation:fr-em-earth-spire calc(var(--fr-fx-duration)*.86) calc(var(--fr-fx-duration)*var(--fr-em-delay)) cubic-bezier(.13,.67,.25,1) both}
+.fr-em-earth-dust{transform-origin:0 21px;animation:fr-em-earth-dust var(--fr-fx-duration) ease-out both}
+.fr-em-wind-flight path{stroke-dasharray:1;animation:fr-em-wind-flight var(--fr-fx-duration) ease-out both}
+.fr-em-wind-vortex{transform-origin:0 0;animation:fr-em-wind-vortex var(--fr-fx-duration) ease-out both}
+.fr-em-wind-blade{transform-origin:0 0;animation:fr-em-wind-blade calc(var(--fr-fx-duration)*.86) calc(var(--fr-fx-duration)*var(--fr-em-delay)) ease-out both}
+.fr-em-star-aura{transform-origin:0 0;animation:fr-em-star-aura var(--fr-fx-duration) ease-out both}
+.fr-em-constellation{transform-origin:0 0;animation:fr-em-constellation var(--fr-fx-duration) ease-out both}
+.fr-em-constellation path{stroke-dasharray:1;animation:fr-em-constellation-lines var(--fr-fx-duration) ease-out both}
+.fr-em-star-strike{transform-origin:0 0;animation:fr-em-star-strike var(--fr-fx-duration) ease-out both}
+.fr-em-star-mote{animation:fr-em-star-mote calc(var(--fr-fx-duration)*.86) calc(var(--fr-fx-duration)*var(--fr-em-delay)) ease-out both}
+.fr-em-speck{transform-box:view-box;transform-origin:0 0;animation:fr-em-speck calc(var(--fr-fx-duration)*.78) calc(var(--fr-fx-duration)*var(--fr-em-delay)) cubic-bezier(.13,.47,.28,1) both}
+.fr-em-specks-ember .fr-em-speck{animation-name:fr-em-rising-speck}
+.fr-em-specks-bubble .fr-em-speck{animation-name:fr-em-bubble}
+.fr-em-specks-shard .fr-em-speck{animation-name:fr-em-shard}
+.fr-em-specks-droplet .fr-em-speck{animation-name:fr-em-droplet}
+.fr-em-ground-bloom{animation:fr-em-ground-bloom var(--fr-fx-duration) ease-out both}
+.fr-em-flame{transform-box:fill-box;transform-origin:50% 100%;animation:fr-em-flame calc(var(--fr-fx-duration)*.86) calc(var(--fr-fx-duration)*var(--fr-em-delay)) ease-out both}
+.fr-em-flame-core{transform-origin:0 20px;animation:fr-em-flame-core calc(var(--fr-fx-duration)*.8) ease-out both}
+.fr-em-pressure-ring{transform-box:fill-box;transform-origin:center;animation:fr-em-pressure-ring calc(var(--fr-fx-duration)*.85) ease-out both}
+.fr-em-frost-ground{transform-origin:0 18px;animation:fr-em-frost-ground var(--fr-fx-duration) ease-out both}
+.fr-em-ice-spear{transform-origin:0 23px;animation:fr-em-ice-spear calc(var(--fr-fx-duration)*.86) calc(var(--fr-fx-duration)*var(--fr-em-delay)) cubic-bezier(.16,.7,.3,1) both}
+.fr-em-frost-sigil{opacity:.75;transform-origin:0 0;animation:fr-em-frost-sigil var(--fr-fx-duration) ease-out both}
+.fr-em-lightning{fill:none;stroke-linecap:round;stroke-linejoin:bevel}
+.fr-em-lightning-halo{stroke:#a3a1df;stroke-width:11;opacity:.22;animation:fr-em-lightning-halo var(--fr-fx-duration) ease-out both}
+.fr-em-lightning-core{stroke:#f0edff;stroke-width:3.3;stroke-dasharray:1;animation:fr-em-lightning var(--fr-fx-duration) ease-out both}
+.fr-em-lightning-branch{stroke:#c4c8f1;stroke-width:1.5;stroke-dasharray:1;animation:fr-em-lightning var(--fr-fx-duration) ease-out both}
+.fr-em-storm-arcs{transform-origin:0 0;animation:fr-em-storm-arcs var(--fr-fx-duration) ease-out both}
+.fr-em-storm-heart{transform-origin:0 0;animation:fr-em-storm-heart var(--fr-fx-duration) ease-out both}
+.fr-em-vapor ellipse{transform-box:fill-box;transform-origin:center;animation:fr-em-vapor calc(var(--fr-fx-duration)*.86) calc(var(--fr-fx-duration)*var(--fr-em-delay)) ease-out both}
+.fr-em-poison-pool{transform-origin:0 17px;animation:fr-em-poison-pool var(--fr-fx-duration) ease-out both}
+.fr-em-vapor-curl{opacity:.6;animation:fr-em-vapor-curl var(--fr-fx-duration) ease-out both}
+.fr-em-flight-object{animation:fr-em-flight-object var(--fr-fx-duration) linear both}
+.fr-em-flask-spin{animation:fr-em-flask-spin calc(var(--fr-fx-duration)*.32) linear both}
+.fr-em-reaction{transform-origin:0 0;animation:fr-em-reaction var(--fr-fx-duration) ease-out both}
+.fr-em-alchemy-mix{transform-origin:0 0;animation:fr-em-alchemy-mix var(--fr-fx-duration) ease-out both}
+.fr-em-miracle{stroke-linecap:round;stroke-linejoin:round}
+.fr-em-tether{stroke-dasharray:1;animation:fr-em-tether var(--fr-fx-duration) ease-out both}
+.fr-em-thread-light{animation:fr-em-thread-light var(--fr-fx-duration) ease-out both}
+.fr-em-anchor-aegis{animation:fr-em-anchor-aegis var(--fr-fx-duration) ease-out both}
+.fr-em-soul-anchor{animation:fr-em-soul-anchor var(--fr-fx-duration) cubic-bezier(.22,.65,.25,1) both}
+.fr-em-cleaving-seal{transform-origin:0 0;animation:fr-em-cleaving-seal var(--fr-fx-duration) ease-out both}
+.fr-em-chain-half{animation:fr-em-chain-half var(--fr-fx-duration) cubic-bezier(.15,.64,.3,1) both}
+.fr-em-sacred-cleave{transform-origin:0 0;animation:fr-em-sacred-cleave var(--fr-fx-duration) cubic-bezier(.1,.75,.2,1) both}
+.fr-em-lantern-portal{transform-origin:0 0;animation:fr-em-lantern-portal var(--fr-fx-duration) ease-out both}
+.fr-em-lantern-body{animation:fr-em-lantern-body var(--fr-fx-duration) ease-out both}
+.fr-em-calamity-approach{stroke-dasharray:1;animation:fr-em-calamity-approach var(--fr-fx-duration) ease-out both}
+.fr-em-split-waves path{stroke-dasharray:1;animation:fr-em-split-wave var(--fr-fx-duration) ease-out both}
+.fr-em-protected-tile{animation:fr-em-protected-tile var(--fr-fx-duration) ease-out both}
+.fr-em-calamity-shield{transform-origin:0 30px;animation:fr-em-calamity-shield var(--fr-fx-duration) ease-out both}
+.fr-em-burden-receiver{animation:fr-em-burden-receiver var(--fr-fx-duration) ease-out both}
+.fr-em-wounds-close{transform-origin:0 0;animation:fr-em-wounds-close var(--fr-fx-duration) ease-out both}
+.fr-em-mending-thread{animation:fr-em-mending-thread var(--fr-fx-duration) ease-out both}
+.fr-em-unfailing-cup{animation:fr-em-unfailing-cup var(--fr-fx-duration) ease-out both}
+.fr-em-cup-streams{stroke-dasharray:140;animation:fr-em-cup-streams var(--fr-fx-duration) ease-out both}
+.fr-em-rekindle-nest{transform-origin:0 25px;animation:fr-em-rekindle-nest var(--fr-fx-duration) ease-out both}
+.fr-em-phoenix{transform-origin:0 10px;animation:fr-em-phoenix var(--fr-fx-duration) cubic-bezier(.16,.6,.25,1) both}
+.fr-em-life-flame{transform-origin:0 20px;animation:fr-em-life-flame var(--fr-fx-duration) ease-out both}
+.fr-em-promise-halo{animation:fr-em-promise-halo var(--fr-fx-duration) ease-out both}
+.fr-em-promise-star{transform-origin:0 0;animation:fr-em-promise-star var(--fr-fx-duration) ease-out both}
+.fr-em-priest-rays{transform-origin:0 0;animation:fr-em-priest-rays var(--fr-fx-duration) ease-out both}
+.fr-em-last-dawn{isolation:isolate}
+.fr-em-dawn-atmosphere{animation:fr-em-dawn-atmosphere var(--fr-fx-duration) ease-out both}
+.fr-em-dawn-rays{transform-origin:0 0;opacity:.6;animation:fr-em-dawn-rays var(--fr-fx-duration) ease-out both}
+.fr-em-aurora{animation:fr-em-aurora var(--fr-fx-duration) ease-out both}
+.fr-em-dawn-pillar{transform-origin:0 0;animation:fr-em-dawn-pillar calc(var(--fr-fx-duration)*.9) calc(var(--fr-fx-duration)*var(--fr-em-delay)) cubic-bezier(.16,.6,.25,1) both}
+.fr-em-celestial-ring{transform-origin:0 0;animation:fr-em-celestial-ring var(--fr-fx-duration) ease-out both}
+.fr-em-dawn-sun{animation:fr-em-dawn-sun var(--fr-fx-duration) ease-out both}
+.fr-em-feather{transform-origin:0 0;animation:fr-em-feather calc(var(--fr-fx-duration)*.85) calc(var(--fr-fx-duration)*var(--fr-em-delay)) ease-out both}
+
+@keyframes fr-em-presence{0%{opacity:0}9%,79%{opacity:1}100%{opacity:0}}
+@keyframes fr-em-travel{0%{stroke-dashoffset:1;opacity:0}20%{opacity:.8}85%{stroke-dashoffset:0;opacity:.7}100%{stroke-dashoffset:0;opacity:0}}
+@keyframes fr-em-speck{0%,13%{opacity:0;translate:0 0;scale:.3}29%{opacity:.9;scale:1}100%{opacity:0;translate:var(--fr-em-dx) var(--fr-em-dy);scale:.35}}
+@keyframes fr-em-rising-speck{0%,15%{opacity:0;translate:0 5px;scale:.5}32%{opacity:.9;scale:1}70%{opacity:.7}100%{opacity:0;translate:var(--fr-em-dx) var(--fr-em-dy);scale:.2}}
+@keyframes fr-em-bubble{0%,18%{opacity:0;translate:0 8px;scale:.3}38%{opacity:.7;scale:1}85%{opacity:.45;scale:1.15}100%{opacity:0;translate:var(--fr-em-dx) var(--fr-em-dy);scale:1.4}}
+@keyframes fr-em-shard{0%,23%{opacity:0;translate:0 0;rotate:0deg;scale:.4}36%{opacity:.9;scale:1}100%{opacity:0;translate:var(--fr-em-dx) var(--fr-em-dy);rotate:var(--fr-em-turn);scale:.4}}
+@keyframes fr-em-droplet{0%,15%{opacity:0;translate:0 10px;scale:.3}40%{opacity:.8;translate:calc(var(--fr-em-dx)*.4) calc(var(--fr-em-dy)*.75);scale:1}100%{opacity:0;translate:var(--fr-em-dx) calc(var(--fr-em-dy)*-.25);scale:.5}}
+@keyframes fr-em-water-ripple{0%,10%{opacity:0;scale:.3}37%{opacity:.8;scale:1}100%{opacity:0;scale:1.6}}
+@keyframes fr-em-water-crest{0%,10%{opacity:0;scale:.6 .2;translate:-17px 0}35%{opacity:.85;scale:1;translate:0 -5px}75%{opacity:.55;scale:1.1 .8;translate:15px 5px}100%{opacity:0;scale:1.3 .3;translate:25px 10px}}
+@keyframes fr-em-water-surge{0%,18%{opacity:0;translate:-12px 14px}48%{opacity:.8;translate:0 0}100%{opacity:0;translate:15px -20px}}
+@keyframes fr-em-earth-cracks{0%{opacity:0;stroke-dashoffset:1}28%,78%{opacity:.8;stroke-dashoffset:0}100%{opacity:0;stroke-dashoffset:0}}
+@keyframes fr-em-earth-spire{0%,12%{opacity:0;scale:.8 .08;translate:0 13px}32%,69%{opacity:.95;scale:1;translate:0 0}100%{opacity:0;scale:1 .8;translate:0 8px}}
+@keyframes fr-em-earth-dust{0%,14%{opacity:0;scale:.4}43%{opacity:.8;scale:1}100%{opacity:0;scale:1.65;translate:0 -7px}}
+@keyframes fr-em-wind-flight{0%{opacity:0;stroke-dashoffset:1}22%{opacity:.75;stroke-dashoffset:.4}58%{opacity:.6;stroke-dashoffset:0}100%{opacity:0;stroke-dashoffset:-.3}}
+@keyframes fr-em-wind-vortex{0%{opacity:0;scale:.3;rotate:-35deg}35%{opacity:.9;scale:1;rotate:0deg}100%{opacity:0;scale:1.35;rotate:100deg}}
+@keyframes fr-em-wind-blade{0%,10%{opacity:0;rotate:-40deg;scale:.5}37%{opacity:.9;rotate:0deg;scale:1}100%{opacity:0;rotate:85deg;scale:1.4}}
+@keyframes fr-em-star-aura{0%,13%{opacity:0;scale:.2}43%{opacity:.75;scale:1}100%{opacity:0;scale:1.4}}
+@keyframes fr-em-constellation{0%{opacity:0;scale:.8;rotate:-9deg}30%,73%{opacity:.85;scale:1;rotate:0deg}100%{opacity:0;scale:1.08;rotate:5deg}}
+@keyframes fr-em-constellation-lines{0%,9%{stroke-dashoffset:1}48%,100%{stroke-dashoffset:0}}
+@keyframes fr-em-star-strike{0%,15%{opacity:0;translate:0 -55px;scale:.4}43%{opacity:1;translate:0 0;scale:1}77%{opacity:.65;scale:1.1}100%{opacity:0;scale:1.25}}
+@keyframes fr-em-star-mote{0%,9%{opacity:0;translate:var(--fr-em-dx) var(--fr-em-dy);scale:.3}32%{opacity:.85;scale:1}78%{opacity:.8;translate:0 0;scale:.6}100%{opacity:0;translate:0 0;scale:.2}}
+@keyframes fr-em-ground-bloom{0%{opacity:0;scale:.2}28%{opacity:.8;scale:1}100%{opacity:0;scale:1.6}}
+@keyframes fr-em-flame{0%,10%{opacity:0;scale:.7 .1;transform:skewX(7deg)}30%{opacity:.85;scale:1 1;transform:skewX(-6deg)}68%{opacity:.65;scale:.8 1.15;transform:skewX(5deg)}100%{opacity:0;scale:.45 1.5;transform:skewX(-4deg)}}
+@keyframes fr-em-flame-core{0%,16%{opacity:0;scale:.4 .15}40%{opacity:.8;scale:1}100%{opacity:0;scale:.5 1.3}}
+@keyframes fr-em-pressure-ring{0%,22%{opacity:0;scale:.35}40%{opacity:.7;scale:.9}100%{opacity:0;scale:1.55}}
+@keyframes fr-em-frost-ground{0%{opacity:0;scale:.2}25%,68%{opacity:.65;scale:1}100%{opacity:0;scale:1.25}}
+@keyframes fr-em-ice-spear{0%,14%{opacity:0;scale:.7 .04}32%,62%{opacity:.9;scale:1 1}82%{opacity:.5;scale:.95 1.05}100%{opacity:0;scale:.75 1.08}}
+@keyframes fr-em-frost-sigil{0%,22%{opacity:0;scale:.55;rotate:-12deg}50%{opacity:.75;scale:1;rotate:0deg}100%{opacity:0;scale:1.15;rotate:5deg}}
+@keyframes fr-em-lightning{0%{opacity:0;stroke-dashoffset:1}17%{opacity:.95;stroke-dashoffset:0}52%{opacity:.8;stroke-dashoffset:0}100%{opacity:0;stroke-dashoffset:0}}
+@keyframes fr-em-lightning-halo{0%{opacity:0}20%,44%{opacity:.3}100%{opacity:0}}
+@keyframes fr-em-storm-arcs{0%,15%{opacity:0;scale:.3;rotate:-18deg}38%{opacity:.85;scale:1;rotate:0deg}100%{opacity:0;scale:1.4;rotate:16deg}}
+@keyframes fr-em-storm-heart{0%,13%{opacity:0;scale:.2}23%{opacity:.7;scale:1}100%{opacity:0;scale:.5}}
+@keyframes fr-em-vapor{0%,12%{opacity:0;translate:0 8px;scale:.35}38%{opacity:.8;scale:1}100%{opacity:0;translate:10px -55px;scale:1.6}}
+@keyframes fr-em-poison-pool{0%,13%{opacity:0;scale:.3}40%,70%{opacity:.65;scale:1}100%{opacity:0;scale:1.2}}
+@keyframes fr-em-vapor-curl{0%,18%{opacity:0;translate:0 12px}46%{opacity:.6}100%{opacity:0;translate:12px -27px}}
+@keyframes fr-em-flight-object{0%{opacity:1}29%{opacity:1}36%,100%{opacity:0}}
+@keyframes fr-em-flask-spin{0%{rotate:-35deg}100%{rotate:210deg}}
+@keyframes fr-em-reaction{0%,23%{opacity:0;scale:.2;rotate:-25deg}47%{opacity:.8;scale:1;rotate:0deg}100%{opacity:0;scale:1.25;rotate:16deg}}
+@keyframes fr-em-alchemy-mix{0%,26%{opacity:0;scale:.1}48%{opacity:.8;scale:1}100%{opacity:0;scale:1.5;rotate:40deg}}
+@keyframes fr-em-tether{0%{opacity:0;stroke-dashoffset:1}25%,75%{opacity:.85;stroke-dashoffset:0}100%{opacity:0;stroke-dashoffset:0}}
+@keyframes fr-em-thread-light{0%,7%{opacity:0}25%,66%{opacity:.9}100%{opacity:0}}
+@keyframes fr-em-anchor-aegis{0%,8%{opacity:0;scale:.7}36%,74%{opacity:.65;scale:1}100%{opacity:0;scale:1.12}}
+@keyframes fr-em-soul-anchor{0%{opacity:0;translate:0 -35px}31%{opacity:1;translate:0 3px}48%,77%{opacity:1;translate:0 0}100%{opacity:0;translate:0 0}}
+@keyframes fr-em-cleaving-seal{0%{opacity:0;rotate:-20deg;scale:.6}24%{opacity:.75;rotate:0deg;scale:1}66%{opacity:.4;rotate:8deg;scale:1.1}100%{opacity:0;rotate:16deg;scale:1.25}}
+@keyframes fr-em-chain-half{0%,20%{opacity:0;translate:0 0;rotate:0deg}29%{opacity:1;translate:0 0}100%{opacity:0;translate:var(--fr-em-dx) var(--fr-em-dy);rotate:var(--fr-em-turn)}}
+@keyframes fr-em-sacred-cleave{0%,13%{opacity:0;translate:25px -30px;scale:.5}31%{opacity:1;translate:0 0;scale:1}65%{opacity:.5;translate:-8px 8px;scale:1.08}100%{opacity:0;translate:-20px 25px;scale:1.12}}
+@keyframes fr-em-lantern-portal{0%{opacity:0;scale:.15 .75}30%,76%{opacity:.85;scale:1}100%{opacity:0;scale:1.16}}
+@keyframes fr-em-lantern-body{0%,8%{opacity:0;translate:0 16px}35%{opacity:1;translate:0 -6px}72%{opacity:1;translate:0 -11px}100%{opacity:0;translate:0 -17px}}
+@keyframes fr-em-calamity-approach{0%{opacity:0;stroke-dashoffset:1}20%{opacity:.55;stroke-dashoffset:0}40%,100%{opacity:0;stroke-dashoffset:0}}
+@keyframes fr-em-split-wave{0%,16%{opacity:0;stroke-dashoffset:1}35%{opacity:.85;stroke-dashoffset:.35}68%{opacity:.65;stroke-dashoffset:0}100%{opacity:0;stroke-dashoffset:0}}
+@keyframes fr-em-protected-tile{0%{opacity:0}24%,88%{opacity:.85}100%{opacity:0}}
+@keyframes fr-em-calamity-shield{0%,6%{opacity:0;scale:.7 .4}24%,80%{opacity:1;scale:1}100%{opacity:0;scale:1.06}}
+@keyframes fr-em-burden-receiver{0%,35%{opacity:0}63%{opacity:.75}100%{opacity:0}}
+@keyframes fr-em-wounds-close{0%{opacity:0}19%{opacity:.85;scale:1}76%{opacity:.2;scale:.8 .5}100%{opacity:0;scale:.75 .2}}
+@keyframes fr-em-mending-thread{0%,19%{opacity:0}55%,83%{opacity:1}100%{opacity:0}}
+@keyframes fr-em-unfailing-cup{0%{opacity:0;translate:0 19px}26%,78%{opacity:1;translate:0 0}100%{opacity:0;translate:0 -6px}}
+@keyframes fr-em-cup-streams{0%,17%{opacity:0;stroke-dashoffset:140}45%{opacity:.75;stroke-dashoffset:30}80%{opacity:.65;stroke-dashoffset:0}100%{opacity:0;stroke-dashoffset:-30}}
+@keyframes fr-em-rekindle-nest{0%{opacity:0;scale:.2}30%,73%{opacity:.7;scale:1}100%{opacity:0;scale:1.35}}
+@keyframes fr-em-phoenix{0%,12%{opacity:0;scale:.25 .35;translate:0 12px}44%{opacity:.9;scale:1;translate:0 -12px}79%{opacity:.7;scale:1.12 .95;translate:0 -42px}100%{opacity:0;scale:1.16;translate:0 -64px}}
+@keyframes fr-em-life-flame{0%{opacity:0;scale:.3 .1}33%,65%{opacity:.85;scale:1}100%{opacity:0;scale:.65 1.5;translate:0 -30px}}
+@keyframes fr-em-promise-halo{0%{opacity:0;translate:0 10px}30%,76%{opacity:.85;translate:0 0}100%{opacity:0;translate:0 -5px}}
+@keyframes fr-em-promise-star{0%,16%{opacity:0;scale:.3}50%{opacity:1;scale:1}100%{opacity:0;scale:.8;translate:0 -6px}}
+@keyframes fr-em-priest-rays{0%{opacity:0;scale:.3;rotate:-8deg}35%{opacity:.8;scale:1;rotate:0deg}100%{opacity:0;scale:1.3;rotate:8deg}}
+@keyframes fr-em-dawn-atmosphere{0%{opacity:0}24%,73%{opacity:1}100%{opacity:0}}
+@keyframes fr-em-dawn-rays{0%{opacity:0;rotate:-6deg}28%,70%{opacity:.65}100%{opacity:0;rotate:9deg}}
+@keyframes fr-em-aurora{0%{opacity:0;translate:-35px 25px}32%,65%{opacity:.9}100%{opacity:0;translate:30px -25px}}
+@keyframes fr-em-dawn-pillar{0%,5%{opacity:0;scale:.2 .9}28%,72%{opacity:.85;scale:1}100%{opacity:0;scale:1.15 1.03}}
+@keyframes fr-em-celestial-ring{0%,10%{opacity:0;scale:.5 .7}34%,78%{opacity:.85;scale:1}100%{opacity:0;scale:1.12}}
+@keyframes fr-em-dawn-sun{0%,15%{opacity:0;translate:0 20px}42%,80%{opacity:.9;translate:0 -12px}100%{opacity:0;translate:0 -20px}}
+@keyframes fr-em-feather{0%,10%{opacity:0;translate:0 25px;rotate:0deg}28%{opacity:.85}82%{opacity:.7}100%{opacity:0;translate:var(--fr-em-dx) var(--fr-em-dy);rotate:var(--fr-em-turn)}}
+
+@media(prefers-reduced-motion:reduce){
+  .fr-em-effect,.fr-em-effect *{animation:none!important;transition:none!important}
+  .fr-em-effect{opacity:.85}
+  .fr-em-flight-object,.fr-em-travel,.fr-em-thread-light,.fr-em-calamity-approach{display:none}
+  .fr-em-specks{opacity:.55}
+  .fr-em-specks .fr-em-speck{opacity:.55}
+  .fr-em-dawn-rays,.fr-em-field-pillars{opacity:.6}
+  .fr-em-aurora{opacity:.6}
+  .fr-em-lightning-core,.fr-em-lightning-branch,.fr-em-split-waves path{stroke-dashoffset:0}
+  .fr-em-wind-flight{display:none}
+  .fr-em-earth-cracks path,.fr-em-constellation path{stroke-dashoffset:0}
+  .fr-em-star-mote{translate:calc(var(--fr-em-dx)*.45) calc(var(--fr-em-dy)*.45);opacity:.5}
+}

@@ -1,3 +1,229 @@
 .fr-combat{padding:18px;background:#f7f3e7;border:1px solid #c9c5af;border-radius:12px;max-height:85vh;overflow:auto}.fr-combat header{display:flex;justify-content:space-between;gap:10px;align-items:center}.fr-combat h2{margin:0;font-size:20px}.fr-combat header span{font-size:12px}.fr-combat-roster{display:grid;gap:20px;margin:20px 0}.fr-combat-side{display:flex;flex-wrap:wrap;gap:10px}.fr-combat-side article{flex:1 1 140px;display:flex;flex-direction:column;gap:5px;border:1px solid #c7cbb8;padding:12px;background:#edf0e5;border-radius:8px}.fr-combat-side.enemies article{background:#f4e8de;border-color:#d7c3af}.fr-combat-side article.self{outline:2px solid #5f7f68}.fr-combat-side article.down{opacity:.5}.fr-combat-side span,.fr-combat-side small{font-size:11px}.fr-combat-side meter{width:100%;height:12px;accent-color:#5c8262}.fr-combat-telegraph{font-size:12px;line-height:1.6;margin:4px 0;color:#81502f}.fr-combat-orders{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}.fr-combat select,.fr-combat-menu select{max-width:100%;padding:8px;background:#fffdf4;border:1px solid #b8bda8;border-radius:5px;color:inherit}.fr-combat label,.fr-combat-menu label{display:grid;gap:6px;font-size:12px;margin:10px 0}.fr-combat-menu .fr-combat-consent{display:flex;align-items:flex-start;gap:8px;line-height:1.7}.fr-combat-danger{padding:12px;border:1px solid #bc8b57;color:#875327;background:#f8ecdb;line-height:1.8;font-size:12px}.fr-combat-log{margin-top:20px}.fr-combat-log p{font-size:12px;line-height:1.6}.fr-combat-die{display:inline-block;padding:3px 6px;background:#fff8d9;border:1px solid #c2ab6a;border-radius:4px;margin-right:7px;animation:fr-combat-roll .6s ease-out}.fr-combat-result{padding:16px;text-align:center;background:#e9eddf}.fr-combat-result h3{font-size:24px;margin:10px 0}.fr-combat-result p{font-size:12px}.fr-combat-menu .fr-action-grid{margin:12px 0}@keyframes fr-combat-roll{from{transform:rotate(-90deg) scale(.4);opacity:.2}to{transform:rotate(0) scale(1);opacity:1}}@media(max-width:700px){.fr-combat{padding:12px;max-height:80vh}.fr-combat-side article{flex-basis:110px}.fr-combat-orders>*{max-width:100%}}
 .fr-tactical{margin:14px 0}.fr-tactical-scroll{overflow:auto;max-width:100%;padding:3px}.fr-tactical-grid{display:grid;gap:3px;min-width:380px}.fr-tactical-cell{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:45px;min-width:0;padding:2px;border:1px solid #c5c9b8;border-radius:4px;background:#edf0e5;color:#53634b;cursor:pointer}.fr-tactical-cell small{font-size:8px;opacity:.7}.fr-tactical-cell b{font-size:10px;white-space:nowrap;overflow:hidden;max-width:100%}.fr-tactical-cell meter{width:90%;height:6px}.fr-tactical-cell.enemies{background:#f1dacf;color:#823f30}.fr-tactical-cell.players{background:#cfdfd0;color:#294e39}.fr-tactical-cell.companion{background:#d7d5e8;color:#494268}.fr-tactical-cell.wall{background:#747d72;color:#fff}.fr-tactical-cell.cover{background-image:repeating-linear-gradient(45deg,transparent,transparent 4px,#7d8e631e 4px,#7d8e631e 8px)}.fr-tactical-cell.reachable{border-color:#5d8d63;box-shadow:inset 0 0 0 1px #83a77c}.fr-tactical-cell.acting{outline:2px solid #386344}.fr-tactical-cell.selected{outline:3px solid #b98c28}.fr-tactical-cell:focus-visible{outline:3px solid #4b6b9e}@media(max-width:700px){.fr-tactical-grid{min-width:360px}.fr-tactical-cell{min-height:42px}}
 .fr-escort-objective{display:flex;flex-wrap:wrap;gap:8px 14px;padding:12px;margin:12px 0;background:#f1e7cc;border:1px solid #b69c62;border-radius:8px}.fr-escort-objective small{flex-basis:100%;line-height:1.5}.fr-tactical-cell.escort-exit{border:2px solid #b08a29;background:#f6e9b6}.fr-tactical-cell.escort-wagon{background:#ecd29d;border-color:#a47d36;color:#62481a}
+.fr-field-markers{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}.fr-field-marker{font-size:10px;font-weight:700;padding:1px 3px;border-radius:3px;border:1px solid currentColor;line-height:1.2}.fr-field-marker.fire{background:#ffe1bf;color:#813200}.fr-field-marker.frost{background:#d9efff;color:#174d74}.fr-field-marker.poison{background:#e6ead0;color:#465717}.fr-field-marker.storm{background:#ebe1fb;color:#573080}.fr-field-legend p{font-size:12px;line-height:1.5;margin:6px 0}
+.fr-tactical-cell.attack-area{outline:2px dashed #9a7734;outline-offset:-4px;box-shadow:inset 0 0 0 3px #fff0c5}.fr-attack-legend{font-size:13px;color:var(--fr-text,#33473a)}
+.fr-tactical-cell.dash-landing{outline:3px solid #397f82;outline-offset:-4px;box-shadow:inset 0 0 0 4px #d6f0ed}
+.fr-combat-group{padding:12px;border:1px solid var(--fr-line,#cbd5bf);border-radius:12px;background:var(--fr-paper,#faf8ed);margin-block:10px}.fr-combat-group>h3,.fr-combat-log>h3{font-size:15px;line-height:1.4;margin:0 0 10px}.fr-combat-orders .fr-combat-choice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px}.fr-combat-choice-grid .fr-btn{padding:10px;text-align:left;white-space:normal;min-height:44px}.fr-combat-choice-grid .fr-btn[aria-pressed=true]{border-width:2px;background:var(--fr-highlight,#edf3e1)}.fr-combat-choice-grid .fr-btn small{display:block;font-size:12px;line-height:1.5;margin-top:5px}.fr-combat-log{max-height:240px;overflow:auto;padding:12px;border-top:1px solid var(--fr-line,#cbd5bf)}@media(max-width:440px){.fr-combat-orders .fr-combat-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.fr-combat-group{padding:9px}}
+.fr-combat-group .fr-combat-choice-grid{max-height:320px;overflow:auto;align-content:start;scrollbar-gutter:stable}.fr-combat-choice-grid .fr-btn small{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}.fr-combat-skill-summary{padding:10px 12px;border-radius:10px;background:var(--fr-paper,#f6f1e1);font-size:14px;line-height:1.7}
+
+/* 戦場と操作欄を分け、操作中も地図を表示する。 */
+.fr-combat{box-sizing:border-box;min-width:0;min-height:0}
+.fr-combat-orders{display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch;gap:10px}
+.fr-combat-orders>*{min-width:0;max-width:100%;box-sizing:border-box}
+.fr-combat-orders .fr-combat-group{margin:0}
+.fr-combat-orders label{display:grid;gap:6px;font-size:13px}
+.fr-combat-orders select{width:100%;max-width:100%;box-sizing:border-box;padding:8px;background:var(--fr-paper,#fffdf4);border:1px solid #b8bda8;border-radius:5px;color:inherit}
+.fr-combat-selected-target{display:grid;gap:5px;line-height:1.6;padding:10px 12px;margin:0;background:var(--fr-paper,#f6f1e1);border:1px solid #c9c5af;border-radius:10px}
+.fr-combat-selected-target span{font-size:12px}
+.fr-tactical-cell.targetable{cursor:pointer}
+.fr-tactical-cell.targetable:hover,.fr-tactical-cell.targetable:focus-visible{outline:2px solid #718f76;outline-offset:-2px}
+.fr-tactical-cell.selected{outline:3px solid #a48339;outline-offset:-3px;box-shadow:inset 0 0 0 2px #fff8d9}
+.fr-combat-detail .fr-combat-sidebar{min-height:0;overflow:auto;padding:18px;scrollbar-gutter:stable}
+.fr-in-combat .fr-center>.fr-combat{flex:1;max-height:none;overflow:auto}
+.fr-in-combat .fr-map-caption,.fr-in-combat .fr-latest{display:none}
+@container(max-width:620px){.fr-game-layout.fr-in-combat{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);overflow:hidden}.fr-in-combat .fr-center{height:auto;min-height:0}.fr-in-combat .fr-combat-detail{min-height:0;overflow:hidden}.fr-combat-detail .fr-combat-sidebar{padding:10px}.fr-in-combat .fr-combat{padding:10px}.fr-in-combat .fr-tactical-cell{min-height:32px}}
+
+/* 可変の説明文は操作側の固定枠に収め、地図を押し下げない。 */
+.fr-combat-guide{height:144px;box-sizing:border-box;overflow:auto;scrollbar-gutter:stable;overflow-anchor:none;padding:10px 12px;border:1px solid #c9c5af;border-radius:10px;background:var(--fr-paper,#f6f1e1);font-size:13px;line-height:1.6}
+.fr-combat-guide p{margin:0 0 7px}
+.fr-combat-guide p:last-child{margin-bottom:0}
+.fr-combat-guide .fr-guide-attack{color:var(--fr-ink,#3e4937)}
+.fr-combat-guide .fr-guide-landing{color:var(--fr-ink,#3e4937)}
+.fr-combat,.preview-battle{overflow-anchor:none;scrollbar-gutter:stable}
+
+.fr-tactical-stage{position:relative;isolation:isolate;min-width:380px}
+.fr-tactical-stage .fr-tactical-grid{min-width:0;grid-template-rows:repeat(var(--fr-board-height),minmax(45px,1fr))}
+.fr-tactical-tokens,.fr-combat-effects{position:absolute;inset:0;pointer-events:none}
+.fr-tactical-tokens{z-index:2}
+.fr-tactical-token{position:absolute;box-sizing:border-box;left:0;top:0;transform:translate(calc((100% + 3px)*var(--fr-token-x)),calc((100% + 3px)*var(--fr-token-y)));width:calc((100% - (var(--fr-board-width) - 1)*3px)/var(--fr-board-width));height:calc((100% - (var(--fr-board-height) - 1)*3px)/var(--fr-board-height));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid #628572;border-radius:7px;background:linear-gradient(155deg,#e9f6e4,#b2cfbb);color:#234832;box-shadow:0 2px 4px #243b2d30,inset 0 1px #ffffffb0;transition:transform 130ms linear}
+.fr-tactical-stage.replaying .fr-tactical-token{will-change:transform}
+.fr-tactical-stage .fr-tactical-cell{position:relative}
+.fr-tactical-stage .fr-field-markers{position:absolute;right:1px;bottom:0;z-index:3;max-width:100%;pointer-events:none}
+.fr-tactical-stage .fr-field-marker{font-size:8px;padding:0 1px}
+.fr-tactical-token.enemies{border-color:#b9866c;background:linear-gradient(155deg,#ffecdd,#e5b3a1);color:#783c2c}
+.fr-tactical-token.companion{border-color:#9386b8;background:linear-gradient(155deg,#eee9fa,#c9c3e1);color:#494268}
+.fr-tactical-token.escort-wagon{background:linear-gradient(155deg,#fff1be,#d2ae67);border-color:#a47d36;color:#62481a}
+.fr-tactical-token.acting{outline:2px solid #386344;outline-offset:-2px}
+.fr-tactical-token.attack-area{outline:2px dashed #9a7734;outline-offset:-3px}
+.fr-tactical-token.selected{outline:3px solid #a48339;outline-offset:-3px;box-shadow:inset 0 0 0 4px #fff8d9}
+.fr-tactical-token.down{opacity:.55;filter:grayscale(.7)}
+.fr-tactical-token b{font-size:10px;max-width:100%;overflow:hidden;white-space:nowrap}
+.fr-tactical-token meter{width:85%;height:6px;accent-color:#527d5a}
+.fr-tactical-token.enemies meter{accent-color:#a15b45}
+.fr-tactical-token.carrying{border-style:double;border-width:3px;padding-bottom:10px}
+.fr-tactical-carry-mark{position:absolute;bottom:1px;max-width:100%;overflow:hidden;white-space:nowrap;font-size:8px;font-weight:700;color:#5d482d}
+.fr-tactical-patients{position:absolute;inset:0;z-index:3;pointer-events:none}
+.fr-tactical-patient-slot{position:absolute;left:0;top:0;width:calc((100% - (var(--fr-board-width) - 1)*3px)/var(--fr-board-width));height:calc((100% - (var(--fr-board-height) - 1)*3px)/var(--fr-board-height));transform:translate(calc((100% + 3px)*var(--fr-token-x)),calc((100% + 3px)*var(--fr-token-y)));transition:transform 130ms linear;display:flex;align-items:flex-end;justify-content:center}
+.fr-tactical-patient{pointer-events:auto;box-sizing:border-box;min-height:25px;max-width:100%;overflow:hidden;white-space:nowrap;padding:2px 3px;border:1px solid #b08c42;border-radius:5px;background:#fff3cc;color:#694b21;font-size:9px;font-weight:700;cursor:pointer;box-shadow:0 1px 3px #3e36142e}
+.fr-tactical-patient:disabled{opacity:1;cursor:default;background:#ede7d6;color:#665e4c;border-color:#bbb39b}
+.fr-tactical-patient:not(:disabled){outline:2px solid #ba9643;outline-offset:-2px}
+.fr-tactical-patient[aria-pressed=true]{outline:3px solid #96681d;background:#fff8dd}
+.fr-tactical-patient:focus-visible{outline:3px solid #4b6b9e;outline-offset:1px}
+.fr-tactical-patient-slot.carried .fr-tactical-patient{border-color:#708a5b;background:#eaf1d9;color:#3f5731}
+.fr-guide-carry{color:#66502e}
+.fr-tactical-stage.replaying .fr-tactical-cell{cursor:wait}
+.fr-tactical-replay-controls{height:32px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:#53634b}
+.fr-tactical-replay-controls>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.fr-tactical-skip:focus-visible{outline:3px solid #4b6b9e;outline-offset:2px}
+.fr-combat-effects{z-index:4;overflow:hidden;border-radius:5px;--fr-fx-color:#fff2bd;--fr-fx-glow:#c09235}
+.fr-combat-effect-map{position:absolute;inset:0;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 0 4px var(--fr-fx-glow))}
+.fr-fx-fire{--fr-fx-color:#ffb461;--fr-fx-glow:#e95e22}
+.fr-fx-frost{--fr-fx-color:#e3fcff;--fr-fx-glow:#5cb4de}
+.fr-fx-storm{--fr-fx-color:#efe4ff;--fr-fx-glow:#965cec}
+.fr-fx-poison{--fr-fx-color:#d5ee83;--fr-fx-glow:#6c9c38}
+.fr-fx-alchemy{--fr-fx-color:#c8f5cf;--fr-fx-glow:#4eae92}
+.fr-fx-trail{fill:none;stroke:var(--fr-fx-color);stroke-width:5;stroke-linecap:round;stroke-dasharray:1;animation:fr-fx-travel .32s ease-out both}
+.fr-fx-missile{fill:#fffdf1;stroke:var(--fr-fx-glow);stroke-width:4}
+.fr-fx-hit{transform-box:fill-box;transform-origin:center;animation:fr-fx-impact .3s ease-out both}
+.fr-fx-flight+.fr-fx-hit,.fr-fx-flight~g .fr-fx-hit{animation-delay:.13s}
+.fr-fx-ring{fill:none;stroke:var(--fr-fx-color);stroke-width:3;opacity:.85}
+.fr-fx-cut{fill:#fffced;stroke:var(--fr-fx-glow);stroke-width:1.5}
+.fr-fx-bolt{fill:none;stroke:var(--fr-fx-color);stroke-width:9;stroke-linejoin:bevel}
+.fr-fx-crystal{fill:none;stroke:var(--fr-fx-color);stroke-width:4;stroke-linecap:round}
+.fr-fx-bloom{fill:var(--fr-fx-color);opacity:.7}
+.fr-fx-alchemy .fr-fx-bloom{animation:fr-fx-bubbles .42s ease-out both}
+.fr-fx-sacred-seal{fill:none;stroke:#fff5c1;stroke-width:2;animation:fr-fx-seal 1.5s ease-out both;transform-box:fill-box;transform-origin:center}
+.fr-fx-sacred-blade{stroke-width:7;stroke:#fffefa}
+.fr-fx-holy-site{position:absolute;left:var(--fr-fx-x);top:var(--fr-fx-y);width:1px;height:1px}
+.fr-fx-halo{position:absolute;width:140px;height:58px;left:-70px;top:-29px;border:2px solid #fff2b3;border-radius:50%;box-shadow:0 0 12px #ffd985,inset 0 0 18px #fff0a8;background:radial-gradient(ellipse,#fffbdc80,transparent 70%);animation:fr-fx-halo 1.5s ease-out both}
+.fr-fx-pillar,.fr-fx-pillar-core{position:absolute;bottom:0;left:-35px;width:70px;height:700px;transform-origin:bottom;background:linear-gradient(90deg,transparent,#ffedaa99 22%,#fffdf3d9 50%,#ffdf9080 78%,transparent);mask-image:linear-gradient(0deg,#000,transparent);animation:fr-fx-pillar 1.5s ease-out both}
+.fr-fx-pillar-core{left:-10px;width:20px;background:linear-gradient(90deg,transparent,#fff,transparent);filter:blur(2px)}
+.fr-fx-motes{position:absolute;inset:0}
+.fr-fx-motes i{position:absolute;left:var(--fr-mote-x);bottom:0;width:3px;height:3px;border-radius:50%;background:#fffde8;box-shadow:0 0 5px 2px #ffdc91;animation:fr-fx-mote 1.3s var(--fr-mote-delay) ease-out both}
+.fr-fx-announcement{position:absolute;left:50%;top:8%;transform:translateX(-50%);width:min(84%,480px);box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 20px;border-block:1px solid #ffe8a780;background:linear-gradient(90deg,transparent,#25322ee8 18%,#25322ee8 82%,transparent);color:#fff5d2;text-align:center;text-shadow:0 1px 4px #132019;animation:fr-fx-announcement 1.5s ease-out both}
+.fr-fx-announcement>span{font-size:10px;letter-spacing:.22em;color:#f4d98d}
+.fr-fx-announcement strong{font-size:clamp(14px,2.6vw,23px);font-weight:600}
+.fr-fx-announcement small{font-size:11px;color:#f3eedf}
+.fr-fx-last-dawn{background:radial-gradient(ellipse at 50% 75%,#ffe7a02b,transparent 70%);animation:fr-fx-dawn-light 3.2s ease-out both}
+.fr-fx-last-dawn .fr-fx-pillar{width:180px;left:-90px;background:linear-gradient(90deg,transparent,#f9d89450 12%,#fff4ccbf 35%,#ffffffed 50%,#fff1c5bf 65%,#f9d89450 88%,transparent);animation-duration:3.2s}
+.fr-fx-last-dawn .fr-fx-pillar-core{width:40px;left:-20px;animation-duration:3.2s}
+.fr-fx-last-dawn .fr-fx-halo{width:230px;height:90px;left:-115px;top:-45px;border-width:3px;box-shadow:0 0 30px #fff1a5,inset 0 0 30px #fff5c6;animation-duration:3.2s}
+.fr-fx-last-dawn .fr-fx-sacred-seal,.fr-fx-last-dawn .fr-fx-announcement{animation-duration:3.2s}
+.fr-fx-last-dawn .fr-fx-motes i{width:4px;height:4px;animation-duration:2.5s}
+.fr-fx-last-dawn-quote{position:absolute;inset:40% 8% auto;display:flex;justify-content:center;text-align:center;color:#fff9e8;font-family:Georgia,'Noto Serif KR','Noto Serif JP',serif;font-size:clamp(15px,2.7vw,24px);font-weight:600;line-height:1.9;letter-spacing:.04em;text-shadow:0 2px 4px #192820,0 0 20px #b49651;animation:fr-fx-quote 3.2s ease-out both}
+.fr-fx-last-dawn-quote span{padding:12px 18px;border-radius:12px;background:#23352dbe;box-shadow:0 0 25px #fff0ad20}
+.fr-fx-sacred-severance .fr-fx-pillar{transform:rotate(16deg)}
+.fr-fx-return-lantern .fr-fx-halo{border-radius:35%;background:#ffe8a64d}
+.fr-fx-divide-calamity .fr-fx-halo{border-style:double;border-width:6px}
+.fr-fx-burden-wounds{--fr-fx-glow:#d29d9b}
+.fr-fx-ultimate{color:var(--fr-fx-color);background:radial-gradient(ellipse at center,#20342b12,transparent 65%)}
+.fr-fx-ultimate-seal{fill:none;stroke:var(--fr-fx-color);stroke-width:3;transform-box:fill-box;transform-origin:center;animation:fr-fx-ultimate-seal var(--fr-ultimate-duration) ease-out both}
+.fr-fx-ultimate-strike{fill:var(--fr-fx-color);stroke:#fffce6;stroke-width:1.5}
+.fr-fx-ultimate-arrow{stroke-width:4;animation:fr-fx-ultimate-arrow .55s ease-out both}
+.fr-fx-ultimate-nova{fill:var(--fr-fx-color);stroke:#fffef0;stroke-width:1;transform-box:fill-box;transform-origin:center;animation:fr-fx-ultimate-nova var(--fr-ultimate-duration) ease-out both}
+.fr-fx-ultimate-shock{stroke-width:5;stroke-dasharray:14 5}
+.fr-fx-ultimate-ward{fill:#f0f6ff30;stroke-width:4;filter:drop-shadow(0 0 8px var(--fr-fx-color))}
+.fr-fx-ultimate-rally{stroke-width:4}
+.fr-fx-ultimate-shadow{fill:#352d4d8c;stroke-width:4;filter:drop-shadow(10px 5px 3px #22163360)}
+.fr-fx-ultimate .fr-fx-announcement{animation-duration:var(--fr-ultimate-duration);border-color:var(--fr-fx-color)}
+.fr-fx-ultimate .fr-fx-announcement>span{color:var(--fr-fx-color)}
+.fr-miracle-ready{position:relative;border-color:#b79840!important;background-image:linear-gradient(125deg,#fffdf1,#fbf0cb)!important;box-shadow:0 0 0 1px #edce77,inset 0 0 13px #f9e9a8;animation:fr-miracle-ready 2.4s ease-in-out infinite}
+.fr-miracle-ready:focus-visible{outline:3px solid #9d7a24;outline-offset:3px}
+@keyframes fr-fx-travel{0%{stroke-dashoffset:1;opacity:.2}65%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+@keyframes fr-fx-impact{0%{opacity:0;scale:.35}30%{opacity:1;scale:1.15}100%{opacity:0;scale:1.7}}
+@keyframes fr-fx-bubbles{0%{translate:0 10px;opacity:.2}40%{opacity:.9}100%{translate:0 -18px;opacity:0}}
+@keyframes fr-fx-seal{0%{opacity:0;scale:.4}20%,65%{opacity:1;scale:1}100%{opacity:0;scale:1.25}}
+@keyframes fr-fx-halo{0%{opacity:0;scale:.3}22%,65%{opacity:1;scale:1}100%{opacity:0;scale:1.65}}
+@keyframes fr-fx-pillar{0%{opacity:0;scale:.1 1}20%,65%{opacity:1;scale:1 1}100%{opacity:0;scale:1.7 1}}
+@keyframes fr-fx-mote{0%{opacity:0;translate:0 10px}20%{opacity:1}100%{opacity:0;translate:calc(var(--fr-mote-x)*.8) -140px}}
+@keyframes fr-fx-announcement{0%,5%{opacity:0;translate:0 8px}18%,76%{opacity:1;translate:0 0}100%{opacity:0;translate:0 -5px}}
+@keyframes fr-fx-dawn-light{0%,100%{box-shadow:inset 0 0 0 0 transparent}35%,65%{box-shadow:inset 0 0 90px 15px #fff0ad66}}
+@keyframes fr-fx-quote{0%,18%{opacity:0;translate:0 8px}32%,82%{opacity:1;translate:0 0}100%{opacity:0;translate:0 -5px}}
+@keyframes fr-miracle-ready{0%,100%{box-shadow:0 0 0 1px #edce77,inset 0 0 13px #f9e9a8}50%{box-shadow:0 0 11px 1px #e9ca7290,inset 0 0 20px #fff1b2}}
+@keyframes fr-fx-ultimate-seal{0%{opacity:0;scale:.35}24%,65%{opacity:1;scale:1}100%{opacity:0;scale:1.3}}
+@keyframes fr-fx-ultimate-nova{0%{rotate:-25deg;scale:.2}55%{rotate:0deg;scale:1.25}100%{rotate:15deg;scale:1.4}}
+@keyframes fr-fx-ultimate-arrow{0%{translate:10px -80px;opacity:0}40%{translate:0 0;opacity:1}100%{translate:0 0;opacity:0}}
+@media(max-width:700px){.fr-tactical-stage{min-width:360px}.fr-tactical-stage .fr-tactical-grid{grid-template-rows:repeat(var(--fr-board-height),minmax(42px,1fr))}}
+@container(max-width:620px){.fr-tactical-stage .fr-tactical-grid{grid-template-rows:repeat(var(--fr-board-height),minmax(32px,1fr))}}
+@media(prefers-reduced-motion:reduce){.fr-tactical-token,.fr-tactical-patient-slot{transition:none;will-change:auto}.fr-combat-effects{animation:none;background:none}.fr-fx-holy-site{display:none}.fr-fx-announcement,.fr-fx-last-dawn-quote{animation:none}.fr-miracle-ready{animation:none}}
+
+.fr-fx-dawn-screen-quote{position:fixed;inset:0;z-index:1100;align-items:center;pointer-events:none;padding:24px;box-sizing:border-box}
+
+/* 見出しは固定行に置き、演出による地図の移動や遮蔽を避ける。 */
+.fr-tactical-cast-caption{height:34px;min-height:34px;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:3px 8px;margin-bottom:4px;overflow:hidden;border-bottom:1px solid #d4d6c4;color:var(--fr-ink,#334a3d);font-size:12px;line-height:1.4}
+.fr-tactical-cast-caption>span{flex:none;font-size:9px;letter-spacing:.08em;color:#9a7b38}
+.fr-tactical-cast-caption>strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600}
+.fr-tactical-cast-caption>small{margin-left:auto;flex:none;font-size:10px;color:#74816a;max-width:28%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fr-tactical-cast-caption:not(.active){border-color:transparent}
+.fr-tactical-cell.enemy-danger::after{content:'';position:absolute;inset:1px;z-index:4;border:2px dashed #a44c28;border-radius:3px;background:repeating-linear-gradient(135deg,#e8a7443b 0 5px,#b4472829 5px 9px);pointer-events:none}
+.fr-enemy-danger-marker{position:absolute;left:2px;top:2px;z-index:4;min-width:15px;padding:0 2px;box-sizing:border-box;border-radius:3px;background:#8c3524;color:#fff5dd;font-size:11px;font-weight:700;line-height:15px;pointer-events:none}
+.fr-tactical-replay-controls.enemy-warning{color:#8a3c24;font-weight:600}
+.fr-tactical-replay-controls.enemy-warning>span{overflow-x:auto;text-overflow:clip;scrollbar-width:thin}
+.fr-tactical-cell.dash-attempt{border-color:#b18739;box-shadow:inset 0 0 0 1px #c7a75d;background-color:#f5e6bc}
+.fr-tactical-cell.dash-attempt::before{content:'?';position:absolute;right:3px;top:1px;color:#78551f;font-size:11px;font-weight:700;pointer-events:none}
+.fr-tactical-replay-controls.move-preview>span{overflow-x:auto;text-overflow:clip;scrollbar-width:thin}
+.fr-fx-charge-rune{transform-box:fill-box;transform-origin:center;animation:fr-enemy-charge 900ms ease-in-out both}
+.fr-fx-area-release{animation:fr-area-release var(--fr-fx-duration,700ms) ease-out both}
+@keyframes fr-enemy-charge{0%,100%{opacity:.3}50%{opacity:.85}}
+@keyframes fr-area-release{0%{opacity:.2}30%{opacity:.85}100%{opacity:0}}
+.fr-combat-effects.reduced-motion svg *{animation:none!important;transition:none!important}
+@media(prefers-reduced-motion:reduce){.fr-fx-charge-rune,.fr-fx-area-release{animation:none}}
+
+/* 通常攻撃は等級ごとに残像と衝撃波だけを増やし、文字は盤面に重ねない。 */
+.fr-combat-effects{z-index:5;overflow:hidden;border-radius:8px}
+.fr-combat-effects>svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 0 4px var(--fr-fx-glow,#e3c784))}
+.fr-fx-shot-trail,.fr-fx-shot-echo{stroke-dasharray:1200;stroke-dashoffset:1200;animation:fr-physical-flight var(--fr-fx-duration,700ms) ease-out both;stroke-linecap:round}
+.fr-fx-shot-echo{animation-delay:50ms;opacity:.55}
+.fr-fx-shot-head{animation:fr-physical-glint var(--fr-fx-duration,700ms) ease-out both}
+.fr-fx-cut,.fr-fx-cut-edge,.fr-fx-cut-follow{transform-box:fill-box;transform-origin:center;animation:fr-physical-cut var(--fr-fx-duration,700ms) cubic-bezier(.15,.8,.2,1) both}
+.fr-fx-cut-follow{animation-delay:65ms;opacity:.65}
+.fr-fx-lance,.fr-fx-lance-core,.fr-fx-lance-lines{transform-origin:0 0;animation:fr-physical-thrust var(--fr-fx-duration,700ms) ease-out both}
+.fr-fx-impact-star,.fr-fx-impact-core{transform-origin:0 0;animation:fr-physical-impact var(--fr-fx-duration,700ms) ease-out both}
+.fr-fx-physical-ring{transform-origin:0 0;animation:fr-physical-ring var(--fr-fx-duration,700ms) ease-out both}
+.fr-fx-physical-spark{animation:fr-physical-spark var(--fr-fx-duration,700ms) ease-out both}
+.fr-fx-miss{position:absolute;translate:-50% -50%;font-size:12px;font-weight:600;color:#5d6461;background:#fffff3df;border:1px solid #d5d4bf;border-radius:6px;padding:3px 8px;animation:fr-physical-glint var(--fr-fx-duration,700ms) ease-out both}
+.fr-fx-last-dawn{animation-duration:var(--fr-fx-duration,4400ms);background:radial-gradient(ellipse at 50% 75%,#ffe7a018,transparent 70%)}
+.fr-fx-dawn-screen-quote{display:flex;justify-content:center;animation:fr-dawn-quiet-quote var(--fr-fx-duration,4400ms) ease-out both}
+.fr-fx-dawn-screen-quote>span{max-width:min(640px,82vw);box-sizing:border-box;padding:9px 16px;border:1px solid #d1b66599;border-radius:10px;background:#fff6e0e8;box-shadow:0 0 25px #fff1c17a;color:#52452c;text-align:center;font-size:clamp(14px,1.35vw,19px);line-height:1.6;letter-spacing:.02em;text-shadow:0 1px #ffffff}
+@keyframes fr-physical-flight{0%{stroke-dashoffset:1200;opacity:0}12%{opacity:1}48%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+@keyframes fr-physical-glint{0%,25%{opacity:0}42%,65%{opacity:1}100%{opacity:0}}
+@keyframes fr-physical-cut{0%{opacity:0;scale:.3;rotate:-32deg}22%{opacity:1}48%{scale:1;rotate:0deg;opacity:.95}100%{scale:1.2;rotate:12deg;opacity:0}}
+@keyframes fr-physical-thrust{0%{opacity:0;translate:-90px 0;scale:.4 1}28%{opacity:1}52%{translate:0 0;scale:1 1;opacity:1}100%{translate:20px 0;opacity:0}}
+@keyframes fr-physical-impact{0%{opacity:0;scale:.2}35%{opacity:1;scale:1.15}100%{opacity:0;scale:1.6}}
+@keyframes fr-physical-ring{0%,18%{opacity:0;scale:.25}36%{opacity:.8}100%{opacity:0;scale:2.1}}
+@keyframes fr-physical-spark{0%,24%{opacity:0;translate:0 0}36%{opacity:1}100%{opacity:0;translate:var(--fr-spark-x) var(--fr-spark-y)}}
+@keyframes fr-dawn-quiet-quote{0%,8%{opacity:0;translate:0 6px}20%,78%{opacity:1;translate:0 0}95%,100%{opacity:0;translate:0 -3px}}
+@media(prefers-reduced-motion:reduce){
+ .fr-combat-effects>svg{display:block;filter:none;opacity:.7}
+ .fr-combat-effects svg *{animation:none!important;transition:none!important}
+ .fr-fx-shot-trail,.fr-fx-shot-echo{stroke-dashoffset:0;opacity:.5}
+ .fr-fx-physical-spark{display:none}
+ .fr-fx-dawn-screen-quote{animation:none;opacity:1;translate:none}
+}
+
+/* 最後の夜明けだけは技名と祈りを画面中央に表示する。 */
+.fr-fx-dawn-screen-title{display:block;margin-bottom:7px;font-size:clamp(23px,2.4vw,34px);line-height:1.35;font-weight:600;letter-spacing:.09em;color:#806626;text-shadow:0 1px 0 #fffefa,0 0 16px #f6d984}
+.fr-fx-dawn-screen-quote>span{padding:16px 24px;background:linear-gradient(100deg,#fff8e7dd,#fff8e7f2,#fff8e7dd);box-shadow:0 0 36px #f6d98466}
+.fr-fx-dawn-screen-quote>span>span{display:block}
+
+.fr-last-dawn-confirm{width:min(32rem,calc(100vw - 2rem));box-sizing:border-box;border:1px solid #ccbda3;border-radius:1rem;background:#fffaf0;color:#373c36;padding:1.5rem;box-shadow:0 1rem 4rem #202d2b40;line-height:1.8;max-height:calc(100dvh - 2rem);overflow:auto}.fr-last-dawn-confirm::backdrop{background:#1b292880}.fr-last-dawn-confirm h2{font-size:1.2rem;margin:0 0 1rem}.fr-last-dawn-confirm>div{display:flex;flex-wrap:wrap;gap:.75rem;justify-content:flex-end}.fr-last-dawn-confirm .fr-last-dawn-sacrifice{background:#f5dfda;color:#702b22;border-color:#aa7064}.fr-skill-gloss{display:block;line-height:1.55;max-width:36rem;white-space:normal}
+.fr-combat-contribution{text-align:left;margin:12px 0;padding:8px;border:1px solid #bbc3aa;border-radius:6px}.fr-combat-contribution summary{cursor:pointer;min-height:44px;line-height:44px;font-weight:600}.fr-combat-contribution summary:focus-visible{outline:2px solid currentColor;outline-offset:3px}.fr-combat-contribution ul{list-style:none;padding:0;margin:8px 0}.fr-combat-contribution li{padding:8px 0;border-top:1px solid #bbc3aa}.fr-combat-contribution dl{display:flex;flex-wrap:wrap;gap:6px 16px;margin:6px 0}.fr-combat-contribution dl div{display:flex;gap:6px;font-size:12px}.fr-combat-contribution dd{margin:0;font-variant-numeric:tabular-nums;font-weight:600}
+.fr-tactical-naval{--fr-sea:#214e5c;--fr-sea-light:#91bec2;--fr-deck:#e1c393;--fr-deck-line:#a28151}
+.fr-naval-guide{margin:0 0 10px;padding:11px 13px;border:1px solid #adbdaf;border-radius:9px;background:#edf1e8;color:#344e43;font-size:13px;line-height:1.6}
+.fr-naval-guide p{margin:7px 0 5px;max-width:76ch}.fr-naval-guide>small{display:block;font-size:12px;color:#4c5b47}
+.fr-naval-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}.fr-naval-legend>b{margin-right:auto;font-size:14px}
+.fr-naval-legend>span{display:flex;align-items:center;gap:6px;font-size:12px}.fr-naval-legend>span::before{content:"";width:12px;height:12px;border:1px solid #a28151;border-radius:2px;background:var(--fr-deck)}.fr-naval-legend>.water::before{background:var(--fr-sea);border-color:#4e7a82}
+.fr-tactical-naval .fr-tactical-stage{border:2px solid #4a6a69;border-radius:10px;background:var(--fr-sea);box-shadow:0 3px 8px #233c3320}
+.fr-tactical-naval .fr-tactical-cell.naval-deck{border-color:var(--fr-deck-line);background:repeating-linear-gradient(0deg,transparent 0 13px,#9b774629 13px 14px),linear-gradient(110deg,#eddbb6,var(--fr-deck));color:#79603c}
+.fr-tactical-naval .fr-tactical-cell.naval-water{border-color:#456f79;background:radial-gradient(ellipse at 50% 95%,#87b6ba24,transparent 70%),var(--fr-sea);color:var(--fr-sea-light)}
+.fr-tactical-naval .fr-tactical-cell.naval-water>b{font:400 22px Georgia,serif;opacity:.6}
+.fr-tactical-naval .fr-tactical-cell.naval-rail{border-right:4px solid #785b37;box-shadow:2px 0 #d1b579}
+.fr-tactical-naval .fr-tactical-cell.naval-deck.cover{background-image:repeating-linear-gradient(45deg,transparent 0 5px,#6b633333 5px 8px),linear-gradient(110deg,#eddbb6,var(--fr-deck))}
+.fr-tactical-naval .fr-tactical-cell.naval-deck.enemy-danger{background:#e7b7a1;border-color:#ad5341}.fr-tactical-naval .fr-tactical-cell.naval-water.enemy-danger{background:#5a5759;border-color:#d6a080}
+.fr-tactical-naval .fr-tactical-cell.reachable{border-color:#88b790}
+.fr-tactical-naval .fr-tactical-cell.selected{outline-color:#f9db83}.fr-tactical-naval .fr-tactical-cell:focus-visible{outline-color:#fff3ac;outline-offset:-3px}
+.fr-naval-tethers{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:visible}
+.fr-naval-tethers path{fill:none;stroke:#b6a9b9;stroke-width:.12;stroke-linecap:round;opacity:.6;filter:drop-shadow(0 .05px .03px #182f3e)}
+.fr-tactical-token.naval-body{border:2px solid #8cb5c3;border-radius:42% 42% 30% 30%;background:linear-gradient(145deg,#6b7f99,#2c435b);color:#f4eece;box-shadow:0 0 0 3px #89c3c32b,0 3px 8px #102d43a0}
+.fr-tactical-token.naval-appendage{border-color:#736b80;border-radius:40% 40% 8px 8px;background:linear-gradient(150deg,#e2d4dc,#a5a1ba);color:#333e53}
+.fr-tactical-token.naval-boarder{border-color:#a86f4f;background:linear-gradient(145deg,#f1d6b0,#bf916b);color:#563d2b}
+.fr-tactical-token.naval-body b,.fr-tactical-token.naval-appendage b,.fr-tactical-token.naval-boarder b{text-overflow:ellipsis}
+.fr-naval-role{font-size:7px;line-height:1;letter-spacing:.04em;font-weight:700;max-width:100%;white-space:nowrap;overflow:hidden}
+.fr-tactical-token.naval-body meter{accent-color:#c7b87a}.fr-tactical-token.naval-appendage meter{accent-color:#665a7a}
+.fr-naval-equipment{background:#eee6d5;border-color:#bcac84}.fr-naval-equipment>.fr-btn{width:100%;text-align:left;padding:10px 12px;min-height:44px;white-space:normal}.fr-naval-equipment>.fr-btn>small{display:block;margin-top:4px;font-size:12px;line-height:1.5}.fr-naval-equipment>.fr-btn[aria-pressed=true]{border:2px solid #8e7541;background:#fff4d5}
+.fr-combat-orders.naval .fr-combat-action-picker .fr-combat-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.fr-combat-orders.naval>.fr-combat-guide{height:auto;min-height:64px}.fr-combat-orders.naval .fr-guide-attack[aria-hidden=true],.fr-combat-orders.naval .fr-guide-landing[aria-hidden=true]{display:none}
+.fr-tactical-naval .fr-tactical-replay-controls.enemy-warning{height:auto;min-height:32px;padding-block:4px}.fr-tactical-naval .fr-tactical-replay-controls.enemy-warning>span{white-space:normal;line-height:1.5;overflow-wrap:anywhere}
+@media(max-width:440px){.fr-naval-guide{padding:9px;font-size:12px}.fr-naval-legend{gap:6px 10px}.fr-naval-legend>b{flex-basis:100%}.fr-tactical-naval .fr-tactical-stage{min-width:300px}.fr-tactical-token.naval-body,.fr-tactical-token.naval-appendage{gap:2px}}

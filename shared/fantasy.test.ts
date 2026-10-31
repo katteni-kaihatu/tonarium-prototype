@@ -1,17 +1,24 @@
+import { FANTASY_FRONTIER_BASE, FANTASY_FRONTIER_DEPARTURE } from './fantasy-frontier-data.ts';
+import {fantasyWorldSituationalBonus} from './fantasy-situational.ts';
+import {fantasyBodyStatModifiers} from './fantasy-body-diversity.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { applyFantasyAction, fantasyEventEligible, fantasyQuestEligible, fantasySkills, fantasyStats, fantasyTransports, newFantasyProfile, startFantasyActivity, advanceFantasyWorld } from './fantasy-engine.ts';
 import { FANTASY_BODY_TRAITS, FANTASY_CONTEXT_NAMES, FANTASY_RACE_BODY_TRAITS, fantasyBodyTraits, fantasyContextBonus } from './fantasy-physiology.ts';
 import { FANTASY_EVENTS, FANTASY_ITEMS, FANTASY_JOBS, FANTASY_LOCATIONS, FANTASY_QUESTS, FANTASY_RACES, FANTASY_RACE_FAMILIES, FANTASY_RECIPES, FANTASY_ROUTES } from './fantasy-data.ts';
 import type { FantasyAction, FantasyCheckContext, FantasyProfile } from './fantasy.ts';
-import { canBuyItem, FANTASY_MAPS } from './fantasy-town.ts';
+import { canBuyItem, FANTASY_MAPS, fantasyBuildings, fantasyCraftFacility } from './fantasy-town.ts';
 import { fantasyHostileEncounter } from './fantasy-encounters.ts';
 import { fantasyMainTrial } from './fantasy-main-trials.ts';
 import { FANTASY_FINAL_ISLE_ID } from './fantasy-isle-access.ts';
+import { FANTASY_MAP_MERCHANT_EVENT } from './fantasy-map-merchant.ts';
+import { fantasyTravelBurden } from './fantasy-travel-burden.ts';
+import { fantasyEnvironmentPenalty } from './fantasy-environment.ts';
 
 const high = () => 0.999;
 const low = () => 0;
 function required<T>(value: T | undefined): T { assert.notEqual(value, undefined); return value!; }
+const sameHours = (actual: number, expected: number, label = '') => assert.ok(Math.abs(actual - expected) < 1e-10, `${label}: ${actual} !== ${expected}`);
 function action(profile: FantasyProfile, command: FantasyAction, rng = high) {
   const original = structuredClone(profile);
   const result = applyFantasyAction(profile, command, rng);
@@ -25,6 +32,8 @@ function action(profile: FantasyProfile, command: FantasyAction, rng = high) {
 function game(job = 'adventurer') {
   const profile = action(newFantasyProfile(), { type: 'create', name: '旅人', gender: 'female', source: 'human', job });
   profile.character!.birthBonuses = {};
+  profile.character!.job = job;
+  profile.character!.jobXp[job] = 0;
   profile.character!.hp = fantasyStats(profile.character!).hp;
   profile.character!.mp = fantasyStats(profile.character!).mp;
   profile.character!.inventory['rain-cape'] = 1;
@@ -129,11 +138,12 @@ test('全種族の能力・最大HP/MP・4つのスキルが計算できる', ()
     const p = newFantasyProfile();
     p.draft.kept = race.id;
     const c = action(p, { type: 'create', name: race.name, gender: 'female', source: 'kept', job: 'adventurer' }).character!;
-    c.job = 'adventurer'; c.jobXp.adventurer = 0;
+    const born = fantasyStats(c); assert.equal(c.hp, born.hp); assert.equal(c.mp, born.mp);
+    c.job = 'adventurer'; c.jobXp.adventurer = 0; c.hp = fantasyStats(c).hp; c.mp = fantasyStats(c).mp;
     const stats = fantasyStats(c);
     assert.equal(c.hp, stats.hp);
     assert.equal(c.mp, stats.mp);
-    assert.equal(stats.strength, 10 + (race.modifiers.strength ?? 0) + (c.birthBonuses?.strength ?? 0));
+    assert.equal(stats.strength, 10 + (race.modifiers.strength ?? 0) + (fantasyBodyStatModifiers(c).strength??0) + (c.birthBonuses?.strength ?? 0));
     assert.equal(fantasySkills(c).length, 4);
     assert.ok(stats.hp > 0 && stats.mp > 0);
   }
@@ -146,6 +156,10 @@ test('職業専用能力は該当職業でだけ現れ、転職で熟練を失�
   assert.equal(fantasyStats(p.character!).charisma, undefined);
   p = action(p, { type: 'job', job: 'leader' });
   assert.ok(fantasyStats(p.character!).charisma);
+  assert.equal(fantasyStats(p.character!).dexterity, 12);
+  assert.equal(p.character!.lifeJob,'cook');
+  p = action(p, { type: 'job', job: 'farmer' });
+  assert.equal(p.character!.job,'leader');
   assert.equal(fantasyStats(p.character!).dexterity, undefined);
   p = action(p, { type: 'job', job: 'cook' });
   assert.equal(p.character!.jobXp.cook, 30);
@@ -160,7 +174,7 @@ test('徒歩は陸路だけを通り、複数区間の経路と所要時間を�
     const edge = required(FANTASY_ROUTES.find(r => r.mode === 'land' && ((r.from === route.path[i - 1] && r.to === route.path[i]) || (r.to === route.path[i - 1] && r.from === route.path[i]))));
     hours += edge.hours;
   }
-  assert.equal(route.hours, hours);
+  sameHours(route.hours, Math.max(1, Math.ceil(hours)) * fantasyTravelBurden(c).multiplier);
   assert.equal(route.cost, 0);
 });
 
@@ -239,7 +253,7 @@ test('経験値によるレベル上昇で最大HP/MPと判定補正が伸びる
 });
 
 test('探索で資源と依頼品を確保でき、必要量まで再探索できる', () => {
-  const quest = FANTASY_QUESTS[0];
+  const quest = required(FANTASY_QUESTS.find(q => q.id === 'quest-herbalist'));
   let p = game();
   p.character!.location = quest.destination;
   p.character!.quests = [quest.id];
@@ -249,7 +263,7 @@ test('探索で資源と依頼品を確保でき、必要量まで再探索で�
 });
 
 test('町の近くで倒れた場合は救助され、依頼と品物を失わない', () => {
-  const p = action(game(), { type: 'accept', quest: FANTASY_QUESTS[0].id });
+  const p = action(game(), { type: 'accept', quest: 'quest-herbalist' });
   p.character!.location = 'greenwood';
   p.character!.hp = 1;
   p.character!.inventory.relic = 1;
@@ -267,7 +281,7 @@ test('町の近くで倒れた場合は救助され、依頼と品物を失わ�
 });
 
 test('依頼の重複受注・未受注・資源不足・二重報酬を拒否する', () => {
-  const quest = FANTASY_QUESTS[0];
+  const quest = required(FANTASY_QUESTS.find(q => q.id === 'quest-herbalist'));
   let p = game();
   p.character!.location = quest.giver;
   p = action(p, { type: 'accept', quest: quest.id });
@@ -310,9 +324,10 @@ test('制作は職業・設備・全材料を検証し、不足時に消費し�
   rejected(p, { type: 'craft', recipe: recipe.id });
 });
 
-test('制作失敗は材料を保存し、成功は一度だけ消費して成果物を渡す', () => {
-  const recipe = FANTASY_RECIPES[0];
+test('通常制作の失敗は材料を保存し、調理の失敗は材料を消費し、成功は成果物を一度だけ渡す', () => {
+  const recipe = required(FANTASY_RECIPES.find(recipe => recipe.job === 'blacksmith'));
   let p = game(recipe.job);
+  p.character!.location = required(FANTASY_LOCATIONS.find(place => fantasyBuildings({ location: place.id }).some(building => building.id === fantasyCraftFacility(recipe.job)))).id;
   p.character!.inventory = { ...recipe.inputs };
   p = action(p, { type: 'craft', recipe: recipe.id }, low);
   assert.deepEqual(p.character!.inventory, recipe.inputs);
@@ -320,10 +335,16 @@ test('制作失敗は材料を保存し、成功は一度だけ消費して成�
   p = action(p, { type: 'craft', recipe: recipe.id });
   for (const id of Object.keys(recipe.inputs)) assert.equal(p.character!.inventory[id], recipe.output === id ? p.character!.inventory[id] : 0);
   assert.ok(p.character!.inventory[recipe.output] >= recipe.count);
+  const cooking = required(FANTASY_RECIPES.find(recipe => recipe.id === 'cook-meal')), cook = game('cook');
+  cook.character!.inventory = { ...cooking.inputs };
+  const failedCook = action(cook, { type: 'craft', recipe: cooking.id }, low);
+  for (const item of Object.keys(cooking.inputs)) assert.equal(failedCook.character!.inventory[item], 0);
+  assert.equal(failedCook.character!.inventory[cooking.output] ?? 0, 0);
+  assert.equal(failedCook.character!.hour, cook.character!.hour + 3); assert.equal(failedCook.character!.jobXp.cook, 2);
 });
 
 test('市場取引は資金・所持品・市場を検証し、売買で無限利益を作らない', () => {
-  const item = FANTASY_ITEMS[0];
+  const item = required(FANTASY_ITEMS.find(item=>item.id==='herb'));
   let p = game('merchant');
   const initial = p.character!.gold;
   p = action(p, { type: 'buy', item: item.id });
@@ -382,7 +403,8 @@ test('判定強化・報酬強化・移動強化は実際に作用して一度�
   const dest = required(FANTASY_LOCATIONS.find(l => fantasyTransports(p.character!, l.id).some(t => t.id === 'foot' && t.available && t.hours > 2)));
   const oldTime = required(fantasyTransports(p.character!, dest.id).find(t => t.id === 'foot')).hours;
   p.character!.buff = { effect: 'travel', power: 2 };
-  assert.equal(required(fantasyTransports(p.character!, dest.id).find(t => t.id === 'foot')).hours, Math.max(1, oldTime - 2));
+  const multiplier = fantasyTravelBurden(p.character!).multiplier;
+  sameHours(required(fantasyTransports(p.character!, dest.id).find(t => t.id === 'foot')).hours, Math.max(1, Math.ceil(oldTime / multiplier - 2 - 1e-10)) * multiplier);
   p = action(p, { type: 'travel', destination: dest.id, transport: 'foot' });
   assert.equal(p.character!.buff, null);
 });
@@ -392,7 +414,7 @@ function jobOfForTest(id: string) { return required(FANTASY_JOBS.find(j => j.id 
 test('条件に合う職業・種族イベントを等確率で選び、選択まで主要行動を止める', () => {
   for (const job of FANTASY_JOBS) {
     const base = game(job.id);
-    const events = FANTASY_EVENTS.filter(e => !fantasyHostileEncounter(e.id) && fantasyEventEligible(base.character!, e));
+    const events = FANTASY_EVENTS.filter(e => e.id !== FANTASY_MAP_MERCHANT_EVENT && !fantasyHostileEncounter(e.id) && fantasyEventEligible(base.character!, e));
     assert.equal(FANTASY_EVENTS.filter(event => event.job === job.id).length, job.id === 'unassigned' ? 0 : 3);
     assert.ok(events.length >= 1);
     const seen = new Set<string>();
@@ -465,7 +487,9 @@ test('陸海の連絡旅行は陸路を徒歩で計算し、船賃を海路だ�
       else { lands++; hours += edge.hours; }
     }
     assert.ok(lands > 0 && seaHours > 0);
-    assert.equal(transport.hours, id === 'ship' ? Math.ceil(hours * 4) / 4 : Math.ceil(hours));
+    const base = id === 'ship' ? Math.ceil(hours * 4) / 4 : Math.ceil(hours);
+    const walkingWeight = hours - seaHours * factor;
+    sameHours(transport.hours, base + base * walkingWeight / hours * fantasyTravelBurden(c).penalty);
     assert.equal(transport.cost, id === 'ship' ? Math.ceil(seaHours * 2) : 0);
   }
 });
@@ -473,15 +497,20 @@ test('陸海の連絡旅行は陸路を徒歩で計算し、船賃を海路だ�
 test('全地域から無資金で出発地まで帰還できる', () => {
   for (const location of FANTASY_LOCATIONS) {
     if (location.id === 'hearth') continue;
-    const p = game();
+    let p = game();
     p.character!.location = location.id;
     if(location.id===FANTASY_FINAL_ISLE_ID)p.character!.completed=FANTASY_QUESTS.filter(quest=>quest.chapter!==undefined&&quest.chapter<=17).map(quest=>quest.id);
-    p.character!.gold = 0;
-    const transport = required(fantasyTransports(p.character!, 'hearth').find(t => t.available && t.cost === 0));
-    const next = action(p, { type: 'travel', destination: 'hearth', transport: transport.id });
-    assert.equal(next.character!.location, 'hearth', location.id);
-    assert.equal(next.character!.gold, 0, location.id);
-    assert.ok(next.character!.hour > p.character!.hour);
+    // 未開拓地では正規の港を経由し、遠征相当の体力で帰路を確認する。
+    if(location.land==='frontier'){p.character!.level=30;p.character!.hp=fantasyStats(p.character!).hp;}
+    p.character!.gold = 0;const started=p.character!.hour;
+    for(const destination of location.land==='frontier'?[FANTASY_FRONTIER_BASE,FANTASY_FRONTIER_DEPARTURE,'hearth']:['hearth']){
+      if(p.character!.location===destination)continue;
+      const transport = required(fantasyTransports(p.character!, destination).find(t => t.available && t.cost === 0));
+      p=action(p,{type:'travel',destination,transport:transport.id});assert.equal(p.character!.location,destination,location.id);
+    }
+    assert.equal(p.character!.location, 'hearth', location.id);
+    assert.equal(p.character!.gold, 0, location.id);
+    assert.ok(p.character!.hour > started);
   }
 });
 
@@ -499,7 +528,7 @@ test('全納品依頼を適切な種族と職業で受注・移動・調達・�
     p.character!.location = quest.giver;
     p.character!.visited = [quest.giver];
     const ration = quest.item === 'dried-fish' ? 'jerky' : 'dried-fish';
-    p.character!.inventory = { [ration]: 30, 'hp-potion-4': 20, 'fatigue-potion-4': 20, lantern: 1, 'rain-cape': 1 };
+    p.character!.inventory = { [ration]: 30, 'hp-potion-4': 20, 'fatigue-potion-4': 20, lantern: 1, 'rain-cape': 1,'arcane-bag-3':1 };p.character!.bag='arcane-bag-3';
     const prepareTravel = () => {
       while (p.character!.hunger > 40) p = action(p, { type: 'use', item: ration });
       if (p.character!.fatigue > 40) p = action(p, { type: 'use', item: 'fatigue-potion-4' });
@@ -521,19 +550,28 @@ test('全納品依頼を適切な種族と職業で受注・移動・調達・�
       }
       if (shop) {
         while (p.character!.gold < item.price * quest.count) { prepareTravel(); p = action(p, { type: 'work' }); }
+        const hour = p.character!.hour, localHour = hour % 24;
+        if (localHour < 6 || localHour >= 18) {
+          rejected(p, { type: 'buy', item: quest.item });
+          p = advanceFantasyWorld(p, Math.floor(hour / 24) * 24 + (localHour < 6 ? 6 : 30)).profile;
+        }
         for (let i = 0; i < quest.count; i++) p = action(p, { type: 'buy', item: quest.item });
       } else {
         while ((p.character!.inventory[quest.item] ?? 0) < quest.count) p = action(p, { type: 'explore' });
       }
     }
     prepareTravel();
-    const outbound = required(fantasyTransports(p.character!, quest.destination).find(t => t.available && !t.cost));
-    p = action(p, { type: 'travel', destination: quest.destination, transport: outbound.id });
+    if (p.character!.location !== quest.destination) {
+      const outbound = required(fantasyTransports(p.character!, quest.destination).find(t => t.available && !t.cost));
+      p = action(p, { type: 'travel', destination: quest.destination, transport: outbound.id });
+    }
     for (let i = 0; (p.character!.inventory[quest.item] ?? 0) < quest.count && i < quest.count; i++) p = action(p, { type: 'explore' });
     assert.ok((p.character!.inventory[quest.item] ?? 0) >= quest.count, quest.id);
     prepareTravel();
-    const inbound = required(fantasyTransports(p.character!, quest.giver).find(t => t.available && !t.cost));
-    p = action(p, { type: 'travel', destination: quest.giver, transport: inbound.id });
+    if (p.character!.location !== quest.giver) {
+      const inbound = required(fantasyTransports(p.character!, quest.giver).find(t => t.available && !t.cost));
+      p = action(p, { type: 'travel', destination: quest.giver, transport: inbound.id });
+    }
     p = action(p, { type: 'complete', quest: quest.id });
     assert.ok(p.character!.completed.includes(quest.id));
   }
@@ -563,6 +601,7 @@ test('全アクティブスキルのpowerが回復・判定・防護・移動へ
   ];
   for (const owner of owners) {
     const skill = owner.skill;
+    if(skill.retired||skill.utility||skill.restore)continue;
     const p = game(owner.job);
     const c = p.character!;
     c.race = owner.race;
@@ -609,7 +648,8 @@ test('全アクティブスキルのpowerが回復・判定・防護・移動へ
     } else if (skill.effect === 'travel') {
       const baseline = required(fantasyTransports(c, 'deepcave').find(t => t.id === 'foot'));
       const result = required(fantasyTransports(boosted.character!, 'deepcave').find(t => t.id === 'foot'));
-      assert.equal(result.hours, Math.max(1, baseline.hours - skill.power), skill.id);
+      const multiplier = fantasyTravelBurden(c).multiplier;
+      sameHours(result.hours, Math.max(1, Math.ceil(baseline.hours / multiplier - skill.power - 1e-10)) * multiplier, skill.id);
     } else if (skill.effect === 'reward') {
       const baseline = action(p, { type: 'work' });
       const result = action(boosted, { type: 'work' });
@@ -647,7 +687,7 @@ test('全パッシブの判定・防護・報酬・移動効果を適用する',
     } else if (owner.skill.effect === 'travel') {
       const sum = effects.filter(s => s.effect === 'travel').reduce((n, s) => n + s.power, 0);
       const foot = required(fantasyTransports(c, 'greenwood').find(t => t.id === 'foot'));
-      assert.equal(foot.hours, Math.max(1, 2 - sum), owner.skill.id);
+      sameHours(foot.hours, Math.max(1, 2 - sum) * fantasyTravelBurden(c).multiplier, owner.skill.id);
     } else if (owner.skill.effect === 'check') {
       const stat = owner.skill.stat ?? jobOfForTest(c.job).stat;
       const sum = effects.filter(s => s.effect === 'check' && (!s.stat || s.stat === stat)).reduce((n, s) => n + s.power, 0);
@@ -655,15 +695,17 @@ test('全パッシブの判定・防護・報酬・移動効果を適用する',
       if (stat === 'vitality') {
         c.location = 'deepcave';
         if (FANTASY_RACES.find(r => r.id === c.race)?.affinity.includes('cave')) expected += 2;
+        expected -= fantasyEnvironmentPenalty(c);
         const result = action(p, { type: 'explore' });
         assert.equal(modifier(result, '青晶の洞窟の探索'), expected, owner.skill.id);
       } else if (stat === 'luck') {
         c.location = 'greenwood';
+        expected+=fantasyWorldSituationalBonus(c,'forest','explore',stat);
         const result = action(p, { type: 'explore' });
         assert.equal(modifier(result, '発見運'), expected, owner.skill.id);
       } else if (stat === jobOfForTest(c.job).stat) {
         const result = action(p, { type: 'work' });
-        assert.equal(modifier(result, `${jobOfForTest(c.job).name}の仕事`), Math.max(-4, Math.min(4, expected)), owner.skill.id);
+        assert.equal(modifier(result, `${jobOfForTest(c.job).name}の仕事`), Math.max(-4, Math.min(4, expected+fantasyWorldSituationalBonus(c,FANTASY_LOCATIONS.find(place=>place.id===c.location)!.kind,'work',stat))), owner.skill.id);
       } else {
         const event = required(FANTASY_EVENTS.find(event => event.job === c.job && event.choices.some(choice => choice.stat === stat)));
         const choice = required(event.choices.find(choice => choice.stat === stat));
@@ -701,7 +743,7 @@ test('カタログのID・参照・経路・重み・数値・イベント対応
     const key = [from.id, to.id].sort().join('/') + '/' + route.mode;
     assert.ok(!routes.has(key), key); routes.add(key);
     assert.notEqual(from.id, to.id);
-    assert.ok(route.mode === 'gate' ? route.hours === .25 : Number.isSafeInteger(route.hours) && route.hours > 0);
+    assert.ok(route.mode === 'gate' ? route.hours === .25 : Number.isFinite(route.hours) && route.hours > 0 && Number.isSafeInteger(route.hours * 4));
     if (route.mode === 'sea') assert.ok(from.services.includes('port') && to.services.includes('port'), key);
     if (route.mode === 'gate') assert.ok(from.services.includes('gate') && to.services.includes('gate'), key);
     if (route.mode === 'land') assert.equal(from.land, to.land, key);
@@ -717,8 +759,15 @@ test('カタログのID・参照・経路・重み・数値・イベント対応
     if (event.families) for (const id of event.families) assert.ok(FANTASY_RACE_FAMILIES.some(family => family.id === id));
     if (event.locations) for (const id of event.locations) assert.ok(FANTASY_LOCATIONS.some(location => location.id === id));
     assert.equal(new Set(event.choices.map(c => c.id)).size, event.choices.length);
+    if (event.id === FANTASY_MAP_MERCHANT_EVENT) assert.equal(event.choices.length, 1);
     for (const choice of event.choices) {
-      assert.ok(Number.isSafeInteger(choice.dc) && choice.dc > 0);
+      if (event.id === FANTASY_MAP_MERCHANT_EVENT) {
+        assert.equal(choice.id, 'leave');
+        assert.equal(choice.dc, 0);
+        assert.equal(choice.gold, 0);
+        assert.equal(choice.item, undefined);
+        assert.equal(choice.context, undefined);
+      } else assert.ok(Number.isSafeInteger(choice.dc) && choice.dc > 0);
       assert.ok(Number.isSafeInteger(choice.gold) && choice.gold >= 0);
       if (choice.item) assert.ok(FANTASY_ITEMS.some(i => i.id === choice.item));
       if (choice.context) assert.ok(Object.hasOwn(FANTASY_CONTEXT_NAMES, choice.context));
@@ -729,7 +778,10 @@ test('カタログのID・参照・経路・重み・数値・イベント対応
     if (quest.families) for (const id of quest.families) assert.ok(FANTASY_RACE_FAMILIES.some(family => family.id === id));
     for (const field of [quest.names, quest.descriptions]) if (field) for (const locale of ['ko', 'en', 'ja'] as const) assert.ok(field[locale]);
   }
-  for (const item of FANTASY_ITEMS) assert.ok(Number.isSafeInteger(item.price) && item.price > 0);
+  for (const item of FANTASY_ITEMS) {
+    assert.ok(Number.isSafeInteger(item.price) && item.price >= 0, item.id);
+    if (item.price === 0) { assert.ok(['guild-loan', 'rank-skill-book'].includes(item.category ?? ''), item.id); assert.equal(item.craftOnly, true, item.id); }
+  }
   for (const recipe of FANTASY_RECIPES) {
     assert.ok(Number.isSafeInteger(recipe.count) && recipe.count > 0);
     for (const count of Object.values(recipe.inputs)) assert.ok(Number.isSafeInteger(count) && count > 0);
@@ -864,7 +916,7 @@ test('無職は職業専用事件を持たないが、無料の品賃と種族�
 test('ギルドは通常職だけを許可し、職業取得は1時間を消費する', () => {
   const p = action(newFantasyProfile(), { type: 'create', name: '旅人', gender: 'male', source: 'human' });
   const next = action(p, { type: 'job', job: 'cook', via: 'guild' });
-  assert.equal(next.character!.job, 'cook');
+  assert.equal(next.character!.job, 'unassigned');assert.equal(next.character!.lifeJob,'cook');
   assert.equal(next.character!.hour, p.character!.hour + 1);
   assert.equal(next.character!.fatigue, 3);
   for (const job of FANTASY_JOBS.filter(job => job.category === 'crime')) rejected(p, { type: 'job', job: job.id, via: 'guild' });
@@ -876,27 +928,27 @@ test('NPCの指導は本人の所在地・実在する建物・専門を検証�
   const p = game('unassigned');
   p.character!.location = 'emberhall';
   const taught = action(p, { type: 'job', job: 'blacksmith', via: 'npc', npcId: 'borin' });
-  assert.equal(taught.character!.job, 'blacksmith');
+  assert.equal(taught.character!.job, 'unassigned');assert.equal(taught.character!.lifeJob,'blacksmith');
   rejected(p, { type: 'job', job: 'mage', via: 'npc', npcId: 'borin' });
   rejected(p, { type: 'job', job: 'merchant', via: 'npc', npcId: 'rin' });
   rejected(p, { type: 'job', job: 'blacksmith', via: 'npc', npcId: 'missing-npc' });
   rejected(p, { type: 'job', job: 'blacksmith', via: 'npc' });
   rejected(p, { type: 'job', job: 'blacksmith', via: 'guild', npcId: 'borin' });
   p.character!.location = 'hearth';
-  assert.equal(action(p, { type: 'job', job: 'merchant', via: 'npc', npcId: 'rin' }).character!.job, 'merchant');
+  assert.equal(action(p, { type: 'job', job: 'merchant', via: 'npc', npcId: 'rin' }).character!.lifeJob, 'merchant');
 });
 
 test('GM経路の明示取得は登録犯罪職にも対応し、6職各3事件がある', () => {
   const crimes = FANTASY_JOBS.filter(job => job.category === 'crime');
   assert.equal(crimes.length, 6);
-  assert.equal(FANTASY_JOBS.length, 38);
-  assert.equal(FANTASY_EVENTS.filter(event => event.job !== undefined).length, 111);
+  assert.equal(FANTASY_JOBS.length, 39);
+  assert.equal(FANTASY_EVENTS.filter(event => event.job !== undefined).length, 114);
   for (const job of FANTASY_JOBS) for (const locale of ['ko', 'en', 'ja'] as const) assert.ok(job.names[locale]);
   for (const job of crimes) {
     const p = game('unassigned'); p.character!.location = 'greenwood';
     const acquired = action(p, { type: 'job', job: job.id, via: 'gm' });
     assert.equal(acquired.character!.job, job.id);
-    assert.equal(job.skills.length, 10);
+    assert.equal(job.skills.length, ({ thief: 12, smuggler: 11, assassin: 13, bandit: 12, spy: 11, crimeboss: 11 } as Record<string, number>)[job.id]);
     assert.equal(job.eventIds.length, 3);
     assert.equal(FANTASY_EVENTS.filter(event => event.job === job.id).length, 3);
     assert.ok(action(acquired, { type: 'work' }).character!.gold > p.character!.gold);
@@ -949,7 +1001,7 @@ test('小さな体と柔軟性は狭い隙間の実際のd20判定に加算さ�
     p.character!.hp = fantasyStats(p.character!).hp; p.character!.mp = fantasyStats(p.character!).mp;
     const expected = Math.floor((fantasyStats(p.character!).agility - 10) / 2)
       + fantasySkills(p.character!).filter(skill => skill.kind === 'passive' && skill.effect === 'check' && (!skill.stat || skill.stat === 'agility')).reduce((sum, skill) => sum + skill.power, 0)
-      + fantasyContextBonus(p.character!, 'narrow-space');
+      + fantasyContextBonus(p.character!, 'narrow-space') - fantasyEnvironmentPenalty(p.character!);
     const next = action(p, { type: 'explore' });
     assert.equal(modifier(next, FANTASY_CONTEXT_NAMES['narrow-space'].ja), expected, raceId);
   }
@@ -960,9 +1012,10 @@ test('小さな体と柔軟性は狭い隙間の実際のd20判定に加算さ�
 
 test('同じ出目でも小柄な種族は隙間を抜け、追加資源を得られる', () => {
   const p = game('unassigned'); p.character!.location = 'deepcave';
+  p.character!.inventory['everglow-lantern'] = 1;
   const small = structuredClone(p); small.character!.race = 'halfling';
-  const human = action(p, { type: 'explore' }, () => 0.5);
-  const halfling = action(small, { type: 'explore' }, () => 0.5);
+  const human = action(p, { type: 'explore' }, () => 0.6);
+  const halfling = action(small, { type: 'explore' }, () => 0.6);
   assert.match(human.log.find(log => log.text.startsWith(FANTASY_CONTEXT_NAMES['narrow-space'].ja))!.text, /失敗$/);
   assert.match(halfling.log.find(log => log.text.startsWith(FANTASY_CONTEXT_NAMES['narrow-space'].ja))!.text, /成功$/);
   assert.equal(halfling.character!.inventory.crystal, (human.character!.inventory.crystal ?? 0) + 1);
@@ -986,7 +1039,7 @@ test('翼や水生体質には利点と弱点があり、通常の交通条件�
 test('全種族に職業に依存しない専用事件があり、他種族の事件は実行できない', () => {
   const racial = FANTASY_EVENTS.filter(event => !event.job && (event.races?.length || event.families?.length));
   assert.ok(racial.length >= FANTASY_RACES.length);
-  assert.equal(FANTASY_EVENTS.filter(event => event.job).length, 111);
+  assert.equal(FANTASY_EVENTS.filter(event => event.job).length, 114);
   for (const race of FANTASY_RACES) {
     const p = game('unassigned');
     p.character!.race = race.id;

@@ -1,9 +1,9 @@
+import { fantasyOffhandEquipError } from './fantasy-equipment-slots.ts';
+import { learnFantasyMagicBook } from './fantasy-magic-discovery.ts';
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { FANTASY_JOB_PATHS, applyFantasyJobPath, fantasyJobPathCombatSkill } from './fantasy-job-paths.ts';
+import { applyFantasyJobPath } from './fantasy-job-paths.ts';
 import { FANTASY_READABLE_LIBRARY_BOOKS } from './fantasy-library.ts';
-import { FANTASY_COMBAT_ENEMIES } from './fantasy-combat-catalog.ts';
 import { FANTASY_ITEMS, FANTASY_JOBS, FANTASY_LOCATIONS, FANTASY_RACES, FANTASY_RECIPES } from './fantasy-data.ts';
 import { applyFantasyAction, fantasyStats, newFantasyProfile } from './fantasy-engine.ts';
 import { createFantasyGear, fantasyCraftInputs, fantasyEquipGear } from './fantasy-equipment.ts';
@@ -13,6 +13,7 @@ import { fantasyCombatPlayer, fantasyCombatSupplies } from '../server/fantasy-co
 import type { FantasyProfile } from './fantasy.ts';
 import { fantasyCanCraft } from './fantasy-town.ts';
 import { fantasyTermName } from './fantasy-lore.ts';
+import { benchmarkOrder } from '../scripts/fantasy-balance-fixtures.ts';
 
 export const equipmentAudit: Record<string, unknown> = {};
 
@@ -28,6 +29,8 @@ export function profile(race: string, job: string, level = 1, fine = false, path
       ['sew-lizard-armor', 'moon-silk', 'diamond'], ['forge-shield', 'starsteel-ingot', 'diamond'], [caster ? 'gemcutter-charm' : 'gemcutter-ruby-ring', 'starsteel-ingot', caster ? 'sapphire' : 'ruby']];
     for (const [recipeId, material, gem] of setup) {
       const recipe = FANTASY_RECIPES.find(recipe => recipe.id === recipeId)!; assert.ok(recipe);
+      const output = FANTASY_ITEMS.find(item => item.id === recipe.output); assert.ok(output);
+      if (fantasyOffhandEquipError(c, output)) continue;
       const crafter = structuredClone(c); crafter.job = recipe.job; crafter.jobXp[recipe.job] = 1000; crafter.inventory = Object.fromEntries(FANTASY_ITEMS.map(item => [item.id, 100]));
       const workshop = FANTASY_LOCATIONS.find(place => fantasyCanCraft({ ...crafter, location: place.id }, recipe)); assert.ok(workshop);
       const validated = fantasyCraftInputs(crafter, recipe, fine ? material : undefined, fine ? gem : undefined); assert.equal(validated.error, undefined);
@@ -45,9 +48,9 @@ export function profile(race: string, job: string, level = 1, fine = false, path
     c.specialization = { companies: { [kind]: { members: ids.slice(0, level > 1 || job !== 'summoner' ? 2 : 1).map(([id, hp]) => ({ id: String(id), hp: Number(hp), condition: 'ready' as const, assigned: true, missions: 0 })) } } };
   }
   c.hour=108; c.location='sunmeadow'; c.inventory.lantern=1; c.jobXp[job]=1000;
-  c.readBooks=FANTASY_READABLE_LIBRARY_BOOKS.map(book=>book.id); c.unlockedSkills=FANTASY_JOBS.find(entry=>entry.id===job)!.skills.filter(skill=>skill.unlock?.kind==='mentor').map(skill=>skill.id);
+  c.readBooks=FANTASY_READABLE_LIBRARY_BOOKS.map(book=>book.id); for(const book of c.readBooks)learnFantasyMagicBook(c,book); c.unlockedSkills=FANTASY_JOBS.find(entry=>entry.id===job)!.skills.filter(skill=>skill.unlock?.kind==='mentor').map(skill=>skill.id);
   c.practice={explore:10,craft:10,gather:10,hunt:10,fish:10,command:10}; c.skillXp=Object.fromEntries(FANTASY_JOBS.find(entry=>entry.id===job)!.skills.map(skill=>[skill.id,200]));
-  if(job==='mage')c.specialization={spells:[{slot:1,element:'flame',form:'bolt'},{slot:2,element:'stone',form:'veil'},{slot:3,element:'light',form:'mend'}]};
+  if(job==='mage')c.specialization={spells:[{slot:1,element:'flame',form:'bolt'},{slot:2,element:'stone',form:'veil'},{slot:3,element:'gale',form:'bolt'}]};
   if(path){const result=applyFantasyJobPath(c,path);if(result.error)throw new Error(path+': '+result.error);c.skillXp['path-'+path+'-insight']=100;c.skillXp['path-'+path+'-art']=100;}
   const stats = fantasyStats(c); c.hp = stats.hp; c.mp = stats.mp; return p;
 }
@@ -58,7 +61,8 @@ export function command(state: FantasyCombatState, actor: FantasyCombatFighter, 
   const allowed = (action: FantasyCombatOrder) => !fantasyCombatOrderError(state, user, wrap(action), supplies);
   const enemies = state.fighters.filter(f => f.side === 'enemies' && live(f)), enemy = enemies[0];
   if (!enemy) return wrap({ type: 'guard' });
-  if (enemy.template?.includes('dragon') && state.round % 3 === 0) return wrap({ type: 'guard' });
+  if (actor.tile && enemies.some(foe => foe.enemyCharge && foe.enemyCharge.resolvesRound <= state.round && foe.enemyCharge.tiles.some(tile => tile.x === actor.tile!.x && tile.y === actor.tile!.y))) return wrap(benchmarkOrder(state, 'trained', supplies, actor.companion ? actor.id : undefined, user));
+  if (!enemy.skills.length && enemy.template?.includes('dragon') && state.round % 3 === 0) return wrap({ type: 'guard' });
   const orderedSkills=[...actor.skills].sort((a,b)=>Number(b.id.startsWith('path-'))-Number(a.id.startsWith('path-')));
   const heal = orderedSkills.find(skill => skill.kind === 'heal' && skill.mp <= actor.mp);
   if (heal) for (const target of fantasyCombatActors(state).filter(f => f.side === 'players' && live(f) && f.stats.hp - f.hp >= 35).sort((a, b) => a.hp / a.stats.hp - b.hp / b.stats.hp)) {

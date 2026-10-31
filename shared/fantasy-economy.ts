@@ -1,38 +1,52 @@
+import { FANTASY_FRONTIER_BASE } from './fantasy-frontier-data.ts';
+import { FANTASY_FRONTIER_SUPPLIES } from './fantasy-expedition.ts';
+import { fantasyGuildSupplyPriceMultiplier } from './fantasy-guild-supply-rates.ts';
+import { fantasyRegisteredGuildGrade } from './fantasy-guild-progression.ts';
+import { FANTASY_RETREAT_MAPS, fantasyRetreatMarketStock } from './fantasy-retreats.ts';
+import { FANTASY_MAP_MERCHANT_EVENT, FANTASY_MAP_MERCHANT_NPC, fantasyMapMerchantDaylight, fantasyMapMerchantRoad, fantasyMapMerchantStock } from './fantasy-map-merchant.ts';
+import { fantasyFacilityOpen } from './fantasy-facility-hours.ts';
+import { fantasyOnRoad } from './fantasy-travel.ts';
 import type { FantasyCharacter, FantasyFoodLot, FantasyGearInstance, FantasyProfile } from './fantasy.ts';
-import { FANTASY_ITEMS } from './fantasy-data.ts';
+import { FANTASY_ITEMS, FANTASY_LOCATIONS, FANTASY_ROUTES } from './fantasy-data.ts';
 import { FANTASY_MAPS, FANTASY_SETTLEMENTS, fantasyBuildingStock, fantasyBuildings, canSellItem, type FantasyBuildingId } from './fantasy-town.ts';
 import { foodMeta, type FantasyFoodQuality } from './fantasy-life.ts';
 import { fantasyFoodLotQuality, fantasySaleGroups, type FantasySaleSelection } from './fantasy-sales.ts';
 import { fantasySpendItem, validFantasyGear } from './fantasy-equipment.ts';
 import { fantasyPrice } from './fantasy-reputation.ts';
+import { validFantasyFoodPreservation } from './fantasy-food-preservation.ts';
+import { fantasyEquippedMagicBags, fantasyNormalBagId } from './fantasy-bag-configuration.ts';
+import { FANTASY_INTERIOR_MAP_ITEM, validFantasyInteriorMapCopy, takeFantasyInteriorMap, deliverFantasyInteriorMap, fantasyInteriorMapValue, type FantasyInteriorMapCopy } from './fantasy-interior-map-catalog.ts';
 
 export interface FantasyEconomySelection { item: string; count: number; instance?: string }
-export interface FantasyEconomyParcel extends FantasyEconomySelection { food?: FantasyFoodLot[]; gear?: FantasyGearInstance; quality?: FantasyFoodQuality }
+export interface FantasyEconomyParcel extends FantasyEconomySelection { food?: FantasyFoodLot[]; gear?: FantasyGearInstance; quality?: FantasyFoodQuality; interiorMap?: FantasyInteriorMapCopy }
 export interface FantasyEconomyOffer { gold: number; goods: FantasyEconomyParcel[]; confirmed: boolean }
 export interface FantasyEconomyTrade {
   id: string; revision: number; users: [string, string]; generations: [number, number]; names: [string, string]; location: string;
   expiresAt: number; status: 'open' | 'completed' | 'cancelled'; offers: [FantasyEconomyOffer, FantasyEconomyOffer];
 }
-export interface FantasyEconomyShopLot { id: string; item: string; count: number; native: boolean; food?: FantasyFoodLot[]; gear?: FantasyGearInstance }
-export interface FantasyEconomyShop { revision: number; epoch: number; lots: FantasyEconomyShopLot[] }
-export interface FantasyEconomyLedger { version: 1; revision: number; shops: Record<string, FantasyEconomyShop>; trades: Record<string, FantasyEconomyTrade> }
+export interface FantasyEconomyShopLot { id: string; item: string; count: number; native: boolean; food?: FantasyFoodLot[]; gear?: FantasyGearInstance; interiorMap?: FantasyInteriorMapCopy }
+export interface FantasyEconomyShop { revision: number; epoch: number; period?: 24; lots: FantasyEconomyShopLot[] }
+export interface FantasyEconomyMerchant { day: number; revision: number; lots: { item: string; count: number }[] }
+export interface FantasyEconomyLedger { version: 1; revision: number; shops: Record<string, FantasyEconomyShop>; trades: Record<string, FantasyEconomyTrade>; merchants?: Record<string, FantasyEconomyMerchant> }
 export type FantasyEconomyCommand = { type: 'sync' }
+  | { type: 'merchantBuy'; item: string; count: 1; day: number; revision: number; quotedUnitPrice?: number }
   | { type: 'open'; peer: string }
   | { type: 'offer'; trade: string; revision: number; gold: number; items: FantasyEconomySelection[] }
   | { type: 'confirm' | 'cancel'; trade: string; revision: number }
   | { type: 'shopBuy'; building: FantasyBuildingId; item: string; count: number; revision: number; lot?: string; quotedUnitPrice?: number }
   | ({ type: 'shopSell'; building: FantasyBuildingId; count: number; revision: number; quotedUnitPrice?: number } & FantasySaleSelection);
-export type FantasyEconomyError = 'invalid' | 'busy' | 'not-alive' | 'unavailable' | 'stale' | 'expired' | 'insufficient-gold' | 'missing-item' | 'equipped' | 'stock' | 'limit' | 'changed-goods' | 'save-failed';
+export type FantasyEconomyError = 'invalid' | 'busy' | 'not-alive' | 'unavailable' | 'stale' | 'expired' | 'insufficient-gold' | 'missing-item' | 'equipped' | 'stock' | 'closed' | 'limit' | 'changed-goods' | 'save-failed';
 export interface FantasyEconomyContext { hour: number; peers: string[]; token?: string; priceMultiplier?: number }
 export interface FantasyEconomyResult { ledger: FantasyEconomyLedger; profiles: Map<string, FantasyProfile>; changed: boolean; error?: FantasyEconomyError }
 export interface FantasyEconomyTradeView {
   id: string; revision: number; mine: 0 | 1; users: [string, string]; names: [string, string]; expiresAt: number; status: FantasyEconomyTrade['status'];
-  offers: { gold: number; confirmed: boolean; items: (FantasyEconomySelection & { gearQuality?: number; quality?: FantasyFoodQuality })[] }[];
+  offers: { gold: number; confirmed: boolean; items: (FantasyEconomySelection & { gearQuality?: number; quality?: FantasyFoodQuality; interiorMap?: FantasyInteriorMapCopy })[] }[];
 }
-export interface FantasyEconomyShopView { building: FantasyBuildingId; revision: number; restockAt: number; lots: { id: string; item: string; count: number; unitPrice: number; gearQuality?: number }[]; sales: { key: string; item: string; count: number; unitPrice: number; quality?: FantasyFoodQuality; instance?: string; canSell: boolean }[] }
-export interface FantasyEconomyState { revision: number; location: string | null; peers: { id: string; name: string }[]; shops: FantasyEconomyShopView[]; trades: FantasyEconomyTradeView[] }
+export interface FantasyEconomyShopView { open?:boolean; building: FantasyBuildingId; revision: number; restockAt: number; lots: { id: string; item: string; count: number; unitPrice: number; gearQuality?: number; interiorMap?: FantasyInteriorMapCopy }[]; sales: { key: string; item: string; count: number; unitPrice: number; quality?: FantasyFoodQuality; instance?: string; canSell: boolean }[] }
+export interface FantasyEconomyMerchantView { npc: string; road: string; day: number; revision: number; offers: { item: string; count: number; unitPrice: number }[] }
+export interface FantasyEconomyState { campMage?:boolean; templeBeds?:number; rooms?: import('./fantasy-inn.ts').FantasyInnRoomAvailability[]; revision: number; location: string | null; peers: { id: string; name: string }[]; shops: FantasyEconomyShopView[]; trades: FantasyEconomyTradeView[]; merchant?: FantasyEconomyMerchantView }
 
-const RESTOCK_HOURS = 6;
+const RESTOCK_HOURS = 24;
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const integer = (v: unknown, min = 0, max = Number.MAX_SAFE_INTEGER): v is number => Number.isSafeInteger(v) && Number(v) >= min && Number(v) <= max;
 const hour = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
@@ -43,9 +57,9 @@ const mapOf = (id: string) => FANTASY_MAPS.find(map => map.item === id);
 const known = (id: unknown): id is string => typeof id === 'string' && (!!itemOf(id) || !!mapOf(id));
 const building = (id: unknown): id is FantasyBuildingId => typeof id === 'string' && Object.values(FANTASY_SETTLEMENTS).some(place => place.buildingIds.includes(id as FantasyBuildingId));
 const generation = (p: FantasyProfile) => p.generation ?? 1;
-const idle = (p: FantasyProfile | undefined) => !!p?.character && !p.death && p.character.hp > 0 && !p.activity && !p.combatId && !p.event;
+const idle = (p: FantasyProfile | undefined) => !!p?.character && !p.death && p.character.hp > 0 && !p.activity && !p.combatId && !p.event && !fantasyOnRoad(p.character);
 const local = (c: FantasyCharacter, id: FantasyBuildingId) => fantasyBuildings(c).some(entry => entry.id === id);
-const capacity = (item: string) => foodMeta(item) ? 20 : (itemOf(item)?.tier ?? 1) > 2 ? 3 : itemOf(item)?.equipment ? 5 : 14;
+const capacity = (item: string) => mapOf(item)?.rare ? 1 : foodMeta(item) ? 20 : (itemOf(item)?.tier ?? 1) > 2 ? 3 : itemOf(item)?.equipment ? 5 : 14;
 const basePrice = (item: string) => itemOf(item)?.price ?? mapOf(item)?.price ?? 0;
 const shopKey = (location: string, id: string) => `${location}:${id}`;
 const fields = (v: Record<string, unknown>, required: string[], optional: string[] = []) => required.every(key => Object.hasOwn(v, key)) && Object.keys(v).every(key => required.includes(key) || optional.includes(key));
@@ -55,32 +69,46 @@ export const newFantasyEconomyLedger = (): FantasyEconomyLedger => ({ version: 1
 export function isFantasyEconomyCommand(v: unknown): v is FantasyEconomyCommand {
   if (!object(v)) return false;
   if (v.type === 'sync') return fields(v, ['type']);
+  if (v.type === 'merchantBuy') return fields(v, ['type', 'item', 'count', 'day', 'revision'], ['quotedUnitPrice']) && !!mapOf(String(v.item))?.dungeon && v.count === 1 && integer(v.day) && integer(v.revision) && (v.quotedUnitPrice === undefined || integer(v.quotedUnitPrice, 1));
   if (v.type === 'open') return fields(v, ['type', 'peer']) && text(v.peer);
   if (v.type === 'offer') return fields(v, ['type', 'trade', 'revision', 'gold', 'items']) && token(v.trade) && integer(v.revision) && integer(v.gold, 0, 1_000_000_000)
-    && Array.isArray(v.items) && v.items.length <= 12 && v.items.every(item => object(item) && fields(item, ['item', 'count'], ['instance']) && known(item.item) && integer(item.count, 1, 999) && (item.instance === undefined || text(item.instance)))
+    && Array.isArray(v.items) && v.items.length <= 12 && v.items.every(item => object(item) && fields(item, ['item', 'count'], ['instance']) && known(item.item) && itemOf(item.item)?.category!=='guild-loan' && integer(item.count, 1, 999) && (item.instance === undefined || text(item.instance)))
     && new Set(v.items.map(item => `${item.item}:${item.instance ?? ''}`)).size === v.items.length;
   if (v.type === 'confirm' || v.type === 'cancel') return fields(v, ['type', 'trade', 'revision']) && token(v.trade) && integer(v.revision);
   if (v.type === 'shopBuy') return fields(v, ['type', 'building', 'item', 'count', 'revision'], ['lot', 'quotedUnitPrice']) && building(v.building) && known(v.item) && integer(v.count, 1, 999) && integer(v.revision) && (v.lot === undefined || text(v.lot)) && (v.quotedUnitPrice === undefined || integer(v.quotedUnitPrice, 1));
   return v.type === 'shopSell' && fields(v, ['type', 'building', 'item', 'count', 'revision'], ['quality', 'instance', 'quotedUnitPrice']) && building(v.building) && known(v.item) && integer(v.count, 1, 999) && integer(v.revision) && (v.quotedUnitPrice === undefined || integer(v.quotedUnitPrice, 1))
     && (v.quality === undefined || ['fresh', 'stale', 'spoiled'].includes(String(v.quality))) && (v.instance === undefined || text(v.instance));
 }
-function validParcel(v: unknown): v is FantasyEconomyParcel {
-  if (!object(v) || !fields(v, ['item', 'count'], ['instance', 'food', 'gear', 'quality']) || !known(v.item) || !integer(v.count, 1, 999) || v.instance !== undefined && !text(v.instance)) return false;
+export function validFantasyEconomyParcel(v: unknown, at = Number.MAX_VALUE): v is FantasyEconomyParcel {
+  if (!object(v) || !fields(v, ['item', 'count'], ['instance', 'food', 'gear', 'quality', 'interiorMap']) || !known(v.item) || itemOf(v.item)?.category === 'guild-loan' || !integer(v.count, 1, 999) || v.instance !== undefined && !text(v.instance)) return false;
   if (!!foodMeta(v.item) !== Array.isArray(v.food)) return false;
-  if (v.food !== undefined && (!Array.isArray(v.food) || !v.food.length || v.food.some(f => !object(f) || !fields(f, ['id', 'item', 'count', 'createdAt']) || !text(f.id) || f.item !== v.item || !integer(f.count, 1, 999) || !hour(f.createdAt)) || v.food.reduce((sum, f) => sum + Number(f.count), 0) !== v.count || new Set(v.food.map(f => f.id)).size !== v.food.length)) return false;
+  if (v.item === FANTASY_INTERIOR_MAP_ITEM ? !validFantasyInteriorMapCopy(v.interiorMap) || v.count !== 1 || v.instance !== v.interiorMap.id || v.gear !== undefined || v.food !== undefined || v.quality !== undefined : v.interiorMap !== undefined) return false;
+  if (v.food !== undefined && (!Array.isArray(v.food) || !v.food.length || v.food.some(f => !object(f) || !fields(f, ['id', 'item', 'count', 'createdAt'], ['preservedHours', 'preservationAt']) || !text(f.id) || f.item !== v.item || !integer(f.count, 1, 999) || !hour(f.createdAt) || f.createdAt > at || !validFantasyFoodPreservation(f, at)) || v.food.reduce((sum, f) => sum + Number(f.count), 0) !== v.count || new Set(v.food.map(f => f.id)).size !== v.food.length)) return false;
   if (v.quality !== undefined && !['fresh', 'stale', 'spoiled'].includes(String(v.quality))) return false;
   return v.gear === undefined || object(v.gear) && v.count === 1 && v.gear.item === v.item && v.instance === v.gear.id && hour(v.gear.createdAt)
     && validFantasyGear({ gear: [v.gear], inventory: { [v.item]: 1 }, hour: v.gear.createdAt } as unknown as FantasyCharacter);
 }
-export function validFantasyEconomyLedger(v: unknown): v is FantasyEconomyLedger {
-  if (!object(v) || !fields(v, ['version', 'revision', 'shops', 'trades']) || v.version !== 1 || !integer(v.revision) || !object(v.shops) || !object(v.trades) || Object.keys(v.shops).length > 250 || Object.keys(v.trades).length > 256) return false;
+export function validFantasyEconomyLedger(v: unknown, at = Number.MAX_VALUE): v is FantasyEconomyLedger {
+  if (!object(v) || !fields(v, ['version', 'revision', 'shops', 'trades'], ['merchants']) || v.version !== 1 || !integer(v.revision) || !object(v.shops) || !object(v.trades) || Object.keys(v.shops).length > 250 || Object.keys(v.trades).length > 256) return false;
   for (const [key, shop] of Object.entries(v.shops)) {
     const [location, id] = key.split(':');
-    if (key !== shopKey(location, id) || !Object.hasOwn(FANTASY_SETTLEMENTS, location) || !building(id) || !local({ location } as FantasyCharacter, id) || !object(shop)
-      || !fields(shop, ['revision', 'epoch', 'lots']) || !integer(shop.revision) || !integer(shop.epoch) || !Array.isArray(shop.lots) || shop.lots.length > 500) return false;
-    if (shop.lots.some(lot => !object(lot) || !fields(lot, ['id', 'item', 'count', 'native'], ['food', 'gear']) || !text(lot.id) || typeof lot.native !== 'boolean'
-      || !validParcel({ item: lot.item, count: lot.count, ...(lot.food ? { food: lot.food } : {}), ...(lot.gear && object(lot.gear) ? { instance: lot.gear.id, gear: lot.gear } : {}) }) || lot.native && (lot.id !== `stock-${lot.item}` || !fantasyBuildingStock({ location }, id).includes(String(lot.item)) || lot.gear !== undefined || Number(lot.count) > capacity(String(lot.item))))) return false;
+    const baseMarket = location === FANTASY_FRONTIER_BASE && id === 'market';
+    if (key !== shopKey(location, id) || !Object.hasOwn(FANTASY_SETTLEMENTS, location) && !baseMarket || !building(id) || !local({ location } as FantasyCharacter, id) || !object(shop)
+      || !fields(shop, ['revision', 'epoch', 'lots'], ['period']) || !integer(shop.revision) || !integer(shop.epoch) || shop.period!==undefined&&shop.period!==24 || !Array.isArray(shop.lots) || shop.lots.length > 500) return false;
+    const allowedStock = new Set(fantasyBuildingStock({ location }, id));
+    if (shop.lots.some(lot => !object(lot) || !fields(lot, ['id', 'item', 'count', 'native'], ['food', 'gear', 'interiorMap']) || !text(lot.id) || typeof lot.native !== 'boolean'
+      || !validFantasyEconomyParcel({ item: lot.item, count: lot.count, ...(lot.food ? { food: lot.food } : {}), ...(lot.gear && object(lot.gear) ? { instance: lot.gear.id, gear: lot.gear } : {}), ...(lot.interiorMap && object(lot.interiorMap) ? { instance: lot.interiorMap.id, interiorMap: lot.interiorMap } : {}) }, at) || lot.native && (lot.id !== `stock-${lot.item}` || !allowedStock.has(String(lot.item)) || lot.gear !== undefined || Number(lot.count) > (baseMarket ? FANTASY_FRONTIER_SUPPLIES[String(lot.item)] ?? 0 : capacity(String(lot.item)))))) return false;
     if (new Set(shop.lots.map(lot => lot.id)).size !== shop.lots.length) return false;
+  }
+  if (v.merchants !== undefined) {
+    if (!object(v.merchants) || Object.keys(v.merchants).length > 300) return false;
+    for (const [road, stock] of Object.entries(v.merchants)) {
+      const nodes = road.split('~');
+      if (nodes.length > 2 || nodes.some(id => !FANTASY_LOCATIONS.some(place => place.id === id)) || nodes.length === 2 && (nodes[0] >= nodes[1] || !FANTASY_ROUTES.some(route => route.mode === 'land' && (route.from === nodes[0] && route.to === nodes[1] || route.to === nodes[0] && route.from === nodes[1])))
+        || !object(stock) || !fields(stock, ['day', 'revision', 'lots']) || !integer(stock.day) || !integer(stock.revision) || !Array.isArray(stock.lots)) return false;
+      const expected = fantasyMapMerchantStock(road, stock.day);
+      if (stock.lots.length !== expected.length || stock.lots.some((lot, index) => !object(lot) || !fields(lot, ['item', 'count']) || lot.item !== expected[index].item || !integer(lot.count, 0, 1))) return false;
+    }
   }
   for (const [id, trade] of Object.entries(v.trades)) {
     if (!token(id) || !object(trade) || trade.id !== id || !fields(trade, ['id', 'revision', 'users', 'generations', 'names', 'location', 'expiresAt', 'status', 'offers']) || !integer(trade.revision)
@@ -88,22 +116,38 @@ export function validFantasyEconomyLedger(v: unknown): v is FantasyEconomyLedger
       || !Array.isArray(trade.generations) || trade.generations.length !== 2 || !trade.generations.every(n => integer(n, 1))
       || !Array.isArray(trade.names) || trade.names.length !== 2 || !trade.names.every(text) || !Object.hasOwn(FANTASY_SETTLEMENTS, String(trade.location))
       || !hour(trade.expiresAt) || !['open', 'completed', 'cancelled'].includes(String(trade.status)) || !Array.isArray(trade.offers) || trade.offers.length !== 2) return false;
-    if (trade.offers.some(offer => !object(offer) || !fields(offer, ['gold', 'goods', 'confirmed']) || !integer(offer.gold, 0, 1_000_000_000) || typeof offer.confirmed !== 'boolean' || !Array.isArray(offer.goods) || offer.goods.length > 12 || !offer.goods.every(validParcel)
+    if (trade.offers.some(offer => !object(offer) || !fields(offer, ['gold', 'goods', 'confirmed']) || !integer(offer.gold, 0, 1_000_000_000) || typeof offer.confirmed !== 'boolean' || !Array.isArray(offer.goods) || offer.goods.length > 12 || !offer.goods.every(good => validFantasyEconomyParcel(good, Math.min(at, Number(trade.expiresAt))))
       || new Set(offer.goods.map(good => `${good.item}:${good.instance ?? ''}`)).size !== offer.goods.length)) return false;
   }
   return true;
 }
-function nativeLot(item: string, epoch: number): FantasyEconomyShopLot {
-  const count = capacity(item);
+function nativeLot(item: string, epoch: number, quantity?:number): FantasyEconomyShopLot {
+  const count = quantity??capacity(item);
   return { id: `stock-${item}`, item, count, native: true, ...(foodMeta(item) ? { food: [{ id: `food-stock-${item}-${epoch}`, item, count, createdAt: epoch * RESTOCK_HOURS }] } : {}) };
 }
-function effectiveShop(ledger: FantasyEconomyLedger, location: string, id: FantasyBuildingId, now: number): FantasyEconomyShop {
-  const epoch = Math.floor(now / RESTOCK_HOURS), prior = ledger.shops[shopKey(location, id)], stock = fantasyBuildingStock({ location }, id);
-  if (!prior) return { revision: 0, epoch, lots: stock.map(item => nativeLot(item, epoch)) };
+export function fantasyRareMapStock(location:string,day:number,item:string):boolean {
+  let hash=2166136261;
+  for(const char of `${location}:${day}:${item}`){hash^=char.charCodeAt(0);hash=Math.imul(hash,16777619);}
+  return (hash>>>0)%10000<300;
+}
+function supplyHash(value:string):number{let hash=2166136261;for(const ch of value){hash^=ch.charCodeAt(0);hash=Math.imul(hash,16777619);}return hash>>>0;}
+function guildSupplyStock(location:string,day:number,items:string[]):string[]{
+  return [...items].sort((a,b)=>supplyHash(`${location}:${day}:${a}`)-supplyHash(`${location}:${day}:${b}`)).slice(0,4+supplyHash(`${location}:${day}:slots`)%3);
+}
+function effectiveShop(ledger: FantasyEconomyLedger, location: string, id: FantasyBuildingId, now: number, available?: string[]): FantasyEconomyShop {
+  const epoch = Math.floor(now / RESTOCK_HOURS), prior = ledger.shops[shopKey(location, id)], retreatStock=fantasyRetreatMarketStock(location,epoch);
+  const pool = (available ?? fantasyBuildingStock({ location }, id)).filter(item=>FANTASY_RETREAT_MAPS.some(map=>map.item===item)?id==='market'&&retreatStock.some(lot=>lot.item===item):!mapOf(item)?.rare||id==='market'&&fantasyRareMapStock(location,epoch,item));
+  const stock=id==='guild'?guildSupplyStock(location,epoch,pool):pool;
+  const create=(item:string)=>nativeLot(item,epoch,location===FANTASY_FRONTIER_BASE?FANTASY_FRONTIER_SUPPLIES[item]:id==='guild'?1+supplyHash(`${location}:${epoch}:${item}:count`)%3:undefined);
+  if (!prior) return { revision: 0, epoch, period:24, lots: stock.map(create) };
   const result = structuredClone(prior);
-  if (epoch > prior.epoch) {
+  if(result.period===undefined){result.epoch=Math.floor(result.epoch*6/24);result.period=24;result.revision++;}
+  if(id==='guild'&&result.epoch===epoch&&(result.lots.filter(lot=>lot.native).length>6||result.lots.some(lot=>lot.native&&lot.count>3))){
+    result.lots=[...stock.map(create),...result.lots.filter(lot=>!lot.native)];result.revision++;
+  }
+  if (epoch > result.epoch) {
     result.epoch = epoch; result.revision++;
-    result.lots = [...stock.map(item => nativeLot(item, epoch)), ...result.lots.filter(lot => !lot.native && !lot.food?.some(food => fantasyFoodLotQuality({ hour: now }, food) === 'spoiled'))];
+    result.lots = [...stock.map(create), ...result.lots.filter(lot => !lot.native && !lot.food?.some(food => fantasyFoodLotQuality({ hour: now }, food) === 'spoiled'))];
   }
   return result;
 }
@@ -113,9 +157,10 @@ const tradedPeer = (trade: FantasyEconomyTrade, profiles: ReadonlyMap<string, Fa
 function syncLedger(ledger: FantasyEconomyLedger, profiles: ReadonlyMap<string, FantasyProfile>, actor: string, context: FantasyEconomyContext) {
   const next = structuredClone(ledger), c = profiles.get(actor)?.character; let changed = false;
   if (c) for (const b of fantasyBuildings(c)) {
-    if (!fantasyBuildingStock(c, b.id).length && !['market', 'archaeology'].includes(b.id)) continue;
-    const key = shopKey(c.location, b.id), shop = effectiveShop(next, c.location, b.id, context.hour);
-    if (!next.shops[key] || shop.epoch !== next.shops[key].epoch) { next.shops[key] = shop; changed = true; }
+    const available = fantasyBuildingStock(c, b.id);
+    if (!available.length && !['market', 'archaeology'].includes(b.id)) continue;
+    const key = shopKey(c.location, b.id), shop = effectiveShop(next, c.location, b.id, context.hour, available);
+    if (!next.shops[key] || shop.epoch !== next.shops[key].epoch || next.shops[key].period!==24) { next.shops[key] = shop; changed = true; }
   }
   for (const trade of Object.values(next.trades)) if (trade.status === 'open' && trade.users.includes(actor)
     && (trade.expiresAt <= context.hour || !tradedPeer(trade, profiles, context))) { trade.status = 'cancelled'; changed = true; }
@@ -128,7 +173,16 @@ export function closeFantasyEconomyTrades(ledger: FantasyEconomyLedger): Fantasy
   if (changed) next.revision++;
   return next;
 }
+function reservedBagCount(character: FantasyCharacter, item: string): number {
+  return (fantasyNormalBagId(character) === item ? 1 : 0) + fantasyEquippedMagicBags(character).filter(id => id === item).length;
+}
 function take(character: FantasyCharacter, selection: FantasyEconomySelection, quality?: FantasyFoodQuality): FantasyEconomyParcel | undefined {
+  if (itemOf(selection.item)?.category === 'guild-loan' || (character.inventory[selection.item] ?? 0) - selection.count < reservedBagCount(character, selection.item)) return;
+  if (selection.item === FANTASY_INTERIOR_MAP_ITEM) {
+    if (selection.count !== 1 || quality) return;
+    const interiorMap = takeFantasyInteriorMap(character, selection.instance);
+    return interiorMap ? { item: selection.item, count: 1, instance: interiorMap.id, interiorMap } : undefined;
+  }
   const ownedGear = character.gear?.filter(g => g.item === selection.item) ?? [], gear = selection.instance ? ownedGear.find(g => g.id === selection.instance) : undefined;
   if (selection.instance && (!gear || selection.count !== 1) || !selection.instance && !foodMeta(selection.item) && (character.inventory[selection.item] ?? 0) - ownedGear.length < selection.count) return undefined;
   const parcel: FantasyEconomyParcel = { ...selection, ...(gear ? { gear: structuredClone(gear) } : {}) };
@@ -147,10 +201,22 @@ function take(character: FantasyCharacter, selection: FantasyEconomySelection, q
   return parcel;
 }
 function takeExact(character: FantasyCharacter, parcel: FantasyEconomyParcel): boolean {
+  if (itemOf(parcel.item)?.category === 'guild-loan' || (character.inventory[parcel.item] ?? 0) - parcel.count < reservedBagCount(character, parcel.item)) return false;
+  if (parcel.item === FANTASY_INTERIOR_MAP_ITEM) {
+    if (!parcel.interiorMap || JSON.stringify(character.interiorMaps?.find(copy => copy.id === parcel.instance)) !== JSON.stringify(parcel.interiorMap)) return false;
+    return !!takeFantasyInteriorMap(character, parcel.instance);
+  }
   if (parcel.food) {
-    if (parcel.food.some(food => !character.foodLots.some(current => current.id === food.id && current.item === food.item && current.createdAt === food.createdAt && current.count >= food.count))) return false;
-    const quality = parcel.food.every(f => fantasyFoodLotQuality(character, f) === 'fresh') ? 'fresh' : parcel.food.some(f => fantasyFoodLotQuality(character, f) === 'spoiled') ? 'spoiled' : 'stale';
+    const currentFood: FantasyFoodLot[] = [];
+    for (const food of parcel.food) {
+      const current = character.foodLots.find(lot => lot.id === food.id && lot.item === food.item && lot.createdAt === food.createdAt && lot.count >= food.count);
+      if (!current || !validFantasyFoodPreservation(current, character.hour) || (current.preservedHours ?? 0) < (food.preservedHours ?? 0) || (current.preservationAt ?? current.createdAt) < (food.preservationAt ?? food.createdAt)) return false;
+      currentFood.push({ ...current, count: food.count });
+    }
+    const quality = currentFood.every(f => fantasyFoodLotQuality(character, f) === 'fresh') ? 'fresh' : currentFood.some(f => fantasyFoodLotQuality(character, f) === 'spoiled') ? 'spoiled' : 'stale';
     if (quality !== parcel.quality) return false;
+    // 成約時の実物の保存履歴を渡し、提示後の正常な時間経過を許す。
+    parcel.food = currentFood;
     for (const food of parcel.food) character.foodLots.find(current => current.id === food.id)!.count -= food.count;
     character.foodLots = character.foodLots.filter(food => food.count > 0);
     if (!fantasySpendItem(character, parcel.item, parcel.count)) return false;
@@ -161,6 +227,7 @@ function takeExact(character: FantasyCharacter, parcel: FantasyEconomyParcel): b
   return fantasySpendItem(character, parcel.item, parcel.count, parcel.instance);
 }
 function deliver(character: FantasyCharacter, parcel: FantasyEconomyParcel | FantasyEconomyShopLot, count: number, suffix: string) {
+  if (parcel.item === FANTASY_INTERIOR_MAP_ITEM) return count === 1 && !!parcel.interiorMap && deliverFantasyInteriorMap(character, parcel.interiorMap);
   if (!Number.isSafeInteger((character.inventory[parcel.item] ?? 0) + count)) return false;
   character.inventory[parcel.item] = (character.inventory[parcel.item] ?? 0) + count;
   if (parcel.gear) { character.gear ??= []; character.gear.push({ ...structuredClone(parcel.gear), id: `gear-exchange-${suffix}`.slice(0, 115) }); }
@@ -172,6 +239,19 @@ function deliver(character: FantasyCharacter, parcel: FantasyEconomyParcel | Fan
     }
   }
   return true;
+}
+export function takeFantasyEconomyParcel(character: FantasyCharacter, selection: FantasyEconomySelection, quality?: FantasyFoodQuality): FantasyEconomyParcel | undefined {
+  if (!known(selection.item) || !integer(selection.count, 1, 999)) return;
+  const draft = structuredClone(character), parcel = take(draft, selection, quality);
+  if (!parcel) return;
+  Object.assign(character, draft); return parcel;
+}
+export function deliverFantasyEconomyParcel(character: FantasyCharacter, parcel: FantasyEconomyParcel, count: number, suffix: string): boolean {
+  if (!validFantasyEconomyParcel(parcel, character.hour) || !integer(count, 1, parcel.count) || (parcel.gear || parcel.interiorMap) && count !== 1) return false;
+  if ((character.gear?.length ?? 0) + (parcel.gear ? 1 : 0) > 1000 || character.foodLots.length + (parcel.food?.length ?? 0) > 1000) return false;
+  const draft = structuredClone(character);
+  if (!deliver(draft, parcel, count, suffix)) return false;
+  Object.assign(character, draft); return true;
 }
 function demand(shop: FantasyEconomyShop, item: string) {
   const total = shop.lots.filter(lot => lot.item === item).reduce((sum, lot) => sum + lot.count, 0), cap = capacity(item);
@@ -186,28 +266,66 @@ function lotPrice(c: FantasyCharacter, shop: FantasyEconomyShop, lot: FantasyEco
   const age = lot.food?.some(food => fantasyFoodLotQuality(c, food) === 'spoiled') ? 0 : lot.food?.some(food => fantasyFoodLotQuality(c, food) === 'stale') ? .65 : 1;
   if (!age) return 0;
   const craftsmanship = lot.gear ? 1 + (lot.gear.quality - 1) * .12 : 1;
-  return fantasyPrice(c, Math.max(1, Math.ceil(basePrice(lot.item) * demand(shop, lot.item) * age * craftsmanship * Math.max(.75, Math.min(1.5, multiplier)))), 'goods');
+  return fantasyPrice(c, Math.max(1, Math.ceil((lot.interiorMap ? fantasyInteriorMapValue(lot.interiorMap) : basePrice(lot.item)) * demand(shop, lot.item) * age * craftsmanship * Math.max(.75, Math.min(1.5, multiplier)))), 'goods');
+}
+// ギルドは同じ品の現在の通常売価を参照し、実際の購入にも同じ見積もりを使う。
+function purchasePrice(ledger:FantasyEconomyLedger,c:FantasyCharacter,buildingId:FantasyBuildingId,shop:FantasyEconomyShop,lot:FantasyEconomyShopLot,multiplier=1,references?:(id:FantasyBuildingId)=>FantasyEconomyShop|undefined):number{
+  const own=lotPrice(c,shop,lot,multiplier);if(buildingId!=='guild'||!own)return own;
+  const prices=[own,fantasyPrice(c,Math.max(1,Math.ceil(basePrice(lot.item)*Math.max(.75,Math.min(1.5,multiplier)))),'goods')];
+  for(const id of ['market','tower','alchemist'] as const){
+    const reference=references?references(id):local(c,id)?effectiveShop(ledger,c.location,id,c.hour):undefined;
+    if(!reference)continue;
+    for(const same of reference.lots)if(same.item===lot.item&&same.count>0&&(!same.gear&&!lot.gear||same.gear?.quality===lot.gear?.quality))prices.push(lotPrice(c,reference,same,multiplier));
+  }
+  return Math.max(1,Math.floor(Math.min(...prices.filter(price=>price>0))*fantasyGuildSupplyPriceMultiplier(fantasyRegisteredGuildGrade(c))));
 }
 function salePrice(shop: FantasyEconomyShop, group: { item: string; unitPrice: number }) {
   return Math.max(1, Math.min(group.unitPrice, Math.floor(group.unitPrice * demand(shop, group.item))));
 }
+function merchantAvailable(p: FantasyProfile | undefined, at: number): p is FantasyProfile & { character: FantasyCharacter } {
+  return !!p?.character && !p.death && p.character.hp > 0 && !p.activity && !p.combatId && p.event === FANTASY_MAP_MERCHANT_EVENT && fantasyMapMerchantDaylight(at);
+}
+function effectiveMerchant(ledger: FantasyEconomyLedger, road: string, day: number): FantasyEconomyMerchant | undefined {
+  const prior = ledger.merchants?.[road];
+  if (prior && prior.day > day) return;
+  return prior?.day === day ? structuredClone(prior) : { day, revision: 0, lots: fantasyMapMerchantStock(road, day) };
+}
 export function fantasyEconomyState(ledger: FantasyEconomyLedger, profiles: ReadonlyMap<string, FantasyProfile>, actor: string, context: FantasyEconomyContext): FantasyEconomyState {
   const p = profiles.get(actor), c = p?.character;
   if (!c) return { revision: ledger.revision, location: null, peers: [], shops: [], trades: [] };
+  const now = { ...c, hour: context.hour }, buildings = fantasyBuildings(c), localBuildings = new Set(buildings.map(b => b.id));
+  // 価格や鮮度を別の呼出しに持ち越さない。
+  const stocks = new Map<FantasyBuildingId, string[]>(), shops = new Map<FantasyBuildingId, FantasyEconomyShop>();
+  const stockFor = (id: FantasyBuildingId) => {
+    if (!stocks.has(id)) stocks.set(id, fantasyBuildingStock(c, id));
+    return stocks.get(id)!;
+  };
+  const shopFor = (id: FantasyBuildingId) => {
+    if (!shops.has(id)) shops.set(id, effectiveShop(ledger, c.location, id, context.hour, stockFor(id)));
+    return shops.get(id)!;
+  };
+  const referenceFor = (id: FantasyBuildingId) => localBuildings.has(id) ? shopFor(id) : undefined;
+  let sales: ReturnType<typeof fantasySaleGroups> | undefined;
+  const road = fantasyMapMerchantRoad(c), merchant = merchantAvailable(p, context.hour) && effectiveMerchant(ledger, road, Math.floor(context.hour / 24));
   return { revision: ledger.revision, location: c.location,
+    ...(merchant ? { merchant: { npc: FANTASY_MAP_MERCHANT_NPC, road, day: merchant.day, revision: merchant.revision,
+      offers: merchant.lots.filter(lot => lot.count > 0).map(lot => ({ ...lot, unitPrice: basePrice(lot.item) })) } } : {}),
     peers: context.peers.filter(user => user !== actor && idle(profiles.get(user)) && profiles.get(user)!.character!.location === c.location).map(id => ({ id, name: profiles.get(id)!.character!.name })),
-    shops: fantasyBuildings(c).filter(b => fantasyBuildingStock(c, b.id).length || ['market', 'archaeology'].includes(b.id)).map(b => {
-      const shop = effectiveShop(ledger, c.location, b.id, context.hour), now = { ...c, hour: context.hour };
-      const visible = [...shop.lots, ...fantasyBuildingStock(c, b.id).filter(item => !shop.lots.some(lot => lot.id === `stock-${item}`)).map(item => ({ ...nativeLot(item, shop.epoch), count: 0 }))];
-      return { building: b.id, revision: shop.revision, restockAt: (shop.epoch + 1) * RESTOCK_HOURS,
-        lots: visible.filter(lot => lotPrice(now, shop, lot, context.priceMultiplier) > 0).map(lot => ({ id: lot.id, item: lot.item, count: lot.count, unitPrice: lotPrice(now, shop, lot, context.priceMultiplier), ...(lot.gear ? { gearQuality: lot.gear.quality } : {}) })),
-        sales: fantasySaleGroups(now).filter(group => sellableHere(now, b.id, group.item)).map(group => ({ key: group.key, item: group.item, count: group.count,
+    shops: buildings.filter(b => stockFor(b.id).length || ['market', 'archaeology'].includes(b.id)).map(b => {
+      const shop = shopFor(b.id);
+      const visible = b.id==='guild'?shop.lots:[...shop.lots, ...stockFor(b.id).filter(item => !mapOf(item)?.rare&&!shop.lots.some(lot => lot.id === `stock-${item}`)).map(item => ({ ...nativeLot(item, shop.epoch), count: 0 }))];
+      return { building: b.id, revision: shop.revision, open:fantasyFacilityOpen(b.id,context.hour), restockAt: (shop.epoch + 1) * RESTOCK_HOURS,
+        lots: visible.flatMap(lot => {
+          const unitPrice = purchasePrice(ledger,now,b.id,shop,lot,context.priceMultiplier,referenceFor);
+          return unitPrice > 0 ? [{ id: lot.id, item: lot.item, count: lot.count, unitPrice, ...(lot.gear ? { gearQuality: lot.gear.quality } : {}), ...(lot.interiorMap ? { interiorMap: structuredClone(lot.interiorMap) } : {}) }] : [];
+        }),
+        sales: (sales ??= fantasySaleGroups(now)).filter(group => sellableHere(now, b.id, group.item)).map(group => ({ key: group.key, item: group.item, count: group.count,
           unitPrice: salePrice(shop, group), canSell: group.canSell, ...(group.quality ? { quality: group.quality } : {}), ...(group.instance ? { instance: group.instance } : {}) })),
       };
     }),
     trades: Object.values(ledger.trades).filter(trade => trade.users.includes(actor) && (trade.status !== 'open' || trade.expiresAt > context.hour && tradedPeer(trade, profiles, context)))
       .slice(-8).map(trade => ({ id: trade.id, revision: trade.revision, mine: trade.users.indexOf(actor) as 0 | 1, users: [...trade.users], names: [...trade.names], expiresAt: trade.expiresAt, status: trade.status,
-        offers: trade.offers.map(offer => ({ gold: offer.gold, confirmed: offer.confirmed, items: offer.goods.map(good => ({ item: good.item, count: good.count, ...(good.instance ? { instance: good.instance, gearQuality: good.gear!.quality } : {}), ...(good.quality ? { quality: good.quality } : {}) })) })) })),
+        offers: trade.offers.map(offer => ({ gold: offer.gold, confirmed: offer.confirmed, items: offer.goods.map(good => ({ item: good.item, count: good.count, ...(good.instance ? { instance: good.instance, gearQuality: good.gear?.quality ?? good.interiorMap?.quality } : {}), ...(good.quality ? { quality: good.quality } : {}), ...(good.interiorMap ? { interiorMap: structuredClone(good.interiorMap) } : {}) })) })) })),
   };
 }
 export function fantasyEconomyShopQuote(state: FantasyEconomyState, id: FantasyBuildingId, item: string, lot?: string) {
@@ -221,12 +339,31 @@ export function applyFantasyEconomyCommand(ledger: FantasyEconomyLedger, profile
   if (!isFantasyEconomyCommand(command) || !hour(context.hour) || !Array.isArray(context.peers) || !context.peers.includes(actor)) return unchanged(ledger, profiles, 'invalid');
   const p = profiles.get(actor), c = p?.character;
   if (!c || p!.death || c.hp <= 0) return unchanged(ledger, profiles, 'not-alive');
+  if (command.type === 'merchantBuy') {
+    if (p!.event !== FANTASY_MAP_MERCHANT_EVENT || p!.activity || p!.combatId) return unchanged(ledger, profiles, 'unavailable');
+    if (!fantasyMapMerchantDaylight(context.hour)) return unchanged(ledger, profiles, 'closed');
+    if (!token(context.token)) return unchanged(ledger, profiles, 'invalid');
+    const day = Math.floor(context.hour / 24), road = fantasyMapMerchantRoad(c), stock = effectiveMerchant(ledger, road, day);
+    if (!stock || command.day !== day || command.revision !== stock.revision) return unchanged(ledger, profiles, 'stale');
+    const lot = stock.lots.find(lot => lot.item === command.item), price = basePrice(command.item);
+    if (!lot || lot.count < 1) return unchanged(ledger, profiles, 'stock');
+    if (!price || command.quotedUnitPrice !== undefined && command.quotedUnitPrice !== price) return unchanged(ledger, profiles, 'stale');
+    if (c.gold < price) return unchanged(ledger, profiles, 'insufficient-gold');
+    const current = structuredClone(p!), cc = current.character!; cc.hour = context.hour;
+    if (!deliver(cc, { item: lot.item, count: 1 }, 1, context.token)) return unchanged(ledger, profiles, 'limit');
+    cc.gold -= price; lot.count--; stock.revision++;
+    const next = structuredClone(ledger); next.merchants ??= {}; next.merchants[road] = stock; next.revision++;
+    log(current, `지도 행상에게 ${command.item} ×1 구매 · -${price}G`);
+    const updated = new Map(profiles); updated.set(actor, current);
+    return { ledger: next, profiles: updated, changed: true };
+  }
   const synchronized = syncLedger(ledger, profiles, actor, context), next = synchronized.next, updated = new Map(profiles);
   if (command.type === 'sync') return { ledger: next, profiles: updated, changed: synchronized.changed };
   if (!idle(p) && command.type !== 'cancel') return unchanged(ledger, profiles, 'busy');
   if (!token(context.token)) return unchanged(ledger, profiles, 'invalid');
   const fail = (error: FantasyEconomyError) => unchanged(ledger, profiles, error);
   if (command.type === 'shopBuy' || command.type === 'shopSell') {
+    if(!fantasyFacilityOpen(command.building,context.hour))return fail('closed');
     if (!local(c, command.building)) return fail('unavailable');
     const key = shopKey(c.location, command.building), shop = effectiveShop(next, c.location, command.building, context.hour);
     if (shop.revision !== command.revision) return fail('stale');
@@ -234,8 +371,8 @@ export function applyFantasyEconomyCommand(ledger: FantasyEconomyLedger, profile
     if (command.type === 'shopBuy') {
       const lot = shop.lots.find(lot => lot.item === command.item && (command.lot ? lot.id === command.lot : lot.id === `stock-${command.item}`));
       if (!lot || lot.count < command.count) return fail('stock');
-      if (lot.gear && command.count !== 1) return fail('invalid');
-      const price = lotPrice(cc, shop, lot, context.priceMultiplier);
+      if ((lot.gear || lot.interiorMap) && command.count !== 1) return fail('invalid');
+      const price = purchasePrice(next,cc,command.building,shop,lot,context.priceMultiplier);
       if (!price) return fail('unavailable');
       if (command.quotedUnitPrice !== undefined && price !== command.quotedUnitPrice) return fail('stale');
       const total = price * command.count;
@@ -258,7 +395,7 @@ export function applyFantasyEconomyCommand(ledger: FantasyEconomyLedger, profile
       const total = salePrice(shop, selected) * command.count;
       if (!Number.isSafeInteger(cc.gold + total)) return fail('limit');
       cc.gold += total;
-      shop.lots.push({ id: `resale-${context.token}`, item: parcel.item, count: parcel.count, native: false, ...(parcel.food ? { food: parcel.food } : {}), ...(parcel.gear ? { gear: parcel.gear } : {}) });
+      shop.lots.push({ id: `resale-${context.token}`, item: parcel.item, count: parcel.count, native: false, ...(parcel.food ? { food: parcel.food } : {}), ...(parcel.gear ? { gear: parcel.gear } : {}), ...(parcel.interiorMap ? { interiorMap: parcel.interiorMap } : {}) });
       log(current, `상점에 ${command.item} ×${command.count} 판매 · +${total}G`);
     }
     shop.lots = shop.lots.filter(lot => lot.count > 0); shop.revision++; next.shops[key] = shop; next.revision++; updated.set(actor, current);
@@ -318,6 +455,7 @@ export function applyFantasyEconomyCommand(ledger: FantasyEconomyLedger, profile
 
 export function fantasyEconomyText(error: string, locale: 'ko' | 'en' | 'ja') {
   const labels: Record<string, [string, string, string]> = {
+    closed:['영업시간이 아닙니다. 오전 6시에 다시 문을 엽니다.','Closed for the night. Reopens at 06:00.','夜間は営業していません。午前6時に再開します。'],
     invalid: ['요청을 확인할 수 없습니다.', 'Invalid request.', '依頼を確認できません。'], busy: ['현재 행동이나 거래를 먼저 마쳐 주세요.', 'Finish the current activity or trade first.', 'いまの行動や取引を先に終えてください。'],
     'not-alive': ['지금은 거래할 수 없습니다.', 'Trading is unavailable now.', 'いまは取引できません。'], unavailable: ['이곳에서는 거래할 수 없습니다.', 'That trade is unavailable here.', 'ここでは取引できません。'],
     stale: ['내용이 바뀌었습니다. 다시 확인해 주세요.', 'The terms changed. Review them again.', '内容が変わりました。確認し直してください。'], expired: ['거래 약속이 끝났습니다.', 'This trade has expired.', '取引の約束が終了しました。'],
@@ -330,7 +468,7 @@ export function fantasyEconomyText(error: string, locale: 'ko' | 'en' | 'ja') {
 }
 
 export function fantasyEconomyLogText(source: string, locale: 'ko' | 'en' | 'ja'): string {
-  const bought = source.match(/^상점에서 (.+) ×(\d+) 구매 · -(\d+)G$/), sold = source.match(/^상점에 (.+) ×(\d+) 판매 · \+(\d+)G$/), exchange = source.match(/^(.+)와 물품 교환을 마쳤습니다\.$/);
+  const bought = source.match(/^(?:상점에서|지도 행상에게) (.+) ×(\d+) 구매 · -(\d+)G$/), sold = source.match(/^상점에 (.+) ×(\d+) 판매 · \+(\d+)G$/), exchange = source.match(/^(.+)와 물품 교환을 마쳤습니다\.$/);
   const match = bought ?? sold;
   if (match) {
     const name = itemOf(match[1])?.names?.[locale] ?? mapOf(match[1])?.name[locale] ?? itemOf(match[1])?.name ?? match[1], count = match[2], amount = match[3];

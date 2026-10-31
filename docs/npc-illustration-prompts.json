@@ -5280,6 +5280,1479 @@
         "accepted": true,
         "notes": "Visually checked complete head, distinct face and ancestry, connected arms and hands, slender female or occupation-specific male build, and regional climate clothing."
       }
+    },
+    {
+      "id": "artisan-hearth-nella",
+      "name": {
+        "ko": "넬라",
+        "en": "Nella",
+        "ja": "ネラ"
+      },
+      "age": 32,
+      "gender": "female",
+      "race": "human",
+      "homeLocation": "hearth",
+      "homeName": "hearth",
+      "wardrobe": {
+        "land": "aurelia",
+        "culture": "western",
+        "climate": "temperate",
+        "fabric": "linen-and-wool"
+      },
+      "role": {
+        "ko": "공동 주방 요리사",
+        "en": "Communal kitchen cook",
+        "ja": "共同厨房の料理人"
+      },
+      "hairColor": "copper rose",
+      "skinColor": "warm medium brown",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-hearth-nella.webp",
+      "width": 897,
+      "height": 1230,
+      "bytes": 194258,
+      "sha256": "8cb2e87106a5d6f484b32ff3879f4d600a80f934336cab89962b87dccb739a03",
+      "prompt": "Precise framing correction only. Use this existing finished Nella upper-body game portrait as the edit target. Preserve her current cute semi-SD large rounded head, big eyes, short torso, face identity, copper-rose bun, warm skin, wine-red vest, cream sleeves/apron, spoon-and-stew bowl pose, all hands and props and clean cel-shaded illustration exactly. Do NOT return to realistic LD proportions. The uppermost bun is pressed against/cut by the top border. ZOOM THE ENTIRE ILLUSTRATION OUT by about15percent and place it fully inside a larger clear transparent canvas. Reconstruct the complete natural curved TOP of the bun and every hair tip. Leave an OBVIOUS empty transparent strip ABOVE all hair, roughly15percent of canvas height, and clear transparent strips on both sides and below the waist. The hair silhouette must be visibly closed and floating INSIDE the image, not touching any border. End the figure just below the waist; do not add legs or change anything into full body. Keep the existing drawing style and anatomy intact, no new objects, extra arms, new face or costume changes. Genuine transparent alpha background, no solid colour, fake checkerboard, backdrop, text or watermark.",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/final/artisan-hearth-nella-v1.png"
+      ],
+      "stylePassPrompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Nella, age32, female human, home hearth. Regional culture: western. Climate: temperate. Keep the target draft costume appropriate to that region and the same occupational objects.  Recover the entire top bun and add clear transparent space above it.",
+      "canvasTrim": {
+        "left": 57,
+        "top": 33,
+        "right": 1075,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-hearth-nella.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true,
+        "framingRetake": "Recovered full top bun with transparent margin."
+      }
+    },
+    {
+      "id": "artisan-reedcross-pavel",
+      "name": {
+        "ko": "파벨",
+        "en": "Pavel",
+        "ja": "パヴェル"
+      },
+      "age": 34,
+      "gender": "male",
+      "race": "human",
+      "homeLocation": "reedcross",
+      "homeName": "reedcross",
+      "wardrobe": {
+        "land": "noctis",
+        "culture": "moon-wrap",
+        "climate": "temperate",
+        "fabric": "linen-and-wool"
+      },
+      "role": {
+        "ko": "갈대마을 제빵사",
+        "en": "Reed village baker",
+        "ja": "葦の里のパン職人"
+      },
+      "hairColor": "midnight teal",
+      "skinColor": "deep cocoa brown",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-reedcross-pavel.webp",
+      "width": 936,
+      "height": 1230,
+      "bytes": 184988,
+      "sha256": "606348b3958ad528c99c5342b61272964071eb6e6336054c62d9eadde07db2ea",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Pavel, age34, male human, home reedcross. Regional culture: moon-wrap. Climate: temperate. Keep the target draft costume appropriate to that region and the same occupational objects. \nPALETTE CORRECTION EXCEPTION: his intended skin tone is deep cocoa brown (#59362b). Make his skin clearly this deep brown, darker than the style guide and the too-light draft. Preserve all other identity, hair/clothes/pose/props details. The style guide is NOT a skin-colour reference. Keep the cute large round head and same stylized features, without realistic facial anatomy.",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-reedcross-pavel.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-galen.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 0,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-reedcross-pavel.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-emberhall-rurik",
+      "name": {
+        "ko": "루리크",
+        "en": "Rurik",
+        "ja": "ルーリク"
+      },
+      "age": 36,
+      "gender": "female",
+      "race": "dwarf",
+      "homeLocation": "emberhall",
+      "homeName": "emberhall",
+      "wardrobe": {
+        "land": "aurelia",
+        "culture": "western",
+        "climate": "temperate",
+        "fabric": "linen-and-wool"
+      },
+      "role": {
+        "ko": "길드 단조 장인",
+        "en": "Guild forging artisan",
+        "ja": "ギルドの鍛造職人"
+      },
+      "hairColor": "burnt orange",
+      "skinColor": "warm copper tan",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-emberhall-rurik.webp",
+      "width": 907,
+      "height": 1230,
+      "bytes": 188196,
+      "sha256": "1441b563f34d1342af02d3818af6312988fd6e0bdc24ffeecc3bd7062dd17c43",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Rurik, age36, female dwarf, home emberhall. Regional culture: western. Climate: temperate. Keep the target draft costume appropriate to that region and the same occupational objects. ",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-emberhall-rurik.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-mira.webp"
+      ],
+      "canvasTrim": {
+        "left": 35,
+        "top": 0,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-emberhall-rurik.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-canopy-sylven",
+      "name": {
+        "ko": "실벤",
+        "en": "Sylven",
+        "ja": "シルヴェン"
+      },
+      "age": 38,
+      "gender": "male",
+      "race": "human",
+      "homeLocation": "canopy-hall",
+      "homeName": "canopy-hall",
+      "wardrobe": {
+        "land": "sylvara",
+        "culture": "rain-hanbok",
+        "climate": "humid",
+        "fabric": "rain-weave"
+      },
+      "role": {
+        "ko": "수관 목수",
+        "en": "Canopy carpenter",
+        "ja": "樹冠の大工"
+      },
+      "hairColor": "warm dark brown",
+      "skinColor": "olive beige",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-canopy-sylven.webp",
+      "width": 936,
+      "height": 1230,
+      "bytes": 192896,
+      "sha256": "c2c4308721410bf5f0bc207097a9c2d33a3735aea56340dfa50cead84de3b3a0",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Sylven, age38, male human, home canopy-hall. Regional culture: rain-hanbok. Climate: humid. Keep the target draft costume appropriate to that region and the same occupational objects. ",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-canopy-sylven.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-galen.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 0,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-canopy-sylven.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-inkstone-hyeon",
+      "name": {
+        "ko": "현",
+        "en": "Hyeon",
+        "ja": "ヒョン"
+      },
+      "age": 40,
+      "gender": "female",
+      "race": "human",
+      "homeLocation": "inkstone-city",
+      "homeName": "inkstone-city",
+      "wardrobe": {
+        "land": "noctis",
+        "culture": "moon-wrap",
+        "climate": "temperate",
+        "fabric": "linen-and-wool"
+      },
+      "role": {
+        "ko": "묵향 필경사",
+        "en": "Inkstone scribe",
+        "ja": "墨香の筆写師"
+      },
+      "hairColor": "charcoal indigo-black",
+      "skinColor": "warm bronze brown",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-inkstone-hyeon.webp",
+      "width": 936,
+      "height": 1230,
+      "bytes": 172808,
+      "sha256": "bece7c19e497f6d4d6fdad0bdd35176d663f47295368ff2d080707f5384f7891",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Hyeon, age40, female human, home inkstone-city. Regional culture: moon-wrap. Climate: temperate. Keep the target draft costume appropriate to that region and the same occupational objects. ",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-inkstone-hyeon.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-mira.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 0,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-inkstone-hyeon.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-suncourt-elodie",
+      "name": {
+        "ko": "엘로디",
+        "en": "Elodie",
+        "ja": "エロディ"
+      },
+      "age": 42,
+      "gender": "male",
+      "race": "human",
+      "homeLocation": "suncourt",
+      "homeName": "suncourt",
+      "wardrobe": {
+        "land": "aurelia",
+        "culture": "western",
+        "climate": "temperate",
+        "fabric": "linen-and-wool"
+      },
+      "role": {
+        "ko": "왕도 재단사",
+        "en": "Court tailor",
+        "ja": "王都の仕立師"
+      },
+      "hairColor": "muted plum magenta",
+      "skinColor": "light warm beige",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-suncourt-elodie.webp",
+      "width": 915,
+      "height": 1230,
+      "bytes": 174432,
+      "sha256": "ee3361e2769a5bae521a99fedca3e6ecef6d00de5659e6a4f209e89793f1fb64",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Elodie, age42, male human, home suncourt. Regional culture: western. Climate: temperate. Keep the target draft costume appropriate to that region and the same occupational objects. ",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-suncourt-elodie.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-galen.webp"
+      ],
+      "canvasTrim": {
+        "left": 26,
+        "top": 0,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-suncourt-elodie.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-loom-mairi",
+      "name": {
+        "ko": "마이리",
+        "en": "Mairi",
+        "ja": "マイリ"
+      },
+      "age": 44,
+      "gender": "female",
+      "race": "human",
+      "homeLocation": "loom-village",
+      "homeName": "loom-village",
+      "wardrobe": {
+        "land": "sylvara",
+        "culture": "rain-hanbok",
+        "climate": "humid",
+        "fabric": "rain-weave"
+      },
+      "role": {
+        "ko": "베틀마을 직조사",
+        "en": "Loom village weaver",
+        "ja": "機織りの里の織師"
+      },
+      "hairColor": "lavender grey",
+      "skinColor": "soft honey brown",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-loom-mairi.webp",
+      "width": 1137,
+      "height": 1230,
+      "bytes": 265520,
+      "sha256": "45d172403f6c0472ea9c73ac11c84a3e8cff481660803ea7d7251ab0d3c51d05",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Mairi, age44, female human, home loom-village. Regional culture: rain-hanbok. Climate: humid. Keep the target draft costume appropriate to that region and the same occupational objects. ",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-loom-mairi.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-mira.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 0,
+        "right": 1181,
+        "bottom": 1283,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-loom-mairi.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-redweave-nadir",
+      "name": {
+        "ko": "나디르",
+        "en": "Nadir",
+        "ja": "ナディル"
+      },
+      "age": 46,
+      "gender": "male",
+      "race": "human",
+      "homeLocation": "redweave",
+      "homeName": "redweave",
+      "wardrobe": {
+        "land": "kazaran",
+        "culture": "caravan",
+        "climate": "hot",
+        "fabric": "light-linen"
+      },
+      "role": {
+        "ko": "붉은직물 가죽 장인",
+        "en": "Redweave leatherworker",
+        "ja": "赤織の革職人"
+      },
+      "hairColor": "black with bronze-grey temples",
+      "skinColor": "deep warm brown",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-redweave-nadir.webp",
+      "width": 943,
+      "height": 1230,
+      "bytes": 176522,
+      "sha256": "c8a0cfb5ad2c674ddfa8b9052f177af5d7f4d9003653008e0ad70e1698406df7",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Nadir, age46, male human, home redweave. Regional culture: caravan. Climate: hot. Keep the target draft costume appropriate to that region and the same occupational objects. Preserve clearly light linen/open or sleeveless cooling garments, with no fur or heavy winter layers. STRONGEST CORRECTION: this draft has a head much too narrow for its shoulders. Enlarge and round the head dramatically, shorten the neck and chest, and enlarge the eyes to match the released guard reference.",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-redweave-nadir.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-galen.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 10,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-redweave-nadir.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-emberhall-briska",
+      "name": {
+        "ko": "브리스카",
+        "en": "Briska",
+        "ja": "ブリスカ"
+      },
+      "age": 48,
+      "gender": "female",
+      "race": "dwarf",
+      "homeLocation": "emberhall",
+      "homeName": "emberhall",
+      "wardrobe": {
+        "land": "aurelia",
+        "culture": "western",
+        "climate": "temperate",
+        "fabric": "linen-and-wool"
+      },
+      "role": {
+        "ko": "불씨회관 보석 세공사",
+        "en": "Emberhall gemcutter",
+        "ja": "熾火館の宝石細工師"
+      },
+      "hairColor": "ice blue",
+      "skinColor": "warm tawny beige",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-emberhall-briska.webp",
+      "width": 925,
+      "height": 1230,
+      "bytes": 192168,
+      "sha256": "c949566b83eebaf1b11fecdbd021e0884bd512a271712d0190452544675b1973",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Briska, age48, female dwarf, home emberhall. Regional culture: western. Climate: temperate. Keep the target draft costume appropriate to that region and the same occupational objects. ",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-emberhall-briska.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-mira.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 0,
+        "right": 1075,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-emberhall-briska.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-sunloom-tala",
+      "name": {
+        "ko": "탈라",
+        "en": "Tala",
+        "ja": "タラ"
+      },
+      "age": 50,
+      "gender": "male",
+      "race": "human",
+      "homeLocation": "sunloom",
+      "homeName": "sunloom",
+      "wardrobe": {
+        "land": "kazaran",
+        "culture": "caravan",
+        "climate": "hot",
+        "fabric": "light-linen"
+      },
+      "role": {
+        "ko": "햇실 도공",
+        "en": "Sunloom potter",
+        "ja": "陽織の陶工"
+      },
+      "hairColor": "violet black",
+      "skinColor": "warm caramel brown",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-sunloom-tala.webp",
+      "width": 936,
+      "height": 1230,
+      "bytes": 179244,
+      "sha256": "c5eef645d880081ea3ebf40c7c6c48543f254920e3aedc578b94eacf05bd485a",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Tala, age50, male human, home sunloom. Regional culture: caravan. Climate: hot. Keep the target draft costume appropriate to that region and the same occupational objects. Preserve clearly light linen/open or sleeveless cooling garments, with no fur or heavy winter layers.",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-sunloom-tala.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-galen.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 0,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-sunloom-tala.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-mossbrook-enna",
+      "name": {
+        "ko": "엔나",
+        "en": "Enna",
+        "ja": "エンナ"
+      },
+      "age": 52,
+      "gender": "female",
+      "race": "human",
+      "homeLocation": "mossbrook",
+      "homeName": "mossbrook",
+      "wardrobe": {
+        "land": "sylvara",
+        "culture": "rain-hanbok",
+        "climate": "humid",
+        "fabric": "rain-weave"
+      },
+      "role": {
+        "ko": "이끼내 약초사",
+        "en": "Mossbrook herbalist",
+        "ja": "苔川の薬草師"
+      },
+      "hairColor": "moss silver",
+      "skinColor": "olive tan",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-mossbrook-enna.webp",
+      "width": 936,
+      "height": 1230,
+      "bytes": 219590,
+      "sha256": "fbe1d72354338fd3428bf814924f68e24c1b86565f7df0269760002cd6749417",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Enna, age52, female human, home mossbrook. Regional culture: rain-hanbok. Climate: humid. Keep the target draft costume appropriate to that region and the same occupational objects. ",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-mossbrook-enna.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-mira.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 0,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-mossbrook-enna.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-wellrest-omri",
+      "name": {
+        "ko": "옴리",
+        "en": "Omri",
+        "ja": "オムリ"
+      },
+      "age": 54,
+      "gender": "male",
+      "race": "human",
+      "homeLocation": "wellrest",
+      "homeName": "wellrest",
+      "wardrobe": {
+        "land": "kazaran",
+        "culture": "caravan",
+        "climate": "hot",
+        "fabric": "light-linen"
+      },
+      "role": {
+        "ko": "샘쉼 농부",
+        "en": "Wellrest farmer",
+        "ja": "泉憩いの農夫"
+      },
+      "hairColor": "sandy blond",
+      "skinColor": "deep sun-browned umber",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-wellrest-omri.webp",
+      "width": 936,
+      "height": 1230,
+      "bytes": 207000,
+      "sha256": "07381ab5dd1401a06a814720e4b25f18bf30c1739a02cad9570ef76892fa6a83",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Omri, age54, male human, home wellrest. Regional culture: caravan. Climate: hot. Keep the target draft costume appropriate to that region and the same occupational objects. Preserve clearly light linen/open or sleeveless cooling garments, with no fur or heavy winter layers.\nPALETTE CORRECTION EXCEPTION: his intended skin tone is deep sun-browned umber (#70452f). Make his skin clearly this deep brown, darker than the style guide and the too-light draft. Preserve all other identity, hair/clothes/pose/props details. The style guide is NOT a skin-colour reference. Keep the cute large round head and same stylized features, without realistic facial anatomy.",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-wellrest-omri.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-galen.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 0,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-wellrest-omri.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-tidehaven-petra",
+      "name": {
+        "ko": "페트라",
+        "en": "Petra",
+        "ja": "ペトラ"
+      },
+      "age": 56,
+      "gender": "female",
+      "race": "human",
+      "homeLocation": "tidehaven",
+      "homeName": "tidehaven",
+      "wardrobe": {
+        "land": "aurelia",
+        "culture": "western",
+        "climate": "temperate",
+        "fabric": "linen-and-wool"
+      },
+      "role": {
+        "ko": "물결항 어부",
+        "en": "Tidehaven fisher",
+        "ja": "潮港の漁師"
+      },
+      "hairColor": "crimson brown",
+      "skinColor": "medium warm brown",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-tidehaven-petra.webp",
+      "width": 926,
+      "height": 1230,
+      "bytes": 224030,
+      "sha256": "71b6db4d219aa6b8a62d93d4c6f491fcb6b68475dc98e955aa7eec07bf103e90",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Petra, age56, female human, home tidehaven. Regional culture: western. Climate: temperate. Keep the target draft costume appropriate to that region and the same occupational objects. ",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-tidehaven-petra.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-mira.webp"
+      ],
+      "canvasTrim": {
+        "left": 12,
+        "top": 0,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-tidehaven-petra.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-saffron-yasmin",
+      "name": {
+        "ko": "야스민",
+        "en": "Yasmin",
+        "ja": "ヤスミン"
+      },
+      "age": 58,
+      "gender": "male",
+      "race": "human",
+      "homeLocation": "saffron-port",
+      "homeName": "saffron-port",
+      "wardrobe": {
+        "land": "kazaran",
+        "culture": "caravan",
+        "climate": "hot",
+        "fabric": "light-linen"
+      },
+      "role": {
+        "ko": "향신항 교역 상인",
+        "en": "Saffron trade merchant",
+        "ja": "香辛港の交易商"
+      },
+      "hairColor": "silver teal",
+      "skinColor": "dark olive brown",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-saffron-yasmin.webp",
+      "width": 922,
+      "height": 1230,
+      "bytes": 204952,
+      "sha256": "72f8fc00ab9fb81979aa09ff789633e36d88a6d447155b3a2f822d24f1a4b249",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Yasmin, age58, male human, home saffron-port. Regional culture: caravan. Climate: hot. Keep the target draft costume appropriate to that region and the same occupational objects. Preserve clearly light linen/open or sleeveless cooling garments, with no fur or heavy winter layers.",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-saffron-yasmin.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-galen.webp"
+      ],
+      "canvasTrim": {
+        "left": 17,
+        "top": 0,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-saffron-yasmin.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-verdant-ilmar",
+      "name": {
+        "ko": "일마르",
+        "en": "Ilmar",
+        "ja": "イルマル"
+      },
+      "age": 60,
+      "gender": "female",
+      "race": "human",
+      "homeLocation": "verdant-quay",
+      "homeName": "verdant-quay",
+      "wardrobe": {
+        "land": "sylvara",
+        "culture": "rain-hanbok",
+        "climate": "humid",
+        "fabric": "rain-weave"
+      },
+      "role": {
+        "ko": "초록부두 조선 장인",
+        "en": "Verdant quay shipwright",
+        "ja": "緑の波止場の船大工"
+      },
+      "hairColor": "dusty rose grey",
+      "skinColor": "light olive beige",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-verdant-ilmar.webp",
+      "width": 936,
+      "height": 1230,
+      "bytes": 196664,
+      "sha256": "8d7dd78ae4d2b4fad3bfdb135c1be2e9303add20c47dbab87a11aeb7051c02c6",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Ilmar, age60, female human, home verdant-quay. Regional culture: rain-hanbok. Climate: humid. Keep the target draft costume appropriate to that region and the same occupational objects. ",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-verdant-ilmar.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-mira.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 0,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-verdant-ilmar.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-mooncity-serit",
+      "name": {
+        "ko": "세리트",
+        "en": "Serit",
+        "ja": "セリト"
+      },
+      "age": 62,
+      "gender": "male",
+      "race": "human",
+      "homeLocation": "mooncity",
+      "homeName": "mooncity",
+      "wardrobe": {
+        "land": "noctis",
+        "culture": "moon-wrap",
+        "climate": "cold",
+        "fabric": "lined-wool"
+      },
+      "role": {
+        "ko": "월도 마탑 연금술사",
+        "en": "Mooncity tower alchemist",
+        "ja": "月都の塔の錬金術師"
+      },
+      "hairColor": "cobalt silver",
+      "skinColor": "light warm beige",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-mooncity-serit.webp",
+      "width": 946,
+      "height": 1230,
+      "bytes": 187096,
+      "sha256": "a9832ff3006a1da4fb6959d27866ec7ac11fee128f4163ee0a9d9eae633bb1ec",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Serit, age62, male human, home mooncity. Regional culture: moon-wrap. Climate: cold. Keep the target draft costume appropriate to that region and the same occupational objects. Preserve abundantly visible fluffy fur collar/cuffs and warm lined wool while keeping the body compact.",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-mooncity-serit.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-galen.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 16,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-mooncity-serit.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-pinewatch-brann",
+      "name": {
+        "ko": "브란",
+        "en": "Brann",
+        "ja": "ブラン"
+      },
+      "age": 64,
+      "gender": "female",
+      "race": "human",
+      "homeLocation": "pinewatch",
+      "homeName": "pinewatch",
+      "wardrobe": {
+        "land": "noctis",
+        "culture": "moon-wrap",
+        "climate": "cold",
+        "fabric": "lined-wool"
+      },
+      "role": {
+        "ko": "월도 마탑 연금술사",
+        "en": "Mooncity tower alchemist",
+        "ja": "月都の塔の錬金術師"
+      },
+      "hairColor": "pearl lavender",
+      "skinColor": "warm medium brown",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-pinewatch-brann.webp",
+      "width": 951,
+      "height": 1230,
+      "bytes": 200252,
+      "sha256": "0dff75640bf6b5c32aa94b050fcd1ec4a6069e4e2a8e04be24e8ff8006f307d3",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Brann, age64, female human, home pinewatch. Regional culture: moon-wrap. Climate: cold. Keep the target draft costume appropriate to that region and the same occupational objects. Preserve abundantly visible fluffy fur collar/cuffs and warm lined wool while keeping the body compact.",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-pinewatch-brann.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-mira.webp"
+      ],
+      "canvasTrim": {
+        "left": 8,
+        "top": 34,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-pinewatch-brann.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-mossbrook-rivet",
+      "name": {
+        "ko": "리베트",
+        "en": "Rivet",
+        "ja": "リヴェト"
+      },
+      "age": 66,
+      "gender": "male",
+      "race": "human",
+      "homeLocation": "mossbrook",
+      "homeName": "mossbrook",
+      "wardrobe": {
+        "land": "sylvara",
+        "culture": "rain-hanbok",
+        "climate": "humid",
+        "fabric": "rain-weave"
+      },
+      "role": {
+        "ko": "월도 마탑 연금술사",
+        "en": "Mooncity tower alchemist",
+        "ja": "月都の塔の錬金術師"
+      },
+      "hairColor": "muted mint grey",
+      "skinColor": "light tawny beige",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-mossbrook-rivet.webp",
+      "width": 931,
+      "height": 1230,
+      "bytes": 180426,
+      "sha256": "248b33208b432fb436a39af9280ba26f2334b7ca56a04765398ad442566affd5",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Rivet, age66, male human, home mossbrook. Regional culture: rain-hanbok. Climate: humid. Keep the target draft costume appropriate to that region and the same occupational objects. ",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-mossbrook-rivet.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-galen.webp"
+      ],
+      "canvasTrim": {
+        "left": 13,
+        "top": 9,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-mossbrook-rivet.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-sunloom-dima",
+      "name": {
+        "ko": "디마",
+        "en": "Dima",
+        "ja": "ディマ"
+      },
+      "age": 68,
+      "gender": "female",
+      "race": "human",
+      "homeLocation": "sunloom",
+      "homeName": "sunloom",
+      "wardrobe": {
+        "land": "kazaran",
+        "culture": "caravan",
+        "climate": "hot",
+        "fabric": "light-linen"
+      },
+      "role": {
+        "ko": "월도 마탑 연금술사",
+        "en": "Mooncity tower alchemist",
+        "ja": "月都の塔の錬金術師"
+      },
+      "hairColor": "silver coral",
+      "skinColor": "soft warm brown",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-sunloom-dima.webp",
+      "width": 930,
+      "height": 1230,
+      "bytes": 222912,
+      "sha256": "4f6e8560a96531285e9fe5ad91f9f0d3d06883a69d47b4fff0a7d3ec4d7051c4",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Dima, age68, female human, home sunloom. Regional culture: caravan. Climate: hot. Keep the target draft costume appropriate to that region and the same occupational objects. Preserve clearly light linen/open or sleeveless cooling garments, with no fur or heavy winter layers.",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-sunloom-dima.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-mira.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 0,
+        "right": 1081,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-sunloom-dima.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-saffron-fadila",
+      "name": {
+        "ko": "파딜라",
+        "en": "Fadila",
+        "ja": "ファディラ"
+      },
+      "age": 70,
+      "gender": "male",
+      "race": "human",
+      "homeLocation": "saffron-port",
+      "homeName": "saffron-port",
+      "wardrobe": {
+        "land": "kazaran",
+        "culture": "caravan",
+        "climate": "hot",
+        "fabric": "light-linen"
+      },
+      "role": {
+        "ko": "월도 마탑 연금술사",
+        "en": "Mooncity tower alchemist",
+        "ja": "月都の塔の錬金術師"
+      },
+      "hairColor": "cream white",
+      "skinColor": "deep warm umber",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-saffron-fadila.webp",
+      "width": 916,
+      "height": 1230,
+      "bytes": 221438,
+      "sha256": "3db3312822c2fd64d05f438b3450fedff8c2a892ce4afd3d9146ba6d2dacb0de",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Fadila, age70, male human, home saffron-port. Regional culture: caravan. Climate: hot. Keep the target draft costume appropriate to that region and the same occupational objects. Preserve clearly light linen/open or sleeveless cooling garments, with no fur or heavy winter layers.\nPALETTE CORRECTION EXCEPTION: his intended skin tone is deep warm umber (#67412f). Make his skin clearly this deep brown, darker than the style guide and the too-light draft. Preserve all other identity, hair/clothes/pose/props details. The style guide is NOT a skin-colour reference. Keep the cute large round head and same stylized features, without realistic facial anatomy.",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-saffron-fadila.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-galen.webp"
+      ],
+      "canvasTrim": {
+        "left": 25,
+        "top": 0,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-saffron-fadila.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "artisan-rockshade-olek",
+      "name": {
+        "ko": "올레크",
+        "en": "Olek",
+        "ja": "オレク"
+      },
+      "age": 72,
+      "gender": "female",
+      "race": "dwarf",
+      "homeLocation": "rockshade",
+      "homeName": "rockshade",
+      "wardrobe": {
+        "land": "kazaran",
+        "culture": "caravan",
+        "climate": "hot",
+        "fabric": "light-linen"
+      },
+      "role": {
+        "ko": "길드 단조 장인",
+        "en": "Guild forging artisan",
+        "ja": "ギルドの鍛造職人"
+      },
+      "hairColor": "smoky purple grey",
+      "skinColor": "warm bronze tan",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/artisan-rockshade-olek.webp",
+      "width": 928,
+      "height": 1230,
+      "bytes": 219382,
+      "sha256": "6b417f1049a5fd4504c186892ac2c306a6d0ddea448e567ae3e1d76315b346f2",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Olek, age72, female dwarf, home rockshade. Regional culture: caravan. Climate: hot. Keep the target draft costume appropriate to that region and the same occupational objects. Preserve clearly light linen/open or sleeveless cooling garments, with no fur or heavy winter layers.",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/artisan-rockshade-olek.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-mira.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 8,
+        "right": 1073,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/artisan-rockshade-olek.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "frontier-landing-sena",
+      "name": {
+        "ko": "세나",
+        "en": "Sena",
+        "ja": "セナ"
+      },
+      "age": 46,
+      "gender": "female",
+      "race": "human",
+      "homeLocation": "frontier-landing",
+      "homeName": "frontier-landing",
+      "wardrobe": {
+        "land": "frontier",
+        "culture": "western",
+        "climate": "temperate",
+        "fabric": "linen-and-wool"
+      },
+      "role": {
+        "ko": "원정대 보급 담당",
+        "en": "Expedition Quartermaster",
+        "ja": "遠征隊の補給係"
+      },
+      "hairColor": "slate blue",
+      "skinColor": "deep olive brown",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/frontier-landing-sena.webp",
+      "width": 933,
+      "height": 1230,
+      "bytes": 187886,
+      "sha256": "cd710dc2a8ca57ff5e23f648b3650f1371e322490d72ff4d4b7271b36a374039",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Sena, age46, female human, home frontier-landing. Regional culture: western. Climate: temperate. Keep the target draft costume appropriate to that region and the same occupational objects. ",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/frontier-landing-sena.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-mira.webp"
+      ],
+      "canvasTrim": {
+        "left": 0,
+        "top": 11,
+        "right": 1077,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/frontier-landing-sena.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
+    },
+    {
+      "id": "wandering-cartographer",
+      "name": {
+        "ko": "나루",
+        "en": "Naru",
+        "ja": "ナル"
+      },
+      "age": 41,
+      "gender": "female",
+      "race": "human",
+      "homeLocation": "hearth",
+      "homeName": "hearth",
+      "wardrobe": {
+        "land": "aurelia",
+        "culture": "western",
+        "climate": "temperate",
+        "fabric": "linen-and-wool"
+      },
+      "role": {
+        "ko": "떠돌이 지도 상인",
+        "en": "Wandering cartographer",
+        "ja": "旅する地図商"
+      },
+      "hairColor": "honey gold with dark roots",
+      "skinColor": "warm deep brown",
+      "framing": "waist-up",
+      "style": "anime-waist-up-v3",
+      "tool": "built-in image_gen",
+      "file": "/fantasy/npc-illustrations/wandering-cartographer.webp",
+      "width": 897,
+      "height": 1230,
+      "bytes": 211622,
+      "sha256": "e523c266f495e548f702c7bf3e204f422a9f27d646fcf77de6be21efc7ec9cf3",
+      "prompt": "COMPREHENSIVE FINAL STYLE CORRECTION. Reference1 is the TARGET draft NPC to REDRAW, reference2 is an ALREADY RELEASED game NPC and is the authoritative illustration STYLE AND PROPORTION guide. This is not a request to copy reference2's character. REDRAW reference1 in that exact cute semi-SD style, deliberately correcting any LD drift. Preserve reference1's NPC identity, gender, age cues, ancestry, hair/skin colours, hair arrangement, outfit design and regional climate features, occupational props, expression and individual pose. Do NOT preserve LD head/body geometry: actively replace it.\n\nPROPORTION CORRECTION IS ESSENTIAL: a VERY LARGE BROAD ROUNDED head and SHORT COMPACT waist-up torso like the released guide. The full head/hair occupies approximately55–60percent of the waist-up portrait height. The neck is very short, the chin-to-waist torso compact. The head should be at least as wide as the shoulders for slender women; for men it should be almost as wide as the shoulders even when shoulders are strong/broad. DO NOT put a narrow head above wide realistic shoulders, a long neck, elongated jaw, long mature mid-face or long adult chest. Widen and round the face, shorten the mid-face and chin, make the stylized eyes visibly larger and rounder, simplify the nose and cheek planes. Adult identity comes from hair, brows, beard, expression and subtle small age lines, not realistic facial anatomy. Women stay SLENDER through shoulders/arms/waist and clothing must not inflate their torso. Men retain masculine brows/jaw/beard and sturdy or lean build but the SAME cute oversized head/short torso style; no feminization or toddler body.\n\nMATCH THE RELEASED ARTIST: clean medium tapered outlines, restrained soft cel shading with2–3 large shadow shapes, big simplified hair locks with broad flat highlights, clear stylized eyes and warm readable colour. Remove realistic strand-by-strand hair, engraved hair grooves, grainy painterly fabric, photorealistic skin and 3D rendering. Keep the occupational prop and garment silhouette individual. Preserve the draft's head/pose direction instead of giving everyone the same left tilt. Exactly one head and two natural connected arms/hands, no extra fingers or arms, no glasses covering the eyes.\n\nFRAMING: whole upper-body portrait from above COMPLETE hair/ears/any accessories to just below the waist. No full body, legs, shoes, standing floor or scenery. Leave visible clear transparent margin above the tallest hair and at both sides. Reconstruct complete curved hair/bun if the draft was clipped. Keep both hands/props naturally inside the frame. True alpha transparent background, no solid backdrop, fake checkerboard, text, watermark or border. Reference2's face, ancestry, hair colour, clothes, armour, weapon and pose must NOT be copied. Final illustration should clearly belong alongside the released NPC, while remaining this distinct NPC.\n\nTARGET IDENTITY: Naru, age41, female human, home hearth. Regional culture: western. Climate: temperate. Keep the target draft costume appropriate to that region and the same occupational objects. ",
+      "referenceImages": [
+        "E:/tonarium2/work/qa/npc-additional-illustrations/raw/wandering-cartographer.png",
+        "E:/tonarium2/client/public/fantasy/npc-illustrations/hearth-mira.webp"
+      ],
+      "canvasTrim": {
+        "left": 55,
+        "top": 11,
+        "right": 1089,
+        "bottom": 1445,
+        "transparentPadding": {
+          "top": 20,
+          "bottom": 10,
+          "left": 16,
+          "right": 16
+        }
+      },
+      "source": "work/qa/npc-illustration-sources/wandering-cartographer.png",
+      "review": {
+        "comparedWith": [
+          "hearth-mira",
+          "hearth-galen",
+          "borin"
+        ],
+        "styleCompared": true,
+        "largeRoundedHead": true,
+        "compactUpperBody": true,
+        "faceHairHandsClothingReviewed": true,
+        "regionalDressReviewed": true
+      }
     }
   ]
 }

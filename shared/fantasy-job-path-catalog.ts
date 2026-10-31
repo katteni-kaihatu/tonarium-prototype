@@ -74,6 +74,7 @@ type FieldId = keyof typeof FIELDS;
 type PathPlan = [slug: string, ko: string, en: string, ja: string, field: FieldId];
 const PLANS: Record<string, PathPlan[]> = {
   adventurer: [['ruin', '유적탐험가', 'Ruin Explorer', '遺跡探検家', 'ruins'], ['dungeon', '던전답사가', 'Dungeon Surveyor', '迷宮踏査者', 'dungeon'], ['pioneer', '개척모험가', 'Frontier Adventurer', '開拓冒険者', 'frontier'], ['slayer', '괴물토벌자', 'Monster Slayer', '怪物討伐者', 'hunt']],
+  ranger: [['tracker', '길추적자', 'Trail Tracker', '道追い', 'tracking'], ['traps', '덫길잡이', 'Trap Guide', '罠の案内人', 'traps'], ['marksman', '경계궁사', 'Watch Marksman', '見張りの射手', 'weapons'], ['warden', '숲수호자', 'Forest Warden', '森の守り手', 'defense']],
   hunter: [['tracker', '추적사냥꾼', 'Trail Hunter', '追跡狩人', 'tracking'], ['trapper', '덫사냥꾼', 'Trap Hunter', '罠猟師', 'traps'], ['beast', '마수사냥꾼', 'Magical Beast Hunter', '魔獣狩人', 'beasts'], ['bounty', '현상금사냥꾼', 'Bounty Hunter', '賞金稼ぎ', 'bounty']],
   bard: [['war', '전쟁가수', 'Battle Singer', '戦歌の歌い手', 'song'], ['court', '궁정악사', 'Court Musician', '宮廷楽師', 'court'], ['lore', '전승수집가', 'Lore Collector', '伝承収集家', 'lore'], ['illusion', '환상연주가', 'Illusion Performer', '幻奏家', 'illusion']],
   mage: [['star', '별마법사', 'Star Mage', '星の魔術師', 'star'], ['flame', '화염술사', 'Flame Mage', '炎術師', 'flame'], ['ice', '빙결술사', 'Frost Mage', '氷結術師', 'frost'], ['earth', '대지술사', 'Earth Mage', '大地術師', 'earth'], ['wind', '바람술사', 'Wind Mage', '風術師', 'wind']],

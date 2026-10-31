@@ -14,6 +14,7 @@ import { FANTASY_CONTRACT_DEADLINE_HOURS, FANTASY_CONTRACT_POST_HOURS, fantasyCo
 import { fantasyHostileEncounter } from './fantasy-encounters.ts';
 import { FantasyStore } from '../server/fantasy-store.ts';
 import type { FantasyAction, FantasyProfile } from './fantasy.ts';
+import { fantasyInstitutionPresent, fantasyQuestInstitution } from './fantasy-institutions.ts';
 
 const high = () => .999;
 function player(quest: FantasyTaskQuest, accepted = true): FantasyProfile {
@@ -42,7 +43,7 @@ function temporary(t: TestContext): string {
 }
 
 test('twenty-four distinct localized action quests use real local issuers and available activities', () => {
-  assert.equal(FANTASY_TASK_QUESTS.length, 24); assert.equal(FANTASY_QUESTS.length, 167);
+  assert.equal(FANTASY_TASK_QUESTS.length, 24); assert.equal(new Set(FANTASY_QUESTS.map(quest => quest.id)).size, FANTASY_QUESTS.length);
   for (const type of ['gather', 'craft', 'fish', 'survey']) assert.equal(FANTASY_TASK_QUESTS.filter(quest => quest.objective.type === type).length, 6);
   for (const quest of FANTASY_TASK_QUESTS) {
     assert.equal(FANTASY_QUESTS.filter(value => value.id === quest.id).length, 1);
@@ -59,8 +60,11 @@ test('twenty-four distinct localized action quests use real local issuers and av
     }
     if (objective.type === 'fish') assert.equal(fantasyFishingError(c, objective.mode), undefined);
     const land = FANTASY_LOCATIONS.find(place => place.id === quest.giver)!.land;
-    const board = ({ aurelia: 'hearth', noctis: 'inkstone-city', sylvara: 'canopy-hall', kazaran: 'sunloom', islands: 'hearth' })[land];
+    assert.ok(land !== 'frontier', `${quest.id}: these issuer quests belong to settled lands`);
+    const regionalGuild = ({ aurelia: 'hearth', noctis: 'inkstone-city', sylvara: 'canopy-hall', kazaran: 'sunloom', islands: 'hearth' })[land];
+    const source = fantasyQuestInstitution(quest), board = source === 'guild' ? regionalGuild : quest.giver;
     for (const season of ['spring', 'summer', 'autumn', 'winter']) assert.ok(fantasyContractCandidates(board, 8, season, 1).some(value => value.id === quest.id), `${quest.id}: ${season}`);
+    if (source !== 'guild' && board !== regionalGuild) assert.ok(!fantasyContractCandidates(regionalGuild, 8, 'spring', 1).some(value => value.id === quest.id), `${quest.id}: local issuer only`);
   }
 });
 
@@ -85,7 +89,7 @@ test('every task completes from its own real successful actions and reports with
   }
 });
 
-test('every possible local guild can reach each task, perform the required actions and report on foot before the latest-accept deadline', () => {
+test('every authorized posting venue can reach its task and report on foot before the latest-accept deadline', () => {
   const footHours = (from: string, destination: string) => {
     const distances = new Map<string, number>([[from, 0]]), remaining = new Set(FANTASY_LOCATIONS.map(place => place.id));
     while (remaining.size) {
@@ -102,9 +106,12 @@ test('every possible local guild can reach each task, perform the required actio
   const latestWindow = FANTASY_CONTRACT_DEADLINE_HOURS - FANTASY_CONTRACT_POST_HOURS;
   for (const quest of FANTASY_TASK_QUESTS) {
     const hours = (quest.objective.type === 'gather' ? 2 : quest.objective.type === 'fish' ? quest.objective.mode === 'sea' ? 4 : 2 : 3) * quest.objective.count;
-    const boards = FANTASY_LOCATIONS.filter(place => fantasyBuildings({ location: place.id }).some(building => building.id === 'guild') && fantasyContractCandidates(place.id, 8, 'spring', 1).some(candidate => candidate.id === quest.id));
+    const source = fantasyQuestInstitution(quest), observer = player(quest, false).character!;
+    const boards = FANTASY_LOCATIONS.filter(place => fantasyInstitutionPresent({ ...observer, location: place.id, hour: 8 }, source) && fantasyContractCandidates(place.id, 8, 'spring', 1).some(candidate => candidate.id === quest.id));
     assert.ok(boards.length, quest.id);
     for (const board of boards) {
+      if (fantasyQuestInstitution(quest) === 'guild') assert.ok(fantasyBuildings({ location: board.id }).some(building => building.id === 'guild'), quest.id);
+      else assert.equal(board.id, quest.giver, `${quest.id}: posted at its actual issuer`);
       const total = footHours(board.id, quest.destination) + hours + footHours(quest.destination, quest.giver);
       assert.ok(total < latestWindow, `${quest.id}: ${board.id} needs ${total}h but has ${latestWindow}h`);
     }

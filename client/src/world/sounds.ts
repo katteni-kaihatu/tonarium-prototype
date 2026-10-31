@@ -8,6 +8,10 @@ export function unlockEmoteAudio() {
   try { ctx ??= new AudioContext(); if (ctx.state === 'suspended') void ctx.resume().catch(() => {}); } catch { /* optional audio */ }
 }
 
+export function activeEffectAudioContext(): AudioContext | undefined {
+  return ctx?.state === 'running' ? ctx : undefined;
+}
+
 export function playChatNotification() {
   try {
     const volume = fxVolume() * 0.22;
@@ -94,6 +98,20 @@ export function playPoke() {
     tone(ctx, ctx.destination, t, 700, 1100, 0.09, 'sine', v);
     tone(ctx, ctx.destination, t + 0.13, 800, 1300, 0.09, 'sine', v);
   } catch { /* 音が出せない環境では無視 */ }
+}
+
+/** ダイスが転がる音。演出だけの任意機能なので、鳴らせない環境では黙って諦める。 */
+export function playDiceRoll(durationMs=2500) {
+  const volume = fxVolume() * 0.42;
+  if (volume <= 0.001) return;
+  try {
+    ctx ??= new AudioContext();
+    if (ctx.state !== 'running') { void ctx.resume().catch(() => {}); }
+    const t = ctx.currentTime, out = ctx.destination;
+    for (let i = 0; i < 7; i++) noise(ctx, out, t + i * 0.075 + Math.random() * 0.02, 0.05, volume);
+    tone(ctx, out, t, 240, 90, 0.2, 'square', volume * 0.22);
+    tone(ctx, out, t + 0.5, 520, 300, 0.12, 'triangle', volume * 0.3);
+  } catch { /* optional audio */ }
 }
 
 export function playSynth(id: string, distanceVolume: number) {

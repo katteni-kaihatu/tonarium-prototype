@@ -283,3 +283,29 @@ test('requests fail immediately while disconnected', async () => {
   await assert.rejects(requestSession({ t: 'leave' }), /接続されていません/);
   assert.equal(globalThis.__tonariumWs.sent.length, 0);
 });
+
+test('private RPG messages wait for the authenticated platform snapshot', () => {
+  state = { ...state, joined: true, wsConnected: true, wsReady: false, fantasyProfile: null, fantasyRanking: null };
+  onMessage({ t: 'fantasyProfile', profile: { revision: 1 } });
+  onMessage({ t: 'fantasyRanking', rows: [{ nickname: 'Hidden' }] });
+  assert.equal(state.fantasyProfile, null);
+  assert.equal(state.fantasyRanking, null);
+  state.wsReady = true;
+  onMessage({ t: 'fantasyProfile', profile: { revision: 2 } });
+  assert.equal(state.fantasyProfile.revision, 2);
+  state.joined = false;
+  onMessage({ t: 'fantasyProfile', profile: { revision: 3 } });
+  assert.equal(state.fantasyProfile.revision, 2);
+});
+
+test('replaced WebSocket cannot deliver a previous platform session’s private data', async () => {
+  const { connectWs } = await import('./ws.ts');
+  globalThis.location = { protocol: 'http:', host: 'localhost', search: '' };
+  state = { ...state, joined: true, wsConnected: true, wsReady: true, fantasyProfile: null };
+  connectWs(); const previous = globalThis.__tonariumWs;
+  connectWs(); const current = globalThis.__tonariumWs;
+  previous.onmessage({ data: JSON.stringify({ t: 'fantasyProfile', profile: { revision: 1 } }) });
+  assert.equal(state.fantasyProfile, null);
+  current.onmessage({ data: JSON.stringify({ t: 'fantasyProfile', profile: { revision: 2 } }) });
+  assert.equal(state.fantasyProfile.revision, 2);
+});

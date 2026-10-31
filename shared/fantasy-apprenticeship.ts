@@ -1,3 +1,4 @@
+import { fantasyHasJob } from './fantasy-careers.ts';
 import type { FantasyCharacter, FantasySkill } from './fantasy.ts';
 import { NPC_PUBLIC, type NpcLocale } from './npc.ts';
 import { fantasyBuildings } from './fantasy-town.ts';
@@ -16,7 +17,7 @@ export function fantasyLearnedSkills(character: Pick<FantasyCharacter, 'learnedS
 export function fantasyNpcMentorSkills(npcId: string, character?: FantasyCharacter): typeof FANTASY_MENTOR_SKILLS {
   const npc = NPC_PUBLIC.find(entry => entry.id === npcId);
   const ordinary = FANTASY_MENTOR_SKILLS.filter(skill => npc?.trainableSkills?.includes(skill.id));
-  const specialized = character && npc?.trainableJobs?.includes(character.job) ? (FANTASY_JOBS.find(job => job.id === character.job)?.skills ?? []).filter(skill => skill.unlock?.kind === 'mentor').map(skill => ({ ...skill, names: skill.names ?? { ko: skill.name, en: skill.name, ja: skill.name } })) : [];
+  const specialized = character ? FANTASY_JOBS.filter(job=>fantasyHasJob(character,job.id)&&npc?.trainableJobs?.includes(job.id)).flatMap(job=>job.skills).filter(skill => !skill.retired&&skill.unlock?.kind === 'mentor').map(skill => ({ ...skill, names: skill.names ?? { ko: skill.name, en: skill.name, ja: skill.name } })) : [];
   return [...ordinary, ...specialized];
 }
 
@@ -26,7 +27,7 @@ export function fantasyApprenticeshipError(character: FantasyCharacter, npcId: s
   if (!npc || npc.homeLocation !== character.location || !skill
     || npc.building !== 'residence' && !fantasyBuildings(character).some(building => building.id === npc.building && building.npcIds.includes(npcId))) return 'この場所でその技能を教える師はいません。';
   if ((skill.unlock?.kind === 'mentor' ? character.unlockedSkills : character.learnedSkills)?.includes(skillId)) return 'その技能はすでに習得しています。';
-  if (skill.unlock?.kind === 'mentor' && (character.jobXp[character.job] ?? 0) < (skill.unlock.jobXp ?? 0)) return 'この職業の熟練度が指導の条件に足りません。';
+  if (skill.unlock?.kind === 'mentor' && (character.jobXp[FANTASY_JOBS.find(job=>job.skills.some(s=>s.id===skill.id))?.id??character.job] ?? 0) < (skill.unlock.jobXp ?? 0)) return 'この職業の熟練度が指導の条件に足りません。';
   if (character.gold < 5) return '指導料5Gが足りません。';
   return undefined;
 }

@@ -1,5 +1,6 @@
 import type { FantasyRealmCommand, FantasyRealmState } from './fantasy-realm.ts';
 import type { FantasyPartyCommand, FantasyPartyError, FantasyPartyState } from './fantasy-party.ts';
+import type { FantasyTownPresence } from './fantasy-town-presence.ts';
 import type { Item, ItemAction, ItemKind, MediaInit } from './items.ts';
 import type { ItemVariant } from './item-variants.ts';
 import type { WorldKind } from './worlds.ts';
@@ -17,7 +18,7 @@ import type { FantasyContractBoard, FantasyContractError } from './fantasy-contr
 import type { FantasyCombatOrder, FantasyCombatState } from './fantasy-combat.ts';
 import type { FantasyCombatStartKind } from './fantasy-combat-challenges.ts';
 import type { FantasyPropertyCommand, FantasyPropertyError, FantasyPropertyState } from './fantasy-property.ts';
-import type { FantasyAccountPublic } from './fantasy-account.ts';
+import type { FantasyRankingRow } from './fantasy-ranking.ts';
 export type { FantasyCombatStartKind } from './fantasy-combat-challenges.ts';
 export type FantasyCombatCommand = { type: 'sync' } | { type: 'inspect'; target: string }
   | { type: 'start'; source: FantasyCombatStartKind; target: string; confirm?: boolean }
@@ -34,7 +35,7 @@ export type Mode = '2d' | '3d';
  * 約束事を壊す変更（メッセージの追加・意味の変更など）を入れたら +1 する。
  * hello で申告が無い・一致しないクライアントはサーバーが接続を断ち、画面は全面で更新を促す（docs/sync.md）
  */
-export const COMPAT_VERSION = 8;
+export const COMPAT_VERSION = 18;
 
 /** セッションを見られる人。省略時は public */
 export type Visibility = 'public' | 'friends' | 'groupPlus' | 'group' | 'invite';
@@ -326,15 +327,16 @@ export interface SessionSnapshot {
 
 /** WebSocket でサーバーへ送るもの（セッションの外でも使う） */
 export type HomeClientMsg =
-  | { t: 'fantasyAccountBind'; ticket: string }
-  | { t: 'fantasyAccountUnbind' }
   | { t: 'fantasyAction'; revision: number; action: FantasyAction }
+  | { t:'fantasyAid';target:string;method:'potion'|'temple'|import('./fantasy-carry-return.ts').FantasyCarryReturnMethod }
   | ({ t: 'fantasyRealmRequest' } & FantasyRealmCommand)
   | { t: 'fantasyPartyRequest'; command: FantasyPartyCommand }
   | { t: 'fantasyPropertyRequest'; command: FantasyPropertyCommand }
   | { t: 'fantasyCombatRequest'; command: FantasyCombatCommand }
   | { t: 'fantasyTestReset'; revision: number; confirm: 'RESET_LIFE' }
   | { t: 'fantasyContracts' }
+  | { t: 'fantasyGuildVisit'; locale: 'ko' | 'en' | 'ja' }
+  | { t: 'fantasyRankingRequest' }
   | ({ t: 'npcChat' } & NpcChatRequest)
   | ({ t: 'fantasyGmChat' } & FantasyGmChatRequest)
   | ({ t: 'communityContribute' } & FantasyCommunityRequest)
@@ -446,7 +448,6 @@ export const isRoomClientMsg = (m: ClientMsg): m is RoomClientMsg => Object.hasO
 
 /** WebSocket でサーバーから届くもの */
 export type HomeServerMsg =
-  | { t: 'fantasyAccountState'; account: FantasyAccountPublic | null; homeId: string; activeId: string; user?: User; error?: string }
   | { t: 'sessionCreated'; sid: string; requestId?: string }
   | { t: 'sessionResult'; requestId: string; error?: string }
   | { t: 'thumbnailRequest'; sid: string }
@@ -486,11 +487,14 @@ export type HomeServerMsg =
   | { t: 'fantasyProfile'; profile: FantasyProfile; error?: string }
   | { t: 'fantasyRealmState'; state: FantasyRealmState | null; error?: string }
   | { t: 'fantasyPartyState'; state: FantasyPartyState; error?: FantasyPartyError }
+  | { t: 'fantasyTownPresence'; state: FantasyTownPresence }
   | { t: 'fantasyPropertyState'; state: FantasyPropertyState | null; error?: FantasyPropertyError }
   | { t: 'fantasyCombatState'; state: FantasyCombatState | null; error?: string }
   | { t: 'fantasyTestMode'; enabled: boolean }
   | { t: 'fantasyLegacies'; records: FantasyLegacyRecord[] }
+  | { t: 'fantasyRanking'; rows: FantasyRankingRow[] }
   | { t: 'fantasyContractBoard'; board: FantasyContractBoard | null; error?: FantasyContractError }
+  | { t: 'fantasyGuildGreeting'; id: string; npcId: import('./npc.ts').NpcId; locale: 'ko'|'en'|'ja'; text: string; location: string; generation: number }
   | { t: 'fantasyClock'; clock: FantasyWorldClock }
   | ({ t: 'fantasyGmReply' } & FantasyGmChatResponse)
   | { t: 'communityState'; state: FantasyCommunityState | null; error?: FantasyCommunityError }

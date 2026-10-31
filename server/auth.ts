@@ -104,6 +104,7 @@ export interface AuthOptions {
   onRenamed: (account: Account) => void;
   /** ゲストの作成数を数える接続元。前段のプロキシを信頼する設定（FANTASY_TRUSTED_PROXY_IPS）に合わせる */
   clientAddress?: (req: http.IncomingMessage) => string;
+  onSessionRevoked?: (sessionKey: string) => void;
 }
 
 /** OAuth の client_id（アプリのトップページ。Misskey が読みに来て、redirect_uri の link を確かめる）と戻り先 */
@@ -146,19 +147,30 @@ export class Auth {
    * 開発時は X-Tonarium-Session（WebSocket は ?session=）を Cookie より先に読む。同じブラウザの別のタブで別人として入るため
    */
   async accountOf(req: http.IncomingMessage, query?: URLSearchParams): Promise<Account | null> {
-    const dev = this.o.devLogin ? (req.headers['x-tonarium-session'] as string | undefined) ?? query?.get('session') ?? undefined : undefined;
-    const token = dev ?? parseCookies(req.headers.cookie)[SESSION_COOKIE];
-    if (!token) return null;
+    const sessionKey = this.sessionKeyOf(req, query);
+    if (!sessionKey) return null;
     const rows = await db().select().from(authSessions).innerJoin(accounts, eq(authSessions.accountId, accounts.id))
-      .where(eq(authSessions.tokenHash, hash(token))).limit(1);
+      .where(eq(authSessions.tokenHash, sessionKey)).limit(1);
     const row = rows[0];
     if (!row) return null;
     const now = Date.now();
     if (row.auth_sessions.expiresAt.getTime() <= now) return null;
     if (row.auth_sessions.expiresAt.getTime() - now < EXTEND_BELOW) {
-      await db().update(authSessions).set({ expiresAt: new Date(now + SESSION_TTL[row.accounts.kind]) }).where(eq(authSessions.tokenHash, hash(token)));
+      await db().update(authSessions).set({ expiresAt: new Date(now + SESSION_TTL[row.accounts.kind]) }).where(eq(authSessions.tokenHash, sessionKey));
     }
     return toAccount(row.accounts);
+  }
+
+  sessionKeyOf(req: http.IncomingMessage, query?: URLSearchParams): string | null {
+    const dev = this.o.devLogin ? (req.headers['x-tonarium-session'] as string | undefined) ?? query?.get('session') ?? undefined : undefined;
+    const token = dev ?? parseCookies(req.headers.cookie)[SESSION_COOKIE];
+    return token ? hash(token) : null;
+  }
+
+  async sessionCurrent(sessionKey: string, accountId: string): Promise<boolean> {
+    const [row] = await db().select({ accountId: authSessions.accountId, expiresAt: authSessions.expiresAt }).from(authSessions)
+      .where(eq(authSessions.tokenHash, sessionKey)).limit(1);
+    return !!row && row.accountId === accountId && row.expiresAt.getTime() > Date.now();
   }
 
   async touch(accountId: string) {
@@ -348,7 +360,11 @@ export class Auth {
         }
         case 'POST /auth/logout': {
           const token = parseCookies(req.headers.cookie)[SESSION_COOKIE] ?? (this.o.devLogin ? req.headers['x-tonarium-session'] as string | undefined : undefined);
-          if (token) await db().delete(authSessions).where(eq(authSessions.tokenHash, hash(token)));
+          const sessionKey = token ? hash(token) : null;
+          if (sessionKey) {
+            await db().delete(authSessions).where(eq(authSessions.tokenHash, sessionKey));
+            this.o.onSessionRevoked?.(sessionKey);
+          }
           json(res, 200, {}, [cookie(req, SESSION_COOKIE, '', 0)]);
           return true;
         }

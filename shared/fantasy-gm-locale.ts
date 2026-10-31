@@ -1,7 +1,8 @@
-import type { FantasyCharacter, FantasyProfile, FantasySkill, FantasyStat } from './fantasy.ts';
+import type { FantasyProfile, FantasySkill, FantasyStat } from './fantasy.ts';
+import { fantasyHasJob, fantasyLifeJob } from './fantasy-careers.ts';
 import { FANTASY_WORLD_TIME_RATE } from './fantasy.ts';
 import type { FantasyGmReply, FantasyGmSourceReply } from './fantasy-gm.ts';
-import { FANTASY_EVENTS, FANTASY_ITEMS, FANTASY_JOBS, FANTASY_LOCATIONS, FANTASY_QUESTS, FANTASY_RECIPES } from './fantasy-data.ts';
+import { FANTASY_EVENTS, FANTASY_JOBS, FANTASY_LOCATIONS, FANTASY_QUESTS, FANTASY_RECIPES } from './fantasy-data.ts';
 import { fantasySkills, fantasyStats, fantasyTransports } from './fantasy-engine.ts';
 import { FANTASY_DINING, FANTASY_LODGINGS } from './fantasy-life.ts';
 import { FANTASY_MAPS, canAcquireJob, fantasyBuildings, fantasyCanCraft, fantasyCraftFacility, fantasyFrontierLocations, fantasyKnownLocations } from './fantasy-town.ts';
@@ -49,7 +50,7 @@ export function fantasyGmActivityName(profile: FantasyProfile, locale: NpcLocale
   const job = (id: string) => FANTASY_JOBS.find(value => value.id === id)?.names[locale] ?? name(id);
   switch (a.type) {
     case 'travel': return say(`${place(a.destination)}까지 이동`, `traveling to ${place(a.destination)}`, `${place(a.destination)}への移動`);
-    case 'work': return say(`${job(c.job)} 일`, `working as ${job(c.job)}`, `${job(c.job)}の仕事`);
+    case 'work': { const selected = a.career === 'life' ? fantasyLifeJob(c) ?? c.job : c.job; return say(`${job(selected)} 일`, `working as ${job(selected)}`, `${job(selected)}の仕事`); }
     case 'job': return say(`${job(a.job)} 수련`, `training as ${job(a.job)}`, `${job(a.job)}の修練`);
     case 'advanceJob': return say('전문 분야 수련', 'training in a specialty', '専門分野の修練');
     case 'priestBranch': return say('성소에서 길을 배우기', 'learning a sacred path', '聖所で道を学ぶ修練');
@@ -186,7 +187,7 @@ export function fantasyGmLocalized(profile: FantasyProfile, source: FantasyGmSou
         case 'draw': label = say(`종족 추첨 (${profile.draft.remaining}회 남음)`, `Draw a race (${profile.draft.remaining} remaining)`); break;
         case 'keep': label = say(`${name(profile.draft.candidate ?? '')} 킵`, `Keep ${name(profile.draft.candidate ?? '')}`); break;
         case 'skip': label = say('이번 후보 넘기기', 'Pass this candidate'); break;
-        case 'work': label = say(`${job(c!.job)} 일하기 (무료 · 실제 ${240 / FANTASY_WORLD_TIME_RATE}분)`, `Work as ${job(c!.job)} (free · ${240 / FANTASY_WORLD_TIME_RATE} real minutes)`); break;
+        case 'work': { const selected = a.career === 'life' ? fantasyLifeJob(c!) ?? c!.job : c!.job; label = say(`${job(selected)} 일하기 (무료 · 실제 ${240 / FANTASY_WORLD_TIME_RATE}분)`, `Work as ${job(selected)} (free · ${240 / FANTASY_WORLD_TIME_RATE} real minutes)`); break; }
         case 'explore': label = say('현재 지역 탐사 (3시간)', 'Explore here (3 game hours)'); break;
         case 'investigate': {
           const stage = c && fantasyMainStage(c, a.quest);
@@ -240,14 +241,15 @@ export function fantasyGmLocalized(profile: FantasyProfile, source: FantasyGmSou
     return { text, suggestions };
   }
   const location = FANTASY_LOCATIONS.find(value => value.id === c.location);
-  const currentJob = FANTASY_JOBS.find(value => value.id === c.job);
+  const lifeJob = fantasyLifeJob(c);
+  const careerNames = lifeJob && lifeJob !== c.job ? `${job(c.job)} · ${say('생활 직업', 'life career')} ${job(lifeJob)}` : job(c.job);
   switch (source.topic) {
     case 'invalid': text = say('현재 기록의 지역·직업 또는 이벤트를 확인할 수 없습니다. 다시 연결하여 최신 기록을 받아 주세요.', 'The location, profession or event in this record is unavailable. Reconnect to obtain the latest record.'); break;
     case 'activity': {
       const remaining = Math.max(0, profile.activity!.endsAt - c.hour);
       const realMinutes = (remaining * 60 / FANTASY_WORLD_TIME_RATE).toFixed(1);
       const activity = fantasyGmActivityName(profile, locale);
-      text = say(`지금은 ${activity} 중입니다. 현재 직업은 ${job(c.job)}입니다. 완료까지 게임 시간 약 ${remaining.toFixed(2)}시간, 실제 시간 약 ${realMinutes}분 남았습니다. 완료 후 결과가 기록됩니다.`, `You are ${activity}. Your current profession is ${job(c.job)}. About ${remaining.toFixed(2)} game hours (${realMinutes} real minutes) remain. The result is recorded when it finishes.`); break;
+      text = say(`지금은 ${activity} 중입니다. 현재 직업은 ${careerNames}입니다. 완료까지 게임 시간 약 ${remaining.toFixed(2)}시간, 실제 시간 약 ${realMinutes}분 남았습니다. 완료 후 결과가 기록됩니다.`, `You are ${activity}. Your current profession is ${careerNames}. About ${remaining.toFixed(2)} game hours (${realMinutes} real minutes) remain. The result is recorded when it finishes.`); break;
     }
     case 'event': {
       const event = FANTASY_EVENTS.find(value => value.id === profile.event)!;
@@ -267,7 +269,7 @@ export function fantasyGmLocalized(profile: FantasyProfile, source: FantasyGmSou
     case 'status': {
       const stats = fantasyStats(c);
       const gender = c.gender === 'female' ? say('여성', 'female') : c.gender === 'male' ? say('남성', 'male') : say('성별 없음', 'no gender');
-      text = `${c.name} / ${name(c.race)} / ${gender} / ${job(c.job)} Lv.${c.level}\nHP ${c.hp}/${stats.hp} · MP ${c.mp}/${stats.mp} · ${say('금화', 'Gold')} ${c.gold}\n${say('피로', 'Fatigue')} ${c.fatigue} · ${say('배고픔', 'Hunger')} ${c.hunger}\n${Object.entries(stats).filter(([key]) => key !== 'hp' && key !== 'mp').map(([key, value]) => `${stat(key as FantasyStat)} ${value}`).join(' · ')}`; break;
+      text = `${c.name} / ${name(c.race)} / ${gender} / ${careerNames} Lv.${c.level}\nHP ${c.hp}/${stats.hp} · MP ${c.mp}/${stats.mp} · ${say('금화', 'Gold')} ${c.gold}\n${say('피로', 'Fatigue')} ${c.fatigue} · ${say('배고픔', 'Hunger')} ${c.hunger}\n${Object.entries(stats).filter(([key]) => key !== 'hp' && key !== 'mp').map(([key, value]) => `${stat(key as FantasyStat)} ${value}`).join(' · ')}`; break;
     }
     case 'skills': {
       const stats = fantasyStats(c);
@@ -292,20 +294,20 @@ export function fantasyGmLocalized(profile: FantasyProfile, source: FantasyGmSou
       const selected = FANTASY_JOBS.find(value => value.id === source.subject);
       if (selected) {
         const summary = (FANTASY_TERMS.find(value => value.id === selected.id)?.summary[locale] ?? '').split('. ')[0].replace(/[.。]+$/, '');
-        text = selected.id === c.job ? say(`이미 ${job(c.job)}입니다. 다시 배울 필요가 없습니다.`, `You are already ${job(c.job)}. You do not need to learn it again.`)
+        text = fantasyHasJob(c, selected.id) ? say(`이미 ${job(selected.id)}입니다. 다시 배울 필요가 없습니다.`, `You are already ${job(selected.id)}. You do not need to learn it again.`)
           : selected.category === 'none' ? say('새 캐릭터는 무직으로 시작합니다. 배우고 싶은 직업을 알려주세요.', 'New characters start unassigned. Tell me which profession you want to learn.')
             : selected.id === 'priest' && !canAcquireJob(c, selected.id, 'gm') ? say('사제는 해당 신전의 신을 섬기는 성직자입니다. 사제 수련은 현재 지역에 신전이 있어야 합니다. 신전의 사제를 찾아가 주세요.', 'A priest serves the deity venerated at their temple. Priest training requires a temple in your current region. Visit a temple priest.')
               : say(`${job(selected.id)}: ${summary}. ${job(selected.id)} 수련을 시작할까요? 무료이며 게임 1시간, 실제 ${60 / FANTASY_WORLD_TIME_RATE}분이 걸립니다.`, `${job(selected.id)}: ${summary}. Start ${job(selected.id)} training? It is free and takes 1 game hour (${60 / FANTASY_WORLD_TIME_RATE} real minutes).`);
-      } else text = say(`현재 직업은 ${job(c.job)}입니다. 일하기는 무료이며 게임 4시간, 실제 ${240 / FANTASY_WORLD_TIME_RATE}분이 걸립니다. 완료 후 판정 결과와 임금이 기록됩니다.`, `Your current profession is ${job(c.job)}. Work is free and takes 4 game hours (${240 / FANTASY_WORLD_TIME_RATE} real minutes). The check and wages are recorded on completion.`);
+      } else text = say(`현재 직업은 ${careerNames}입니다. 일하기는 무료이며 게임 4시간, 실제 ${240 / FANTASY_WORLD_TIME_RATE}분이 걸립니다. 완료 후 판정 결과와 임금이 기록됩니다.`, `Your current profession is ${careerNames}. Work is free and takes 4 game hours (${240 / FANTASY_WORLD_TIME_RATE} real minutes). The check and wages are recorded on completion.`);
       break;
     }
     case 'craft': {
-      const recipes = FANTASY_RECIPES.filter(recipe => recipe.job === c.job);
-      const facility = fantasyCraftFacility(c.job);
+      const recipes = FANTASY_RECIPES.filter(recipe => fantasyHasJob(c, recipe.job));
+      const facility = fantasyCraftFacility(lifeJob ?? c.job);
       text = recipes.length ? recipes.map(recipe => {
         const missing = Object.entries(recipe.inputs).filter(([id, count]) => (c.inventory[id] ?? 0) < count).map(([id, count]) => `${name(id)} ×${count - (c.inventory[id] ?? 0)}`);
         const materials = Object.entries(recipe.inputs).map(([id, count]) => `${name(id)} ×${count} (${say('보유', 'held')} ${c.inventory[id] ?? 0})`).join(', ');
-        return `${materials} → ${name(recipe.output)} ×${recipe.count}. ${stat(currentJob!.stat)} DC${recipe.dc} · ${say('3시간', '3 game hours')}. ${!facility || !has(facility) ? say('현재 지역에 필요한 제작 시설이 없습니다.', 'The required crafting facility is unavailable here.') : missing.length ? `${say('부족', 'Missing')}: ${missing.join(', ')}` : fantasyCanCraft(c, recipe) ? say('제작할 수 있습니다. 결과는 실행 후 판정합니다.', 'Ready to craft. The outcome is checked after confirmation.') : say('지도를 그리는 데 필요한 지역 정보를 아직 모릅니다.', 'You do not yet know the areas needed to copy this map.')}`;
+        return `${materials} → ${name(recipe.output)} ×${recipe.count}. ${stat(FANTASY_JOBS.find(value => value.id === recipe.job)!.stat)} DC${recipe.dc} · ${say('3시간', '3 game hours')}. ${!facility || !has(facility) ? say('현재 지역에 필요한 제작 시설이 없습니다.', 'The required crafting facility is unavailable here.') : missing.length ? `${say('부족', 'Missing')}: ${missing.join(', ')}` : fantasyCanCraft(c, recipe) ? say('제작할 수 있습니다. 결과는 실행 후 판정합니다.', 'Ready to craft. The outcome is checked after confirmation.') : say('지도를 그리는 데 필요한 지역 정보를 아직 모릅니다.', 'You do not yet know the areas needed to copy this map.')}`;
       }).join('\n') : say(`${job(c.job)}의 제작법은 없습니다. 요리사·대장장이·연금술사 등 제작 직업을 배울 수 있습니다.`, `${job(c.job)} has no crafting recipes. You can learn a crafting profession such as cook, blacksmith or alchemist.`); break;
     }
     case 'quests': {

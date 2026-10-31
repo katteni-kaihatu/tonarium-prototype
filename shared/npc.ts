@@ -1,3 +1,5 @@
+import { NPC_FRONTIER_PUBLIC } from './npc-frontier.ts';
+import { FANTASY_MAP_MERCHANT_PROFILE } from './fantasy-map-merchant.ts';
 export const NPC_NAME = 'リン';
 export type NpcLocale = 'ko' | 'en' | 'ja';
 export type NpcId = string;
@@ -17,6 +19,8 @@ export interface NpcPublicProfile {
   personality: Record<NpcLocale, string>;
   speech: Record<NpcLocale, string>;
   knownTopics: Record<NpcLocale, string[]>;
+  /** Encounter-only travelers are excluded from permanent town residence and service schedules. */
+  travelOnly?: boolean;
   trainableJobs?: string[];
   trainableSkills?: string[];
 }
@@ -48,7 +52,8 @@ export const NPC_PUBLIC: NpcPublicProfile[] = [
   },
 ];
 import { NPC_RESIDENTS } from './npc-residents.ts';
-NPC_PUBLIC.push(...NPC_RESIDENTS);
+import { NPC_ARTISANS } from './npc-artisans.ts';
+NPC_PUBLIC.push(...NPC_RESIDENTS, ...NPC_ARTISANS, ...NPC_FRONTIER_PUBLIC, FANTASY_MAP_MERCHANT_PROFILE);
 
 export interface NpcChatMessage {
   id: string;

@@ -1,5 +1,6 @@
 import type { FantasyCharacter, FantasyItem, FantasyStats, FantasyTimedEffect } from './fantasy.ts';
-import { fantasyEquippedGear, validFantasyGear } from './fantasy-equipment.ts';
+import { fantasyActiveEquipmentEntries, validFantasyEquipment } from './fantasy-equipment-slots.ts';
+import { validFantasyGear } from './fantasy-equipment.ts';
 
 const STAT_KEYS = ['hp', 'mp', 'strength', 'agility', 'intelligence', 'luck', 'vitality', 'dexterity', 'charisma'] as const;
 export const FANTASY_PERMANENT_STAT_CAP = 3;
@@ -13,6 +14,12 @@ export const FANTASY_STATUS_DEFINITIONS = {
   weakness: { hours: 8, check: -2 },
 } as const;
 export type FantasyStatusId = keyof typeof FANTASY_STATUS_DEFINITIONS;
+export const FANTASY_UTILITY_EFFECT_DEFINITIONS = {
+  'skill-haste': { hours: 3, stats: { agility: 2 } },
+  'skill-regen': { hours: 3, periodicHp: 2 },
+  'skill-clarity': { hours: 3, stats: { intelligence: 2 } },
+  'skill-resolve': { hours: 3, guard: 2 },
+} as const;
 
 export function fantasyActiveEffects(character: FantasyCharacter): FantasyTimedEffect[] {
   return (character.effects ?? []).filter(effect => effect.expiresAt > character.hour);
@@ -40,11 +47,13 @@ export function fantasyEffectDamage(character: FantasyCharacter, from: number, t
   return (character.effects ?? []).reduce((sum, effect) => sum + Math.max(0, -Math.min(0, effect.periodicHp ?? 0))
     * Math.max(0, Math.floor(Math.min(to, effect.expiresAt)) - Math.floor(from)), 0);
 }
+export function fantasyEffectHealing(character: FantasyCharacter, from: number, to: number): number {
+  if (character.hp <= 0 || character.downed) return 0;
+  return (character.effects ?? []).reduce((sum, effect) => sum + Math.max(0, effect.periodicHp ?? 0)
+    * Math.max(0, Math.floor(Math.min(to, effect.expiresAt)) - Math.floor(from)), 0);
+}
 export function fantasyEquipmentItems(character: FantasyCharacter, items: readonly FantasyItem[]): FantasyItem[] {
-  return Object.entries(character.equipment ?? {}).flatMap(([slot, id]) => {
-    const item = items.find(item => item.id === id && item.equipment?.slot === slot);
-    return item && (character.inventory[item.id] ?? 0) > 0 ? [item] : [];
-  });
+  return fantasyActiveEquipmentEntries(character, items).map(entry => entry.item);
 }
 export function fantasyItemBonuses(character: FantasyCharacter, items: readonly FantasyItem[]): { stats: Partial<FantasyStats>; check: number; guard: number } {
   const stats: Partial<FantasyStats> = {};
@@ -53,10 +62,26 @@ export function fantasyItemBonuses(character: FantasyCharacter, items: readonly 
     if (bonus) stats[key] = Math.max(0, Math.min(key === 'hp' || key === 'mp' ? FANTASY_PERMANENT_RESOURCE_CAP : FANTASY_PERMANENT_STAT_CAP, bonus));
   }
   let check = 0, guard = 0;
-  for (const source of [...fantasyEquipmentItems(character, items).map(item => item.equipment!), ...fantasyEquippedGear(character).map(gear => ({ stats: gear.bonuses, check: gear.check, guard: gear.guard })), ...fantasyActiveEffects(character)]) {
+  const ancillary: Partial<FantasyStats> = {}; let ancillaryCheck = 0, ancillaryGuard = 0;
+  for (const entry of fantasyActiveEquipmentEntries(character, items)) {
+    const gear = character.gear?.find(gear => gear.id === entry.instance);
+    const limited = !['weapon', 'offhand', 'body', 'artifact'].includes(entry.slot);
+    for (const source of [entry.item.equipment!, ...(gear ? [{ stats: gear.bonuses, check: gear.check, guard: gear.guard }] : [])]) {
+      const target = limited ? ancillary : stats;
+      for (const [key, value] of Object.entries(source.stats ?? {})) target[key as keyof FantasyStats] = (target[key as keyof FantasyStats] ?? 0) + value;
+      if (limited) { ancillaryCheck += source.check ?? 0; ancillaryGuard += source.guard ?? 0; }
+      else { check += source.check ?? 0; guard += source.guard ?? 0; }
+    }
+  }
+  // 追加部位と制作加点を一緒に制限し、既存の戦闘帯を保つ。
+  for (const [key, value] of Object.entries(ancillary)) {
+    const stat = key as keyof FantasyStats, cap = stat === 'hp' || stat === 'mp' ? 20 : 3;
+    stats[stat] = (stats[stat] ?? 0) + Math.max(-cap, Math.min(cap, value));
+  }
+  check += Math.max(-2, Math.min(2, ancillaryCheck)); guard += Math.max(0, Math.min(3, ancillaryGuard));
+  for (const source of fantasyActiveEffects(character)) {
     for (const [key, value] of Object.entries(source.stats ?? {})) stats[key as keyof FantasyStats] = (stats[key as keyof FantasyStats] ?? 0) + value;
-    check += source.check ?? 0;
-    guard += source.guard ?? 0;
+    check += source.check ?? 0; guard += source.guard ?? 0;
   }
   return { stats, check: Math.max(-8, Math.min(8, check)), guard: Math.max(0, Math.min(15, guard)) };
 }
@@ -88,15 +113,11 @@ export function applyFantasyItemUse(character: FantasyCharacter, item: FantasyIt
 export function validFantasyItemState(character: FantasyCharacter, items: readonly FantasyItem[]): boolean {
   if (!validFantasyGear(character)) return false;
   const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
-  if (character.equipment !== undefined) {
-    if (!object(character.equipment) || Object.keys(character.equipment).some(slot => !['weapon', 'armor', 'accessory', 'offhand'].includes(slot))) return false;
-    const entries = Object.entries(character.equipment);
-    if (new Set(entries.map(([, id]) => id)).size !== entries.length || entries.some(([slot, id]) => !items.some(item => item.id === id && item.equipment?.slot === slot) || (character.inventory[id] ?? 0) < 1)) return false;
-  }
+  if (!validFantasyEquipment(character, items)) return false;
   if (character.permanentBonuses !== undefined && (!object(character.permanentBonuses) || Object.entries(character.permanentBonuses).some(([key, value]) => !STAT_KEYS.includes(key as typeof STAT_KEYS[number]) || !Number.isInteger(value) || Number(value) < 0 || Number(value) > (key === 'hp' || key === 'mp' ? 20 : 3)))) return false;
   if (character.effects !== undefined) {
     if (!Array.isArray(character.effects) || character.effects.length > FANTASY_MAX_EFFECTS || character.effects.some(effect => !object(effect)) || new Set(character.effects.map(effect => effect.id)).size !== character.effects.length) return false;
-    const definitions = [...Object.entries(FANTASY_STATUS_DEFINITIONS).map(([id, values]) => ({ id, ...values })), ...items.flatMap(item => item.use?.effect ? [item.use.effect] : [])];
+    const definitions = [...Object.entries({ ...FANTASY_STATUS_DEFINITIONS, ...FANTASY_UTILITY_EFFECT_DEFINITIONS }).map(([id, values]) => ({ id, ...values })), ...items.flatMap(item => item.use?.effect ? [item.use.effect] : [])];
     for (const effect of character.effects) {
       if (!object(effect) || typeof effect.expiresAt !== 'number' || !Number.isFinite(effect.expiresAt) || effect.expiresAt < 0 || effect.expiresAt > character.hour + FANTASY_MAX_EFFECT_HOURS) return false;
       if (Object.keys(effect).some(key => !['id', 'expiresAt', 'stats', 'check', 'guard', 'periodicHp', 'diceFaces', 'dicePenalty'].includes(key))) return false;

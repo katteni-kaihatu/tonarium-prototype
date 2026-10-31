@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { FantasyAction, FantasyCharacter, FantasyProfile } from './fantasy.ts';
 import { advanceFantasyWorld, applyFantasyAction, fantasyActionHours, fantasyStats, fantasyTransports, newFantasyProfile, startFantasyActivity } from './fantasy-engine.ts';
 import { FANTASY_WORLD_TIME_RATE } from './fantasy.ts';
-import { FANTASY_EVENTS, FANTASY_LOCATIONS } from './fantasy-data.ts';
+import { FANTASY_EVENTS, FANTASY_LOCATIONS, FANTASY_ITEMS } from './fantasy-data.ts';
 import { canInspectFood, FANTASY_DINING, FANTASY_FOOD_META, FANTASY_LODGINGS, fantasyNeedPenalty, foodDetails, foodSense, migrateFantasyLife, reconcileFoodLots } from './fantasy-life.ts';
 import { FANTASY_MAPS } from './fantasy-town.ts';
 
@@ -71,15 +71,17 @@ test('legacy migration only supplies absent life fields and timestamps old food 
 test('work, exploration, travel and job change charge elapsed time exactly once', () => {
   const cases: { action: FantasyAction; hours: number; job?: string }[] = [
     { action: { type: 'work' }, hours: 4 }, { action: { type: 'explore' }, hours: 3 },
-    { action: { type: 'travel', destination: 'greenwood', transport: 'foot' }, hours: 2 },
+    // The default 8.24kg of supplies adds 8.24% to the two-hour walk.
+    { action: { type: 'travel', destination: 'greenwood', transport: 'foot' }, hours: 2.1648 },
     { action: { type: 'job', job: 'cook' }, hours: 1 },
   ];
   for (const entry of cases) {
     const p = player(entry.job);
     const next = step(p, entry.action);
-    assert.equal(next.character!.hour - p.character!.hour, entry.hours);
-    assert.equal(next.character!.fatigue, entry.hours * 3);
-    assert.equal(next.character!.hunger, entry.hours * 2);
+    assert.ok(Math.abs(next.character!.hour - p.character!.hour - entry.hours) < 1e-10);
+    const elapsedWhole = Math.floor(p.character!.hour + entry.hours) - Math.floor(p.character!.hour);
+    assert.equal(next.character!.fatigue, elapsedWhole * 3);
+    assert.equal(next.character!.hunger, elapsedWhole * 2);
   }
 });
 
@@ -104,8 +106,8 @@ test('free camping recovers part of HP MP and fatigue while hunger still advance
   const next = step(p, { type: 'rest' });
   assert.equal(next.character!.gold, p.character!.gold);
   assert.equal(next.character!.hour - p.character!.hour, 8);
-  assert.equal(next.character!.hp, 30);
-  assert.equal(next.character!.mp, 8);
+  assert.equal(next.character!.hp, Math.min(fantasyStats(p.character!).hp, 10 + Math.ceil(fantasyStats(p.character!).hp * .2)));
+  assert.equal(next.character!.mp, Math.ceil(fantasyStats(p.character!).mp * .15));
   assert.equal(next.character!.fatigue, 65);
   assert.equal(next.character!.hunger, 26);
   assert.equal(next.character!.buff, null);
@@ -121,8 +123,9 @@ test('all three inn rooms apply distinct costs and recovery without counting res
     assert.equal(next.character!.hour - p.character!.hour, room.hours);
     assert.equal(next.character!.fatigue, 100 - room.fatigueRecovery);
     assert.equal(next.character!.hunger, 16);
-    assert.equal(next.character!.hp, Math.min(100, 1 + Math.ceil(100 * room.hpRecovery)));
-    assert.equal(next.character!.mp, Math.ceil(50 * room.mpRecovery));
+    const maximum = fantasyStats(p.character!);
+    assert.equal(next.character!.hp, Math.min(maximum.hp, 1 + Math.ceil(maximum.hp * room.hpRecovery)));
+    assert.equal(next.character!.mp, Math.ceil(maximum.mp * room.mpRecovery));
     hp.push(next.character!.hp); mp.push(next.character!.mp); fatigue.push(next.character!.fatigue);
   }
   assert.ok(hp[0] < hp[1] && hp[1] < hp[2]);
@@ -217,7 +220,7 @@ test('camping incidents include theft and attacks while settlement risk is lower
   rolls = [0, 0.5];
   const injured = step(attacked, { type: 'rest' }, () => rolls.shift() ?? 0.99);
   assert.ok(injured.character!.hp < 70);
-  const city = player(); city.character!.fatigue = 50;
+  const city = player(); city.character!.fatigue = 50; city.character!.inventory['rain-cape'] = 1; city.character!.outfit = 'rain-cape';
   const wilderness = structuredClone(city); wilderness.character!.location = 'greenwood';
   assert.equal(step(city, { type: 'rest' }, () => 0.1).character!.fatigue, 35);
   rolls = [0.1, 0.99];
@@ -319,7 +322,25 @@ test('spoiled ingredients cannot be laundered into fresh crafted food', () => {
   const p = player('cook');
   p.character!.hour = 30; p.character!.inventory = { meat: 2, spice: 1 };
   p.character!.foodLots = [{ id: 'old', item: 'meat', count: 2, createdAt: 0 }];
-  reject(p, { type: 'craft', recipe: 'cook-jerky' });
+  const done = step(p, { type: 'craft', recipe: 'cook-jerky' });
+  assert.equal(done.character!.inventory.meat, 0); assert.equal(done.character!.inventory.spice, 0);
+  assert.equal(done.character!.inventory.jerky ?? 0, 0);
+  assert.equal(FANTASY_ITEMS.filter(item => item.foodPenalty?.status === 'poison').reduce((sum, item) => sum + (done.character!.inventory[item.id] ?? 0), 0), 2);
+});
+
+test('ordinary recipes validate every consumed food lot after preservation changes chronological freshness', () => {
+  const p = player('cook');
+  p.character!.hour = 14; p.character!.inventory = { meat: 2, spice: 1 };
+  p.character!.foodLots = [
+    { id: 'fresh-preserved', item: 'meat', count: 1, createdAt: 0, preservedHours: 11.7, preservationAt: 13 },
+    { id: 'spoiled-younger', item: 'meat', count: 1, createdAt: 1 },
+  ];
+  const done = step(p, { type: 'craft', recipe: 'cook-jerky' });
+  assert.equal(done.character!.inventory.meat, 0); assert.equal(done.character!.inventory.spice, 0);
+  assert.equal(done.character!.inventory.jerky ?? 0, 0);
+  const poisoned = done.character!.foodLots.filter(lot => FANTASY_ITEMS.find(item => item.id === lot.item)?.foodPenalty?.status === 'poison');
+  assert.equal(poisoned.reduce((sum, lot) => sum + lot.count, 0), 2);
+  assert.ok(poisoned.every(lot => lot.createdAt === done.character!.hour));
 });
 
 test('potions restore resources without acting as meals or gaining food lots', () => {
@@ -492,15 +513,18 @@ test('scheduled lodging applies recovery once without another eight-hour jump', 
 
 test('travel does not disclose its destination or intermediate visits before arrival', () => {
   const p = player('unassigned');
+  const deadline = 8 + fantasyTransports(p.character!, 'greenwood').find(transport => transport.id === 'foot')!.hours;
   const reserved = startFantasyActivity(p, { type: 'travel', destination: 'greenwood', transport: 'foot' }, 8, high).profile;
-  assert.equal(reserved.activity?.endsAt, 10);
+  assert.equal(reserved.activity?.endsAt, deadline); assert.ok(deadline > 10, 'starting supplies add travel burden');
   const pending = advanceFantasyWorld(reserved, 9.5).profile;
   assert.equal(pending.character!.location, 'hearth');
   assert.deepEqual(pending.character!.visited, ['hearth']);
-  const done = advanceFantasyWorld(pending, 10).profile;
+  const almost = advanceFantasyWorld(pending, deadline - .001).profile;
+  assert.equal(almost.character!.location, 'hearth'); assert.deepEqual(almost.character!.visited, ['hearth']);
+  const done = advanceFantasyWorld(almost, deadline).profile;
   assert.equal(done.character!.location, 'greenwood');
   assert.ok(done.character!.visited.includes('greenwood'));
-  assert.equal(done.character!.hour, 10);
+  assert.equal(done.character!.hour, deadline);
 });
 
 test('instant actions and new characters use the world hour and create fresh initial food', () => {
@@ -509,11 +533,16 @@ test('instant actions and new characters use the world hour and create fresh ini
   assert.equal(created.character!.foodLots[0].createdAt, 500);
   assert.equal(created.log[0].hour, 500);
   assert.equal(created.activity, undefined);
-  const bought = startFantasyActivity(created, { type: 'buy', item: 'bread' }, 500, high).profile;
+  const closed = startFantasyActivity(created, { type: 'buy', item: 'bread' }, 500, high);
+  assert.ok(closed.error);
+  assert.deepEqual(closed.profile, created);
+  const purchase = startFantasyActivity(created, { type: 'buy', item: 'bread' }, 510, high);
+  assert.equal(purchase.error, undefined);
+  const bought = purchase.profile;
   assert.equal(bought.activity, undefined);
-  assert.equal(bought.character!.hour, 500);
+  assert.equal(bought.character!.hour, 510);
   assert.equal(bought.character!.inventory.bread, 1);
-  assert.equal(bought.character!.foodLots.find(lot => lot.item === 'bread')?.createdAt, 500);
+  assert.equal(bought.character!.foodLots.find(lot => lot.item === 'bread')?.createdAt, 510);
 });
 
 test('reservation validates actions and invalid clocks without spending or changing state', () => {
@@ -555,7 +584,7 @@ test('collapse cancels an unfinished journey and rescues without moving the worl
   assert.ok(done.log.every(log => log.hour <= 20));
 });
 
-test('food that spoils during crafting cancels cleanly without spending ingredients', () => {
+test('food that spoils during crafting produces harmful food and consumes ingredients without laundering it', () => {
   const p = player('cook');
   p.character!.hour = 10;
   p.character!.inventory.meat = 2;
@@ -565,19 +594,23 @@ test('food that spoils during crafting cancels cleanly without spending ingredie
   assert.ok(reserved.activity);
   const done = advanceFantasyWorld(reserved, 13).profile;
   assert.equal(done.activity, undefined);
-  assert.equal(done.character!.inventory.meat, 2);
-  assert.equal(done.character!.inventory.spice, 1);
+  assert.equal(done.character!.inventory.meat, 0);
+  assert.equal(done.character!.inventory.spice, 0);
   assert.equal(done.character!.inventory.jerky ?? 0, 0);
   assert.equal(done.character!.hour, 13);
-  assert.ok(done.log.some(log => log.text.includes('行動を完了できなかった')));
+  const poisoned = done.character!.foodLots.filter(lot => FANTASY_ITEMS.find(item => item.id === lot.item)?.foodPenalty?.status === 'poison');
+  assert.equal(poisoned.reduce((sum, lot) => sum + lot.count, 0), 2);
+  assert.ok(poisoned.every(lot => lot.createdAt === 13));
+  assert.ok(done.log.some(log => log.text.startsWith('cooking:')));
 });
 
 test('an offline journey keeps its reserved deadline after needs slow future travel and after a restart', () => {
   const p = player('unassigned');
   p.character!.hunger = 49;
   p.character!.fatigue = 49;
+  const deadline = 8 + fantasyTransports(p.character!, 'greenwood').find(transport => transport.id === 'foot')!.hours;
   const reserved = startFantasyActivity(p, { type: 'travel', destination: 'greenwood', transport: 'foot' }, 8, high).profile;
-  assert.equal(reserved.activity!.endsAt, 10);
+  assert.equal(reserved.activity!.endsAt, deadline);
   const partial = advanceFantasyWorld(reserved, 9.25).profile;
   const reloaded = JSON.parse(JSON.stringify(partial)) as FantasyProfile;
   const done = advanceFantasyWorld(reloaded, 1000).profile;
@@ -587,6 +620,6 @@ test('an offline journey keeps its reserved deadline after needs slow future tra
   assert.equal(done.character!.hour, 1000);
   assert.equal(done.character!.hunger, 53);
   assert.equal(done.character!.fatigue, 55);
-  assert.ok(done.log.some(log => log.hour === 10 && log.text.includes('2時間')));
-  assert.equal(fantasyTransports(done.character!, 'hearth').find(transport => transport.id === 'foot')?.hours, 3);
+  assert.ok(done.log.some(log => log.hour === deadline && log.text.includes(FANTASY_LOCATIONS.find(place => place.id === 'greenwood')!.name)));
+  assert.ok(fantasyTransports(done.character!, 'hearth').find(transport => transport.id === 'foot')!.hours > deadline - 8, 'needs only slow the next journey');
 });

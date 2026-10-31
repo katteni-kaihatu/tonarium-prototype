@@ -1,18 +1,26 @@
+import { fantasyHasJob } from './fantasy-careers.ts';
+import { fantasyMagicKnown, initializeFantasyMagicKnowledge, validFantasyMagicKnowledge } from './fantasy-magic-discovery.ts';
 import type { FantasyAction, FantasyCharacter, FantasyProfile, FantasyResult, FantasyStat, FantasyStats } from './fantasy.ts';
 import { FANTASY_ITEMS, FANTASY_LOCATIONS } from './fantasy-data.ts';
 import { fantasyBuildings } from './fantasy-town.ts';
 import type { NpcLocale } from './npc.ts';
 import { fantasyManaAfterSkill, fantasyManaSkillError } from './fantasy-mana.ts';
+import { fantasyCircleKnowledge, fantasyCircleNodeCapacity, fantasyCompileCircle, grantFantasyCircleBasics, validFantasyCircleKnowledge, validFantasyCircleShape, type FantasyCircleRecipe, FANTASY_CIRCLE_CORES, FANTASY_CIRCLE_RUNES } from './fantasy-magic-circle.ts';
+import { FANTASY_PATH_SUMMONS, fantasyCompanionAvailable } from './fantasy-summon-paths.ts';
+import { FANTASY_WORKER_COMPANIONS, fantasyIsWorkerCompanion, fantasyHasWorkerCompany } from './fantasy-worker-companions.ts';
+import { fantasyAlchemyFormulaKnown, fantasyAlchemyUnidentifiedFormulaName, learnFantasyAlchemyFormula } from './fantasy-alchemy-discovery.ts';
+export { fantasyCompanionAvailable } from './fantasy-summon-paths.ts';
 
 type Names = Record<NpcLocale, string>;
 const l = (ko: string, en: string, ja: string): Names => ({ ko, en, ja });
 export type FantasyCompanyKind = 'troop' | 'syndicate' | 'summons';
-export interface FantasyCompanion { id: string; condition: 'ready' | 'injured' | 'absent'; hp: number; assigned: boolean; missions: number }
-export interface FantasyPreparedSpell { slot: number; element: 'flame' | 'tide' | 'gale' | 'stone' | 'light'; form: 'bolt' | 'veil' | 'mend' }
+export interface FantasyCompanion { id: string; condition: 'ready' | 'injured' | 'absent'; hp: number; assigned: boolean; missions: number; workerLevel?: number }
+export interface FantasyPreparedSpell { slot: number; element: 'flame' | 'tide' | 'gale' | 'stone' | 'light'; form: 'bolt' | 'veil' | 'mend'; circle?: FantasyCircleRecipe }
 export interface FantasySpecializationState { companies?: Partial<Record<FantasyCompanyKind, { members: FantasyCompanion[] }>>; spells?: FantasyPreparedSpell[] }
 export type FantasySpecializationAction =
   | { type: 'command'; kind: FantasyCompanyKind; operation: 'hire' | 'assign' | 'dismiss' | 'mission' | 'recover' | 'recontract'; member?: string }
   | { type: 'magicPrepare'; slot: number; element: string; form: string }
+  | { type: 'magicCompose'; slot: number; core: string; runes: string[] }
   | { type: 'magicCast'; slot: number }
   | { type: 'alchemy'; formula: string };
 export interface FantasySpecializationContext {
@@ -26,7 +34,9 @@ const random = (rng: () => number) => Math.max(0, Math.min(1 - Number.EPSILON, N
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const integer = (value: unknown, low: number, high: number): value is number => Number.isSafeInteger(value) && Number(value) >= low && Number(value) <= high;
 
-export const FANTASY_COMPANIONS: { id: string; kind: FantasyCompanyKind; names: Names; role: Names; cost: number; mp: number; hp: number; check: number; guard: number }[] = [
+export const FANTASY_COMPANIONS: { id: string; kind: FantasyCompanyKind; names: Names; role: Names; cost: number; mp: number; hp: number; check: number; guard: number; requiresPath?: string }[] = [
+  ...FANTASY_PATH_SUMMONS,
+  ...FANTASY_WORKER_COMPANIONS,
   { id: 'troop-guard', kind: 'troop', names: l('방패 호위병', 'Shield Escort', '盾の護衛'), role: l('호위', 'Guard', '護衛'), cost: 10, mp: 0, hp: 30, check: 0, guard: 2 },
   { id: 'troop-scout', kind: 'troop', names: l('길잡이 정찰병', 'Trail Scout', '道の斥候'), role: l('정찰', 'Scout', '偵察'), cost: 12, mp: 0, hp: 24, check: 1, guard: 0 },
   { id: 'troop-carrier', kind: 'troop', names: l('짐꾼 대원', 'Company Porter', '荷運びの隊員'), role: l('지원', 'Support', '支援'), cost: 8, mp: 0, hp: 28, check: 1, guard: 0 },
@@ -70,6 +80,7 @@ const ERRORS: [string, Names][] = [
   ['この場所では仲間を募ったり契約したりできません。', l('현재 장소에서는 동료를 모집하거나 계약할 수 없습니다.', 'You cannot recruit or make that agreement here.', 'この場所では仲間を募ったり契約したりできません。')],
   ['雇用・契約に必要な金貨やMPが足りません。', l('고용·계약에 필요한 금화나 MP가 부족합니다.', 'You lack the gold or MP needed for this agreement.', '雇用・契約に必要な金貨やMPが足りません。')],
   ['編成できる元気な仲間を選んでください。', l('편성할 수 있는 건강한 동료를 선택해 주세요.', 'Choose a healthy companion who can be assigned.', '編成できる元気な仲間を選んでください。')],
+  ['戦闘に編成できる仲間は合計2人までです。', l('전투에 편성할 동료는 모두 합해 2명까지입니다.', 'You may assign at most two battle companions in total.', '戦闘に編成できる仲間は合計2人までです。')],
   ['その仲間はいません。', l('해당 동료가 없습니다.', 'That companion is not in your roster.', 'その仲間はいません。')],
   ['治療が必要な負傷した仲間を選んでください。', l('치료가 필요한 부상 동료를 선택해 주세요.', 'Choose an injured companion who needs treatment.', '治療が必要な負傷した仲間を選んでください。')],
   ['仲間の治療には宿屋か神殿と回復薬1個が必要です。', l('동료 치료에는 여관 또는 신전과 회복 물약 1개가 필요합니다.', 'Treating a companion requires an inn or temple and one recovery potion.', '仲間の治療には宿屋か神殿と回復薬1個が必要です。')],
@@ -77,6 +88,7 @@ const ERRORS: [string, Names][] = [
   ['その仲間への指示は登録されていません。', l('등록되지 않은 동료 지시입니다.', 'That companion instruction is not registered.', 'その仲間への指示は登録されていません。')],
   ['現在の職業・保存枠ではその魔法を合成できません。', l('현재 직업이나 저장 칸으로 해당 마법을 합성할 수 없습니다.', 'Your profession or available slot cannot prepare that spell.', '現在の職業・保存枠ではその魔法を合成できません。')],
   ['使える合成魔法、または必要なMPがありません。', l('사용 가능한 합성 마법이 없거나 MP가 부족합니다.', 'No usable prepared spell is available, or MP is insufficient.', '使える合成魔法、または必要なMPがありません。')],
+  ['この魔法には戦闘中の対象が必要です。', l('이 마법에는 전투 중 대상이 필요합니다.', 'This spell requires a target during combat.', 'この魔法には戦闘中の対象が必要です。')],
   ['回復や一時強化を適用する余地がありません。', l('회복이나 일시 강화를 적용할 여지가 없습니다.', 'There is no room for that healing or temporary buff.', '回復や一時強化を適用する余地がありません。')],
   ['この職業・場所ではその錬金調合ができません。', l('현재 직업·장소에서는 해당 연금 조합을 할 수 없습니다.', 'Your profession or location cannot make that mixture.', 'この職業・場所ではその錬金調合ができません。')],
   ['錬金調合の材料が足りません。', l('연금 조합 재료가 부족합니다.', 'The alchemy ingredients are insufficient.', '錬金調合の材料が足りません。')],
@@ -88,6 +100,20 @@ const ERRORS: [string, Names][] = [
 export function fantasySpecializationText(text: string, locale: NpcLocale): string | undefined {
   const exact = ERRORS.find(([source]) => source === text); if (exact) return exact[1][locale];
   const say = (ko: string, en: string, ja = text) => ({ ko, en, ja })[locale];
+  const unknownAlchemyFailure = text.match(/^未確認の配合 ([1-4])は安定せず中止した。最初の材料を1個失った。$/);
+  if (unknownAlchemyFailure) {
+    const formula = FANTASY_ALCHEMY_FORMULAS[Number(unknownAlchemyFailure[1]) - 1], name = fantasyAlchemyUnidentifiedFormulaName(formula.id, locale);
+    return say(`${name}: 안정되지 않아 중단했습니다. 첫 재료 1개를 잃었습니다.`, `${name}: unstable mixture stopped; one unit of the first ingredient was lost.`);
+  }
+  const circleLog = text.match(/^(.+)(を第(\d+)枠へ保存した。|を使った。MP(\d+)を消費。)$/);
+  if (circleLog) {
+    const [coreName, ...runeNames] = circleLog[1].split(' · '), core = FANTASY_CIRCLE_CORES.find(core => core.names.ja === coreName);
+    const runes = runeNames.map(name => FANTASY_CIRCLE_RUNES.find(rune => rune.names.ja === name));
+    if (core && runes.every(Boolean)) {
+      const name = [core.names[locale], ...runes.map(rune => rune!.names[locale])].join(' · ');
+      return circleLog[3] ? say(`${name}을 ${circleLog[3]}번 칸에 저장했습니다.`, `${name} was saved in slot ${circleLog[3]}.`) : say(`${name} 사용: MP${circleLog[4]} 소비.`, `${name} cast: spent ${circleLog[4]} MP.`);
+    }
+  }
   const entity = [...FANTASY_COMPANIONS, ...FANTASY_MAGIC_COMBINATIONS, ...FANTASY_ALCHEMY_FORMULAS].find(entity => text.startsWith(entity.names.ja));
   if (entity) {
     const name = entity.names[locale]; let match: RegExpMatchArray | null;
@@ -106,18 +132,26 @@ export function fantasySpecializationText(text: string, locale: NpcLocale): stri
   return undefined;
 }
 
-export function fantasySpellCapacity(character: Pick<FantasyCharacter, 'jobXp'>): number {
-  const xp = character.jobXp.mage ?? 0; return xp >= 100 ? 3 : xp >= 30 ? 2 : 1;
+export function fantasySpellCapacity(character: Pick<FantasyCharacter, 'jobXp'> & Partial<Pick<FantasyCharacter, 'job'>>): number {
+  const xp = character.jobXp[character.job === 'priest' ? 'priest' : 'mage'] ?? 0; return xp >= 100 ? 3 : xp >= 30 ? 2 : 1;
+}
+export function fantasyCanPrepareMagic(character: FantasyCharacter, element: string, form: string, slot = 1): boolean {
+  const combo = FANTASY_MAGIC_COMBINATIONS.find(combo => combo.element === element && combo.form === form);
+  const profession = character.job === 'mage' && combo?.effect!=='heal' || character.job === 'priest' && ['tide', 'light'].includes(element) && (combo?.effect === 'heal' || combo?.effect === 'guard');
+  return !!combo && profession && integer(slot, 1, fantasySpellCapacity(character)) && fantasyMagicKnown(character, element, form);
 }
 export function fantasyCompanyCapacity(character: Pick<FantasyCharacter, 'jobXp'>, kind: FantasyCompanyKind): number {
   const xp = character.jobXp[JOBS[kind]] ?? 0; return (kind === 'summons' ? 1 : 2) + (xp >= 100 ? 2 : xp >= 30 ? 1 : 0);
 }
+export function fantasyActiveCompanions(character: FantasyCharacter): { kind: FantasyCompanyKind; member: FantasyCompanion }[] {
+  return (Object.entries(character.specialization?.companies ?? {}) as [FantasyCompanyKind, { members: FantasyCompanion[] }][])
+    .flatMap(([kind, company]) => company.members.filter(member => member.assigned && member.condition === 'ready' && member.hp > 0 && fantasyCompanionAvailable(character, member.id)).map(member => ({ kind, member }))).slice(0, 2);
+}
 export function fantasyCompanionBonus(character: FantasyCharacter): { check: number; guard: number } {
-  const kind = (Object.keys(JOBS) as FantasyCompanyKind[]).find(kind => JOBS[kind] === character.job);
-  const active = kind ? character.specialization?.companies?.[kind]?.members.filter(member => member.assigned && member.condition === 'ready' && member.hp > 0) ?? [] : [];
-  if (kind === 'summons' && (character.mp < active.length * 2 || !!fantasyManaSkillError(character, 'specialization'))) return { check: 0, guard: 0 };
-  return active.reduce((bonus, member) => {
-    const definition = FANTASY_COMPANIONS.find(template => template.id === member.id && template.kind === kind);
+  const active = fantasyActiveCompanions(character), summons = active.filter(entry => entry.kind === 'summons');
+  const summonReady = !summons.length || character.mp >= summons.length * 2 && !fantasyManaSkillError(character, 'specialization');
+  return active.filter(entry => entry.kind !== 'summons' || summonReady).reduce((bonus, { member }) => {
+    const definition = FANTASY_COMPANIONS.find(template => template.id === member.id);
     return { check: Math.min(3, bonus.check + (definition?.check ?? 0)), guard: Math.min(4, bonus.guard + (definition?.guard ?? 0)) };
   }, { check: 0, guard: 0 });
 }
@@ -127,16 +161,14 @@ function addLog(profile: FantasyProfile, text: string, success = true) {
 }
 export function settleFantasyCompanions(profile: FantasyProfile, success: boolean, rng: () => number): number {
   const c = profile.character; if (!c) return 0;
-  const kind = (Object.keys(JOBS) as FantasyCompanyKind[]).find(kind => JOBS[kind] === c.job);
-  if (!kind) return 0;
-  const members = c.specialization?.companies?.[kind]?.members ?? [];
-  const mp = kind === 'summons' ? members.filter(member => member.assigned && member.condition === 'ready').length * 2 : 0;
-  if (c.mp < mp || mp > 0 && !!fantasyManaSkillError(c, 'specialization')) { for (const member of members) member.assigned = false; return 0; }
+  const active = fantasyActiveCompanions(c), summons = active.filter(entry => entry.kind === 'summons');
+  let mp = summons.length * 2;
+  if (c.mp < mp || mp > 0 && !!fantasyManaSkillError(c, 'specialization')) { for (const { member } of summons) member.assigned = false; mp = 0; }
   c.mp -= mp;
   if (mp > 0) { const spent = fantasyManaAfterSkill(c, 'specialization', mp); c.mana = spent.mana; c.fatigue = spent.fatigue; }
-  for (const member of members) {
-    if (!member.assigned || member.condition !== 'ready') continue;
-    member.missions++;
+  for (const { member } of active) {
+    if (!member.assigned) continue;
+    member.missions = Math.min(Number.MAX_SAFE_INTEGER, member.missions + 1);
     if (success) continue;
     member.hp = Math.max(0, member.hp - 8 - Math.floor(random(rng) * 8));
     if (member.hp === 0 || random(rng) < .25) member.condition = 'absent';
@@ -151,17 +183,18 @@ export function fantasyCompanionRescue(character: FantasyCharacter): boolean {
 }
 export function fantasySpecializationSummary(character: FantasyCharacter, locale: NpcLocale): string {
   const say = (ko: string, en: string, ja: string) => ({ ko, en, ja })[locale];
-  const kind = (Object.keys(JOBS) as FantasyCompanyKind[]).find(kind => JOBS[kind] === character.job);
+  const kind = (Object.keys(JOBS) as FantasyCompanyKind[]).find(kind => JOBS[kind] === character.job) ?? (fantasyHasWorkerCompany(character) ? 'troop' : undefined);
   if (kind) {
-    const members = character.specialization?.companies?.[kind]?.members ?? [];
+    const members = (character.specialization?.companies?.[kind]?.members ?? []).filter(member => fantasyCompanionAvailable(character, member.id));
     const title = { troop: l('부대', 'Company', '部隊'), syndicate: l('조직', 'Organization', '組織'), summons: l('소환 계약', 'Summoning contracts', '召喚契約') }[kind][locale];
     return `${title}: ${members.length}/${fantasyCompanyCapacity(character, kind)}. ${members.map(member => `${FANTASY_COMPANIONS.find(template => template.id === member.id)?.names[locale] ?? '?'} HP${member.hp} ${member.condition === 'ready' ? say('대기', 'ready', '待機') : member.condition === 'injured' ? say('부상', 'injured', '負傷') : say('이탈', 'absent', '離脱')}${member.assigned ? say('·편성', '·assigned', '・編成中') : ''}`).join(', ')} ${say('편성한 건강한 동료는 탐사와 임무의 판정·방호를 돕습니다. 실패 후 부상은 치료하고 이탈은 재계약합니다.', 'Assigned healthy companions aid checks and protection in exploration and missions. Treat injuries and renew agreements after departure.', '編成した元気な仲間は探索と任務の判定・防護を助けます。負傷は治療し、離脱は再契約します。')}`;
   }
-  if (character.job === 'mage') return say(`합성 마법 저장 칸 ${fantasySpellCapacity(character)}/3. 원소와 형태를 등록 조합으로 저장하고 사용하면 MP를 소모해 다음 판정·방호나 HP 회복에 실제 적용됩니다.`, `Prepared spell slots ${fantasySpellCapacity(character)}/3. Save a registered element/form combination; casting spends MP for a real check buff, protection or HP recovery.`, `合成魔法の保存枠${fantasySpellCapacity(character)}/3。登録された元素と形を保存し、使用時にMPを消費して判定・防護・HP回復へ作用します。`);
-  if (character.job === 'alchemist') return say('연금 조합은 현지 연금 공방에서 실제 재료를 소비해 약을 만듭니다. 재료 등급과 숙련이 품질의 중심이며 무작위 편차는 작습니다.', 'Alchemy mixtures consume actual ingredients at a local workshop. Material grades and proficiency determine quality, with only small random variation.', '錬金調合は現地の工房で実際の材料を使って薬を作ります。品質は材料と熟練が中心で、乱数の差は小さくなります。');
+  if (character.job === 'mage' || character.job === 'priest') return say(`마법진 저장 칸 ${fantasySpellCapacity(character)}/3, 룬 자리 ${fantasyCircleNodeCapacity(character)}개. 배운 중심 문양에 룬을 배치하면 위력·MP·사거리·범위가 바뀝니다. 공격은 전투 중에 시전합니다.`, `Circle spell slots ${fantasySpellCapacity(character)}/3; ${fantasyCircleNodeCapacity(character)} rune nodes. Place learned runes around a known core to change power, MP, reach and area. Cast attacks during combat.`, `魔法陣の保存枠${fantasySpellCapacity(character)}/3、ルーン枠${fantasyCircleNodeCapacity(character)}個。学んだ核とルーンで威力・MP・射程・範囲が変わります。攻撃術は戦闘で使用します。`);
+  if (fantasyHasJob(character,'alchemist')) return say('연금 조합은 현지 연금 공방에서 실제 재료를 소비해 약을 만듭니다. 재료 등급과 숙련이 품질의 중심이며 무작위 편차는 작습니다.', 'Alchemy mixtures consume actual ingredients at a local workshop. Material grades and proficiency determine quality, with only small random variation.', '錬金調合は現地の工房で実際の材料を使って薬を作ります。品質は材料と熟練が中心で、乱数の差は小さくなります。');
   return say('지도자는 부대, 범죄조직두목은 조직, 소환술사는 소환 계약, 마법사는 마법 합성, 연금술사는 전용 조합 메뉴를 사용합니다.', 'Leaders manage a company, crime bosses an organization, summoners contracts, mages prepared spells, and alchemists mixtures.', '指導者は部隊、裏社会の頭領は組織、召喚士は契約、魔術師は合成魔法、錬金術師は専用調合を扱います。');
 }
-export function validFantasySpecialization(character: Pick<FantasyCharacter, 'specialization' | 'jobXp'>): boolean {
+export function validFantasySpecialization(character: Pick<FantasyCharacter, 'specialization' | 'jobXp'> & Partial<Pick<FantasyCharacter, 'magicKnowledge' | 'readBooks' | 'circleKnowledge' | 'job' | 'jobPaths' | 'hour' | 'lastPrayerDay'>>): boolean {
+  if (!validFantasyMagicKnowledge(character) || !validFantasyCircleKnowledge(character)) return false;
   const state = character.specialization;
   if (state === undefined) return true;
   if (!record(state) || Object.keys(state).some(key => !['companies', 'spells'].includes(key))) return false;
@@ -169,10 +202,13 @@ export function validFantasySpecialization(character: Pick<FantasyCharacter, 'sp
     if (!record(state.companies) || Object.keys(state.companies).some(key => !Object.hasOwn(JOBS, key))) return false;
     for (const kind of Object.keys(state.companies) as FantasyCompanyKind[]) {
       const company = state.companies[kind];
-      if (!record(company) || Object.keys(company).length !== 1 || !Array.isArray(company.members) || company.members.length > fantasyCompanyCapacity(character, kind)) return false;
+      if (!record(company) || Object.keys(company).length !== 1 || !Array.isArray(company.members) || company.members.length > FANTASY_COMPANIONS.filter(template => template.kind === kind).length
+        || company.members.filter(member => record(member) && typeof member.id === 'string' && !fantasyIsWorkerCompanion(member.id) && fantasyCompanionAvailable({ ...character, job: JOBS[kind] }, member.id)).length > fantasyCompanyCapacity(character, kind)
+        || company.members.filter(member => record(member) && typeof member.id === 'string' && fantasyIsWorkerCompanion(member.id)).length > fantasyCompanyCapacity(character, 'troop')) return false;
       const ids = new Set<string>();
       for (const member of company.members) {
-        if (!record(member) || Object.keys(member).length !== 5 || typeof member.id !== 'string' || ids.has(member.id)) return false;
+        if (!record(member) || ![5, 6].includes(Object.keys(member).length) || Object.keys(member).some(key => !['id', 'condition', 'hp', 'assigned', 'missions', 'workerLevel'].includes(key)) || typeof member.id !== 'string' || ids.has(member.id)) return false;
+        if (Object.hasOwn(member, 'workerLevel') && (!fantasyIsWorkerCompanion(member.id) || !integer(member.workerLevel, 1, 6))) return false;
         const template = FANTASY_COMPANIONS.find(template => template.id === member.id && template.kind === kind);
         if (!template || !['ready', 'injured', 'absent'].includes(String(member.condition)) || !integer(member.hp, 0, template.hp)
           || typeof member.assigned !== 'boolean' || !integer(member.missions, 0, Number.MAX_SAFE_INTEGER)
@@ -182,32 +218,38 @@ export function validFantasySpecialization(character: Pick<FantasyCharacter, 'sp
     }
   }
   if (state.spells !== undefined) {
-    if (!Array.isArray(state.spells) || state.spells.length > fantasySpellCapacity(character) || new Set(state.spells.map(spell => spell?.slot)).size !== state.spells.length) return false;
-    if (!state.spells.every(spell => record(spell) && Object.keys(spell).length === 3 && integer(spell.slot, 1, fantasySpellCapacity(character))
-      && FANTASY_MAGIC_COMBINATIONS.some(combo => combo.element === spell.element && combo.form === spell.form))) return false;
+    const capacity = Math.max(fantasySpellCapacity({ ...character, job: 'mage' }), fantasySpellCapacity({ ...character, job: 'priest' }));
+    if (!Array.isArray(state.spells) || state.spells.length > capacity || new Set(state.spells.map(spell => spell?.slot)).size !== state.spells.length) return false;
+    if (!state.spells.every(spell => record(spell) && Object.keys(spell).every(key => ['slot', 'element', 'form', 'circle'].includes(key)) && integer(spell.slot, 1, capacity)
+      && FANTASY_MAGIC_COMBINATIONS.some(combo => combo.element === spell.element && combo.form === spell.form)
+      && (spell.circle === undefined ? fantasyMagicKnown(character, String(spell.element), String(spell.form)) : validFantasyCircleShape(spell.circle)
+        && spell.circle.runes.length <= Math.max(fantasyCircleNodeCapacity({ ...character, job: 'mage' }), fantasyCircleNodeCapacity({ ...character, job: 'priest' }))
+        && fantasyCircleKnowledge(character).cores.includes(spell.circle.core) && spell.circle.runes.every(id => fantasyCircleKnowledge(character).runes.includes(id))))) return false;
   }
   return true;
 }
 export function fantasySpecializationHours(_profile: FantasyProfile, action: FantasyAction | FantasySpecializationAction): number {
   if (action.type === 'command') return action.operation === 'mission' ? 4 : ['hire', 'recover', 'recontract'].includes(action.operation) ? 2 : 0;
-  return action.type === 'magicPrepare' ? 1 : action.type === 'alchemy' ? 3 : 0;
+  return action.type === 'magicPrepare' || action.type === 'magicCompose' ? 1 : action.type === 'alchemy' ? 3 : 0;
 }
 const facilities = (c: FantasyCharacter, kinds: string[]) => fantasyBuildings(c).some(building => kinds.includes(building.id));
 
 export function applyFantasySpecialization(profile: FantasyProfile, action: FantasyAction | FantasySpecializationAction, rng: () => number, context?: FantasySpecializationContext): FantasyResult | undefined {
-  if (!['command', 'magicPrepare', 'magicCast', 'alchemy'].includes(action.type)) return undefined;
+  if (!['command', 'magicPrepare', 'magicCompose', 'magicCast', 'alchemy'].includes(action.type)) return undefined;
   const fail = (error: string): FantasyResult => ({ profile, error, changed: false });
   if (!profile.character || !context || !validFantasySpecialization(profile.character)) return fail('職業の管理記録を確認できません。');
   const next = structuredClone(profile); const c = next.character!;
   const state = c.specialization ??= {};
   if (action.type === 'command') {
-    if (!Object.hasOwn(JOBS, action.kind) || c.job !== JOBS[action.kind]) return fail('現在の職業ではその仲間を指揮できません。');
+    const workerCommand = action.kind === 'troop' && action.operation !== 'hire' && (action.member ? fantasyIsWorkerCompanion(action.member) : action.operation === 'mission' && fantasyHasWorkerCompany(c));
+    if (!Object.hasOwn(JOBS, action.kind) || c.job !== JOBS[action.kind] && !workerCommand) return fail('現在の職業ではその仲間を指揮できません。');
     const company = (state.companies ??= {})[action.kind] ??= { members: [] };
     const member = company.members.find(member => member.id === action.member);
     const template = FANTASY_COMPANIONS.find(template => template.id === action.member && template.kind === action.kind);
     if (action.operation === 'hire' || action.operation === 'recontract') {
-      if (!template || action.operation === 'hire' && member || action.operation === 'recontract' && member?.condition !== 'absent') return fail('その雇用・契約はできません。');
-      if (action.operation === 'hire' && company.members.length >= fantasyCompanyCapacity(c, action.kind)) return fail('現在の熟練度では仲間の定員です。');
+      if (action.operation === 'hire' && !!template && fantasyIsWorkerCompanion(template.id)) return fail('その雇用・契約はできません。');
+      if (!template || !fantasyCompanionAvailable(c, template.id) || action.operation === 'hire' && member || action.operation === 'recontract' && member?.condition !== 'absent') return fail('その雇用・契約はできません。');
+      if (action.operation === 'hire' && company.members.filter(member => fantasyCompanionAvailable(c, member.id)).length >= fantasyCompanyCapacity(c, action.kind)) return fail('現在の熟練度では仲間の定員です。');
       if (!facilities(c, action.kind === 'troop' ? ['guild'] : action.kind === 'summons' ? ['tower', 'library'] : ['market', 'guild'])) return fail('この場所では仲間を募ったり契約したりできません。');
       const cost = action.operation === 'hire' ? template.cost : Math.ceil(template.cost / 2);
       if (c.gold < cost || c.mp < template.mp) return fail('雇用・契約に必要な金貨やMPが足りません。');
@@ -218,7 +260,8 @@ export function applyFantasySpecialization(profile: FantasyProfile, action: Fant
       else company.members.push({ id: template.id, condition: 'ready', hp: template.hp, assigned: false, missions: 0 });
       addLog(next, `${template.names.ja}と${action.operation === 'hire' ? '契約した' : '再契約した'}。金貨${cost}枚・MP${template.mp}。`);
     } else if (action.operation === 'assign') {
-      if (!member || member.condition !== 'ready' || !member.hp) return fail('編成できる元気な仲間を選んでください。');
+      if (!member || member.condition !== 'ready' || !member.hp || !member.assigned && !fantasyCompanionAvailable(c, member.id)) return fail('編成できる元気な仲間を選んでください。');
+      if (!member.assigned && fantasyActiveCompanions(c).length >= 2) return fail('戦闘に編成できる仲間は合計2人までです。');
       member.assigned = !member.assigned; addLog(next, '仲間の編成を更新した。');
     } else if (action.operation === 'dismiss') {
       if (!member) return fail('その仲間はいません。');
@@ -228,7 +271,7 @@ export function applyFantasySpecialization(profile: FantasyProfile, action: Fant
       if (!facilities(c, ['inn', 'temple']) || (c.inventory.potion ?? 0) < 1) return fail('仲間の治療には宿屋か神殿と回復薬1個が必要です。');
       c.inventory.potion--; member.hp = template.hp; member.condition = 'ready'; member.assigned = false; addLog(next, `${template.names.ja}の負傷を治療した。回復薬1個を使用。`);
     } else if (action.operation === 'mission') {
-      const active = company.members.filter(member => member.assigned && member.condition === 'ready');
+      const active = company.members.filter(member => member.assigned && member.condition === 'ready' && fantasyCompanionAvailable(c, member.id));
       if (!active.length) return fail('任務に参加する仲間を編成してください。');
       const danger = FANTASY_LOCATIONS.find(place => place.id === c.location)?.danger ?? 0;
       const success = context.check(next, action.kind === 'summons' ? 'intelligence' : 'charisma', 11 + danger, '仲間との現地任務', rng);
@@ -238,13 +281,44 @@ export function applyFantasySpecialization(profile: FantasyProfile, action: Fant
     } else return fail('その仲間への指示は登録されていません。');
   } else if (action.type === 'magicPrepare') {
     const combo = FANTASY_MAGIC_COMBINATIONS.find(combo => combo.element === action.element && combo.form === action.form);
-    if (c.job !== 'mage' || !integer(action.slot, 1, fantasySpellCapacity(c)) || !combo) return fail('現在の職業・保存枠ではその魔法を合成できません。');
+    if (!combo || !fantasyCanPrepareMagic(c, action.element, action.form, action.slot)) return fail('現在の職業・保存枠ではその魔法を合成できません。');
+    initializeFantasyMagicKnowledge(c);
     state.spells = [...(state.spells ?? []).filter(spell => spell.slot !== action.slot), { slot: action.slot, element: combo.element, form: combo.form }].sort((a, b) => a.slot - b.slot);
     addLog(next, `${combo.names.ja}を第${action.slot}枠へ保存した。`);
+  } else if (action.type === 'magicCompose') {
+    const compiled = fantasyCompileCircle(c, action.core, action.runes);
+    if (!compiled || !integer(action.slot, 1, fantasySpellCapacity(c))) return fail('現在の職業・保存枠ではその魔法を合成できません。');
+    grantFantasyCircleBasics(c);
+    c.circleKnowledge = fantasyCircleKnowledge(c);
+    // 旧形式のキーは保存互換のため残し、効果には使用しない。
+    const element: FantasyPreparedSpell['element'] = ['flame', 'tide', 'gale', 'stone'].includes(compiled.core) ? compiled.core as FantasyPreparedSpell['element'] : 'light';
+    const form: FantasyPreparedSpell['form'] = ['heal', 'miracle'].includes(compiled.kind) ? 'mend' : ['guard', 'blessing', 'cleanse'].includes(compiled.kind) && element !== 'light' ? 'veil' : 'bolt';
+    state.spells = [...(state.spells ?? []).filter(spell => spell.slot !== action.slot), { slot: action.slot, element, form, circle: { core: compiled.core, runes: compiled.runes } }].sort((a, b) => a.slot - b.slot);
+    addLog(next, `${compiled.names.ja}を第${action.slot}枠へ保存した。`);
   } else if (action.type === 'magicCast') {
     const spell = state.spells?.find(spell => spell.slot === action.slot);
+    if (spell?.circle) {
+      const compiled = fantasyCompileCircle(c, spell.circle.core, spell.circle.runes);
+      if (!compiled || !integer(action.slot, 1, fantasySpellCapacity(c)) || c.mp < compiled.mp) return fail('使える合成魔法、または必要なMPがありません。');
+      if (compiled.kind === 'attack' || compiled.kind === 'miracle') return fail('この魔法には戦闘中の対象が必要です。');
+      const error = fantasyManaSkillError(c, 'specialization'); if (error) return fail(error);
+      const harmful = (c.effects ?? []).filter(effect => effect.expiresAt > c.hour && ((effect.periodicHp ?? 0) < 0 || (effect.check ?? 0) < 0 || (effect.dicePenalty ?? 0) > 0 || effect.diceFaces !== undefined || Object.values(effect.stats ?? {}).some(value => value < 0)));
+      const canHeal = compiled.kind === 'heal' && c.hp < context.stats.hp;
+      const canGuard = (['guard', 'blessing'].includes(compiled.kind) || !!compiled.effects.guard) && !c.buff;
+      const canCleanse = !!compiled.effects.cleanse && harmful.length > 0;
+      if (!canHeal && !canGuard && !canCleanse) return fail('回復や一時強化を適用する余地がありません。');
+      c.mp -= compiled.mp;
+      if (compiled.kind === 'heal') c.hp = Math.min(context.stats.hp, c.hp + compiled.power);
+      if ((compiled.kind === 'guard' || compiled.kind === 'blessing') && !c.buff) c.buff = { effect: 'guard', power: compiled.power, mp: compiled.mp };
+      if (compiled.effects.cleanse) c.effects = (c.effects ?? []).filter(effect => !harmful.includes(effect));
+      if (compiled.effects.guard && !c.buff) c.buff = { effect: 'guard', power: compiled.effects.guard, mp: compiled.mp };
+      const spent = fantasyManaAfterSkill(c, 'specialization', compiled.mp); c.mana = spent.mana; c.fatigue = spent.fatigue;
+      if (spent.hpDamage) context.hurt(next, spent.hpDamage);
+      addLog(next, `${compiled.names.ja}を使った。MP${compiled.mp}を消費。`);
+      return { profile: next, changed: true };
+    }
     const combo = spell && FANTASY_MAGIC_COMBINATIONS.find(combo => combo.element === spell.element && combo.form === spell.form);
-    if (c.job !== 'mage' || !combo || c.mp < combo.mp) return fail('使える合成魔法、または必要なMPがありません。');
+    if (!combo || !spell || !fantasyCanPrepareMagic(c, spell.element, spell.form, action.slot) || c.mp < combo.mp) return fail('使える合成魔法、または必要なMPがありません。');
     const error = fantasyManaSkillError(c, 'specialization'); if (error) return fail(error);
     if (combo.effect === 'heal' ? c.hp >= context.stats.hp : !!c.buff) return fail('回復や一時強化を適用する余地がありません。');
     c.mp -= combo.mp;
@@ -255,10 +329,11 @@ export function applyFantasySpecialization(profile: FantasyProfile, action: Fant
     addLog(next, `${combo.names.ja}を使った。MP${combo.mp}を消費。`);
   } else if (action.type === 'alchemy') {
     const formula = FANTASY_ALCHEMY_FORMULAS.find(formula => formula.id === action.formula);
-    if (c.job !== 'alchemist' || !facilities(c, ['alchemist']) || !formula) return fail('この職業・場所ではその錬金調合ができません。');
+    if (!fantasyHasJob(c,'alchemist') || !facilities(c, ['tower']) || !formula) return fail('この職業・場所ではその錬金調合ができません。');
     const inputs = Object.entries(formula.inputs) as [string, number][];
     if (inputs.some(([id, count]) => !FANTASY_ITEMS.some(item => item.id === id) || (c.inventory[id] ?? 0) < count)) return fail('錬金調合の材料が足りません。');
-    const success = context.check(next, 'intelligence', formula.dc, formula.names.ja, rng);
+    const label = fantasyAlchemyFormulaKnown(c, formula.id) ? formula.names.ja : fantasyAlchemyUnidentifiedFormulaName(formula.id, 'ja');
+    const success = context.check(next, 'intelligence', formula.dc, label, rng);
     if (success) {
       for (const [id, count] of inputs) c.inventory[id] -= count;
       const material = Math.floor(inputs.reduce((sum, [id, count]) => sum + (FANTASY_ITEMS.find(item => item.id === id)?.tier ?? 1) * count, 0) / inputs.reduce((sum, [, count]) => sum + count, 0));
@@ -266,8 +341,8 @@ export function applyFantasySpecialization(profile: FantasyProfile, action: Fant
       const variation = random(rng); const tier = Math.max(1, Math.min(4, material + mastery + (variation > .95 ? 1 : variation < .05 ? -1 : 0)));
       const output = formula.family ? `${formula.family}-${tier}` : formula.output;
       if (!FANTASY_ITEMS.some(item => item.id === output)) return fail('調合結果の品物を確認できません。');
-      context.addItem(next, output, 1); addLog(next, `${formula.names.ja}：${FANTASY_ITEMS.find(item => item.id === output)!.name}を1個調合した。`);
-    } else { c.inventory[inputs[0][0]]--; addLog(next, `${formula.names.ja}は安定せず中止した。最初の材料を1個失った。`, false); }
+      context.addItem(next, output, 1); learnFantasyAlchemyFormula(c, formula.id); addLog(next, `${formula.names.ja}：${FANTASY_ITEMS.find(item => item.id === output)!.name}を1個調合した。`);
+    } else { c.inventory[inputs[0][0]]--; addLog(next, `${label}は安定せず中止した。最初の材料を1個失った。`, false); }
   }
   return { profile: next, changed: true };
 }

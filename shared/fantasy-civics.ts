@@ -1,10 +1,11 @@
 import type { FantasyProfile } from './fantasy.ts';
 import { FANTASY_LOCATIONS } from './fantasy-data.ts';
 import { FANTASY_SETTLEMENTS } from './fantasy-town.ts';
-import { NPC_PUBLIC, type NpcLocale } from './npc.ts';
+import { NPC_PUBLIC as ALL_NPCS, type NpcLocale } from './npc.ts';
 import { fantasyStats } from './fantasy-engine.ts';
 import { grantFantasyReputation } from './fantasy-reputation.ts';
 import { grantFantasyPractice } from './fantasy-progression.ts';
+const NPC_PUBLIC=ALL_NPCS.filter(npc=>!npc.travelOnly);
 
 type Text = Record<NpcLocale, string>;
 const text = (ko: string, en: string, ja: string): Text => ({ ko, en, ja });

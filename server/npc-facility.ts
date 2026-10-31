@@ -1,3 +1,5 @@
+import type { FantasyEconomyMerchantView } from '../shared/fantasy-economy.ts';
+import { npcMapMerchantReply, npcMapMerchantFacts, npcMapMerchantUnverifiedSpeech } from './npc-map-merchant.ts';
 import { NPC_PUBLIC, type NpcId, type NpcLocale } from '../shared/npc.ts';
 import type { FantasyAction, FantasyCharacter } from '../shared/fantasy.ts';
 import { FANTASY_ITEMS, FANTASY_JOBS, FANTASY_QUESTS, FANTASY_RECIPES } from '../shared/fantasy-data.ts';
@@ -20,7 +22,7 @@ const normal = (value: string) => value.normalize('NFKC').toLowerCase();
 function mentions(query: string, value: string) {
   const name = normal(value);
   if (!name) return false;
-  return /^[a-z0-9 -]+$/.test(name) ? new RegExp(`(^|[^a-z0-9])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`).test(query) : query.replace(/\s/g, '').includes(name.replace(/\s/g, ''));
+  return /^[a-z0-9 -]+$/.test(name) || /^[가-힣]$/u.test(name) ? new RegExp(namePattern(name), 'u').test(query) : query.replace(/\s/g, '').includes(name.replace(/\s/g, ''));
 }
 const itemName = (id: string, locale: NpcLocale) => FANTASY_ITEMS.find(item => item.id === id)?.names?.[locale]
   ?? FANTASY_MAPS.find(map => map.item === id)?.name[locale] ?? fantasyTermName(id, locale);
@@ -31,7 +33,12 @@ const bookTopic = /도서|소장|책|서적|\b(?:books?|library|collection|shelv
 const teachingTopic = /가르치|가르칠|배울|배우|지도|직업|기술|\b(?:teach|learn|profession|lessons?|skills?)\b|教え|学べ|職業|技能|指導/;
 const craftingTopic = /제작|만들|제련|조합|\b(?:craft|make|forge|recipes?)\b|制作|作れ|鍛え|調合/;
 const generalTopic = /(?:여기|이곳|이\s*가게|이\s*시설).*(?:뭐|무엇|어떤|할\s*수)|무슨\s*서비스|어떤\s*서비스|what.*(?:offer|available|this place)|your (?:services|establishment)|こ(?:こ|の店).*(?:何|でき)|どんな.*施設/;
-const namePattern = (name: string) => /^[a-z0-9 -]+$/u.test(name) ? `(?<![a-z0-9])${name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}(?![a-z0-9])` : name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function namePattern(name: string): string {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (/^[a-z0-9 -]+$/u.test(name)) return `(?<![a-z0-9])${escaped}(?![a-z0-9])`;
+  if (/^[가-힣]$/u.test(name)) return `(?<![가-힣])${escaped}(?=(?:은|는|을|를|이|가|의|에서|에|도)?(?:$|[^가-힣]|가격|얼마|재고|몇\\s*개))`;
+  return escaped;
+}
 const registeredFacilityNames = new RegExp([...new Set([
   ...FANTASY_ITEMS.flatMap(item => [item.id,...(['ko','en','ja'] as const).map(locale=>itemName(item.id,locale))]), ...FANTASY_MAPS.flatMap(map=>[map.item,...Object.values(map.name)]),
   ...FANTASY_LIBRARY_BOOKS.filter(book=>book.inGame!==false).flatMap(book=>[book.id,...Object.values(book.title)]), ...FANTASY_JOBS.flatMap(job=>[job.id,...Object.values(job.names)]),
@@ -48,7 +55,7 @@ export function npcFacilityQuerySupported(npcId: NpcId, text: string, character?
   if (/[.!?。！？;；]/u.test(query) || /\b(?:and|or|but|because|why|if)\b|그리고|하지만|왜|만약|けれど|けど|なぜ|どうして|それと|それから/u.test(query)) return false;
   const english = new Set('what which are is do does can could would you i have has here there this that the a an your at in on for to of about from me please tell show offer offers available sell selling sold stock wares goods buy purchase price prices cost costs how much many rooms room type types lodging inn stay food meal meals menu dining serve dishes book books library collection shelves shelf teach learn profession professions lesson lessons skills skill craft make forge recipe recipes workshop rent fishing boat boats contracts contract quests quest postings posted description describe effect effects mean meaning hold holdings provide services establishment place normal discount special standard pension triple'.split(' '));
   query = query.replace(/[a-z]+/gu, word => english.has(word) ? '' : word);
-  query = query.replace(/(?:여기서는|여기서|여기는|여기|이곳에서는|이곳에서|이곳은|이곳|이\s*가게|이\s*시설|지금|현재|받을|받는|받아볼|있는|주문|어떤|어느|무슨|무엇|뭔가요|뭐야|뭘|뭐|어떻게|할\s*수\s*있(?:어|나요|어요)|할\s*수|배울\s*수\s*있(?:어|나요|어요)|배울\s*수|가르쳐|가르칠|가르치|알려주세요|알려줘|보여주세요|보여줘|설명해주세요|설명해줘|설명|알고\s*싶어|궁금해|있나요|있어요|있어|있니|있습니까|있을까|인가요|일까|예요|이에요|얼마(?:야|예요|인가요)?|종류|가격|값|재고|판매|파는|팔아|파나요|팔고|상품|물건|품목|구매|살\s*수|사고|객실|숙박|숙소|방|특별|할인|트리플|펜션|일반|음식|식사|먹거리|메뉴|요리|먹을|책|도서|소장|서적|제작|만들|제련|조합|직업|기술|스킬|배우|배울|어선|배|대여|빌릴|빌려|의뢰|게시|내용|효과|뜻|추천|서비스|주세요|수|는|은|을|를|이|가|의|에서|에|도|좀|요|야)/gu, '');
+  query = query.replace(/(?:여기서는|여기서|여기는|여기|이곳에서는|이곳에서|이곳은|이곳|이\s*가게|이\s*시설|지금|현재|받을|받는|받아볼|있는|주문|어떤|어느|무슨|무엇|뭔가요|뭐야|뭘|뭐|어떻게|할\s*수\s*있(?:어|나요|어요)|할\s*수|배울\s*수\s*있(?:어|나요|어요)|배울\s*수|가르쳐|가르칠|가르치|알려주세요|알려줘|보여주세요|보여줘|설명해주세요|설명해줘|설명|알고\s*싶어|궁금해|있나요|있어요|있어|있니|있습니까|있을까|인가요|일까|예요|이에요|얼마(?:야|예요|인가요)?|종류|몇\s*개|가격|값|재고|판매|파는|팔아|파나요|팔고|상품|물건|품목|구매|살\s*수|사고|객실|숙박|숙소|방|특별|할인|트리플|펜션|일반|음식|식사|먹거리|메뉴|요리|먹을|책|도서|소장|서적|제작|만들|제련|조합|직업|기술|스킬|배우|배울|어선|배|대여|빌릴|빌려|의뢰|게시|내용|효과|뜻|추천|서비스|주세요|수|는|은|을|를|이|가|의|에서|에|도|좀|요|야)/gu, '');
   query = query.replace(/(?:いま|今|現在|ここでは|ここで|ここ|この店|この施設|どんな|どの|何が|何を|何|なに|できる|できますか|できます|教えてください|教えて|見せてください|見せて|ありますか|ある|あります|ですか|って|どういう|について|種類|値段|価格|料金|いくら|商品|品物|在庫|売る|売り|買う|買える|客室|部屋|宿泊|割引|トリプル|ペンション|食事|料理|献立|メニュー|蔵書|書籍|図書|本|技能|職業|学べますか|学べる|学べ|学ぶ|教えられますか|教えられる|教え|指導|制作|作れる|作れ|鍛え|調合|漁船|船|借りる|借り|借|依頼|掲示|意味|内容|説明|効果|サービス|は|を|の|が|に|で|も|と)/gu, '');
   return !query.replace(/[\s\p{P}\p{S}]/gu, '');
 }
@@ -221,7 +228,9 @@ export function npcLibraryReading(locale: NpcLocale, npcId: NpcId, text: string,
   }[locale], actions: unread.map(book => ({ type: 'read', book: book.id })) };
 }
 
-export function npcFacilityReply(locale: NpcLocale, npcId: NpcId, text: string, character?: FantasyCharacter, board?: FantasyContractBoard, dynamicFacts?: DialogueDynamicContext): string | undefined {
+export function npcFacilityReply(locale: NpcLocale, npcId: NpcId, text: string, character?: FantasyCharacter, board?: FantasyContractBoard, dynamicFacts?: DialogueDynamicContext, merchant?: FantasyEconomyMerchantView): string | undefined {
+  if (NPC_PUBLIC.find(npc => npc.id === npcId)?.travelOnly) return npcMapMerchantReply(locale,text,merchant)
+    ?? (teachingTopic.test(normal(text)) ? { ko:'제가 가르치는 직업이나 기술은 없어요. 확인한 길을 지도로 기록해 팔고 있어요.', en:'I teach no professions or skills. I record checked routes and sell their charts.', ja:'教えられる職業や技能はありません。確かめた道を地図にして売っています。' }[locale] : undefined);
   if(!npcFacilityQuerySupported(npcId,text,character))return undefined;
   const k = npcFacilityKnowledge(npcId, character, dynamicFacts), query = normal(text);
   const polite = ['scholar', 'priest', 'trade'].includes(fantasyNpcTone(npcId));
@@ -301,7 +310,8 @@ export function npcFacilityReply(locale: NpcLocale, npcId: NpcId, text: string, 
   return undefined;
 }
 
-export function npcFacilityFacts(npcId: NpcId, locale: NpcLocale, character?: FantasyCharacter, query = '', dynamicFacts?: DialogueDynamicContext): string[] {
+export function npcFacilityFacts(npcId: NpcId, locale: NpcLocale, character?: FantasyCharacter, query = '', dynamicFacts?: DialogueDynamicContext, merchant?: FantasyEconomyMerchantView): string[] {
+  if (NPC_PUBLIC.find(npc => npc.id === npcId)?.travelOnly) return npcMapMerchantFacts(merchant,locale);
   const k = npcFacilityKnowledge(npcId, character, dynamicFacts), q = normal(query);
   const named = k.catalogStock.some(id => [id,...(['ko','en','ja'] as const).map(language=>itemName(id,language))].some(name=>mentions(q,name)))
     || k.books.some(book=>[book.id,...Object.values(book.title)].some(name=>mentions(q,name)))
@@ -322,5 +332,6 @@ export function npcFacilityFacts(npcId: NpcId, locale: NpcLocale, character?: Fa
 
 export function npcUnfoundedFacilitySpeech(npcId: NpcId, text: string): boolean {
   const npc = NPC_PUBLIC.find(npc => npc.id === npcId);
+  if (npc?.travelOnly) return npcMapMerchantUnverifiedSpeech(text);
   return npc?.building === 'inn' && /특별\s*할인\s*(?:객실|방)|트리플|펜션|\b(?:triple|pension|discount rooms?|standard rooms?)\b|割引.*(?:部屋|客室)|トリプル|ペンション/.test(normal(text));
 }

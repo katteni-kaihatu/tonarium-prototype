@@ -7,6 +7,12 @@ export const FANTASY_JOB_PATH_SKILL_NAMES: Record<string, Pair[]> = {
     [['낯선 땅의 발걸음', 'Steps on Strange Ground', '未知の地の足取り'], ['개척자의 첫 일격', 'The Pioneer’s First Strike', '開拓者の初撃']],
     [['포효 속의 빈틈', 'An Opening in the Roar', '咆哮の隙'], ['급소를 향한 결의', 'Resolve for the Weak Point', '急所への決意']],
   ],
+  ranger: [
+    [['사라진 발자국 읽기','Read the Vanished Track','消えた足跡を読む'], ['추적자의 관통시','Tracker’s Piercing Shot','追跡者の貫き矢']],
+    [['숨은 당김줄의 감각','Hidden Trigger Sense','隠れた引き紐の感覚'], ['장력 끊는 한 발','Severing Shot','張りを断つ一矢']],
+    [['먼 움직임의 예측','Read Distant Movement','遠い動きの予測'], ['능선의 정밀 사격','Ridge Precision Shot','尾根の精密射撃']],
+    [['동료의 사각 지키기','Watch the Blind Side','仲間の死角を守る'], ['탐사대 엄호선','Expedition Cover','探索隊の援護線']],
+  ],
   hunter: [
     [['꺾인 풀잎 읽기', 'Read the Bent Grass', '折れた草を読む'], ['놓치지 않는 한 발', 'The Unlost Shot', '逃さぬ一矢']],
     [['매듭과 장력', 'Knots and Tension', '結び目と張り'], ['발목을 노린 견제', 'Ankle Harrier', '足元への牽制']],

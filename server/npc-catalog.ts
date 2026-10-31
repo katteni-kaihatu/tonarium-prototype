@@ -3,6 +3,7 @@ import { NPC_PUBLIC } from '../shared/npc.ts';
 import { FANTASY_LOCATIONS } from '../shared/fantasy-data.ts';
 import { fantasyTermName } from '../shared/fantasy-lore.ts';
 import { NPC_SETTLEMENT_APPEARANCE } from '../shared/npc-settlement-expansion.ts';
+import { NPC_ARTISAN_PRIVATE } from './npc-artisan-profiles.ts';
 
 export interface NpcServerDefinition {
   knownFacts: string[];
@@ -12,6 +13,20 @@ export interface NpcServerDefinition {
 }
 
 export const NPC_SERVER: Record<NpcId, NpcServerDefinition> = {
+  'wandering-cartographer': {
+    knownFacts: [
+      'Naru meets travelers beside the road in daylight; she has no permanent shop in Hearth.',
+      'Her ruin charts identify sites and entrances, not safe routes, treasure or magical travel.',
+      'Only her verified current road stock determines the charts, quantities and prices she can offer.',
+    ],
+    publicFacts: [
+      'Naru is a 41-year-old human woman and a wandering cartographer.',
+      'She is curious and meticulous, and admits unknown dangers.',
+      'She points to the chart when explaining a route and distinguishes unchecked passages.',
+    ],
+    conditionalFacts: [],
+    privateSecrets: ['ADMIN ONLY: Naru privately worries that a copied route may outlast the landmarks she used to verify it.'],
+  },
   rin: {
     knownFacts: [
       'Hearth (hearth) has a guild, market, inn, restaurant, and library; its travel connections include a port and transfer gate.',
@@ -34,7 +49,7 @@ export const NPC_SERVER: Record<NpcId, NpcServerDefinition> = {
   },
   borin: {
     knownFacts: [
-      'Emberhall (emberhall) is a forge city associated with mountain dwarves, with a market, blacksmith, and inn, but no public library or guild building.',
+      'Emberhall (emberhall) is a forge city associated with mountain dwarves, with a market, blacksmith, inn, guild workshop and merchant guild, but no public library.',
       'Ironridge (ironridge) has iron ore and gems, and its mountain paths require care.',
       'Deepcave (deepcave) contains crystals, ore, and gems, and is more dangerous than Ironridge.',
     ],
@@ -109,3 +124,4 @@ const privateNotes: Record<string, string> = {
   'loom-village-teo': 'Teo privately wonders whether he listens long enough before assigning work.',
 };
 for (const [id, note] of Object.entries(privateNotes)) NPC_SERVER[id].privateSecrets = [`ADMIN ONLY: ${note}`];
+for (const [id, note] of Object.entries(NPC_ARTISAN_PRIVATE)) NPC_SERVER[id].privateSecrets = [`ADMIN ONLY: ${note.en}`];

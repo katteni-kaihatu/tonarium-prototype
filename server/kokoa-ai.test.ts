@@ -102,7 +102,7 @@ test('remote HTTP errors preserve busy/unavailable behavior and never expose ups
         assert.equal(reply.error, status === 429 ? 'busy' : 'unavailable');
         assert.ok(!JSON.stringify(reply).includes(fixtureKey));
       }
-     
+
     }
   });
 });

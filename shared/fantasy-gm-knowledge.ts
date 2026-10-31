@@ -1,16 +1,22 @@
+import { fantasyEquipmentEntries, fantasyEquipmentSlotName, fantasyOffhandEquipError } from './fantasy-equipment-slots.ts';
+import { fantasyPriestRankName } from './fantasy-priest-ranks.ts';
+import { fantasyLifeJob } from './fantasy-careers.ts';
+import { fantasyDungeonView } from './fantasy-dungeon.ts';
+import { fantasyMagicKnowledge } from './fantasy-magic-discovery.ts';
+import { FANTASY_MAGIC_ELEMENTS, FANTASY_MAGIC_FORMS } from './fantasy-specializations.ts';
 import type { FantasyProfile } from './fantasy.ts';
 import { FANTASY_WORLD_TIME_RATE } from './fantasy.ts';
 import { FANTASY_EVENTS, FANTASY_ITEMS, FANTASY_JOBS, FANTASY_LOCATIONS, FANTASY_QUESTS, FANTASY_RACES } from './fantasy-data.ts';
 import { fantasyEventEligible, fantasyQuestEligible } from './fantasy-access.ts';
 import { fantasySkills, fantasyStats } from './fantasy-engine.ts';
-import { foodMeta, foodSense, FANTASY_DINING, FANTASY_LODGINGS } from './fantasy-life.ts';
+import { foodMeta, foodSense } from './fantasy-life.ts';
 import { FANTASY_CANON_FACTS, FANTASY_TERMS } from './fantasy-lore.ts';
 import { fantasyEventText, fantasyQuestText } from './fantasy-narrative.ts';
 import { fantasyBodyTraits, fantasyContextBonus, FANTASY_CONTEXT_NAMES } from './fantasy-physiology.ts';
 import { fantasySkillName } from './fantasy-skill-names.ts';
 import { fantasyBuildings, fantasyKnownLocations, FANTASY_MAPS } from './fantasy-town.ts';
 import { NPC_PUBLIC, type NpcLocale } from './npc.ts';
-import { FANTASY_MANA_EXERCISES, fantasyMana } from './fantasy-mana.ts';
+import { fantasyMana } from './fantasy-mana.ts';
 import { FANTASY_PROPERTY_PLOTS } from './fantasy-property.ts';
 import { FANTASY_PRIEST_BRANCHES, fantasyPriestGrowthStatus } from './fantasy-priest-growth.ts';
 import { FANTASY_JOB_PATHS } from './fantasy-job-paths.ts';
@@ -69,6 +75,10 @@ export function fantasyGmKnowledge(profile: FantasyProfile, locale: NpcLocale): 
     }
     return conceal(lines.join('\n'));
   }
+  const dungeon=fantasyDungeonView(c,locale),magic=fantasyMagicKnowledge(c);
+  if(dungeon)lines.push(say('현재 탐사 현장','Current exploration','現在の探索現場')+`: ${dungeon.name} / ${dungeon.roomName}. `+dungeon.roomDescription+(dungeon.trap?say(' 발견한 함정이 있다.',' A detected trap is here.',' 発見した罠がある。'):''));
+  const components=[...FANTASY_MAGIC_ELEMENTS.filter(item=>magic.elements.some(id=>id===item.id)).map(item=>item.names[locale]),...FANTASY_MAGIC_FORMS.filter(item=>magic.forms.some(id=>id===item.id)).map(item=>item.names[locale])];
+  if(components.length)lines.push(say('이미 배운 합성 요소','Synthesis components already learned','習得済みの合成要素')+': '+components.join(', '));
   if (profile.combatId) lines.push(say('현재 전투 중이다. 라운드별 행동은 전투 화면에서 선택하며 결과는 아직 확정되지 않았다. 전투를 끝내거나 퇴각하기 전에는 다른 활동을 시작할 수 없다.', 'Combat is in progress. Round actions are chosen on the battlefield and the outcome is not yet settled. Other activities require finishing combat or retreating.', '現在は戦闘中。ラウンドの行動は戦闘画面で選び、結果は未確定。戦闘を終えるか離脱するまで別の活動を始められない。'));
   const publicLabel = say('기초 공개 설정', 'Public basics', '基本の公開設定');
   for (const term of FANTASY_TERMS.filter(term => ['world-title', 'calendar', 'mana'].includes(term.id))) lines.push(`${publicLabel}: ${term.names[locale]} — ${term.summary[locale]}`);
@@ -81,6 +91,12 @@ export function fantasyGmKnowledge(profile: FantasyProfile, locale: NpcLocale): 
   for (const fact of FANTASY_CANON_FACTS.filter(fact => ['uncharted-isle-rumor', 'core-attributes', 'life-and-rescue'].includes(fact.id)&&!superseded.has(fact.id))) lines.push(`${publicLabel}: ${fact.text[locale]}`);
   const race = FANTASY_RACES.find(race => race.id === c.race);
   const job = FANTASY_JOBS.find(job => job.id === c.job);
+  const lifeId = fantasyLifeJob(c), lifeJob = FANTASY_JOBS.find(job => job.id === lifeId);
+  if (lifeJob && lifeJob.id !== c.job) lines.push(say(
+    `생활 직업: ${lifeJob.names.ko}; 직업 숙련 ${c.jobXp[lifeJob.id] ?? 0}. 전투 직업과 함께 유지한다.`,
+    `Life career: ${lifeJob.names.en}; career proficiency ${c.jobXp[lifeJob.id] ?? 0}. Retained alongside the combat career.`,
+    `生活職: ${lifeJob.names.ja}; 職業熟練${c.jobXp[lifeJob.id] ?? 0}。戦闘職と共に維持する。`,
+  ));
   const stats = fantasyStats(c);
   const chosenPath = FANTASY_JOB_PATHS.find(path => path.id === c.jobPaths?.[c.job]?.path);
   if (chosenPath) lines.push(say('본인이 택한 전문 분야', 'Your chosen specialty', '自分が選んだ専門分野') + ': ' + chosenPath.names[locale] + ' — ' + chosenPath.fields[locale]);
@@ -90,6 +106,7 @@ export function fantasyGmKnowledge(profile: FantasyProfile, locale: NpcLocale): 
   if (c.propertyTitles?.length) lines.push(say('본인 소유 부동산', 'Your properties', '自分の不動産') + ': ' + c.propertyTitles.map(id => FANTASY_PROPERTY_PLOTS.find(plot => plot.id === id)?.names[locale]).filter(Boolean).join(', '));
   if (c.job === 'priest' && c.priestGrowth) {
     const faith = fantasyPriestGrowthStatus(c), branch = FANTASY_PRIEST_BRANCHES.find(branch => branch.id === faith.branch);
+    lines.push(say('본인의 성직 등급', 'Your clergy rank', '自分の聖職等級')+': '+fantasyPriestRankName(faith.clergyGrade,locale));
     lines.push(say(`본인의 신앙 기록: 신앙 ${faith.faith}, 봉사 ${faith.service}, 교리 독서 ${faith.doctrine}, 성소 ${faith.pilgrimage}, 이행한 서약 ${faith.vows}, 현재 신전 신뢰 ${faith.templeTrust[c.location] ?? 0}.`, `Your faith record: faith ${faith.faith}, services ${faith.service}, doctrine books ${faith.doctrine}, sanctuaries ${faith.pilgrimage}, fulfilled vows ${faith.vows}, local temple trust ${faith.templeTrust[c.location] ?? 0}.`, `自分の信仰記録: 信仰${faith.faith}、奉仕${faith.service}、教理書${faith.doctrine}、聖所${faith.pilgrimage}、果たした誓い${faith.vows}、現地神殿の信頼${faith.templeTrust[c.location] ?? 0}。`));
     if (branch) lines.push(say('걷고 있는 신앙의 길', 'Your chosen faith path', '歩んでいる信仰の道') + ': ' + branch.names[locale]);
   }
@@ -112,18 +129,16 @@ export function fantasyGmKnowledge(profile: FantasyProfile, locale: NpcLocale): 
   lines.push(fantasySpecializationSummary(c,locale));
   if(profile.death)lines.push(say('현재 인물은 사망했다. 새 삶을 시작하기 전에는 게임 행동을 할 수 없다. 이전 삶의 발자취는 세계에 남는다.','This character has died. Gameplay requires beginning a new life. Footprints of past lives remain in the world.','この人物は亡くなった。新しい人生を始めるまでゲーム行動はできず、過去の足跡は世界に残る。'));
   const bonuses = (values: Record<string, number | undefined>) => Object.entries(values).filter(([, value]) => value).map(([stat, value]) => `${stat === 'hp' || stat === 'mp' ? stat.toUpperCase() : statNames[stat as keyof typeof statNames] ?? stat} ${value! > 0 ? '+' : ''}${value}`).join(', ');
-  for (const [slot, id] of Object.entries(c.equipment ?? {})) {
-    const item = FANTASY_ITEMS.find(item => item.id === id && item.equipment?.slot === slot);
-    if (!item || (c.inventory[item.id] ?? 0) <= 0) continue;
-    const slots = { weapon: say('무기', 'weapon', '武器'), offhand: say('보조 장비', 'offhand', '副手'), armor: say('방어구', 'armor', '防具'), accessory: say('장신구', 'accessory', '装身具') };
-    lines.push(`${say('장착 장비', 'Equipped item', '装備中の品')}: ${itemName(item.id)} (${slots[slot as keyof typeof slots]}); ${bonuses(item.equipment!.stats ?? {})}${item.equipment!.guard ? `; ${say('피해 경감', 'damage reduction', '被害軽減')} +${item.equipment!.guard}` : ''}.`);
+  for (const { slot, item } of fantasyEquipmentEntries(c, FANTASY_ITEMS)) {
+    const inactive = fantasyOffhandEquipError(c, item, locale);
+    lines.push(`${say('장착 장비', 'Equipped item', '装備中の品')}: ${itemName(item.id)} (${fantasyEquipmentSlotName(slot, locale)}); ${inactive ?? bonuses(item.equipment!.stats ?? {})}${!inactive && item.equipment!.guard ? `; ${say('피해 경감', 'damage reduction', '被害軽減')} +${item.equipment!.guard}` : ''}.`);
   }
   for(const gear of fantasyEquippedGear(c))lines.push(say('장착 개체의 추가 효과','Equipped instance additions','装備個体の追加効果')+': '+itemName(gear.item)+'; '+say('품질','quality','品質')+' '+gear.quality+'; '+bonuses(gear.bonuses??{})+(gear.guard?'; '+say('방호','guard','防護')+' +'+gear.guard:'')+(gear.check?'; '+say('판정','check','判定')+' +'+gear.check:'')+(gear.gem?'; '+itemName(gear.gem):''));
   const effectNames = { poison: say('중독', 'poison', '毒'), burn: say('화상', 'burn', '火傷'), frost: say('동상', 'frost', '凍傷'), weakness: say('쇠약', 'weakness', '衰弱'), 'well-fed': say('식사 강화', 'meal enhancement', '食事強化'), 'gem-focus': say('보석 집중', 'gem focus', '宝石の集中'), 'gem-ward': say('보석 수호', 'gem ward', '宝石の守り'), 'gem-luck': say('보석 행운', 'gem luck', '宝石の幸運') };
   for (const effect of fantasyActiveEffects(c)) lines.push(`${say('현재 지속 효과', 'Current timed effect', '現在の持続効果')}: ${fantasyTravelEffectName(effect.id,locale) ?? effectNames[effect.id as keyof typeof effectNames] ?? effect.id}; ${bonuses(effect.stats ?? {})}${effect.check ? `; ${say('판정', 'check', '判定')} ${effect.check > 0 ? '+' : ''}${effect.check}` : ''}${effect.guard ? `; ${say('피해 경감', 'damage reduction', '被害軽減')} +${effect.guard}` : ''}${effect.periodicHp ? `; HP ${effect.periodicHp}/${say('게임 시간', 'game hour', 'ゲーム時間')}` : ''}; ${say('남은 게임 시간', 'game hours remaining', '残りゲーム時間')} ${(effect.expiresAt - c.hour).toFixed(3)}.`);
   for (const skill of fantasySkills(c)) {
     const effects = { check: skill.kind === 'passive' ? say('해당 판정마다', 'every matching check', '該当する判定ごと') : say('다음 해당 판정', 'next matching check', '次の該当判定'), heal: 'HP', guard: say('피해 경감', 'damage reduction', '被害軽減'), reward: say('성과 추가', 'extra yield', '成果追加'), travel: say('여행 시간 단축', 'travel hours reduced', '旅時間短縮') };
-    lines.push(`${say('본인 스킬', 'Owned skill', '自分のスキル')}: ${fantasySkillName(skill, locale)}; XP ${c.skillXp?.[skill.id]??0}; ${skill.kind === 'passive' ? say('패시브', 'passive', '常時') : say('액티브', 'active', '発動')}; MP ${skill.mp}; ${effects[skill.effect]} +${skill.power}${skill.stat ? ` (${statNames[skill.stat]})` : ''}.`);
+    lines.push(`${say('본인 스킬', 'Owned skill', '自分のスキル')}: ${fantasySkillName(skill, locale)}; XP ${c.skillXp?.[skill.id]??0}; ${skill.kind === 'passive' ? say('패시브', 'passive', '常時') : say('액티브', 'active', '発動')}; MP ${skill.mp}; ${skill.utility?skill.descriptions?.[locale]??skill.description:skill.restore==='mp'?`MP +${skill.power}`:`${effects[skill.effect]} +${skill.power}${skill.stat ? ` (${statNames[skill.stat]})` : ''}`}.`);
   }
   if (c.learnedSkills?.length) lines.push(`${say('사사해 습득한 기술', 'Skills learned from mentors', '師から習得した技能')}: ${fantasySkills(c).filter(skill => c.learnedSkills!.includes(skill.id)).map(skill => fantasySkillName(skill, locale)).join(', ')}.`);
   for (const trait of fantasyBodyTraits(c)) lines.push(`${say('자기 신체 특성', 'Own body trait', '自分の体の特性')}: ${trait.names[locale]}. ${trait.descriptions[locale]}`);

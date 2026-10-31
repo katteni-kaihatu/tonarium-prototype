@@ -13,6 +13,7 @@ import type { FantasyEconomyCommand } from '../shared/fantasy-economy.ts';
 const context = { session: 'realm-public', publicSession: true, peers: ['a', 'b'] };
 function profile(name: string): FantasyProfile {
   const p = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', gender: 'female', name }, () => .5).profile, c = p.character!;
+  c.inventory['arcane-bag-3']=1;c.bag='arcane-bag-3';
   c.gold = 1000; c.hour = 8; c.level = 10; c.job = 'warrior'; c.jobXp.warrior = 100; c.location = 'hearth'; c.visited = ['hearth', 'greenwood', 'sunmeadow'];
   c.inventory.herb = 20; c.inventory.ore = 10; c.inventory.meal = 2; c.foodLots = [{ id: `${name}-meal`, item: 'meal', count: 2, createdAt: 5 }];
   c.hp = fantasyStats(c).hp; c.mp = fantasyStats(c).mp;
@@ -82,7 +83,8 @@ test('finite market inventory rejects a second claimant and legacy buy cannot re
   const otherBefore = f.store.profile('b'); assert.ok(f.economy('b', { type: 'shopBuy', building: 'market', item: 'lantern', count: 1, revision: rival.shop.revision }).error); assert.deepEqual(f.store.profile('b'), otherBefore);
   const oldRoute = f.store.apply('b', f.store.profile('b').revision, { type: 'buy', item: 'lantern' }); assert.ok(oldRoute.error); assert.deepEqual(f.store.profile('b'), otherBefore);
   const restored = new FantasyStore(f.file, f.options); assert.equal(restored.realmState('b', context).economy.shops.find(entry => entry.building === 'market')!.lots.find(entry => entry.item === 'lantern')!.count, 0);
-  f.setHour(14); assert.equal(f.request('a', 'economy', { type: 'sync' }).error, undefined); assert.ok(f.quote().lot.count > 0);
+  f.setHour(14); assert.equal(f.request('a', 'economy', { type: 'sync' }).error, undefined); assert.equal(f.quote().lot.count, 0);
+  f.setHour(30); assert.equal(f.request('a', 'economy', { type: 'sync' }).error, undefined); assert.ok(f.quote().lot.count > 0);
 });
 
 test('failed finite-shop saves keep both the quoted stock and player funds unchanged', t => {
