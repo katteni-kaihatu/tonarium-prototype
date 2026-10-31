@@ -1,3 +1,5 @@
+import {fantasyWorldUtilityError} from './fantasy-world-utilities.ts';
+import { fantasyHasJob, fantasyLifeJob } from './fantasy-careers.ts';
 import type { FantasyAction, FantasyCharacter, FantasyEventChoice, FantasyJob, FantasyProfile, FantasyQuest, FantasySkill, FantasyStat } from './fantasy.ts';
 import { FANTASY_WORLD_TIME_RATE } from './fantasy.ts';
 import {
@@ -27,6 +29,7 @@ import { FANTASY_FINAL_ISLE_ID } from './fantasy-isle-access.ts';
 import { fantasyVoyageClueReply } from './fantasy-voyage-knowledge.ts';
 import { fantasyVoyageChoiceReply } from './fantasy-voyage-decisions.ts';
 import { fantasyPrivateCareerQuestion, fantasyPrivateCareerReply } from './fantasy-career-privacy.ts';
+import { fantasyGmGrowthQuestion, fantasyGmGrowthReply } from './fantasy-gm-growth.ts';
 
 export interface FantasyGmReply {
   text: string;
@@ -132,7 +135,7 @@ export function fantasyDialogueJob(text: string): FantasyJob | undefined {
 }
 
 function professionReply(character: FantasyCharacter, selected: FantasyJob): FantasyGmSourceReply {
-  const already = selected.id === character.job;
+  const already = fantasyHasJob(character, selected.id);
   const learnable = canAcquireJob(character, selected.id, 'gm');
   return reply(already ? `すでに${selected.name}です。改めて学ぶ必要はありません。`
     : selected.category === 'none' ? '新しいキャラクターは無職で始まります。学びたい職業を教えてください。'
@@ -158,6 +161,8 @@ function named<T extends { id: string; name: string }>(values: T[], query: strin
 }
 
 function skillEffect(skill: FantasySkill) {
+  if(skill.utility)return `${skill.descriptions?.ja??skill.description}（戦闘強度${Math.max(1,Math.min(12,skill.power))}）`;
+  if(skill.restore==='mp')return `MPを${skill.power}回復（最大MPまで）、再使用まで世界時間6時間`;
   if (skill.id === 'cook-sense') return '食品を見て匂いを調べ、鮮度と経過時間・保存期間を判断できる';
   const next = skill.kind === 'active' ? '次の対応する行動で' : '';
   switch (skill.effect) {
@@ -279,10 +284,12 @@ function fantasyGmReplyJapanese(profile: FantasyProfile, text: string): FantasyG
   const location = FANTASY_LOCATIONS.find(place => place.id === character.location);
   const job = FANTASY_JOBS.find(value => value.id === character.job);
   if (!location || !job) return reply('現在の冒険記録に対応する場所・職業を確認できません。再接続して最新の記録を取得してください。', [], 'invalid');
+  const lifeJob = FANTASY_JOBS.find(value => value.id === fantasyLifeJob(character));
+  const careerNames = lifeJob && lifeJob.id !== job.id ? `${job.name}・生活職 ${lifeJob.name}` : job.name;
   if (profile.activity && /행동|진행|뭐\s*(?:하고|하는|해)|무슨\s*일|하고\s*있|얼마나|남았|남은|何.*(?:して|やって|行動)|行動中|進行中|あと|残り|doing|activity|remaining|how long|busy/.test(query)) {
     const remaining = Math.max(0, profile.activity.endsAt - character.hour);
     const activity = fantasyGmActivityName(profile, 'ja');
-    return reply(`いまは${activity}の最中です。現在の職業は${job.name}。完了までゲーム内で約${remaining.toFixed(2)}時間、現実では約${(remaining * 60 / FANTASY_WORLD_TIME_RATE).toFixed(1)}分です。完了後に結果が記録されます。`, [tab('冒険日誌', 'journal')], 'activity');
+    return reply(`いまは${activity}の最中です。現在の職業は${careerNames}。完了までゲーム内で約${remaining.toFixed(2)}時間、現実では約${(remaining * 60 / FANTASY_WORLD_TIME_RATE).toFixed(1)}分です。完了後に結果が記録されます。`, [tab('冒険日誌', 'journal')], 'activity');
   }
   if (!profile.event && !profile.activity && /호위|escort|護衛/.test(query)) {
     const escort = fantasyEscortGuidance(character, 'ja');
@@ -330,13 +337,13 @@ function fantasyGmReplyJapanese(profile: FantasyProfile, text: string): FantasyG
     const stats = fantasyStats(character);
     const race = FANTASY_RACES.find(value => value.id === character.race);
     const gender = character.gender === 'female' ? '女性' : character.gender === 'male' ? '男性' : '性別なし';
-    return reply(`${character.name}／${race?.name ?? character.race}・${gender}／${job.name} Lv.${character.level}\nHP ${character.hp}/${stats.hp}・MP ${character.mp}/${stats.mp}・金貨${character.gold}枚\n疲労${character.fatigue}・空腹${character.hunger}\n${Object.entries(stats).filter(([stat]) => stat !== 'hp' && stat !== 'mp').map(([stat, value]) => `${FANTASY_STAT_NAMES[stat as FantasyStat]}${value}`).join('・')}\n${job.extra ? `${FANTASY_STAT_NAMES[job.extra]}は現在の職業で使う追加能力です。` : '職業によっては手先やカリスマが追加されます。'}`, [tab('スキルを見る', 'skills'), tab('職業を見る', 'jobs')], 'status');
+    return reply(`${character.name}／${race?.name ?? character.race}・${gender}／${careerNames} Lv.${character.level}\nHP ${character.hp}/${stats.hp}・MP ${character.mp}/${stats.mp}・金貨${character.gold}枚\n疲労${character.fatigue}・空腹${character.hunger}\n${Object.entries(stats).filter(([stat]) => stat !== 'hp' && stat !== 'mp').map(([stat, value]) => `${FANTASY_STAT_NAMES[stat as FantasyStat]}${value}`).join('・')}\n${job.extra ? `${FANTASY_STAT_NAMES[job.extra]}は現在の職業で使う追加能力です。` : '職業によっては手先やカリスマが追加されます。'}`, [tab('スキルを見る', 'skills'), tab('職業を見る', 'jobs')], 'status');
   }
   if (/スキル|技能|パッシブ|アクティブ|魔法|스킬|패시브|액티브|skill|passive|active|(?:mp|마나).*(?:足り|不足|부족)/.test(query)) {
     const skills = fantasySkills(character);
     const stats = fantasyStats(character);
     const usable = skills.filter(skill => skill.kind === 'active' && character.mp >= skill.mp
-      && (skill.effect === 'heal' ? character.hp < stats.hp : !character.buff));
+      && (skill.restore==='mp'?character.mp<stats.mp&&(character.manaRecoveryAt===undefined||character.hour-character.manaRecoveryAt>=6):skill.utility?!fantasyWorldUtilityError(character,skill):skill.effect === 'heal' ? character.hp < stats.hp : !character.buff));
     const rest = recovery(character);
     return reply(`現在のMPは${character.mp}/${stats.mp}。\n${skills.map(skill => `${skill.name}【${skill.kind === 'passive' ? 'パッシブ・常時' : `アクティブ・MP${skill.mp}`}】：${skill.description} 実効：${skillEffect(skill)}。${skill.kind === 'active' && character.mp < skill.mp ? '（MP不足）' : ''}`).join('\n')}\n${character.buff ? '一時強化が有効です。次の対応する行動で使うか、休息して解除できます。' : 'アクティブスキルは名前を伝えて確認するとMPを消費します。'}${rest.text}`,
       [...usable.map(skill => ({ label: `${skill.name}を使う（MP${skill.mp}）`, action: { type: 'skill' as const, skill: skill.id } })), ...rest.suggestions, tab('自分のスキル', 'skills')], 'skills');
@@ -348,17 +355,17 @@ function fantasyGmReplyJapanese(profile: FantasyProfile, text: string): FantasyG
       [...(dining ? FANTASY_DINING.filter(meal => character.gold >= meal.cost).map(meal => ({ label: `${meal.name.ja}を注文（金貨${meal.cost}枚・${meal.hours}時間）`, action: { type: 'eat' as const, meal: meal.id } })) : []), tab('持ち物の食べ物', 'inventory')], 'dining');
   }
   if (/制作|製作|作成|調合|レシピ|材料|料理を|鍛える|제작|제조|조합|레시피|재료|만들|craft|recipe/.test(query)) {
-    const recipes = FANTASY_RECIPES.filter(recipe => recipe.job === character.job);
+    const recipes = FANTASY_RECIPES.filter(recipe => fantasyHasJob(character, recipe.job));
     if (!recipes.length) return reply(`${job.name}には現在、制作レシピがありません。料理人・鍛冶師・錬金術師などの職業には専用の製法があります。転職はギルドで行えます。`, [tab('職業と製法を確認', 'jobs'), tab('持ち物', 'inventory')], 'craft');
     const suggestions: Suggestion[] = [];
-    const facility = fantasyCraftFacility(character.job);
-    const facilityName = facility ? ({ blacksmith: '鍛冶屋', alchemist: '錬金工房', tower: '魔術師の塔', restaurant: '食堂', market: '市場', library: '図書館', temple: '神殿', shipyard: '造船所' } as Record<string, string>)[facility] ?? '共同設備' : '共同設備';
+    const facility = fantasyCraftFacility(lifeJob?.id ?? character.job);
+    const facilityName = facility ? ({ guild: 'ギルド', blacksmith: '鍛冶屋', alchemist: '錬金工房', tower: '魔術師の塔', restaurant: '食堂', market: '市場', library: '図書館', temple: '神殿', shipyard: '造船所' } as Record<string, string>)[facility] ?? '共同設備' : '共同設備';
     const descriptions = recipes.map(recipe => {
       const missing = Object.entries(recipe.inputs).filter(([id, amount]) => (character.inventory[id] ?? 0) < amount);
       const materials = Object.entries(recipe.inputs).map(([id, amount]) => `${itemName(id)}${amount}個（所持${character.inventory[id] ?? 0}）`).join('・');
       const ready = fantasyCanCraft(character, recipe) && !missing.length;
       if (ready) suggestions.push({ label: `${recipe.name}を制作（3時間・DC${recipe.dc}）`, action: { type: 'craft', recipe: recipe.id } });
-      return `${recipe.name}：${materials} → ${itemName(recipe.output)}${recipe.count}個。${FANTASY_STAT_NAMES[job.stat]}判定 DC${recipe.dc}・3時間。${!facility || !hasBuilding(character, facility) ? `現在地には${facilityName}がありません。` : missing.length ? `不足：${missing.map(([id, amount]) => `${itemName(id)}${amount - (character.inventory[id] ?? 0)}個`).join('・')}。` : ready ? '制作できます。' : '写図に必要な地理情報をまだ知りません。'}結果は実行後に判定します。`;
+      return `${recipe.name}：${materials} → ${itemName(recipe.output)}${recipe.count}個。${FANTASY_STAT_NAMES[FANTASY_JOBS.find(value => value.id === recipe.job)!.stat]}判定 DC${recipe.dc}・3時間。${!facility || !hasBuilding(character, facility) ? `現在地には${facilityName}がありません。` : missing.length ? `不足：${missing.map(([id, amount]) => `${itemName(id)}${amount - (character.inventory[id] ?? 0)}個`).join('・')}。` : ready ? '制作できます。' : '写図に必要な地理情報をまだ知りません。'}結果は実行後に判定します。`;
     });
     return reply(descriptions.join('\n'), [...suggestions, tab('持ち物と制作', 'inventory')], 'craft');
   }
@@ -377,11 +384,13 @@ function fantasyGmReplyJapanese(profile: FantasyProfile, text: string): FantasyG
   const selectedJob = fantasyDialogueJob(query);
   if (selectedJob || /職業|転職|仕事|働|金策|稼|お金|旅費|金貨|직업|전직|일하|일할|돈|금화|생활|job|work|money|profession|career|earn/.test(query)) {
     const workWanted = /仕事|働|金策|稼|お金|旅費|金貨|일하|일할|돈|금화|work|money|earn/.test(query);
-    if (selectedJob && !(selectedJob.id === character.job && workWanted)) {
+    if (selectedJob && !(fantasyHasJob(character, selectedJob.id) && workWanted)) {
       return professionReply(character, selectedJob);
     }
-    return reply(`現在の職業は${job.name}です。仕事は無料・ゲーム内4時間（実時間${240 / FANTASY_WORLD_TIME_RATE}分）で、完了後に判定結果と賃金が記録されます。`,
-      [...(workWanted ? [{ label: `${job.name}として働く（無料・実時間${240 / FANTASY_WORLD_TIME_RATE}分）`, action: { type: 'work' as const } }] : []), tab('職業一覧', 'jobs')], 'jobs');
+    const workJob = selectedJob && selectedJob.id === lifeJob?.id ? lifeJob : job;
+    const workAction: FantasyAction = workJob.id !== character.job ? { type: 'work', career: 'life' } : { type: 'work' };
+    return reply(`現在の職業は${careerNames}です。仕事は無料・ゲーム内4時間（実時間${240 / FANTASY_WORLD_TIME_RATE}分）で、完了後に判定結果と賃金が記録されます。`,
+      [...(workWanted ? [{ label: `${workJob.name}として働く（無料・実時間${240 / FANTASY_WORLD_TIME_RATE}分）`, action: workAction }] : []), tab('職業一覧', 'jobs')], 'jobs');
   }
   if (/採集|資源|探索|探検|採取|채집|자원|탐사|탐험|수집|explore|gather|resource/.test(query)) {
     return reply(`${location.name}の採集候補は${location.resources.map(itemName).join('・')}。探索には3時間かかり、危険度は${location.danger}です。発見と危険の判定は実行後に決まり、結果は冒険日誌に残ります。`, [{ label: '現在地を探索（3時間）', action: { type: 'explore' } }, tab('現在地の詳細', 'location')], 'explore');
@@ -405,6 +414,8 @@ function fantasyGmReplyJapanese(profile: FantasyProfile, text: string): FantasyG
 
 export function fantasyGmReply(profile: FantasyProfile, text: string, locale: NpcLocale = 'ja'): FantasyGmReply {
   if (fantasyPrivateCareerQuestion(text)) return { text: fantasyPrivateCareerReply(locale), suggestions: [] };
+  const growth = !profile.death && fantasyGmGrowthQuestion(text) ? fantasyGmGrowthReply(profile, locale) : undefined;
+  if (growth) return growth;
   if (profile.combatId) return { text: { ko: '지금은 전투 중이야. 전투 화면에서 공격·방어·기술·소모품·퇴각을 선택해 줘. 아직 승패는 정해지지 않았어.', en: 'Combat is in progress. Choose attacks, defense, skills, consumables or retreat on the battlefield. The outcome is not settled yet.', ja: '現在は戦闘中です。戦闘画面で攻撃・防御・技能・消耗品・離脱を選んでください。勝敗はまだ決まっていません。' }[locale], suggestions: [] };
   const clue = profile.character && (fantasyVoyageChoiceReply(profile.character, text, locale) ?? fantasyVoyageClueReply(profile.character, text, locale));
   if (clue) return { text: clue, suggestions: [{ label: { ko: '항해 기록', en: 'Voyage journal', ja: '航海の記録' }[locale], tab: 'journal' }] };
@@ -415,6 +426,7 @@ export function fantasyGmReply(profile: FantasyProfile, text: string, locale: Np
 
 export function fantasyGmCanAnswer(profile: FantasyProfile, text: string): boolean {
   if (fantasyPrivateCareerQuestion(text)) return true;
+  if (profile.character && !profile.death && fantasyGmGrowthQuestion(text)) return true;
   if (profile.combatId) return true;
   if (profile.character && (fantasyVoyageChoiceReply(profile.character, text, 'ja') ?? fantasyVoyageClueReply(profile.character, text, 'ja'))) return true;
   return fantasyGmReplyJapanese(profile, text).topic !== 'unknown';

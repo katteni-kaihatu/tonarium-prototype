@@ -3,10 +3,13 @@ import { FANTASY_ITEMS } from './fantasy-data.ts';
 import { FANTASY_MAPS } from './fantasy-town.ts';
 import { foodMeta } from './fantasy-life.ts';
 import { fantasySpendItem, validFantasyGear } from './fantasy-equipment.ts';
+import { validFantasyFoodPreservation } from './fantasy-food-preservation.ts';
+import { fantasyEquippedMagicBags, fantasyNormalBagId } from './fantasy-bag-configuration.ts';
+import { FANTASY_INTERIOR_MAP_ITEM, validFantasyInteriorMapCopy, takeFantasyInteriorMap, deliverFantasyInteriorMap, type FantasyInteriorMapCopy } from './fantasy-interior-map-catalog.ts';
 
 export interface FantasyPartyVaultLot {
   id: string; item: string; count: number; donor: string; generation: number; name: string;
-  food?: FantasyFoodLot[]; gear?: FantasyGearInstance;
+  food?: FantasyFoodLot[]; gear?: FantasyGearInstance; interiorMap?: FantasyInteriorMapCopy;
 }
 export interface FantasyPartyWithdrawal { id: string; user: string; generation: number; name: string; lot: string; count: number }
 export interface FantasyPartyVault { revision: number; lots: FantasyPartyVaultLot[]; requests: FantasyPartyWithdrawal[] }
@@ -23,14 +26,15 @@ const text = (v: unknown): v is string => typeof v === 'string' && v.length > 0 
 const knownItem = (id: string) => FANTASY_ITEMS.some(item => item.id === id) || FANTASY_MAPS.some(map => map.item === id);
 export const newFantasyPartyVault = (): FantasyPartyVault => ({ revision: 0, lots: [], requests: [] });
 
-export function validFantasyPartyVaults(value: unknown): value is FantasyPartyVaults {
+export function validFantasyPartyVaults(value: unknown, at = Number.MAX_VALUE): value is FantasyPartyVaults {
   return object(value) && Object.entries(value).every(([key, v]) => text(key) && object(v) && integer(v.revision)
     && Array.isArray(v.lots) && v.lots.length <= 500 && Array.isArray(v.requests) && v.requests.length <= 100
-    && v.lots.every(lot => object(lot) && text(lot.id) && typeof lot.item === 'string' && knownItem(lot.item)
+    && v.lots.every(lot => object(lot) && text(lot.id) && typeof lot.item === 'string' && knownItem(lot.item) && FANTASY_ITEMS.find(item => item.id === lot.item)?.category !== 'guild-loan'
       && integer(lot.count, 1) && text(lot.donor) && integer(lot.generation, 1) && text(lot.name)
+      && (lot.item === FANTASY_INTERIOR_MAP_ITEM ? lot.count === 1 && validFantasyInteriorMapCopy(lot.interiorMap) && lot.gear === undefined && lot.food === undefined : lot.interiorMap === undefined)
       && (!!foodMeta(lot.item) === Array.isArray(lot.food))
-      && (lot.food === undefined || Array.isArray(lot.food) && !!foodMeta(lot.item) && lot.food.every(f => object(f) && text(f.id)
-        && f.item === lot.item && integer(f.count, 1) && typeof f.createdAt === 'number' && Number.isFinite(f.createdAt) && f.createdAt >= 0)
+      && (lot.food === undefined || Array.isArray(lot.food) && !!foodMeta(lot.item) && lot.food.every(f => object(f) && Object.keys(f).every(key => ['id', 'item', 'count', 'createdAt', 'preservedHours', 'preservationAt'].includes(key)) && text(f.id)
+        && f.item === lot.item && integer(f.count, 1) && typeof f.createdAt === 'number' && Number.isFinite(f.createdAt) && f.createdAt >= 0 && f.createdAt <= at && validFantasyFoodPreservation(f, at))
         && lot.food.reduce((sum, f) => sum + Number(f.count), 0) === lot.count)
       && (lot.gear === undefined || object(lot.gear) && lot.count === 1 && text(lot.gear.id) && lot.gear.item === lot.item
         && integer(lot.gear.quality, 1) && Number(lot.gear.quality) <= 5 && typeof lot.gear.createdAt === 'number' && Number.isFinite(lot.gear.createdAt)
@@ -43,6 +47,11 @@ export function validFantasyPartyVaults(value: unknown): value is FantasyPartyVa
 
 function deliver(profile: FantasyProfile, lot: FantasyPartyVaultLot, amount: number, suffix: string) {
   const c = profile.character!;
+  if (FANTASY_ITEMS.find(item => item.id === lot.item)?.category === 'guild-loan' || lot.food?.some(food => food.createdAt > c.hour || !validFantasyFoodPreservation(food, c.hour))) return false;
+  if (lot.item === FANTASY_INTERIOR_MAP_ITEM) {
+    if (amount !== 1 || !lot.interiorMap || !deliverFantasyInteriorMap(c, lot.interiorMap)) return false;
+    lot.count--; profile.revision++; return true;
+  }
   c.inventory[lot.item] = (c.inventory[lot.item] ?? 0) + amount;
   if (lot.gear) { c.gear ??= []; c.gear.push({ ...lot.gear, id: `gear-shared-${suffix}-${lot.id}`.slice(0, 110) }); }
   if (lot.food) {
@@ -54,7 +63,7 @@ function deliver(profile: FantasyProfile, lot: FantasyPartyVaultLot, amount: num
     lot.food = lot.food.filter(food => food.count > 0);
   }
   lot.count -= amount;
-  profile.revision++;
+  profile.revision++; return true;
 }
 
 export function applyFantasyPartyVault(vaults: FantasyPartyVaults, profiles: ReadonlyMap<string, FantasyProfile>, party: FantasyPartyVaultContext, actor: string, command: FantasyPartyVaultCommand, token: string): FantasyPartyVaultResult {
@@ -69,6 +78,14 @@ export function applyFantasyPartyVault(vaults: FantasyPartyVaults, profiles: Rea
   const vault = next[party.id] ??= newFantasyPartyVault(); updated.set(actor, current);
   if (command.type === 'deposit') {
     if (!knownItem(command.item) || !integer(command.count, 1) || command.count > 999 || vault.lots.length >= 500) return fail('invalid');
+    const reservedBags = (fantasyNormalBagId(c) === command.item ? 1 : 0) + fantasyEquippedMagicBags(c).filter(id => id === command.item).length;
+    if (FANTASY_ITEMS.find(item => item.id === command.item)?.category === 'guild-loan' || (c.inventory[command.item] ?? 0) - command.count < reservedBags) return fail('equipped');
+    if (command.item === FANTASY_INTERIOR_MAP_ITEM) {
+      if (command.count !== 1) return fail('invalid');
+      const interiorMap = takeFantasyInteriorMap(current.character!, command.instance); if (!interiorMap) return fail('invalid');
+      vault.lots.push({ id: token, item: command.item, count: 1, donor: actor, generation: before!.generation ?? 1, name: c.name, interiorMap });
+      current.revision++;
+    } else {
     const character = current.character!, ownedGear = character.gear?.filter(g => g.item === command.item) ?? [];
     const gear = command.instance ? ownedGear.find(g => g.id === command.instance) : undefined;
     if (command.instance && (!gear || command.count !== 1)) return fail('invalid');
@@ -87,6 +104,7 @@ export function applyFantasyPartyVault(vaults: FantasyPartyVaults, profiles: Rea
     vault.lots.push({ id: token, item: command.item, count: command.count, donor: actor, generation: before!.generation ?? 1, name: c.name,
       ...(foods.length ? { food: foods } : {}), ...(gear ? { gear: structuredClone(gear) } : {}) });
     current.revision++;
+    }
   } else if (command.type === 'requestWithdraw') {
     const lot = vault.lots.find(lot => lot.id === command.lot);
     if (!lot || !integer(command.count, 1) || command.count > lot.count || vault.requests.some(r => r.user === actor && r.lot === lot.id) || vault.requests.length >= 100) return fail('invalid');
@@ -101,7 +119,7 @@ export function applyFantasyPartyVault(vaults: FantasyPartyVaults, profiles: Rea
       if (recipient!.activity || recipient!.combatId || recipient!.event || rc.location !== c.location) return fail('busy');
       if (!lot || lot.count < request.count) return fail('invalid');
       const changed = request.user === actor ? current : structuredClone(recipient!);
-      deliver(changed, lot, request.count, token); updated.set(request.user, changed);
+      if (!deliver(changed, lot, request.count, token)) return fail('invalid'); updated.set(request.user, changed);
     }
     vault.requests = vault.requests.filter(r => r.id !== request.id);
   }
@@ -119,7 +137,7 @@ export function returnFantasyPartyDeposits(vaults: FantasyPartyVaults, profiles:
       if (owner && owner !== lot.donor) continue;
       const before = updated.get(lot.donor);
       if (!before?.character || before.death || before.character.hp <= 0 || (before.generation ?? 1) !== lot.generation) continue;
-      const profile = structuredClone(before); deliver(profile, lot, lot.count, `return-${vault.revision}`); updated.set(lot.donor, profile); changed = true;
+      const profile = structuredClone(before); if (!deliver(profile, lot, lot.count, `return-${vault.revision}`)) continue; updated.set(lot.donor, profile); changed = true;
     }
     const pending = vault.requests.length;
     vault.lots = vault.lots.filter(lot => lot.count > 0);

@@ -9,12 +9,11 @@ import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
 import { COMPAT_VERSION, type User, type SessionSnapshot } from '../shared/protocol.ts';
 import { WORLD_COUNTDOWN_MS } from '../shared/worlds.ts';
-import type { FantasyAccountResponse } from '../shared/fantasy-account.ts';
 import type { FantasyProfile } from '../shared/fantasy.ts';
 import { testServerEnv } from './test-db.ts';
 
 interface Message {
-  t: string; list?: User[]; account?: FantasyAccountResponse['account']; activeId?: string; homeId?: string;
+  t: string; list?: User[];
   user?: User; profile?: FantasyProfile; world?: string; at?: number; sid?: string; requestId?: string;
   error?: string;
   config?: { token: string; sid: string; user: string }; snapshot?: SessionSnapshot;
@@ -84,7 +83,7 @@ async function fixture(t: TestContext) {
   await new Promise<void>(resolve => probe.close(() => resolve()));
   const origin = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ['--import', 'tsx', '--import', pathToFileURL(loader).href, 'server/index.ts', '--dev'], {
-    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '0', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
+    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
       LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = '';
@@ -108,14 +107,6 @@ async function fixture(t: TestContext) {
     const inspect = () => { if (logs.includes('server on')) { clearTimeout(timer); child.stdout.off('data', inspect); resolve(); } };
     child.stdout.on('data', inspect); child.once('exit', () => { clearTimeout(timer); reject(Error(`World fixture exited: ${logs}`)); }); inspect();
   });
-  async function account(action: string, body?: unknown, cookie = '') {
-    const response = await fetch(`${origin}/api/fantasy/account/${action}`, {
-      method: body === undefined ? 'GET' : 'POST', headers: { Origin: origin, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(cookie ? { Cookie: cookie } : {}) },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
-    assert.equal(response.status, 200);
-    return { body: await response.json() as FantasyAccountResponse, cookie: response.headers.get('set-cookie')?.split(';')[0] ?? '' };
-  }
   async function peer(id: string, name = id) {
     const socket = new WebSocket(`${origin.replace('http', 'ws')}/ws`, { headers: { Origin: origin } }); sockets.push(socket);
     const messages: Message[] = []; socket.on('message', raw => messages.push(JSON.parse(String(raw)) as Message));
@@ -151,96 +142,50 @@ async function fixture(t: TestContext) {
     send({ t: 'hello', compat: COMPAT_VERSION, id, name }); await wait(message => message.t === 'snapshot');
     return { id, name, socket, messages, send, wait, barrier, sync };
   }
-  return { account, peer };
+  return { peer };
 }
 
-test('home observers retain both original identities while shared fantasy room actors stay deduplicated', { timeout: 30000 }, async t => {
-  const f = await fixture(t), observer = await f.peer('observer'), alice = await f.peer('home-alice', 'Common Alice'), bob = await f.peer('home-bob', 'Common Bob');
-  const registered = await f.account('register', { username: 'projection_owner', password: 'World fixture password 123' });
-  const principal = registered.body.account!.principal;
-  alice.send({ t: 'join', sid: 'fantasy' }); alice.send({ t: 'fantasyAccountBind', ticket: registered.body.ticket });
-  await alice.wait(message => message.t === 'fantasyAccountState' && message.activeId === principal);
-  const status = await f.account('status', undefined, registered.cookie), observedAt = observer.messages.length;
-  bob.send({ t: 'join', sid: 'fantasy' }); bob.send({ t: 'fantasyAccountBind', ticket: status.body.ticket });
-  await bob.wait(message => message.t === 'fantasyAccountState' && message.activeId === principal); await bob.barrier(); await observer.barrier();
-  const homes = observer.messages.slice(observedAt).filter(message => message.t === 'users').at(-1)!.list!;
-  assert.ok(homes.some(user => user.id === 'home-alice' && user.name === 'Common Alice' && user.session === 'fantasy'), 'observer must retain Alice home identity');
-  assert.ok(homes.some(user => user.id === 'home-bob' && user.name === 'Common Bob' && user.session === 'fantasy'), 'observer must retain Bob home identity');
-  assert.ok(homes.every(user => !user.id.startsWith('fantasy:')));
-  const local = bob.messages.filter(message => message.t === 'users').at(-1)!.list!;
-  for (const id of ['home-alice', 'home-bob']) assert.ok(local.some(user => user.id === id && user.session === null));
-  assert.equal(local.filter(user => user.id === principal && user.session === 'fantasy').length, 1);
-  assert.equal(local.find(user => user.id === principal)?.name, 'Common Bob');
-  const room = await bob.sync(); assert.equal(room.config.user, principal);
-  assert.deepEqual(Object.keys(room.snapshot.presence), [principal]);
+
+test('RPG room participants retain their distinct Tonarium identities',{timeout:30000},async t=>{
+  const f=await fixture(t),observer=await f.peer('observer'),alice=await f.peer('home-alice','Common Alice'),bob=await f.peer('home-bob','Common Bob');
+  for(const peer of [alice,bob]){peer.send({t:'join',sid:'fantasy'});await peer.wait(message=>message.t==='fantasyProfile');}
+  await observer.barrier();await bob.barrier();
+  const homes=observer.messages.filter(message=>message.t==='users').at(-1)!.list!;
+  const local=bob.messages.filter(message=>message.t==='users').at(-1)!.list!;
+  for(const list of [homes,local])for(const [id,name] of [['home-alice','Common Alice'],['home-bob','Common Bob']])
+    assert.ok(list.some(user=>user.id===id&&user.name===name&&user.session==='fantasy'));
+  const room=await bob.sync();assert.equal(room.config.user,bob.id);
+  assert.deepEqual(Object.keys(room.snapshot.presence).sort(),[alice.id,bob.id].sort());
 });
 
-test('live room world changes bind and restore existing authenticated tabs while anonymous visitors stay private', { timeout: 45000 }, async t => {
-  const f = await fixture(t), observer = await f.peer('observer'), alice = await f.peer('home-alice', 'Common Alice'), bob = await f.peer('home-bob', 'Common Bob'), guest = await f.peer('guest');
-  const registered = await f.account('register', { username: 'switch_owner', password: 'World fixture password 123' });
-  const principal = registered.body.account!.principal, status = await f.account('status', undefined, registered.cookie);
-  for (const [peer, ticket] of [[alice, registered.body.ticket], [bob, status.body.ticket]] as const) {
-    peer.send({ t: 'join', sid: 'switching' }); peer.send({ t: 'fantasyAccountBind', ticket }); await peer.barrier();
-  }
-  guest.send({ t: 'join', sid: 'switching' }); await guest.barrier();
-  const initial = await alice.sync(), enteredAt = alice.messages.length, bobEnteredAt = bob.messages.length, guestEnteredAt = guest.messages.length;
-  const switchingAt = Date.now(); initial.send({ t: 'world', world: 'fantasy' });
-  const countdown = await initial.until(message => message.t === 'worldPending');
-  assert.ok(countdown.at! >= switchingAt + WORLD_COUNTDOWN_MS - 100);
-  const identity = await alice.wait(message => message.t === 'fantasyAccountState' && message.activeId === principal, enteredAt);
-  assert.ok(Date.now() >= countdown.at! - 100); assert.equal(identity.homeId, alice.id);
-  await bob.wait(message => message.t === 'fantasyAccountState' && message.activeId === principal, bobEnteredAt);
-  const empty = (await alice.wait(message => message.t === 'fantasyProfile', enteredAt)).profile!;
-  await bob.wait(message => message.t === 'fantasyProfile', bobEnteredAt);
-  const guestIdentity = await guest.wait(message => message.t === 'fantasyAccountState', guestEnteredAt);
-  assert.equal(guestIdentity.activeId, 'guest'); assert.equal(guestIdentity.account, null);
-  assert.deepEqual(guest.messages.slice(guestEnteredAt).filter(message => privateTypes.has(message.t)), []);
-  assert.notEqual(initial.room.readyState, WebSocket.OPEN);
-  const fantasy = await alice.sync(); assert.equal(fantasy.config.user, principal); assert.equal(fantasy.snapshot.world, 'fantasy');
-  assert.deepEqual(Object.keys(fantasy.snapshot.presence).sort(), ['guest', principal].sort());
-  const createdAt = alice.messages.length;
-  alice.send({ t: 'fantasyAction', revision: empty.revision, action: { type: 'create', name: 'Switch private hero', source: 'human', gender: 'female' } });
-  await alice.wait(message => message.t === 'fantasyProfile' && message.profile?.character?.name === 'Switch private hero', createdAt);
+test('live world changes keep platform owners and private state across entry and exit',{timeout:45000},async t=>{
+  const f=await fixture(t),observer=await f.peer('observer'),alice=await f.peer('home-alice','Common Alice'),bob=await f.peer('home-bob','Common Bob');
+  for(const peer of [alice,bob]){peer.send({t:'join',sid:'switching'});await peer.barrier();}
+  const initial=await alice.sync(),enteredAt=alice.messages.length,bobEnteredAt=bob.messages.length;
+  const switchingAt=Date.now();initial.send({t:'world',world:'fantasy'});
+  const countdown=await initial.until(message=>message.t==='worldPending');
+  assert.ok(countdown.at!>=switchingAt+WORLD_COUNTDOWN_MS-100);
+  const empty=(await alice.wait(message=>message.t==='fantasyProfile',enteredAt)).profile!;
+  assert.ok(Date.now()>=countdown.at!-100);
+  await bob.wait(message=>message.t==='fantasyProfile',bobEnteredAt);
+  const fantasy=await alice.sync();assert.equal(fantasy.config.user,alice.id);assert.equal(fantasy.snapshot.world,'fantasy');
+  assert.deepEqual(Object.keys(fantasy.snapshot.presence).sort(),[alice.id,bob.id].sort());
+  const createdAt=alice.messages.length;
+  alice.send({t:'fantasyAction',revision:empty.revision,action:{type:'create',name:'Switch private hero',source:'human',gender:'female'}});
+  await alice.wait(message=>message.t==='fantasyProfile'&&message.profile?.character?.name==='Switch private hero',createdAt);
   assert.ok(!JSON.stringify(observer.messages).includes('Switch private hero'));
-  const leftAt = alice.messages.length, bobLeftAt = bob.messages.length, guestLeftAt = guest.messages.length;
-  const guestRoom = await guest.sync(); fantasy.send({ t: 'world', world: 'city' });
-  await guestRoom.until(message => message.t === 'world' && message.world === 'city');
-  for (const [peer, from] of [[alice, leftAt], [bob, bobLeftAt]] as const) {
-    const restored = await peer.wait(message => message.t === 'fantasyAccountState' && message.activeId === peer.id, from);
-    assert.equal(restored.account, null); assert.equal(restored.user?.name, peer.name); assert.equal(restored.user?.session, 'switching');
-    const room = await peer.sync(); assert.equal(room.config.user, peer.id); assert.equal(room.snapshot.world, 'city');
-    assert.deepEqual(Object.keys(room.snapshot.presence).sort(), ['guest', 'home-alice', 'home-bob']);
-    const deniedAt = peer.messages.length; peer.send({ t: 'fantasyAction', revision: empty.revision, action: { type: 'sync' } }); await peer.barrier();
-    assert.deepEqual(peer.messages.slice(deniedAt).filter(message => privateTypes.has(message.t)), []);
+  assert.ok(!JSON.stringify(bob.messages).includes('Switch private hero'));
+  fantasy.send({t:'world',world:'city'});
+  await fantasy.until(message=>message.t==='worldPending'&&message.world==='city');
+  await alice.wait(message=>message.t==='users'&&!!message.list?.some(user=>user.id===alice.id&&user.session==='switching'));
+  await fantasy.until(message=>message.t==='world'&&message.world==='city');
+  const city=await alice.sync();assert.equal(city.snapshot.world,'city');assert.equal(city.config.user,alice.id);
+  for(const peer of [alice,bob]){
+    const deniedAt=peer.messages.length;peer.send({t:'fantasyAction',revision:empty.revision,action:{type:'sync'}});await peer.barrier();
+    assert.deepEqual(peer.messages.slice(deniedAt).filter(message=>privateTypes.has(message.t)),[]);
   }
-  await guest.barrier(); assert.deepEqual(guest.messages.slice(guestLeftAt).filter(message => privateTypes.has(message.t)), []);
-  assert.ok(alice.messages.filter(message => message.t === 'users').at(-1)!.list!.every(user => !user.id.startsWith('fantasy:')));
-});
-
-test('a live world change cannot move an account already occupying a different session', { timeout: 30000 }, async t => {
-  const f = await fixture(t), alice = await f.peer('home-alice'), bob = await f.peer('home-bob');
-  const registered = await f.account('register', { username: 'occupied_owner', password: 'World fixture password 123' });
-  const principal = registered.body.account!.principal;
-  alice.send({ t: 'join', sid: 'fantasy' }); alice.send({ t: 'fantasyAccountBind', ticket: registered.body.ticket });
-  await alice.wait(message => message.t === 'fantasyAccountState' && message.activeId === principal);
-  const originalRoom = await alice.sync(), status = await f.account('status', undefined, registered.cookie);
-  bob.send({ t: 'join', sid: 'switching' }); bob.send({ t: 'fantasyAccountBind', ticket: status.body.ticket }); await bob.barrier();
-  const switching = await bob.sync(), changedAt = bob.messages.length;
-  switching.send({ t: 'world', world: 'fantasy' });
-  const denied = await bob.wait(message => message.t === 'fantasyAccountState', changedAt);
-  assert.equal(denied.activeId, bob.id); assert.equal(denied.account, null); assert.equal(denied.error, 'unavailable');
-  assert.equal(originalRoom.room.readyState, WebSocket.OPEN);
-  assert.deepEqual(bob.messages.slice(changedAt).filter(message => privateTypes.has(message.t)), []);
-  const refreshed = await alice.sync(); assert.equal(refreshed.snapshot.sid, 'fantasy'); assert.deepEqual(Object.keys(refreshed.snapshot.presence), [principal]);
-  const retry = await f.account('status', undefined, registered.cookie), retriedAt = bob.messages.length;
-  bob.send({ t: 'fantasyAccountBind', ticket: retry.body.ticket });
-  const stillDenied = await bob.wait(message => message.t === 'fantasyAccountState', retriedAt);
-  assert.equal(stillDenied.activeId, bob.id); assert.equal(stillDenied.error, 'unavailable');
-  assert.equal(originalRoom.room.readyState, WebSocket.OPEN);
-  assert.deepEqual(bob.messages.slice(retriedAt).filter(message => privateTypes.has(message.t)), []);
-  const joinedAt = bob.messages.length;
-  bob.send({ t: 'join', sid: 'switching', requestId: 'occupied-account-join' });
-  const joinDenied = await bob.wait(message => message.t === 'sessionResult' && message.requestId === 'occupied-account-join', joinedAt);
-  assert.ok(joinDenied.error); assert.equal(originalRoom.room.readyState, WebSocket.OPEN);
-  assert.deepEqual(bob.messages.slice(joinedAt).filter(message => privateTypes.has(message.t)), []);
+  alice.send({t:'join',sid:'fantasy'});
+  await alice.wait(message=>message.t==='fantasyProfile'&&message.profile?.character?.name==='Switch private hero',createdAt);
+  const resumed=await alice.sync();assert.equal(resumed.config.user,alice.id);
+  assert.ok(alice.messages.filter(message=>message.t==='users').at(-1)!.list!.every(user=>!user.id.startsWith('fantasy:')));
 });

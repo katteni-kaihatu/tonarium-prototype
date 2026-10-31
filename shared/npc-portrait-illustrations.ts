@@ -1,4 +1,3 @@
-export const NPC_PORTRAIT_ILLUSTRATIONS_ENABLED: boolean = true;
 export const NPC_ILLUSTRATION_STYLE = 'anime-waist-up-v3';
 export const NPC_ILLUSTRATION_IDS = [
   'rin',
@@ -138,6 +137,29 @@ export const NPC_ILLUSTRATION_IDS = [
   'rockshade-tarek',
   'rockshade-kehra',
   'sunmeadow-faye',
+  'artisan-hearth-nella',
+  'artisan-reedcross-pavel',
+  'artisan-emberhall-rurik',
+  'artisan-canopy-sylven',
+  'artisan-inkstone-hyeon',
+  'artisan-suncourt-elodie',
+  'artisan-loom-mairi',
+  'artisan-redweave-nadir',
+  'artisan-emberhall-briska',
+  'artisan-sunloom-tala',
+  'artisan-mossbrook-enna',
+  'artisan-wellrest-omri',
+  'artisan-tidehaven-petra',
+  'artisan-saffron-yasmin',
+  'artisan-verdant-ilmar',
+  'artisan-mooncity-serit',
+  'artisan-pinewatch-brann',
+  'artisan-mossbrook-rivet',
+  'artisan-sunloom-dima',
+  'artisan-saffron-fadila',
+  'artisan-rockshade-olek',
+  'frontier-landing-sena',
+  'wandering-cartographer',
 ] as const;
 
 export const NPC_PORTRAIT_ILLUSTRATIONS: Readonly<Record<string, string>> = Object.freeze(Object.fromEntries(
@@ -145,6 +167,6 @@ export const NPC_PORTRAIT_ILLUSTRATIONS: Readonly<Record<string, string>> = Obje
 ));
 
 export function npcIllustrationUrl(id: string): string | undefined {
-  return NPC_PORTRAIT_ILLUSTRATIONS_ENABLED && Object.hasOwn(NPC_PORTRAIT_ILLUSTRATIONS, id)
+  return Object.hasOwn(NPC_PORTRAIT_ILLUSTRATIONS, id)
     ? NPC_PORTRAIT_ILLUSTRATIONS[id] : undefined;
 }

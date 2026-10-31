@@ -7,6 +7,8 @@ import { FANTASY_STORY_COMBATS, fantasyStoryCombatRequirement } from './fantasy-
 import { fantasyMainInvestigationError, fantasyMainStage } from './fantasy-main-trials.ts';
 import { FANTASY_APEX_PROVOCATIONS, fantasyCombatEnemy } from './fantasy-combat-catalog.ts';
 import { fantasyCombatHuntOptions, fantasyCombatStartError, fantasyCombatStartPlan, validFantasyCombatProgress } from './fantasy-combat-challenges.ts';
+import { FANTASY_ESCORT_AMBUSH_ENCOUNTER, fantasyHostileEncounter } from './fantasy-encounters.ts';
+import { fantasyMonsterSiteForProvocation } from './fantasy-monster-sites.ts';
 import { fantasyHuntTargets } from './fantasy-gathering.ts';
 import { fantasyGmReply } from './fantasy-gm.ts';
 
@@ -33,7 +35,10 @@ test('eight intermittent main-story battles start early and never contain an ape
     p.character!.location = fantasyMainStage(p.character!, combat.quest)!.location;
     const error = fantasyMainInvestigationError(p.character!, { type: 'investigate', quest: combat.quest, approach: 'observe' }); assert.ok(error);
     const plan = fantasyCombatStartPlan(p, 'story', combat.quest)!;
-    assert.equal(plan.source, combat.key); assert.equal(plan.victoryKey, combat.key); assert.equal(plan.enemies[0].template, combat.enemy);
+    assert.equal(plan.source, combat.key); assert.equal(plan.victoryKey, combat.key);
+    const narrative = fantasyCombatEnemy(combat.enemy)!, actual = fantasyCombatEnemy(plan.enemies[0].template)!;
+    if (narrative.tier <= 6) assert.equal(actual.id, narrative.id);
+    else { assert.ok(actual.tier <= 6); assert.equal(actual.kind, narrative.kind); }
     assert.equal(fantasyCombatEnemy(combat.enemy)!.provocationOnly, false);
     for (const locale of ['ko', 'en', 'ja'] as const) assert.ok(combat.setup[locale]);
     (p.character!.combatVictories ??= {})[combat.key] = p.character!.hour;
@@ -51,10 +56,16 @@ test('legacy investigation rules remain valid while enabled characters must fini
   assert.equal(fantasyMainInvestigationError(p.character!, { type: 'investigate', quest: q.quest, approach: 'analyze' }), undefined);
 });
 
-test('apex challenges require the actual site, a recent personal warning and explicit provocation', () => {
+test('rank-seven and apex challenges require an earned site map, the actual site, a recent personal warning and explicit provocation', () => {
   for (const action of FANTASY_APEX_PROVOCATIONS) {
-    const p = player(), c = p.character!; c.location = action.location; c.visited.push(action.location);
+    let p = player(); p.character!.location = action.location; p.character!.visited.push(action.location);
     assert.ok(fantasyCombatStartError(p, 'apex', action.id, true));
+    const site = fantasyMonsterSiteForProvocation(action.id)!; assert.ok(site);
+    p.character!.inventory[site.item] = 1;
+    const mapped = applyFantasyAction(p, { type: 'use', item: site.item }, () => .5);
+    assert.equal(mapped.error, undefined, action.id); p = mapped.profile;
+    const c = p.character!; assert.ok(c.monsterSites!.includes(site.id));
+    assert.ok(fantasyCombatStartError(p, 'apex', action.id, true), 'a chart alone does not supply a recent personal warning');
     c.apexWarnings = { [action.id]: { location: c.location, hour: c.hour } };
     assert.ok(fantasyCombatStartError(p, 'apex', action.id, false));
     assert.equal(fantasyCombatStartError(p, 'apex', action.id, true), undefined);
@@ -79,11 +90,14 @@ test('ordinary hunting never reveals or spawns tier-eight enemies across the who
   }
 });
 
-test('a criminal profession alone never begins combat and lawful opponents require an explicit challenge', () => {
+test('a criminal profession alone never begins combat and lawful opponents require the current hostile encounter', () => {
   const p = player(); p.character!.job = 'thief'; p.character!.jobXp.thief = 0; p.character!.location = 'hearth';
   assert.equal(p.combatId, undefined); assert.equal(p.event, null);
   assert.ok(fantasyCombatStartError(p, 'challenge', 'human-watch-patrol', false));
-  assert.equal(fantasyCombatStartError(p, 'challenge', 'human-watch-patrol', true), undefined);
+  assert.ok(fantasyCombatStartError(p, 'challenge', 'human-watch-patrol', true));
+  const encountered = structuredClone(p); encountered.event = 'encounter-watch';
+  assert.equal(fantasyCombatStartError(encountered, 'encounter', 'encounter-watch'), undefined);
+  assert.equal(fantasyCombatEnemy(fantasyCombatStartPlan(encountered, 'encounter', 'encounter-watch')!.enemies[0].template)!.humanCause, 'crime-enforcement');
   const active = structuredClone(p); active.combatId = 'combat-local';
   assert.ok(applyFantasyAction(active, { type: 'work' }).error);
   for (const locale of ['ko', 'en', 'ja'] as const) {
@@ -91,10 +105,42 @@ test('a criminal profession alone never begins combat and lawful opponents requi
   }
 });
 
-test('hostile encounters preserve their actual opponents rather than replacing a waterside crab with a goblin', () => {
+test('an escort ambush plans the wagon battle while other encounters keep their own opponents', () => {
+  const p = player(1), c = p.character!;
+  c.location = 'hearth'; c.hour = 12; c.level = 5;
+  const contract = { id: 'escort-hearth-sunmeadow-48', from: 'hearth', destination: 'sunmeadow', hours: 4, reward: 6, acceptedAt: 12, defense: 'pending' as const };
+  c.escort = contract;
+  const departing = fantasyCombatStartPlan(p, 'escort', contract.id)!;
+  assert.equal(departing.source, `escort:${contract.id}`);
+  const attacker = fantasyCombatEnemy(departing.enemies[0].template)!;
+  assert.equal(attacker.kind, 'human'); assert.notEqual(attacker.humanCause, 'crime-enforcement'); assert.ok(attacker.tier <= 6); assert.equal(attacker.provocationOnly, false);
+  assert.equal(fantasyCombatStartPlan(p, 'encounter', FANTASY_ESCORT_AMBUSH_ENCOUNTER), undefined, 'no ambush is pending yet');
+  p.event = 'encounter-woodland-wolf';
+  assert.equal(fantasyCombatStartPlan(p, 'escort', contract.id), undefined, 'another encounter never opens the wagon battle');
+  p.event = FANTASY_ESCORT_AMBUSH_ENCOUNTER;
+  assert.equal(fantasyCombatStartPlan(p, 'encounter', FANTASY_ESCORT_AMBUSH_ENCOUNTER)!.source, `escort:${contract.id}`);
+  assert.equal(fantasyCombatStartError(p, 'encounter', FANTASY_ESCORT_AMBUSH_ENCOUNTER), undefined);
+  assert.equal(fantasyCombatStartPlan(p, 'escort', 'escort-forged'), undefined);
+  c.location = 'sunmeadow';
+  assert.equal(fantasyCombatStartPlan(p, 'encounter', FANTASY_ESCORT_AMBUSH_ENCOUNTER), undefined);
+});
+
+test('generic hostile encounters choose deterministic suitable opponents from the current encounter tier without free challenge targets', () => {
   const p = player();
-  for (const [event, enemy] of [['encounter-woodland-wolf','monster-forest-wolf'],['encounter-goblin','monster-goblin-raider'],['encounter-ruin-skeleton','monster-skeleton-guard'],['encounter-reef-beast','monster-reef-crab'],['encounter-watch','human-watch-patrol'],['encounter-bandits','human-road-bandit']]) {
+  const templates = new Set<string>();
+  for (const tier of [1, 3, 6] as const) for (const event of ['encounter-woodland-wolf','encounter-goblin','encounter-ruin-skeleton','encounter-reef-beast','encounter-watch','encounter-bandits']) {
+    p.character!.encounterTier = tier;
     p.event = event;
-    assert.equal(fantasyCombatStartPlan(p, 'encounter', event)!.enemies[0].template, enemy);
+    const before = structuredClone(p), plan = fantasyCombatStartPlan(p, 'encounter', event)!, enemy = fantasyCombatEnemy(plan.enemies[0].template)!;
+    assert.equal(plan.source, `encounter:${event}`); assert.equal(plan.enemies.length, 1);
+    assert.equal(enemy.kind, fantasyHostileEncounter(event)!.opponent === 'person' ? 'human' : 'monster');
+    assert.ok(enemy.tier <= 6); assert.equal(enemy.provocationOnly, false);
+    if (event === 'encounter-watch') assert.equal(enemy.humanCause, 'crime-enforcement');
+    else if (enemy.kind === 'human') assert.notEqual(enemy.humanCause, 'crime-enforcement');
+    assert.deepEqual(fantasyCombatStartPlan(p, 'encounter', event), plan); assert.deepEqual(p, before);
+    assert.equal(fantasyCombatStartPlan(p, 'encounter', 'unrelated-event'), undefined);
+    templates.add(enemy.id);
   }
+  assert.ok(templates.size >= 3);
+  p.event = null; assert.equal(fantasyCombatStartPlan(p, 'encounter', 'encounter-watch'), undefined);
 });

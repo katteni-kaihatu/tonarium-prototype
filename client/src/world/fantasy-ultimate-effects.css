@@ -1,0 +1,120 @@
+.fue {
+  color: var(--fue-color, #e8cf8f);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  filter: drop-shadow(0 0 5px currentColor);
+}
+.fue .fue-bold { stroke-width: 3.3; }
+.fue .fue-heavy { stroke-width: 5; }
+.fue .fue-fill { fill: currentColor; fill-opacity: .1; }
+.fue .fue-solid { fill: currentColor; stroke: none; }
+.fue .fue-sigil {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  animation: fue-inscribe var(--fue-duration) ease-out both;
+}
+.fue .fue-motion { animation: fue-presence var(--fue-duration) ease-out both; }
+.fue .fue-trace {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: fue-draw calc(var(--fue-duration) * .66) cubic-bezier(.18,.65,.24,1) both;
+  animation-delay: calc(var(--fue-duration) * var(--fue-delay, 0));
+}
+.fue .fue-fracture, .fue .fue-crack { stroke-width: 3.5; }
+.fue .fue-arrow { stroke-width: 3.8; }
+.fue .fue-route { stroke-width: 4; stroke-dasharray: .03 .035; }
+.fue .fue-hidden-route { stroke-width: 4; stroke-dasharray: .025 .028; }
+.fue .fue-wind { stroke-width: 4; }
+.fue .fue-vine { stroke-width: 3; }
+.fue .fue-song { stroke-width: 3.5; }
+.fue .fue-particle {
+  animation: fue-mote calc(var(--fue-duration) * .66) ease-out both;
+  animation-delay: calc(var(--fue-duration) * var(--fue-delay, 0));
+}
+.fue .fue-particle-leaf, .fue .fue-particle-chip, .fue .fue-particle-diamond { fill: currentColor; fill-opacity: .55; }
+.fue .fue-sunder, .fue .fue-axe { transform-origin: 0 0; animation: fue-swing var(--fue-duration) cubic-bezier(.2,.7,.2,1) both; }
+.fue .fue-unfold, .fue .fue-gate { transform-origin: 0 0; animation: fue-unfold var(--fue-duration) ease-out both; }
+.fue .fue-rise, .fue .fue-wall, .fue .fue-lance, .fue .fue-banner {
+  animation: fue-rise calc(var(--fue-duration) * .85) ease-out both;
+  animation-delay: calc(var(--fue-duration) * var(--fue-delay, 0));
+}
+.fue .fue-thrust { animation: fue-thrust var(--fue-duration) cubic-bezier(.15,.8,.2,1) both; }
+.fue .fue-coil { transform-origin: 0 0; animation: fue-coil var(--fue-duration) ease-out both; }
+.fue .fue-punch { animation: fue-punch var(--fue-duration) cubic-bezier(.18,.75,.18,1) both; }
+.fue .fue-scatter, .fue .fue-feathers, .fue .fue-leaf { animation: fue-scatter var(--fue-duration) ease-out both; }
+.fue .fue-lock, .fue .fue-trap { animation: fue-lock var(--fue-duration) ease-out both; }
+.fue .fue-grow { animation: fue-grow var(--fue-duration) ease-out both; }
+.fue .fue-compass, .fue .fue-array, .fue .fue-starblade { transform-origin: 0 0; animation: fue-orbit var(--fue-duration) ease-out both; }
+.fue .fue-meteor {
+  animation: fue-meteor calc(var(--fue-duration) * .82) cubic-bezier(.3,.1,.7,1) both;
+  animation-delay: calc(var(--fue-duration) * var(--fue-delay, 0));
+}
+.fue .fue-gate-right { animation-name: fue-gate-right; }
+.fue .fue-sound {
+  animation: fue-sound calc(var(--fue-duration) * .8) ease-out both;
+  animation-delay: calc(var(--fue-duration) * var(--fue-delay, 0));
+}
+.fue .fue-staff { animation: fue-song var(--fue-duration) ease-out both; }
+.fue .fue-scissor { transform-origin: 0 0; animation: fue-scissor var(--fue-duration) ease-out both; }
+.fue .fue-key { animation: fue-key var(--fue-duration) ease-out both; }
+.fue .fue-eclipse { transform-origin: 0 0; animation: fue-eclipse var(--fue-duration) ease-out both; }
+.fue .fue-deathmark { animation: fue-mark var(--fue-duration) ease-out both; }
+.fue .fue-anchor { animation: fue-anchor var(--fue-duration) ease-out both; }
+.fue .fue-tide { animation: fue-tide var(--fue-duration) ease-out both; }
+.fue .fue-reveal { transform-origin: 0 0; animation: fue-reveal var(--fue-duration) ease-out both; }
+.fue .fue-code { animation: fue-code var(--fue-duration) ease-out both; }
+.fue .fue-web { transform-origin: 0 0; animation: fue-web var(--fue-duration) ease-out both; }
+.fue .fue-chain { animation: fue-chain var(--fue-duration) ease-out both; }
+.fue .fue-crown { animation: fue-crown var(--fue-duration) ease-out both; }
+.fue-mage .fue-sigil, .fue-spellblade .fue-sigil { animation-name: fue-astral-inscribe; }
+.fue-summoner .fue-sigil { animation-name: fue-contract-inscribe; }
+.fue-bard .fue-sigil { animation-name: fue-melody-inscribe; }
+.fue-assassin .fue-sigil, .fue-thief .fue-sigil { animation-name: fue-shadow-inscribe; }
+.fue-ranger .fue-sigil { animation-name: fue-forest-inscribe; }
+.fue-tier-1 { opacity: .8; stroke-width: 1.8; }
+.fue-tier-4 { stroke-width: 2.5; filter: drop-shadow(0 0 7px currentColor); }
+
+@keyframes fue-presence { 0%, 5% { opacity: 0; } 15%, 76% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes fue-inscribe { 0% { opacity: 0; transform: scale(.45) rotate(-12deg); } 18% { opacity: 1; transform: scale(1.08) rotate(0); } 65% { opacity: .95; transform: scale(1); } 100% { opacity: 0; transform: scale(1.22); } }
+@keyframes fue-astral-inscribe { 0% { opacity: 0; transform: scale(.45) rotate(-40deg); } 23% { opacity: 1; transform: scale(1.06) rotate(0); } 78% { opacity: .9; transform: scale(1.1) rotate(22deg); } 100% { opacity: 0; transform: scale(1.25) rotate(32deg); } }
+@keyframes fue-contract-inscribe { 0% { opacity: 0; transform: scaleX(.1) scaleY(1.25); } 23% { opacity: 1; transform: scale(1); } 76% { opacity: 1; transform: scale(1.06); } 100% { opacity: 0; transform: scale(1.12); } }
+@keyframes fue-melody-inscribe { 0% { opacity: 0; transform: translateY(22px) scale(.8); } 22% { opacity: 1; transform: translateY(0) scale(1); } 66% { opacity: .9; transform: translateY(-9px) scale(1.05); } 100% { opacity: 0; transform: translateY(-22px) scale(1.08); } }
+@keyframes fue-shadow-inscribe { 0% { opacity: 0; transform: translateX(-38px) scale(.7); } 20% { opacity: .9; transform: translateX(0) scale(1); } 58% { opacity: .9; transform: translateX(0) scale(1); } 100% { opacity: 0; transform: translateX(27px) scale(.88); } }
+@keyframes fue-forest-inscribe { 0% { opacity: 0; transform: scaleY(.3) scaleX(.75); } 25% { opacity: 1; transform: scale(1); } 78% { opacity: .9; transform: scale(1.07); } 100% { opacity: 0; transform: scale(1.15); } }
+@keyframes fue-draw { 0%, 12% { opacity: 0; stroke-dashoffset: 1; } 24% { opacity: 1; } 66% { opacity: 1; stroke-dashoffset: 0; } 100% { opacity: 0; stroke-dashoffset: -.25; } }
+@keyframes fue-mote { 0%, 8% { opacity: 0; transform: scale(.2); } 30% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: translate(var(--fue-px), var(--fue-py)) scale(.3); } }
+@keyframes fue-swing { 0%, 16% { opacity: 0; transform: rotate(-52deg) scale(.55); } 29% { opacity: 1; transform: rotate(-20deg) scale(1); } 46% { opacity: 1; transform: rotate(12deg) scale(1.15); } 100% { opacity: 0; transform: rotate(29deg) scale(1.3); } }
+@keyframes fue-unfold { 0%, 13% { opacity: 0; transform: scaleX(.1) scaleY(.8); } 39%, 72% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.12); } }
+@keyframes fue-rise { 0%, 12% { opacity: 0; transform: translateY(95px) scaleY(.5); } 37%, 71% { opacity: 1; transform: translateY(0) scaleY(1); } 100% { opacity: 0; transform: translateY(-12px); } }
+@keyframes fue-thrust { 0%, 16% { opacity: 0; transform: translateX(-130px) scaleX(.7); } 34%, 61% { opacity: 1; transform: translateX(0) scaleX(1); } 100% { opacity: 0; transform: translateX(65px); } }
+@keyframes fue-coil { 0%, 14% { opacity: 0; transform: rotate(-50deg) scale(.4); } 42% { opacity: 1; transform: rotate(0) scale(1); } 100% { opacity: 0; transform: rotate(46deg) scale(1.28); } }
+@keyframes fue-punch { 0%, 17% { opacity: 0; transform: translate(-70px,-58px) scale(1.6); } 33% { opacity: 1; transform: translate(0,0) scale(1); } 45% { transform: translate(0,5px) scale(1.09); } 70% { opacity: .8; } 100% { opacity: 0; transform: scale(1.3); } }
+@keyframes fue-scatter { 0%, 24% { opacity: 0; transform: scale(.3); } 44% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.5) translateY(15px); } }
+@keyframes fue-lock { 0% { opacity: 0; transform: scale(1.7); } 28%, 65% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(.9); } }
+@keyframes fue-grow { 0%, 16% { opacity: 0; transform: scaleY(.1) translateY(40px); } 43%, 73% { opacity: 1; transform: scaleY(1) translateY(0); } 100% { opacity: 0; transform: scale(1.15); } }
+@keyframes fue-orbit { 0%, 9% { opacity: 0; transform: rotate(-34deg) scale(.5); } 32% { opacity: 1; transform: rotate(0) scale(1); } 76% { opacity: 1; transform: rotate(23deg) scale(1.06); } 100% { opacity: 0; transform: rotate(34deg) scale(1.18); } }
+@keyframes fue-meteor { 0%, 23% { opacity: 0; transform: translate(-65px,-170px); } 40% { opacity: .95; } 64% { opacity: 1; transform: translate(0,0); } 100% { opacity: 0; transform: translate(18px,30px); } }
+@keyframes fue-gate-right { 0%, 13% { opacity: 0; transform: scaleX(.1) translateX(-45px); } 39%, 72% { opacity: 1; transform: scaleX(1) translateX(0); } 100% { opacity: 0; transform: scaleX(1.1) translateX(15px); } }
+@keyframes fue-sound { 0%, 17% { opacity: 0; transform: scaleX(.45); } 42% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1.55); } }
+@keyframes fue-song { 0%, 14% { opacity: 0; transform: translateY(34px); } 37%, 70% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-35px); } }
+@keyframes fue-scissor { 0%, 15% { opacity: 0; transform: rotate(-28deg) scale(1.4); } 35%, 57% { opacity: 1; transform: rotate(0) scale(1); } 100% { opacity: 0; transform: rotate(20deg) scale(.8); } }
+@keyframes fue-key { 0%, 27% { opacity: 0; transform: scale(.5); } 48%, 66% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: translateY(-19px); } }
+@keyframes fue-eclipse { 0%, 9% { opacity: 0; transform: rotate(-40deg) scale(.6); } 29% { opacity: .8; transform: rotate(0) scale(1); } 72% { opacity: .7; transform: rotate(28deg) scale(1.05); } 100% { opacity: 0; transform: rotate(40deg) scale(.8); } }
+@keyframes fue-mark { 0%, 34% { opacity: 0; transform: scale(1.7); } 49%, 68% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(.7); } }
+@keyframes fue-anchor { 0%, 14% { opacity: 0; transform: translateY(-110px) rotate(-17deg); } 37%, 64% { opacity: 1; transform: translateY(0) rotate(0); } 100% { opacity: 0; transform: translateY(14px); } }
+@keyframes fue-tide { 0%, 27% { opacity: 0; transform: translateX(-50px) scaleY(.4); } 54% { opacity: 1; transform: translateX(0) scaleY(1); } 100% { opacity: 0; transform: translateX(45px) scaleY(.8); } }
+@keyframes fue-reveal { 0%, 15% { opacity: 0; transform: scaleY(.03); } 39%, 69% { opacity: 1; transform: scaleY(1); } 100% { opacity: 0; transform: scaleY(.2); } }
+@keyframes fue-code { 0%, 26% { opacity: 0; transform: translateX(-22px); } 45%, 70% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(26px); } }
+@keyframes fue-web { 0%, 16% { opacity: 0; transform: scale(.25); } 42%, 76% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.14); } }
+@keyframes fue-chain { 0%, 21% { opacity: 0; transform: translateY(-80px); } 48%, 75% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(17px); } }
+@keyframes fue-crown { 0%, 13% { opacity: 0; transform: translateY(-35px) scale(1.4); } 39%, 74% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-12px) scale(1.08); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fue { filter: none; }
+  .fue .fue-motion { display: none; }
+  .fue .fue-sigil, .fue .fue-sigil * { animation: none; transform: none; opacity: .95; }
+}

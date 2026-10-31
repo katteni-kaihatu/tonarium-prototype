@@ -1,4 +1,30 @@
+import { FANTASY_FRONTIER_LOCATIONS, FANTASY_FRONTIER_ROUTES } from './fantasy-frontier-data.ts';
+import { FANTASY_FRONTIER_ARTIFACTS } from './fantasy-frontier-artifacts.ts';
+import { FANTASY_EQUIPMENT_ITEMS, FANTASY_EQUIPMENT_RECIPES } from './fantasy-equipment-catalog.ts';
+import { FANTASY_TEMPLE_QUESTS } from './fantasy-temple-quests.ts';
+import { FANTASY_UNDERWORLD_QUESTS } from './fantasy-underworld-quests.ts';
+import { FANTASY_CUISINE_ITEMS, FANTASY_CUISINE_PANTRY_ITEMS, FANTASY_FIVE_INGREDIENT_RECIPES } from './fantasy-cuisine-catalog.ts';
+import { FANTASY_FREEFORM_COOKING_ITEMS } from './fantasy-freeform-cooking-catalog.ts';
+import { FANTASY_RETREAT_LOCATIONS, FANTASY_RETREAT_ROUTES, FANTASY_RETREAT_ITEMS } from './fantasy-retreats.ts';
+import { FANTASY_OUTDOOR_COOKING_ITEMS } from './fantasy-outdoor-cooking-catalog.ts';
+import { FANTASY_GUILD_HUNT_QUESTS } from './fantasy-guild-hunts.ts';
+import { fantasyRankBookItems } from './fantasy-rank-book-catalog.ts';
+import { FANTASY_GUILD_LOAN_GEAR } from './fantasy-guild-loan-gear.ts';
+import { fantasyUltimateJobSkills } from './fantasy-ultimate-skills.ts';
+import {FANTASY_BLACK_MARKET_ITEMS} from './fantasy-black-market-catalog.ts';
+import {FANTASY_FURNITURE_ITEMS,FANTASY_FURNITURE_RECIPES} from './fantasy-furniture.ts';
+import {FANTASY_ALCHEMY_SYNTHESIS_ITEMS} from './fantasy-alchemy-catalog.ts';
+import {FANTASY_BAG_ITEMS} from './fantasy-bag-catalog.ts';
+import { FANTASY_PRODUCTION_ITEMS, FANTASY_PRODUCTION_RECIPES } from './fantasy-production-catalog.ts';
+import { FANTASY_WORKSHOP_MATERIAL_ITEMS, FANTASY_WORKSHOP_PRODUCT_ITEMS, FANTASY_WORKSHOP_RECIPES } from './fantasy-workshop-materials.ts';
+import { FANTASY_INTERIOR_MAP_ITEMS } from './fantasy-interior-map-catalog.ts';
+import {fantasyManaRestorationSkill} from './fantasy-mana-restoration.ts';
+import { FANTASY_NOCTIS_SHIFT_X } from './fantasy-map-geometry.ts';
+import { fantasyJobSkillVariety, fantasyRaceSkillVariety } from './fantasy-skill-variety.ts';
+import { FANTASY_DUNGEON_QUESTS } from './fantasy-dungeon-catalog.ts';
+import { FANTASY_RANGER_JOB, FANTASY_RANGER_EVENTS } from './fantasy-ranger-content.ts';
 import type { FantasyEvent, FantasyItem, FantasyJob, FantasyLocation, FantasyQuest, FantasyRace, FantasyRaceFamily, FantasyRecipe, FantasyRoute, FantasySkill, FantasyStat } from './fantasy';
+import { FANTASY_MAP_MERCHANT_ENCOUNTER } from './fantasy-map-merchant.ts';
 import { FANTASY_LINEAGE_QUESTS, FANTASY_RACIAL_EVENTS } from './fantasy-racial-content.ts';
 import { FANTASY_EXPANSION_LOCATIONS, FANTASY_EXPANSION_ROUTES } from './fantasy-world-expansion.ts';
 import { FANTASY_GATE_HOURS, FANTASY_GATE_SETTLEMENTS } from './fantasy-gates.ts';
@@ -9,6 +35,7 @@ import { APPROVED_QUESTS } from './fantasy-approved-quests.ts';
 import { FANTASY_PRIEST_JOB, FANTASY_PRIEST_EVENTS } from './fantasy-priest.ts';
 import { FANTASY_REGIONAL_EVENTS } from './fantasy-regional-events.ts';
 import { FANTASY_JOB_SKILL_EXPANSIONS, FANTASY_SKILL_METADATA_OVERRIDES } from './fantasy-skill-expansion.ts';
+import { FANTASY_WEAPON_TECHNIQUES } from './fantasy-weapon-training.ts';
 import { FANTASY_MAIN_QUESTS, FANTASY_SIDE_QUESTS, FANTASY_SECOND_RACIAL_EVENTS, FANTASY_SECOND_FAMILY_EVENTS } from './fantasy-second-content.ts';
 import { FANTASY_ENVIRONMENT_ITEMS, FANTASY_ENVIRONMENT_RECIPES } from './fantasy-environment-data.ts';
 import { FANTASY_TASK_QUESTS } from './fantasy-task-quests.ts';
@@ -146,13 +173,16 @@ const BASE_FANTASY_JOBS: FantasyJob[] = [
   crimeJob('bandit', '산적', 'Bandit', '山賊', '山道と荒野を拠点にする裏稼業。力を振るうか、別の解決を選ぶかは本人次第。', 'strength', [skill('bandit-toughness', '荒野の頑健', 'passive', '受ける被害を2軽減する。', 'guard', 2), skill('bandit-intimidate', '山道の威勢', 'active', '次の力判定を4強化する。', 'check', 4, 8, 'strength')], ['bandit-ambush', 'bandit-camp', 'bandit-share']),
   crimeJob('spy', '첩자', 'Spy', '密偵', '身分と記録を慎重に扱う情報の担い手。知力とカリスマを使い分ける。', 'intelligence', [skill('spy-patterns', '記録の行間', 'passive', '知力判定に2の補正を得る。', 'check', 2, 0, 'intelligence'), skill('spy-cover', '揺るがぬ表情', 'active', '次のカリスマ判定を4強化する。', 'check', 4, 8, 'charisma')], ['spy-record', 'spy-cover', 'spy-message'], 'charisma'),
   crimeJob('crimeboss', '범죄조직 두목', 'Crime Boss', '裏社会の頭領', '裏の人脈と取り決めをまとめる立場。カリスマで利害を調整する。', 'charisma', [skill('crimeboss-network', '裏の人脈', 'passive', '仕事や採集などの成果を2増やす。', 'reward', 2), skill('crimeboss-command', '頭領の采配', 'active', '次のカリスマ判定を5強化する。', 'check', 5, 10, 'charisma')], ['crimeboss-dispute', 'crimeboss-network', 'crimeboss-truce'], 'charisma'),
-  FANTASY_PRIEST_JOB, ...APPROVED_JOBS,
+  FANTASY_PRIEST_JOB, ...APPROVED_JOBS, FANTASY_RANGER_JOB,
 ];
 
 export const FANTASY_JOBS: FantasyJob[] = BASE_FANTASY_JOBS.map(job => ({ ...job, skills: [
   ...job.skills.map(skill => ({ ...skill, ...(FANTASY_SKILL_METADATA_OVERRIDES[skill.id] ?? {}) })),
   ...(FANTASY_JOB_SKILL_EXPANSIONS[job.id] ?? []),
-] }));
+  ...(FANTASY_WEAPON_TECHNIQUES[job.id] ?? []),
+  ...fantasyUltimateJobSkills(job.id),
+].map(fantasyManaRestorationSkill).map(skill => fantasyJobSkillVariety(job, skill)) }));
+for (const race of FANTASY_RACES) race.skills = race.skills.map(skill => fantasyRaceSkillVariety(race, skill)) as FantasyRace['skills'];
 
 export const FANTASY_LOCATIONS: FantasyLocation[] = [
   { id: 'hearth', name: '炉火の街ハース', region: '中央街道', land: 'aurelia', x: 285, y: 340, kind: 'city', danger: 0, description: '冒険者と職人が集う、すべての旅の出発点。宿、工房、港、転移門がある。', resources: ['herb', 'wood'], services: ['guild', 'market', 'workshop', 'inn', 'port', 'gate'] },
@@ -179,9 +209,12 @@ export const FANTASY_LOCATIONS: FantasyLocation[] = [
   { id: 'mushroom-isle', name: '巨茸の島', region: '境界の群島', land: 'islands', x: 585, y: 405, kind: 'island', danger: 2, description: '家ほどの茸が茂る島。料理人が探す独特の香味が採れる。', resources: ['herb', 'spice', 'wood'], services: ['port'] },
   { id: 'storm-isle', name: '雷鐘の島', region: '境界の群島', land: 'islands', x: 610, y: 515, kind: 'island', danger: 4, description: '雷を告げる鐘と古い灯台の島。嵐が磨いた鉱物が浜に転がる。', resources: ['ore', 'crystal', 'relic'], services: ['port'] },
   { id: 'echo-isle', name: 'こだまの小島', region: '境界の群島', land: 'islands', x: 520, y: 335, kind: 'island', danger: 1, description: '歌声が不思議に響く小さな島。旅の詩人と漁師が焚火を囲む。', resources: ['fish', 'wood', 'silk'], services: ['inn', 'port'] },
+  { id:'starfall-isle',name:'星降りの島',region:'境界の群島',land:'islands',x:540,y:165,kind:'island',danger:2,description:'夜になると星の軌跡が海と古い観測環に映る小島。静かな入り江に小船が着く。',resources:['crystal','relic'],services:['port'] },
 ];
 
 export const FANTASY_ROUTES: FantasyRoute[] = [
+  {from:'glass-isle',to:'starfall-isle',mode:'sea',hours:3},
+  {from:'dawnport',to:'starfall-isle',mode:'sea',hours:5},
   { from: 'hearth', to: 'greenwood', mode: 'land', hours: 2 },
   { from: 'greenwood', to: 'whispergrove', mode: 'land', hours: 2 },
   { from: 'greenwood', to: 'ironridge', mode: 'land', hours: 3 },
@@ -239,9 +272,10 @@ const BASE_FANTASY_ITEMS: FantasyItem[] = [
   { id: 'gem', name: '原石の宝玉', price: 24, description: '装飾品や上質な魔術触媒になる。' },
 ];
 
-export const FANTASY_ITEMS: FantasyItem[] = [...BASE_FANTASY_ITEMS.map(item => ({ ...item, ...FANTASY_LEGACY_ITEM_UPDATES[item.id] })), ...FANTASY_EXPANDED_ITEMS, ...FANTASY_PROFESSION_ITEMS, ...FANTASY_ENVIRONMENT_ITEMS, ...FANTASY_TRAVEL_GOODS, ...FANTASY_COMBAT_LOOT_ITEMS];
+export const FANTASY_ITEMS: FantasyItem[] = [...FANTASY_FRONTIER_ARTIFACTS, ...FANTASY_EQUIPMENT_ITEMS, ...BASE_FANTASY_ITEMS.map(item => ({ ...item, ...FANTASY_LEGACY_ITEM_UPDATES[item.id] })), ...FANTASY_EXPANDED_ITEMS, ...FANTASY_PROFESSION_ITEMS, ...FANTASY_ENVIRONMENT_ITEMS, ...FANTASY_TRAVEL_GOODS, ...FANTASY_COMBAT_LOOT_ITEMS, ...fantasyRankBookItems(FANTASY_JOBS)];
 
 export const FANTASY_RECIPES: FantasyRecipe[] = [
+  ...FANTASY_EQUIPMENT_RECIPES,
   { id: 'cook-meal', name: '旅人のごちそう', job: 'cook', inputs: { fish: 1, herb: 1 }, output: 'meal', count: 1, dc: 9 },
   { id: 'cook-banquet', name: '香草の宴', job: 'cook', inputs: { fish: 2, spice: 1, herb: 1 }, output: 'meal', count: 3, dc: 12 },
   { id: 'cook-jerky', name: '旅の干し肉', job: 'cook', inputs: { meat: 2, spice: 1 }, output: 'jerky', count: 2, dc: 10 },
@@ -258,6 +292,8 @@ export const FANTASY_RECIPES: FantasyRecipe[] = [
 ];
 
 export const FANTASY_QUESTS: FantasyQuest[] = [
+  ...FANTASY_UNDERWORLD_QUESTS,
+  ...FANTASY_TEMPLE_QUESTS,
   { id: 'quest-herbalist', name: '薬師の朝支度', description: '翠葉の森で薬草を集め、ハースの薬師へ持ち帰ろう。', giver: 'hearth', destination: 'greenwood', item: 'herb', count: 3, gold: 28, xp: 24 },
   { id: 'quest-timber', name: '牧場の柵を直そう', description: '陽だまり牧草地で柵を調べて木材を集め、ハースの修理担当へ渡そう。', giver: 'hearth', destination: 'sunmeadow', item: 'wood', count: 3, gold: 24, xp: 22 },
   { id: 'quest-ore', name: '山の鍛冶仲間', description: '鉄冠山脈で鉄鉱石を集め、エンバーホールの鍛冶仲間へ持ち帰ろう。', giver: 'emberhall', destination: 'ironridge', item: 'ore', count: 3, gold: 38, xp: 30 },
@@ -276,7 +312,7 @@ export const FANTASY_QUESTS: FantasyQuest[] = [
   { id: 'quest-sword', name: '王都の護衛隊', description: '白日王都の護衛隊を訪ねて必要な剣を確かめ、手鍛えの剣をエンバーホールの依頼人へ渡そう。剣は鍛冶か市場で用意する。', giver: 'emberhall', destination: 'suncourt', item: 'blade', count: 1, gold: 78, xp: 45 },
   ...FANTASY_PROFESSION_QUESTS, ...APPROVED_QUESTS,
   ...FANTASY_MAIN_QUESTS, ...FANTASY_SIDE_QUESTS,
-  ...FANTASY_TASK_QUESTS,
+  ...FANTASY_TASK_QUESTS, ...FANTASY_DUNGEON_QUESTS, ...FANTASY_GUILD_HUNT_QUESTS,
 ];
 
 const choice = (id: string, label: string, stat: FantasyStat, dc: number, success: string, failure: string, gold: number, item?: string) => ({ id, label, stat, dc, success, failure, gold, ...(item ? { item } : {}) });
@@ -336,23 +372,38 @@ export const FANTASY_EVENTS: FantasyEvent[] = [
   { id: 'leader-dispute', job: 'leader', name: '水路を巡る相談', description: '隣り合う二つの畑が、同じ水路の使い方で揉めている。', choices: [choice('mediate', '双方の話を聞いて順番を決める', 'charisma', 11, '互いの事情が伝わり、水を分け合う約束ができた。', '結論は出なかったが、次の話し合いの場を用意した。', 24, 'herb'), choice('plan', '水量と時間を調べて計画を作る', 'intelligence', 12, '数字で示した計画に納得してもらえた。', '雨の予想が難しく、試験的な運用から始めた。', 28, 'wood')] },
   { id: 'leader-settlement', job: 'leader', name: '開拓団の第一歩', description: '小さな開拓団が新しい集落の準備をしている。仕事の割り振りを頼まれた。', choices: [choice('organize', '得意な仕事を聞いて班を作る', 'charisma', 13, '皆の得意分野が生き、集落の土台が整った。', '役割に偏りが出たため、団員と一緒に組み直した。', 32, 'ingot'), choice('logistics', '食料と資材の順序を決める', 'intelligence', 13, '必要な物が必要な時に届き、無駄なく作業が進んだ。', '到着が遅れた資材を待つ間に、別の仕事を進めた。', 32, 'meal')] },
   { id: 'leader-defense', job: 'leader', name: '砦の避難訓練', description: '嵐と魔物に備え、砦の守備隊が避難と連絡の訓練を行う。', choices: [choice('rally', '分かりやすい合図で人々を導く', 'charisma', 14, '混乱なく避難が進み、守備隊から信頼を得た。', '合図が届かない場所があり、連絡役を増やすことにした。', 36, 'silk'), choice('support', '最後の確認まで現場を支える', 'vitality', 13, '最後の一人まで安全を確認し、訓練を終えた。', '疲れて見落としが出たが、班を分ける改善案を残した。', 30, 'potion')] },
-  ...FANTASY_PRIEST_EVENTS, ...APPROVED_EVENTS, ...FANTASY_REGIONAL_EVENTS,
+  ...FANTASY_PRIEST_EVENTS, ...APPROVED_EVENTS, ...FANTASY_RANGER_EVENTS, ...FANTASY_REGIONAL_EVENTS,
   ...FANTASY_SECOND_RACIAL_EVENTS, ...FANTASY_SECOND_FAMILY_EVENTS,
   ...FANTASY_HOSTILE_ENCOUNTERS,
 ];
 
 FANTASY_EVENTS.push(...CRIME_EVENTS);
+FANTASY_EVENTS.push(FANTASY_MAP_MERCHANT_ENCOUNTER);
 FANTASY_EVENTS.push(...FANTASY_RACIAL_EVENTS);
 FANTASY_QUESTS.push(...FANTASY_LINEAGE_QUESTS);
 
-FANTASY_LOCATIONS.push(...FANTASY_EXPANSION_LOCATIONS);
+FANTASY_LOCATIONS.push(...FANTASY_EXPANSION_LOCATIONS.map(location => location.land === 'noctis' ? { ...location } : location));
+for (const location of FANTASY_LOCATIONS) if (location.land === 'noctis') location.x += FANTASY_NOCTIS_SHIFT_X;
 FANTASY_ROUTES.push(...FANTASY_EXPANSION_ROUTES);
 FANTASY_RECIPES.push(...FANTASY_EXPANDED_RECIPES);
 FANTASY_RECIPES.push(...FANTASY_COMBAT_LOOT_RECIPES);
 FANTASY_EVENTS.push(...FANTASY_ADDITIONAL_RACIAL_EVENTS);
 FANTASY_QUESTS.push(...FANTASY_EXPANSION_QUESTS);
 
+FANTASY_ITEMS.push(...FANTASY_BLACK_MARKET_ITEMS.map(item=>({...item,craftOnly:true})),...FANTASY_ALCHEMY_SYNTHESIS_ITEMS.map(item=>({...item,craftOnly:true})),...FANTASY_BAG_ITEMS,...FANTASY_FURNITURE_ITEMS.map(item=>({...item,craftOnly:true})));
+FANTASY_RECIPES.push(...FANTASY_FURNITURE_RECIPES);
+FANTASY_ITEMS.push(...FANTASY_PRODUCTION_ITEMS.map(item => ({ ...item, craftOnly: !['scribe-paper', 'scribe-ink'].includes(item.id) })));
+FANTASY_RECIPES.push(...FANTASY_PRODUCTION_RECIPES);
+FANTASY_ITEMS.push(...FANTASY_WORKSHOP_MATERIAL_ITEMS, ...FANTASY_WORKSHOP_PRODUCT_ITEMS, ...FANTASY_INTERIOR_MAP_ITEMS);
+FANTASY_ITEMS.push(...FANTASY_GUILD_LOAN_GEAR,...FANTASY_OUTDOOR_COOKING_ITEMS,...FANTASY_FREEFORM_COOKING_ITEMS,...FANTASY_RETREAT_ITEMS);
+FANTASY_LOCATIONS.push(...FANTASY_RETREAT_LOCATIONS, ...FANTASY_FRONTIER_LOCATIONS);
+FANTASY_ROUTES.push(...FANTASY_RETREAT_ROUTES, ...FANTASY_FRONTIER_ROUTES);
+FANTASY_RECIPES.push(...FANTASY_WORKSHOP_RECIPES);
+
 export const fantasyRaceById = (id: string): FantasyRace | undefined => FANTASY_RACES.find(race => race.id === id);
 export const fantasyJobById = (id: string): FantasyJob | undefined => FANTASY_JOBS.find(job => job.id === id);
 export const fantasyLocationById = (id: string): FantasyLocation | undefined => FANTASY_LOCATIONS.find(location => location.id === id);
+FANTASY_ITEMS.push(...FANTASY_CUISINE_PANTRY_ITEMS, ...FANTASY_CUISINE_ITEMS);
+FANTASY_RECIPES.push(...FANTASY_FIVE_INGREDIENT_RECIPES);
+
 export const fantasyItemById = (id: string): FantasyItem | undefined => FANTASY_ITEMS.find(item => item.id === id);

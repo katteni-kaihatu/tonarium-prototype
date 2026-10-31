@@ -1,4 +1,6 @@
+import { fantasyLifeJob, fantasyHasJob, fantasyIsLifeJob } from './fantasy-careers.ts';
 import type { FantasyCharacter, FantasyProfile, FantasySkill } from './fantasy.ts';
+import { fantasyRankBookLearned } from './fantasy-rank-book-catalog.ts';
 import { FANTASY_JOBS, FANTASY_LOCATIONS, FANTASY_QUESTS, FANTASY_RACES } from './fantasy-data.ts';
 import { FANTASY_READABLE_LIBRARY_BOOKS } from './fantasy-library.ts';
 import { FANTASY_MENTOR_SKILLS } from './fantasy-apprenticeship.ts';
@@ -26,13 +28,14 @@ export function fantasyPracticeMultiplier(character: FantasyCharacter, key: stri
 }
 
 /** 技能の加点では反復履歴を上書きせず、行動完了の加点で一度だけ更新する。 */
-export function grantFantasyPractice(character: FantasyCharacter, options: { key: string; amount: number; success: boolean; skill?: string; practice?: keyof NonNullable<FantasyCharacter['practice']> }): number {
+export function grantFantasyPractice(character: FantasyCharacter, options: { key: string; amount: number; success: boolean; skill?: string; practice?: keyof NonNullable<FantasyCharacter['practice']>; job?: string }): number {
   const amount = Math.max(1, Math.floor(Math.max(0, options.amount) * fantasyPracticeMultiplier(character, options.key) * (options.success ? 1 : 1 / 3)));
   if (options.skill) {
     character.skillXp ??= {};
     character.skillXp[options.skill] = Math.min(cap, (character.skillXp[options.skill] ?? 0) + amount);
   } else {
-    character.jobXp[character.job] = Math.min(cap, (character.jobXp[character.job] ?? 0) + amount);
+    const job = options.job ?? (['craft','gather','fish'].includes(options.practice ?? '') ? fantasyLifeJob(character) ?? 'unassigned' : character.job);
+    character.jobXp[job] = Math.min(cap, (character.jobXp[job] ?? 0) + amount);
     const prior = character.proficiencyUse;
     const repeats = prior?.key === options.key && character.hour - prior.hour < 6 ? prior.repeats + 1 : 1;
     character.proficiencyUse = { key: options.key, hour: character.hour, repeats };
@@ -45,6 +48,11 @@ export function grantFantasyPractice(character: FantasyCharacter, options: { key
 }
 
 export function fantasySkillUnlocked(character: FantasyCharacter, skill: FantasySkill): boolean {
+  if (skill.retired) return false;
+  const owner=FANTASY_JOBS.find(job=>job.skills.some(known=>known.id===skill.id));
+  if(owner&&!fantasyHasJob(character,owner.id))return false;
+  if(owner&&owner.id!==character.job)return fantasySkillUnlocked({...character,job:owner.id},skill);
+  if (fantasyRankBookLearned(character, skill.id) && FANTASY_JOBS.find(job => job.id === character.job)?.skills.some(known => known.id === skill.id)) return true;
   const unlock = skill.unlock;
   if (!unlock) return true;
   if (unlock.kind === 'job') return (character.jobXp[character.job] ?? 0) >= unlock.xp;
@@ -54,15 +62,17 @@ export function fantasySkillUnlocked(character: FantasyCharacter, skill: Fantasy
   return (character.practice?.[unlock.condition] ?? 0) >= unlock.count;
 }
 export function fantasyAvailableJobSkills(character: FantasyCharacter): FantasySkill[] {
-  return (FANTASY_JOBS.find(job => job.id === character.job)?.skills ?? []).filter(skill => fantasySkillUnlocked(character, skill));
+  const jobs=[character.job,...(fantasyLifeJob(character)&&fantasyLifeJob(character)!==character.job?[fantasyLifeJob(character)!]:[])];
+  return jobs.flatMap(job=>(FANTASY_JOBS.find(entry=>entry.id===job)?.skills??[]).filter(skill=>fantasySkillUnlocked({...character,job},skill)));
 }
 export function fantasySkilledPower(character: FantasyCharacter, skill: FantasySkill): number {
   return skill.power + Math.min(skill.kind === 'active' ? 3 : 2, Math.floor((character.skillXp?.[skill.id] ?? 0) / (skill.kind === 'active' ? 50 : 100)));
 }
 
 export function validFantasyProgression(character: FantasyCharacter): boolean {
+  if(character.lifeJob!==undefined&&(!fantasyIsLifeJob(character.lifeJob)||!Object.hasOwn(character.jobXp,character.lifeJob)))return false;
   const skills = [...FANTASY_JOBS.flatMap(job => job.skills), ...FANTASY_RACES.flatMap(race => race.skills), ...FANTASY_MENTOR_SKILLS, ...FANTASY_PRIEST_PATH_SKILLS];
-  const knownSkill = (id: string) => skills.some(skill => skill.id === id) || fantasyIsJobPathSkill(id) || ['mana-body-strength', 'mana-body-agility', 'mana-body-vitality', 'mana-focus', 'mana-ward'].includes(id);
+  const knownSkill = (id: string) => skills.some(skill => skill.id === id) || FANTASY_BODY_ATTACK_IDS.has(id) || fantasyIsJobPathSkill(id) || ['mana-body-strength', 'mana-body-agility', 'mana-body-vitality', 'mana-focus', 'mana-ward'].includes(id);
   if (character.skillXp !== undefined && (!record(character.skillXp) || Object.entries(character.skillXp).some(([id, xp]) => !knownSkill(id) || !count(xp)))) return false;
   if (character.practice !== undefined && (!record(character.practice) || Object.entries(character.practice).some(([key, value]) => !['explore', 'craft', 'gather', 'hunt', 'fish', 'command'].includes(key) || !count(value)))) return false;
   if (character.readBooks !== undefined && (!unique(character.readBooks) || character.readBooks.some(id => !FANTASY_READABLE_LIBRARY_BOOKS.some(book => book.id === id)))) return false;
@@ -88,8 +98,9 @@ export function validFantasyLifeProfile(profile: FantasyProfile): boolean {
       || life.ageHours !== undefined && (!Number.isFinite(life.ageHours) || life.ageHours < 0 || life.ageHours > life.hour)
       || !validFantasyReputation({ reputation: life.reputation } as FantasyCharacter)) return false;
   }
-  if (!profile.death) return !profile.character || profile.character.hp > 0;
+  if (!profile.death) return !profile.character || profile.character.hp > 0 || profile.character.hp===0&&!!profile.character.downed&&!profile.activity;
   return !!profile.character && record(profile.death) && Object.keys(profile.death).length === 3 && profile.character.hp === 0 && !profile.activity && profile.event === null
     && (profile.death.location === 'sea' || profile.death.location === profile.character.location) && Number.isFinite(profile.death.hour) && profile.death.hour >= 0 && profile.death.hour <= profile.character.hour
     && typeof profile.death.cause === 'string' && profile.death.cause.length <= 160 && lives.some(life => life.generation === generation && life.hour === profile.death!.hour);
 }
+import { FANTASY_BODY_ATTACK_IDS } from './fantasy-body-combat-catalog.ts';

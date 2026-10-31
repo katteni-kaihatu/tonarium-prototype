@@ -9,14 +9,12 @@ import { WebSocket } from 'ws';
 import { COMPAT_VERSION, dmKey } from '../shared/protocol.ts';
 import { applyFantasyAction, newFantasyProfile } from '../shared/fantasy-engine.ts';
 import type { FantasyProfile } from '../shared/fantasy.ts';
-import type { FantasyAccountResponse } from '../shared/fantasy-account.ts';
 import { readFantasySavedProfiles } from './fantasy-test-saved-profiles.ts';
 import { testServerEnv } from './test-db.ts';
 import { devLogin } from './test-auth.ts';
 
-interface Message {t:string;profile?:FantasyProfile;account?:FantasyAccountResponse['account'];activeId?:string;homeId?:string;user?:{id:string;name:string};error?:string;[key:string]:unknown}
+interface Message {t:string;profile?:FantasyProfile;user?:{id:string;name:string};error?:string;[key:string]:unknown}
 const privateTypes=new Set(['fantasyProfile','fantasyRealmState','fantasyContractBoard','fantasyPartyState','fantasyPropertyState','fantasyCombatState','fantasyLegacies','fantasyGmReply','fantasyDialogueChunk','communityState','npcReply']);
-const password='A world only password 123',newPassword='A rotated world password 456';
 
 async function isolated(t:TestContext){
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'tonarium-account-ws-')),file=path.join(directory,'fantasy.json');
@@ -26,7 +24,8 @@ async function isolated(t:TestContext){
   const sessions=path.join(directory,'sessions.json');fs.writeFileSync(sessions,JSON.stringify({name:'Account fixture',sessions:[{id:'account-world',name:'Private fixture world',world:'fantasy'}]}));
   const probe=net.createServer();await new Promise<void>(resolve=>probe.listen(0,'127.0.0.1',resolve));
   const port=(probe.address() as net.AddressInfo).port;await new Promise<void>(resolve=>probe.close(()=>resolve()));
-  const child=spawn(process.execPath,['--import','tsx','server/index.ts','--dev'],{env:{...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1',AUTH_DEV_LOGIN:'1',NODE_ENV:'test',FANTASY_ACCOUNT_TEST_BYPASS:'0',SERVER_PORT:String(port),DATA_DIR:directory,SESSIONS_FILE:sessions,LIVEKIT_URL:'',LIVEKIT_API_KEY:'',LIVEKIT_API_SECRET:'',KOKOAAI_APIKEY: ''},stdio:['ignore','pipe','pipe']});
+  const databaseEnv=await testServerEnv(t);
+  const child=spawn(process.execPath,['--import','tsx','server/index.ts','--dev'],{env:{...process.env, ...databaseEnv, TONARIUM_TEST_HELLO_ID: '0',AUTH_DEV_LOGIN:'1',NODE_ENV:'test',SERVER_PORT:String(port),DATA_DIR:directory,SESSIONS_FILE:sessions,LIVEKIT_URL:'',LIVEKIT_API_KEY:'',LIVEKIT_API_SECRET:'',KOKOAAI_APIKEY: ''},stdio:['ignore','pipe','pipe']});
   let logs='';child.stdout.on('data',data=>{logs+=String(data);});child.stderr.on('data',data=>{logs+=String(data);});
   const sockets:WebSocket[]=[];
   t.after(async()=>{
@@ -44,7 +43,7 @@ async function isolated(t:TestContext){
   const origin=`http://127.0.0.1:${port}`;
   async function http(action:string,body?:unknown,cookie=''){
     const response=await fetch(`${origin}/api/fantasy/account/${action}`,{method:body===undefined?'GET':'POST',headers:{Origin:origin,...(body===undefined?{}:{'Content-Type':'application/json'}),...(cookie?{Cookie:cookie}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});
-    return{status:response.status,body:await response.json() as FantasyAccountResponse,cookie:response.headers.get('set-cookie')?.split(';')[0]??''};
+    return{status:response.status,body:await response.json() as {error?:string},cookie:response.headers.get('set-cookie')?.split(';')[0]??''};
   }
   async function peer(id:string,options:{cookie?:string;origin?:string;hello?:boolean;name?:string}={}){
     const socket=new WebSocket(`ws://127.0.0.1:${port}/ws`,{headers:{Origin:options.origin??origin,...(options.cookie?{Cookie:options.cookie}:{})}});sockets.push(socket);
@@ -64,95 +63,144 @@ async function isolated(t:TestContext){
     return{socket,messages,send,wait,barrier,id};
   }
   const profile=(id:string)=>readFantasySavedProfiles(file)[id];
-  return{http,peer,profile,legacy,origin};
+  return{http,peer,profile,legacy,origin,databaseUrl:databaseEnv.DATABASE_URL};
 }
 
-test('world accounts deny anonymous legacy IDs, forged reserved identities, wrong tickets and cookie-only cross-origin sockets',{timeout:30000},async t=>{
-  const fixture=await isolated(t),anonymous=await fixture.peer('legacy-browser-id');
-  anonymous.send({t:'join',sid:'account-world'});anonymous.send({t:'fantasyAction',revision:fixture.legacy.revision,action:{type:'sync'}});anonymous.send({t:'fantasyRealmRequest',domain:'economy',command:{type:'sync'}});anonymous.send({t:'fantasyContracts'});await anonymous.barrier();
-  assert.deepEqual(anonymous.messages.filter(message=>privateTypes.has(message.t)),[]);assert.ok(!JSON.stringify(anonymous.messages).includes('PRIVATE_LEGACY_HERO'));
-  const registered=await fixture.http('register',{username:'world_owner',password});assert.equal(registered.status,200);assert.ok(registered.body.account);
-  const forged=await fixture.peer(registered.body.account.principal,{hello:false});forged.send({t:'hello',compat: COMPAT_VERSION,id:registered.body.account.principal,name:'Forged owner'});forged.send({t:'join',sid:'account-world'});forged.send({t:'fantasyAction',revision:0,action:{type:'sync'}});await forged.barrier();assert.deepEqual(forged.messages.filter(message=>privateTypes.has(message.t)),[]);
-  const cross=await fixture.peer('other-browser',{cookie:registered.cookie,origin:'https://other-origin.invalid'});cross.send({t:'join',sid:'account-world'});await cross.barrier();
-  assert.ok(cross.messages.some(message=>message.t==='fantasyAccountState'&&message.account===null));assert.deepEqual(cross.messages.filter(message=>privateTypes.has(message.t)),[]);
-  const start=cross.messages.length;cross.send({t:'fantasyAccountBind',ticket:'x'.repeat(43)});await cross.barrier();assert.ok(cross.messages.slice(start).some(message=>message.t==='fantasyAccountState'&&message.error==='unauthenticated'));assert.deepEqual(cross.messages.filter(message=>privateTypes.has(message.t)),[]);
-  assert.equal(fixture.profile('legacy-browser-id').character!.gold,98765);assert.equal(fixture.profile('legacy-browser-id').character!.name,'PRIVATE_LEGACY_HERO');
+
+test('platform login owns RPG data and hello IDs or obsolete world tickets cannot select an owner',{timeout:30000},async t=>{
+  const f=await isolated(t), alice=await devLogin(f.origin,'Platform Alice'),bob=await devLogin(f.origin,'Platform Bob');
+  const owner=await f.peer('FORGED_BROWSER_ID',{cookie:alice.headers.Cookie,name:'Forged name'});
+  assert.ok(JSON.stringify(owner.messages).includes(alice.id));
+  assert.ok(!JSON.stringify(owner.messages).includes('PRIVATE_LEGACY_HERO'));
+  assert.deepEqual(owner.messages.filter(message=>privateTypes.has(message.t)),[]);
+  owner.send({t:'join',sid:'account-world'});
+  const initial=(await owner.wait(message=>message.t==='fantasyProfile')).profile!;
+  const from=owner.messages.length;
+  owner.send({t:'fantasyAction',revision:initial.revision,action:{type:'create',name:'PRIVATE_ALICE_HERO',source:'human',gender:'female'}});
+  await owner.wait(message=>message.t==='fantasyProfile'&&message.profile?.character?.name==='PRIVATE_ALICE_HERO',from);
+  const other=await f.peer(alice.id,{cookie:bob.headers.Cookie});
+  other.send({t:'join',sid:'account-world'});
+  const own=(await other.wait(message=>message.t==='fantasyProfile')).profile!;
+  assert.equal(own.character,null);
+  const attempted=other.messages.length;
+  other.send({t:'fantasyAccountBind',ticket:'x'.repeat(43)});
+  other.send({t:'fantasyAccountUnbind'});
+  other.send({t:'hello',compat:COMPAT_VERSION,id:alice.id,name:'Impersonated Alice'});
+  await other.barrier();
+  assert.ok(!JSON.stringify(other.messages).includes('PRIVATE_ALICE_HERO'));
+  assert.ok(!other.messages.slice(attempted).some(message=>message.t==='fantasyAccountState'));
+  other.send({t:'fantasyAction',revision:own.revision,action:{type:'sync'}});await other.barrier();
+  assert.ok(!JSON.stringify(other.messages).includes('PRIVATE_ALICE_HERO'));
+  assert.equal(f.profile(alice.id).character!.name,'PRIVATE_ALICE_HERO');
+  assert.equal(f.profile('FORGED_BROWSER_ID'),undefined);
+  assert.equal(f.profile('legacy-browser-id'),undefined);
 });
 
-test('world accounts preserve separate Tonarium friends, DMs, groups, profiles and online identities for same-cookie tabs',{timeout:30000},async t=>{
-  // ホームの本人はログインで決まる。2 人が同じ fantasy のアカウントで遊んでも、フォロー・DM・グループ・プロフィールはそれぞれのアカウントに残る
-  const alice='Common Alice',bob='Common Bob',friend='Common Friend',newFriend='New Friend';
-  const fixture=await isolated(t);
-  const [aliceLogin,bobLogin,friendLogin,newLogin]=await Promise.all([alice,bob,friend,newFriend].map(name=>devLogin(fixture.origin,name)));
-  const aliceId=aliceLogin.id,bobId=bobLogin.id,friendId=friendLogin.id,newId=newLogin.id;
-  const observer=await fixture.peer(friendId,{cookie:friendLogin.headers.Cookie});
-  const first=await fixture.peer(aliceId,{cookie:aliceLogin.headers.Cookie});
-  const second=await fixture.peer(bobId,{cookie:bobLogin.headers.Cookie});
-  for(const [from,to] of [[observer,aliceId],[observer,bobId],[first,friendId],[second,friendId]] as const)from.send({t:'followUser',to,on:true});
-  await observer.wait(message=>message.t==='friends'&&Array.isArray(message.ids)&&message.ids.includes(aliceId)&&message.ids.includes(bobId));
-  first.send({t:'join',sid:'account-world'});await first.barrier();
-  const registered=await fixture.http('register',{username:'common_scope',password}),principal=registered.body.account!.principal;
-  first.send({t:'fantasyAccountBind',ticket:registered.body.ticket});await first.wait(message=>message.t==='fantasyAccountState'&&message.activeId===principal);
-  const status=await fixture.http('status',undefined,registered.cookie);
-  second.send({t:'join',sid:'account-world'});await second.barrier();second.send({t:'fantasyAccountBind',ticket:status.body.ticket});await second.wait(message=>message.t==='fantasyAccountState'&&message.activeId===principal);await second.barrier();
-  const peopleAt=observer.messages.length;second.send({t:'setStatus',status:'busy',text:'Bob only status'});
-  const people=await observer.wait(message=>message.t==='people'&&Array.isArray(message.list)&&(message.list as {id:string;status:string}[]).some(person=>person.id===bobId&&person.status==='busy'),peopleAt);
-  for(const id of [aliceId,bobId])assert.equal((people.list as {id:string;lastSeen:number|null}[]).find(person=>person.id===id)?.lastSeen,null);
-  assert.notEqual((people.list as {id:string;status:string}[]).find(person=>person.id===aliceId)?.status,'busy');
-  const groupAt=observer.messages.length;first.send({t:'groupCreate',name:'Alice own group',color:'#abcdef'});
-  await observer.wait(message=>message.t==='groups'&&Array.isArray(message.list)&&(message.list as {name:string;owner:string}[]).some(group=>group.name==='Alice own group'&&group.owner===aliceId),groupAt);
-  second.send({t:'groupCreate',name:'Bob own group',color:'#abcdef'});
-  await observer.wait(message=>message.t==='groups'&&Array.isArray(message.list)&&(message.list as {name:string;owner:string}[]).some(group=>group.name==='Bob own group'&&group.owner===bobId),groupAt);
-  const newcomer=await fixture.peer(newId,{cookie:newLogin.headers.Cookie});const friendAt=newcomer.messages.length;
-  first.send({t:'followUser',to:newId,on:true});
-  const invitation=await newcomer.wait(message=>message.t==='followed',friendAt);assert.equal(invitation.from,aliceId);assert.equal(invitation.fromName,alice);
-  const aliceFriendsAt=first.messages.length,bobPrivateAt=second.messages.length;newcomer.send({t:'followUser',to:aliceId,on:true});
-  const followed=await first.wait(message=>message.t==='followed'&&message.from===newId,aliceFriendsAt);assert.equal(followed.fromName,newFriend);
-  await first.wait(message=>message.t==='friends'&&Array.isArray(message.ids)&&message.ids.includes(newId),aliceFriendsAt);
-  await first.wait(message=>message.t==='follows'&&Array.isArray(message.following)&&message.following.includes(newId)&&Array.isArray(message.followers)&&message.followers.includes(newId),aliceFriendsAt);await second.barrier();
-  assert.ok(!second.messages.slice(bobPrivateAt).some(message=>message.t==='friends'&&Array.isArray(message.ids)&&message.ids.includes(newId)));
-  assert.ok(!second.messages.slice(bobPrivateAt).some(message=>message.t==='followed'&&message.from===newId));
-  for(const message of second.messages.slice(bobPrivateAt).filter(message=>message.t==='follows')) {
-    assert.ok(Array.isArray(message.following)&&!message.following.includes(newId));
-    assert.ok(Array.isArray(message.followers)&&!message.followers.includes(newId));
+test('unauthenticated, stale platform cookies and cross-origin sockets receive no private RPG data',{timeout:30000},async t=>{
+  const f=await isolated(t), login=await devLogin(f.origin,'Protected Alice');
+  for(const cookie of ['', 'tonarium_fantasy_session=obsolete', 'tonarium_session=forged']){
+    const peer=await f.peer(login.id,{cookie,hello:false});
+    const closed=new Promise<number>(resolve=>peer.socket.once('close',code=>resolve(code)));
+    peer.send({t:'hello',compat:COMPAT_VERSION,id:login.id,name:'Forged'});
+    peer.send({t:'fantasyAccountBind',ticket:'x'.repeat(43)});
+    assert.equal(await closed,4401);
+    assert.deepEqual(peer.messages.filter(message=>privateTypes.has(message.t)),[]);
   }
-  const conv=dmKey(aliceId,newId),incoming='ALICE_ONLY_PRIVATE_MESSAGE',outgoing='ALICE_ONLY_PRIVATE_REPLY';
-  const aliceDmAt=first.messages.length,newcomerDmAt=newcomer.messages.length;newcomer.send({t:'msg',conv,text:incoming});
-  await first.wait(message=>message.t==='msg'&&(message.m as {text?:string})?.text===incoming,aliceDmAt);first.send({t:'msg',conv,text:outgoing});
-  const answer=await newcomer.wait(message=>message.t==='msg'&&(message.m as {text?:string})?.text===outgoing,newcomerDmAt);assert.equal((answer.m as {from:string}).from,aliceId);await second.barrier();
-  assert.ok(!JSON.stringify(second.messages.slice(bobPrivateAt)).includes(incoming));assert.ok(!JSON.stringify(second.messages.slice(bobPrivateAt)).includes(outgoing));
-  assert.equal(first.messages.slice(aliceDmAt).filter(message=>message.t==='msg'&&(message.m as {text?:string})?.text===incoming).length,1);
-  const profileResponse=await fetch(`${fixture.origin}/profile`,{method:'POST',headers:{'Content-Type':'application/json',...aliceLogin.headers},body:JSON.stringify({bio:'Alice original profile'})});assert.equal(profileResponse.ok,true);
-  const updatedAt=first.messages.length;first.send({t:'profileUpdated'});await first.wait(message=>message.t==='users'&&Array.isArray(message.list)&&(message.list as {id:string;bio:string}[]).some(user=>user.id===principal&&user.bio==='Alice original profile'),updatedAt);
-  const firstLeaveAt=first.messages.length,secondLeaveAt=second.messages.length;first.send({t:'leave'});
-  const restoredAlice=await first.wait(message=>message.t==='fantasyAccountState'&&message.activeId===aliceId,firstLeaveAt),restoredBob=await second.wait(message=>message.t==='fantasyAccountState'&&message.activeId===bobId,secondLeaveAt);
-  assert.equal(restoredAlice.user?.name,alice);assert.equal((restoredAlice.user as {bio?:string})?.bio,'Alice original profile');assert.equal(restoredBob.user?.name,bob);assert.equal((restoredBob.user as {status?:string})?.status,'busy');assert.notEqual((restoredBob.user as {bio?:string})?.bio,'Alice original profile');
+  await assert.rejects(f.peer(login.id,{cookie:login.headers.Cookie,origin:'https://untrusted.invalid',hello:false}));
+  const logout=await fetch(`${f.origin}/auth/logout`,{method:'POST',headers:{Origin:f.origin,Cookie:login.headers.Cookie}});
+  assert.equal(logout.status,200);
+  const stale=await f.peer(login.id,{cookie:login.headers.Cookie,hello:false});
+  const closed=new Promise<number>(resolve=>stale.socket.once('close',code=>resolve(code)));
+  stale.send({t:'hello',compat:COMPAT_VERSION,id:login.id,name:'Stale'});
+  assert.equal(await closed,4401);
+  assert.deepEqual(stale.messages.filter(message=>privateTypes.has(message.t)),[]);
+  for(const action of ['status','register','login','logout','recover','password','recovery','claim'])
+    assert.equal((await f.http(action,action==='status'?undefined:{})).status,410);
 });
 
-test('authenticated world ownership survives device changes and leaving restores home identity while revoked bindings receive no private state',{timeout:30000},async t=>{
-  const fixture=await isolated(t),first=await fixture.peer('home-device-one');first.send({t:'join',sid:'account-world'});await first.barrier();
-  const registered=await fixture.http('register',{username:'stable_owner',password});assert.equal(registered.status,200);const principal=registered.body.account!.principal;
-  first.send({t:'fantasyAccountBind',ticket:registered.body.ticket});await first.wait(message=>message.t==='fantasyAccountState'&&message.activeId===principal&&message.account?.id===registered.body.account!.id);const empty=(await first.wait(message=>message.t==='fantasyProfile')).profile!;
-  const createdAt=first.messages.length;first.send({t:'fantasyAction',revision:empty.revision,action:{type:'create',name:'Stable world hero',source:'human',gender:'female'}});
-  const created=(await first.wait(message=>message.t==='fantasyProfile'&&message.profile?.character?.name==='Stable world hero',createdAt)).profile!;assert.ok(fixture.profile(principal).character);
-  const leaving=first.messages.length;first.send({t:'leave'});const firstHome=await first.wait(message=>message.t==='fantasyAccountState'&&message.activeId==='home-device-one',leaving);
-  assert.equal(firstHome.homeId,'home-device-one');assert.equal(firstHome.user?.name,'Guest home-device-one');
-  first.send({t:'join',sid:'account-world'});await first.wait(message=>message.t==='fantasyAccountState'&&message.activeId===principal,leaving);await first.barrier();
-  const login=await fixture.http('login',{username:'stable_owner',password});assert.equal(login.status,200);assert.equal(login.body.account!.principal,principal);
-  await first.barrier();const revokedStart=first.messages.length;
-  const second=await fixture.peer('home-device-two');second.send({t:'join',sid:'account-world'});await second.barrier();second.send({t:'fantasyAccountBind',ticket:login.body.ticket});
-  const deviceIdentity=await second.wait(message=>message.t==='fantasyAccountState'&&message.activeId===principal&&!!message.account);assert.equal(deviceIdentity.user?.name,'Guest home-device-two');
-  const resumed=(await second.wait(message=>message.t==='fantasyProfile'&&message.profile?.character?.name==='Stable world hero')).profile!;assert.equal(resumed.character!.lifeStartedAt,created.character!.lifeStartedAt);assert.equal(resumed.character!.race,created.character!.race);
-  const restAt=second.messages.length;second.send({t:'fantasyAction',revision:resumed.revision,action:{type:'rest'}});await second.wait(message=>message.t==='fantasyProfile'&&!!message.profile?.activity,restAt);await first.barrier();assert.deepEqual(first.messages.slice(revokedStart).filter(message=>privateTypes.has(message.t)),[]);
-  first.send({t:'fantasyAction',revision:created.revision,action:{type:'sync'}});await first.barrier();assert.deepEqual(first.messages.slice(revokedStart).filter(message=>privateTypes.has(message.t)),[]);
-  const rotated=await fixture.http('password',{password,newPassword},login.cookie);assert.equal(rotated.status,200);
-  const beforeDenied=second.messages.length;second.send({t:'fantasyAction',revision:resumed.revision,action:{type:'sync'}});await second.barrier();assert.deepEqual(second.messages.slice(beforeDenied).filter(message=>privateTypes.has(message.t)),[]);
-  const rebindAt=second.messages.length;second.send({t:'fantasyAccountBind',ticket:rotated.body.ticket});await second.wait(message=>message.t==='fantasyAccountState'&&message.activeId===principal,rebindAt);await second.wait(message=>message.t==='fantasyProfile'&&message.profile?.character?.name==='Stable world hero',rebindAt);
-  const secondLeaveAt=second.messages.length;second.send({t:'leave'});
-  const secondHome=await second.wait(message=>message.t==='fantasyAccountState'&&message.activeId==='home-device-two',secondLeaveAt);
-  assert.equal(secondHome.homeId,'home-device-two');assert.equal(secondHome.user?.id,'home-device-two');assert.equal(secondHome.user?.name,'Guest home-device-two');assert.notEqual(secondHome.user?.name,firstHome.user?.name);
-  const secondReturnAt=second.messages.length;second.send({t:'join',sid:'account-world'});await second.wait(message=>message.t==='fantasyAccountState'&&message.activeId===principal,secondReturnAt);await second.wait(message=>message.t==='fantasyProfile'&&message.profile?.character?.name==='Stable world hero',secondReturnAt);await second.barrier();
-  assert.equal((await fixture.http('logout',{},rotated.cookie)).status,200);
-  const logoutAt=second.messages.length;second.send({t:'fantasyAction',revision:resumed.revision,action:{type:'sync'}});await second.barrier();assert.deepEqual(second.messages.slice(logoutAt).filter(message=>privateTypes.has(message.t)),[]);
-  assert.equal((await fixture.http('status',undefined,rotated.cookie)).body.account,null);assert.equal(fixture.profile(principal).character!.name,'Stable world hero');
+test('Tonarium friends, DMs and original identity remain account bound inside and outside RPG',{timeout:30000},async t=>{
+  const f=await isolated(t),[alice,bob]=await Promise.all(['Social Alice','Social Bob'].map(name=>devLogin(f.origin,name)));
+  const a=await f.peer('forged-a',{cookie:alice.headers.Cookie}),b=await f.peer('forged-b',{cookie:bob.headers.Cookie});
+  a.send({t:'followUser',to:bob.id,on:true});b.send({t:'followUser',to:alice.id,on:true});
+  await a.wait(message=>message.t==='friends'&&Array.isArray(message.ids)&&message.ids.includes(bob.id));
+  a.send({t:'join',sid:'account-world'});await a.wait(message=>message.t==='fantasyProfile');
+  const from=b.messages.length;
+  a.send({t:'msg',conv:dmKey(alice.id,bob.id),text:'PLATFORM_PRIVATE_DM'});
+  const dm=await b.wait(message=>message.t==='msg'&&JSON.stringify(message).includes('PLATFORM_PRIVATE_DM'),from);
+  assert.ok(JSON.stringify(dm).includes(alice.id));
+  assert.ok(!JSON.stringify(dm).includes('fantasy:'));
+  const left=a.messages.length;a.send({t:'leave',requestId:'left'});
+  await a.wait(message=>message.t==='sessionResult'&&message.requestId==='left',left);
+  const denied=a.messages.length;a.send({t:'fantasyAction',revision:0,action:{type:'sync'}});await a.barrier();
+  assert.deepEqual(a.messages.slice(denied).filter(message=>privateTypes.has(message.t)),[]);
+  const after=b.messages.length;a.send({t:'msg',conv:dmKey(alice.id,bob.id),text:'HOME_PRIVATE_DM'});
+  await b.wait(message=>message.t==='msg'&&JSON.stringify(message).includes('HOME_PRIVATE_DM'),after);
+  assert.equal(dmKey(alice.id,bob.id),dmKey(bob.id,alice.id));
+});
+
+test('same Tonarium account resumes its character in another tab and guest accounts can play',{timeout:30000},async t=>{
+  const f=await isolated(t),login=await devLogin(f.origin,'Resuming Owner');
+  const first=await f.peer('device-one',{cookie:login.headers.Cookie});first.send({t:'join',sid:'account-world'});
+  const initial=(await first.wait(message=>message.t==='fantasyProfile')).profile!;
+  first.send({t:'fantasyAction',revision:initial.revision,action:{type:'create',name:'RESUMED_PLATFORM_HERO',source:'human',gender:'female'}});
+  await first.wait(message=>message.t==='fantasyProfile'&&message.profile?.character?.name==='RESUMED_PLATFORM_HERO');
+  const second=await f.peer('device-two',{cookie:login.headers.Cookie});
+  await second.wait(message=>message.t==='fantasyProfile'&&message.profile?.character?.name==='RESUMED_PLATFORM_HERO');
+  const response=await fetch(`${f.origin}/auth/guest`,{method:'POST',headers:{Origin:f.origin,'Content-Type':'application/json'},body:JSON.stringify({name:'Platform Guest'})});
+  assert.equal(response.status,200);
+  const cookie=response.headers.getSetCookie().find(value=>value.startsWith('tonarium_session='))!.split(';')[0];
+  const guest=await f.peer(login.id,{cookie});guest.send({t:'join',sid:'account-world'});
+  const profile=(await guest.wait(message=>message.t==='fantasyProfile')).profile!;
+  assert.equal(profile.character,null);assert.ok(!JSON.stringify(guest.messages).includes('RESUMED_PLATFORM_HERO'));
+});
+
+
+test('logout closes only the revoked platform session and an open socket cannot continue RPG commands',{timeout:30000},async t=>{
+  const f=await isolated(t),first=await devLogin(f.origin,'Revoked Owner'),second=await devLogin(f.origin,'Revoked Owner');
+  const revoked=await f.peer(first.id,{cookie:first.headers.Cookie}),active=await f.peer(second.id,{cookie:second.headers.Cookie});
+  revoked.send({t:'join',sid:'account-world'});const profile=(await revoked.wait(message=>message.t==='fantasyProfile')).profile!;
+  const closed=new Promise<number>(resolve=>revoked.socket.once('close',code=>resolve(code)));
+  const response=await fetch(`${f.origin}/auth/logout`,{method:'POST',headers:{Origin:f.origin,...first.headers}});
+  assert.equal(response.status,200);
+  if(revoked.socket.readyState===WebSocket.OPEN)revoked.send({t:'fantasyAction',revision:profile.revision,action:{type:'create',name:'REVOKED_SOCKET_HERO',source:'human',gender:'female'}});
+  assert.equal(await Promise.race([closed,new Promise(resolve=>setTimeout(()=>resolve('still-open'),1000))]),4401);
+  assert.equal(f.profile(first.id)?.character??null,null);
+  const from=active.messages.length;active.send({t:'fantasyAction',revision:profile.revision,action:{type:'create',name:'VALID_SESSION_HERO',source:'human',gender:'female'}});
+  await active.wait(message=>message.t==='fantasyProfile'&&message.profile?.character?.name==='VALID_SESSION_HERO',from);
+});
+
+test('external session revocation and expiration invalidate already-open platform sockets',{timeout:30000},async t=>{
+  const f=await isolated(t);
+  const {default:postgres}=await import('postgres');
+  const sql=postgres(f.databaseUrl,{max:1,onnotice:()=>{}});t.after(()=>sql.end());
+  const {createHash}=await import('node:crypto');
+  for(const expired of [false,true]){
+    const login=await devLogin(f.origin,expired?'Expired Owner':'Deleted Owner');
+    const peer=await f.peer(login.id,{cookie:login.headers.Cookie});peer.send({t:'join',sid:'account-world'});
+    const profile=(await peer.wait(message=>message.t==='fantasyProfile')).profile!;
+    const hash=createHash('sha256').update(login.headers.Cookie.split('=')[1]).digest('hex');
+    if(expired)await sql`update auth_sessions set expires_at = now() - interval '1 second' where token_hash = ${hash}`;
+    else await sql`delete from auth_sessions where token_hash = ${hash}`;
+    const closed=new Promise<number>(resolve=>peer.socket.once('close',code=>resolve(code)));
+    peer.send({t:'fantasyAction',revision:profile.revision,action:{type:'create',name:'REVOKED_SOCKET_HERO',source:'human',gender:'female'}});
+    assert.equal(await Promise.race([closed,new Promise(resolve=>setTimeout(()=>resolve('still-open'),1000))]),4401);
+    assert.equal(f.profile(login.id)?.character??null,null);
+  }
+});
+
+
+test('private updates revalidate a passive socket after its database session is revoked',{timeout:30000},async t=>{
+  const f=await isolated(t),revokedLogin=await devLogin(f.origin,'Passive Owner'),activeLogin=await devLogin(f.origin,'Passive Owner');
+  const revoked=await f.peer(revokedLogin.id,{cookie:revokedLogin.headers.Cookie}),active=await f.peer(activeLogin.id,{cookie:activeLogin.headers.Cookie});
+  revoked.send({t:'join',sid:'account-world'});const profile=(await revoked.wait(message=>message.t==='fantasyProfile')).profile!;
+  await revoked.barrier();const from=revoked.messages.length;
+  const {default:postgres}=await import('postgres'),{createHash}=await import('node:crypto');
+  const sql=postgres(f.databaseUrl,{max:1,onnotice:()=>{}});t.after(()=>sql.end());
+  const hash=createHash('sha256').update(revokedLogin.headers.Cookie.split('=')[1]).digest('hex');
+  await sql`delete from auth_sessions where token_hash = ${hash}`;
+  const closed=new Promise<number>(resolve=>revoked.socket.once('close',code=>resolve(code)));
+  active.send({t:'fantasyAction',revision:profile.revision,action:{type:'create',name:'VALID_PRIVATE_UPDATE',source:'human',gender:'female'}});
+  await active.wait(message=>message.t==='fantasyProfile'&&message.profile?.character?.name==='VALID_PRIVATE_UPDATE');
+  assert.equal(await Promise.race([closed,new Promise(resolve=>setTimeout(()=>resolve('still-open'),1000))]),4401);
+  assert.ok(!JSON.stringify(revoked.messages.slice(from)).includes('VALID_PRIVATE_UPDATE'));
 });

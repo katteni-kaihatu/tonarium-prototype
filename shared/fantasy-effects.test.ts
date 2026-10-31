@@ -36,7 +36,7 @@ function reject(profile: FantasyProfile, action: FantasyAction) {
 }
 
 test('equipment modifies real stats in four independent slots without copying inventory or healing', () => {
-  let p = player(); p.character!.inventory = { 'steel-sword': 1, 'bear-armor': 1, 'sapphire-charm': 1, 'iron-shield': 1 };
+  let p = player('warrior'); p.character!.inventory = { 'steel-sword': 1, 'bear-armor': 1, 'sapphire-charm': 1, 'iron-shield': 1 };
   const hp = p.character!.hp, mp = p.character!.mp;
   for (const item of Object.keys(p.character!.inventory)) p = step(p, { type: 'equip', item });
   assert.deepEqual(p.character!.inventory, { 'steel-sword': 1, 'bear-armor': 1, 'sapphire-charm': 1, 'iron-shield': 1 });
@@ -57,16 +57,16 @@ test('equipment modifies real stats in four independent slots without copying in
 test('unequipping boosted resources clamps current HP and MP and re-equipping cannot refill them', () => {
   let p = player(); p.character!.inventory = { 'ruby-ring': 1, 'echo-pendant': 1 };
   p = step(p, { type: 'equip', item: 'ruby-ring' }); p.character!.hp = fantasyStats(p.character!).hp;
-  p = step(p, { type: 'unequip', slot: 'accessory' }); assert.equal(p.character!.hp, 100);
+  p = step(p, { type: 'unequip', slot: 'ring1' }); assert.equal(p.character!.hp, 100);
   p = step(p, { type: 'equip', item: 'ruby-ring' }); assert.equal(p.character!.hp, 100);
   p = step(p, { type: 'equip', item: 'echo-pendant' }); p.character!.mp = fantasyStats(p.character!).mp;
-  p = step(p, { type: 'unequip', slot: 'accessory' }); assert.equal(p.character!.mp, 50);
+  p = step(p, { type: 'unequip', slot: 'necklace' }); assert.equal(p.character!.mp, 50);
   reject(p, { type: 'equip', item: 'missing' }); reject(p, { type: 'equip', item: 'herb' });
   reject(p, { type: 'unequip', slot: '__proto__' } as unknown as FantasyAction);
 });
 
 test('an offhand shield reduces actual combat damage without preventing status or hunger damage', () => {
-  const base = player(); base.character!.location = 'ashpeak';
+  const base = player('warrior'); base.character!.location = 'ashpeak';
   const armored = structuredClone(base); armored.character!.inventory['iron-shield'] = 1;
   const equipped = step(armored, { type: 'equip', item: 'iron-shield' });
   const plainThreat = step(base, { type: 'explore' }, () => 0);
@@ -217,7 +217,7 @@ test('haggle applies the same price to purchases, rooms and meals while preservi
 test('reputation is earned from successful ordinary work and completed quests without rewarding criminal work', () => {
   const ordinary = step(player('merchant'), { type: 'work' }); assert.equal(ordinary.character!.reputation!.towns.hearth, 1);
   const criminal = step(player('thief'), { type: 'work' }); assert.equal(criminal.character!.reputation, undefined);
-  const p = player(); const quest = FANTASY_QUESTS.find(quest => quest.giver === 'hearth' && !quest.races && !quest.families)!;
+  const p = player(); const quest = FANTASY_QUESTS.find(quest => quest.giver === 'hearth' && !quest.races && !quest.families && !quest.jobs && !quest.chapter)!;
   p.character!.quests = [quest.id]; p.character!.inventory[quest.item] = quest.count; p.character!.visited.push(quest.destination);
   const done = step(p, { type: 'complete', quest: quest.id }); assert.equal(done.character!.reputation!.towns.hearth, 6);
 });

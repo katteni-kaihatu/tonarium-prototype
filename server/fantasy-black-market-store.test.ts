@@ -1,0 +1,37 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {FantasyStore} from './fantasy-store.ts';
+import {applyFantasyAction,newFantasyProfile} from '../shared/fantasy-engine.ts';
+import {fantasyBlackMarketOpening} from '../shared/fantasy-black-market.ts';
+import {NPC_PUBLIC} from '../shared/npc.ts';
+
+test('black market bids, NPC outbids, escrow and reload share one atomic save',t=>{
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'fantasy-auction-'));
+  t.after(()=>{assert.equal(path.dirname(path.resolve(directory)),path.resolve(os.tmpdir()));assert.ok(path.basename(directory).startsWith('fantasy-auction-'));fs.rmSync(directory,{recursive:true,force:true});});
+  const file=path.join(directory,'fantasy.json'),resident=NPC_PUBLIC.find(npc=>npc.building==='residence')!;
+  const realm={session:'auction-test',publicSession:true,peers:['a','b']};
+  let hour=20;while(!fantasyBlackMarketOpening(resident.homeLocation,hour,realm.session).open)hour+=24;
+  const make=(name:string)=>{const p=applyFantasyAction(newFantasyProfile(),{type:'create',source:'human',gender:'female',name},()=>.99).profile,c=p.character!;c.hour=hour;c.location=resident.homeLocation;c.gold=10000;c.reputation={lands:{},regions:{},towns:{[c.location]:20}};return p;};
+  fs.writeFileSync(file,JSON.stringify({a:make('하나'),b:make('둘')}));
+  let fail=false;const options={worldHour:()=>hour,onError:()=>{},save:(target:string,data:string)=>{if(fail)throw new Error('test write failure');fs.writeFileSync(target,data);}};
+  let store=new FantasyStore(file,options);assert.equal(store.loadError,undefined);
+  const request=(user:string,command:unknown)=>store.realmRequest(user,{domain:'blackMarket',command},realm);
+  assert.equal(request('a',{type:'blackMarketLearn',npc:resident.id}).error,undefined);
+  assert.equal(request('b',{type:'blackMarketLearn',npc:resident.id}).error,undefined);
+  let state=store.realmState('a',realm).blackMarket!,lot=state.market!.lots[0];
+  const before=fs.readFileSync(file,'utf8'),gold=store.profile('a').character!.gold;
+  fail=true;assert.equal(request('a',{type:'blackMarketBid',market:state.market!.id,lot:lot.id,amount:lot.minimumBid,revision:state.revision}).error,'save-failed');
+  assert.equal(store.profile('a').character!.gold,gold);assert.equal(fs.readFileSync(file,'utf8'),before);
+  fail=false;assert.equal(request('a',{type:'blackMarketBid',market:state.market!.id,lot:lot.id,amount:lot.minimumBid,revision:state.revision}).error,undefined);
+  assert.equal(store.profile('a').character!.gold,gold-lot.minimumBid);
+  store=new FantasyStore(file,options);assert.equal(store.loadError,undefined);state=store.realmState('a',realm).blackMarket!;
+  assert.equal(state.market!.lots[0].yours,true);
+  hour+=1;store.tick(new Set());
+  assert.equal(store.profile('a').character!.gold,gold);
+  const after=fs.readFileSync(file,'utf8');store=new FantasyStore(file,options);assert.equal(store.loadError,undefined);store.tick(new Set());
+  assert.equal(store.profile('a').character!.gold,gold);assert.equal(fs.readFileSync(file,'utf8'),after);
+  assert.ok(store.realmState('a',realm).blackMarket!.market!.lots[0].history.some(entry=>entry.bidder.type==='npc'));
+});

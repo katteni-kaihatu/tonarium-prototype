@@ -1,3 +1,24 @@
+import { fantasyExpeditionText } from '../../../shared/fantasy-expedition.ts';
+import { fantasyInstitutionText } from '../../../shared/fantasy-institutions.ts';
+import { fantasyCommissionText } from '../../../shared/fantasy-commissions.ts';
+import { fantasyOutdoorCookingErrorText, fantasyOutdoorCookingLogText } from '../../../shared/fantasy-outdoor-cooking.ts';
+import { fantasyCookingText } from '../../../shared/fantasy-cooking.ts';
+import { fantasyRankBenefitText } from '../../../shared/fantasy-rank-benefits.ts';
+import { fantasyInnErrorText } from '../../../shared/fantasy-inn.ts';
+import { fantasyRankBookText } from '../../../shared/fantasy-rank-rewards.ts';
+import { fantasyMiracleText } from '../../../shared/fantasy-miracles.ts';
+import { fantasyMonsterSiteText } from '../../../shared/fantasy-monster-sites.ts';
+import { fantasyGuildAssessmentErrorText } from '../../../shared/fantasy-adventurer.ts';
+import { fantasyDownedText } from '../../../shared/fantasy-downed.ts';
+import { fantasyCarryReturnText } from '../../../shared/fantasy-carry-return.ts';
+import {fantasyBagText} from '../../../shared/fantasy-bags.ts';
+import {fantasyAlchemySynthesisText} from '../../../shared/fantasy-alchemy-synthesis.ts';
+import {fantasyProductionText} from '../../../shared/fantasy-production-expansion.ts';
+import {fantasyBlackMarketText} from '../../../shared/fantasy-black-market.ts';
+import {fantasyWorldUtilityText} from '../../../shared/fantasy-world-utilities.ts';
+import {fantasyOccultText} from '../../../shared/fantasy-occult.ts';
+import { fantasyDungeonErrorText, fantasyDungeonLogText } from '../../../shared/fantasy-dungeon.ts';
+import { fantasyMagicDiscoveryTranslation } from '../../../shared/fantasy-magic-discovery.ts';
 import { fantasyEconomyLogText } from '../../../shared/fantasy-economy.ts';
 import { fantasyCivicLogText } from '../../../shared/fantasy-civics.ts';
 import { fantasyWorkLogText } from '../../../shared/fantasy-work.ts';
@@ -12,7 +33,7 @@ import { fantasySkillName } from '../../../shared/fantasy-skill-names.ts';
 import { FANTASY_CONTEXT_NAMES } from '../../../shared/fantasy-physiology.ts';
 import { FANTASY_MANA_EXERCISES } from '../../../shared/fantasy-mana.ts';
 import { FANTASY_MENTOR_SKILLS } from '../../../shared/fantasy-apprenticeship.ts';
-import { fantasySpecializationText } from '../../../shared/fantasy-specializations.ts';
+import { fantasySpecializationText, FANTASY_ALCHEMY_FORMULAS } from '../../../shared/fantasy-specializations.ts';
 import { fantasyTerrainText, FANTASY_TERRAIN_ACTIVITIES } from '../../../shared/fantasy-terrain.ts';
 import { FANTASY_MONSTERS } from '../../../shared/fantasy-monsters.ts';
 import { FANTASY_LIBRARY_BOOKS } from '../../../shared/fantasy-library.ts';
@@ -27,6 +48,7 @@ import { fantasyVoyageDecisionLogText } from '../../../shared/fantasy-voyage-dec
 import { fantasyPropertyText } from '../../../shared/fantasy-property.ts';
 import { fantasyPriestText } from '../../../shared/fantasy-priest-growth.ts';
 import { fantasyJobPathText } from '../../../shared/fantasy-job-paths.ts';
+import { fantasyUnderworldText } from '../../../shared/fantasy-underworld.ts';
 
 export const statLabels: Record<NpcLocale, Record<keyof FantasyStats,string>> = {
   ko:{hp:'HP',mp:'MP',strength:'힘',agility:'민첩',intelligence:'지능',luck:'운',vitality:'체력',dexterity:'재주',charisma:'카리스마'},
@@ -37,6 +59,9 @@ export const genderLabels = {ko:{male:'남성',female:'여성',none:'성별 없�
 export function gameClock(h:number,locale:NpcLocale) { const totalMinutes=Math.max(0,Math.floor(h*60+1e-7)),day=Math.floor(totalMinutes/1440)+1,time=`${String(Math.floor(totalMinutes%1440/60)).padStart(2,'0')}:${String(totalMinutes%60).padStart(2,'0')}`;return locale==='ko'?`${day}일째 ${time}`:locale==='en'?`Day ${day} · ${time}`:`${day}日目 ${time}`; }
 
 const errorCopy: Record<string, [ko: string, en: string]> = {
+  '一般依頼は担当施設か依頼人の掲示から受注してください。': ['일반 의뢰는 담당 시설이나 의뢰인의 게시에서 수락해 주세요.', 'Accept ordinary contracts from the responsible facility or issuer’s postings.'],
+  'この依頼を受ける所属資格がありません。': ['이 의뢰를 맡을 현재 직업이나 등록 조건이 맞지 않습니다.', 'Your current profession or registration does not qualify for this contract.'],
+  '生活職業を選んでください。': ['생활 직업을 먼저 선택하세요.', 'Choose a life profession first.'],
   '祈りを捧げられる神殿を訪ねてください。':['기도할 수 있는 신전에 방문해 주세요.','Visit a temple to pray.'],
   '今日はすでに祈りました。次の日に再び祈れます。':['오늘은 이미 기도했습니다. 다음 날 다시 기도할 수 있습니다.','You have already prayed today. Return on the next world day.'],
   '今は祈りを捧げられる状態ではありません。':['지금은 기도할 수 있는 상태가 아닙니다.','You are not in a condition to pray now.'],
@@ -102,6 +127,13 @@ const errorCopy: Record<string, [ko: string, en: string]> = {
   'キャラクターはすでに作成されています。': ['이미 캐릭터를 생성했습니다.', 'Your character has already been created.'],
   '先に発生中の職業イベントを選択してください。': ['먼저 진행 중인 이벤트의 선택지를 골라 주세요.', 'Resolve the current event first.'],
   '先に発生中のイベントを選択してください。': ['먼저 진행 중인 이벤트의 선택지를 골라 주세요.', 'Resolve the current event first.'],
+  '到着前の船・飛空艇・転移門からは途中で降りられません。': ['배·비공정·전이문은 도착할 때까지 내릴 수 없습니다.', 'You cannot disembark from a ship, airship or gate before arrival.'],
+  '船・飛空艇・転移門の移動中は目的地を変えられません。': ['배·비공정·전이문으로 이동 중에는 목적지를 바꿀 수 없습니다.', 'You cannot change destination while aboard a ship, airship or gate.'],
+  'パーティーの移動や戦闘は、リーダーの提案に返答して始めてください。': ['파티 이동과 전투는 파티장의 제안에 동의한 뒤 시작합니다.', 'Party travel and battles begin after responding to the leader’s proposal.'],
+  '移動経路の途中です。施設や現地の行動は、地域に到着してから行ってください。': ['이동 경로 위에 있습니다. 시설과 현장 활동은 지역에 도착한 뒤 이용해 주세요.', 'You are on the road. Reach the region before using its facilities or local activities.'],
+  '夜間は営業していません。午前6時に再開します。':['영업시간이 아닙니다. 오전 6시에 다시 문을 엽니다.','Closed for the night. Reopens at 06:00.'],
+  '神殿の治療には、実際の負傷・病気と治療費が必要です。':['실제 부상·질병이 있고 치료비를 지불할 수 있어야 합니다.','Treatment requires an actual injury or illness and sufficient gold.'],
+  '遺跡の入口へ戻り、外へ出てから行ってください。':['입구로 돌아가 밖으로 나온 뒤 할 수 있습니다.','Return to the entrance and leave first.'],
   '目的地と交通手段を選んでください。': ['목적지와 이동 수단을 선택해 주세요.', 'Choose a destination and transport.'],
   'その交通手段は利用できません。': ['해당 이동 수단을 이용할 수 없습니다.', 'That transport is unavailable.'],
   '目的地はまだ地図にありません。隣接地域を探索するか地図を入手してください。': ['목적지가 아직 지도에 없습니다. 인접 지역을 탐사하거나 지도를 구해 주세요.', 'The destination is not on your map yet. Explore nearby regions or obtain a chart.'],
@@ -206,8 +238,26 @@ const errorCopy: Record<string, [ko: string, en: string]> = {
 };
 
 const translatedEconomyLog = (text:string,locale:NpcLocale) => { const translated=fantasyEconomyLogText(text,locale); return translated===text?undefined:translated; };
+const partyContractCopy: Record<string, Record<NpcLocale, string>> = {
+  'party-contract:owner-only': { ko: '파티 의뢰의 수락과 완료 보고는 계약자가 맡습니다.', en: 'The contract holder handles acceptance and completion reports for the party.', ja: 'パーティーの依頼の受注と完了報告は契約者が行います。' },
+  'party-contract:unavailable': { ko: '파티 의뢰의 기록을 확인하지 못했습니다. 진행을 보존한 채 다시 확인해 주세요.', en: 'The party contract record could not be verified. Your progress is preserved; try again.', ja: 'パーティーの依頼記録を確認できません。進行は保たれています。もう一度確かめてください。' },
+};
 
 export function fantasyErrorText(text: string, locale: NpcLocale): string {
+  const expedition=fantasyExpeditionText(text,locale);if(expedition!==undefined)return expedition;
+  const institution = partyContractCopy[text]?.[locale] ?? fantasyInstitutionText(text,locale) ?? fantasyUnderworldText(text, locale); if (institution !== undefined) return institution;
+  const commission=fantasyCommissionText(text,locale);if(commission!==undefined)return commission;
+  const cooking=fantasyCookingText(text,locale)??fantasyOutdoorCookingErrorText(text,locale);if(cooking!==undefined)return cooking;
+  if(text==='combat:retreat-safe')return {ko:'휴양지는 전투 없이 쉬는 안전한 장소입니다.',en:'Retreats are safe places to relax without combat.',ja:'休養地は戦闘をせずに休む安全な場所です。'}[locale];
+  if(text==='combat:encounter-only')return {ko:'탐색 중 조우하거나 수락한 토벌 의뢰의 대상을 추적해 전투를 시작해 주세요.',en:'Begin combat through an encounter or by tracking an accepted hunt contract.',ja:'探索中の遭遇か、受注した討伐対象の追跡から戦闘を始めてください。'}[locale];
+  const interiorMap = fantasyInteriorMapText(text, locale); if (interiorMap) return interiorMap;
+  const benefitText=fantasyRankBenefitText(text,locale);if(benefitText!==undefined)return benefitText;
+  const guildOrSite = fantasyRankBookText(text, locale) ?? fantasyInnErrorText(text, locale) ?? fantasyGuildAssessmentErrorText(text, locale) ?? fantasyMonsterSiteText(text, locale); if (guildOrSite !== undefined) return guildOrSite;
+  if (text === 'この技は戦場で使ってください。') return { ko: '이 기술은 전투 화면에서 사용하세요.', en: 'Use this technique on the battlefield.', ja: text }[locale];
+  if(text==='手当てには同じ場所のパーティーの仲間と、回復薬または治療費が必要です。')return {ko:'같은 위치의 파티 동료와 회복약 또는 치료비가 필요합니다.',en:'A party member at the same location and a potion or treatment fee are required.',ja:text}[locale];
+  const additions=fantasyMiracleText(text,locale)??fantasyDownedText(text,locale)??fantasyCarryReturnText(text,locale)??fantasyBagText(text,locale)??fantasyAlchemySynthesisText(text,locale)??fantasyProductionText(text,locale)??fantasyBlackMarketText(text,locale)??fantasyWorldUtilityText(text,locale)??fantasyOccultText(text,locale);if(additions)return additions;
+  const dungeon=fantasyDungeonErrorText(text,locale);if(dungeon)return dungeon;
+  const magic=fantasyMagicDiscoveryTranslation(text,locale);if(magic)return magic;
   const expansion = translatedEconomyLog(text,locale) ?? fantasyCivicLogText(text,locale) ?? fantasyPropertyText(text,locale) ?? fantasyPriestText(text,locale) ?? fantasyJobPathText(text,locale); if(expansion)return expansion;
   if (locale === 'ja') return text;
   const specialty=fantasySpecializationText(text,locale)??fantasyTerrainText(text,locale);
@@ -229,6 +279,22 @@ function replaceLabels(raw: string, entries: [string, string][]): string {
 }
 
 export function fantasyLogText(text:string,locale:NpcLocale,character:FantasyCharacter|null):string {
+  const expedition=fantasyExpeditionText(text,locale);if(expedition!==undefined)return expedition;
+  const institution = partyContractCopy[text]?.[locale] ?? fantasyInstitutionText(text,locale) ?? fantasyUnderworldText(text, locale); if (institution !== undefined) return institution;
+  const commission=fantasyCommissionText(text,locale);if(commission!==undefined)return commission;
+  const cooking=fantasyCookingText(text,locale)??fantasyOutdoorCookingLogText(text,locale);if(cooking!==undefined)return cooking;
+  const interiorMap = fantasyInteriorMapText(text, locale); if (interiorMap) return interiorMap;
+  const benefitText=fantasyRankBenefitText(text,locale);if(benefitText!==undefined)return benefitText;
+  const guildOrSite = fantasyRankBookText(text, locale) ?? fantasyInnErrorText(text, locale) ?? fantasyGuildAssessmentErrorText(text, locale) ?? fantasyMonsterSiteText(text, locale); if (guildOrSite !== undefined) return guildOrSite;
+  const additions=fantasyMiracleText(text,locale)??fantasyDownedText(text,locale)??fantasyCarryReturnText(text,locale)??fantasyBagText(text,locale)??fantasyAlchemySynthesisText(text,locale)??fantasyProductionText(text,locale)??fantasyBlackMarketText(text,locale);if(additions)return additions;
+  const downed:Record<string,[string,string]>={'倒れて意識を失った。仲間の奇跡か、戦闘後の手当てを待っている。':['쓰러져 의식을 잃었다. 동료의 기적이나 전투 후 치료를 기다린다.','Fell unconscious. Waiting for an ally’s miracle or treatment after battle.'],'応急手当てで容体が安定した。目覚めるまで2時間。':['응급처치로 안정됐다. 깨어나기까지 세계 시간 2시간.','Stabilized by first aid. Waking in two world hours.'],'手当てを受け、意識を取り戻した。':['치료를 받고 의식을 되찾았다.','Regained consciousness after treatment.']};if(locale!=='ja'&&downed[text])return downed[text][locale==='ko'?0:1];
+  const utility=fantasyWorldUtilityText(text,locale);if(utility)return utility;
+  const situation=/^職業の状況補正\+(\d+)。$/.exec(text);if(situation)return {ko:'직업 상황 보정 +'+situation[1],en:'Profession situation bonus +'+situation[1],ja:text}[locale];
+  const occult=fantasyOccultText(text,locale);if(occult)return occult;
+  const dungeon=fantasyDungeonLogText(text,locale);if(dungeon)return dungeon;
+  if(text==='地図売りに別れを告げた。')return {ko:'지도 상인과 헤어졌다.',en:'Took leave of the map seller.',ja:text}[locale];
+  if(text==='街道で、地図を広げる行商に出会った。')return {ko:'길에서 지도를 펼친 떠돌이 상인을 만났다.',en:'Met a wandering map seller on the road.',ja:text}[locale];
+  if(text==='運賃が足りず、以前の移動予約を中止した。')return {ko:'운임이 부족해 이전 이동 예약이 취소되었습니다.',en:'The earlier travel booking was cancelled because the fare could not be paid.',ja:text}[locale];
   const expansion = translatedEconomyLog(text,locale) ?? fantasyCivicLogText(text,locale) ?? fantasyPropertyText(text,locale) ?? fantasyPriestText(text,locale) ?? fantasyJobPathText(text,locale); if(expansion)return expansion;
   const combatXp=/^戦闘勝利。経験値(\d+)。$/.exec(text),combatGold=/^戦果の金貨(\d+)枚を受け取った。$/.exec(text),combatItem=/^戦果の品［([a-z-]+)］を(\d+)個受け取った。$/.exec(text),combatRecord=/^戦闘記録［[^］]+］(victory|defeat|escaped|active)。$/.exec(text),combatRescue=/^戦場から救護され、金貨(\d+)枚を支払った。$/.exec(text);
   if(combatXp)return {ko:`전투 승리. 경험치 +${combatXp[1]}.`,en:`Victory. XP +${combatXp[1]}.`,ja:text}[locale];
@@ -239,6 +305,7 @@ export function fantasyLogText(text:string,locale:NpcLocale,character:FantasyCha
   if(text==='戦場で力尽き、この人生は終わった。足跡は世界に残る。')return {ko:'전장에서 쓰러져 이번 삶이 끝났다. 발자취는 세계에 남는다.',en:'Fell in battle and this life ended. Its footprints remain in the world.',ja:text}[locale];
   const decisionText=fantasyVoyageDecisionLogText(text,character,locale);if(decisionText!==undefined)return decisionText;
   const sceneText=fantasyVoyageSceneLogText(text,locale,character??undefined);if(sceneText!==undefined)return sceneText;
+  if(text==='行動を途中で取り消した。判定済みの受取分は残り、依頼や調査の完了は数えない。')return {ko:'행동을 중간에 취소했다. 이미 판정된 보수는 남고, 의뢰·조사의 완료는 인정되지 않는다.',en:'Cancelled the action midway. Rewards already resolved stay, but the quest or investigation does not count as complete.',ja:text}[locale];
   const workText=fantasyWorkLogText(text,locale);if(workText)return workText;
   const campText=fantasyCampLogText(text,locale);if(campText)return campText;
   const encounterText=fantasyEncounterLogText(text,locale);if(encounterText)return encounterText;
@@ -261,6 +328,9 @@ export function fantasyLogText(text:string,locale:NpcLocale,character:FantasyCha
   const names=(raw:string) => {
     if(locale==='ja')return replaceLabels(raw,FANTASY_TERMS.filter(t=>t.category==='place'&&!known.includes(t.id)).map(t=>[t.names.ja,'未知の場所']));
     const entries:[string,string][]=FANTASY_TERMS.map(t=>[t.names.ja,t.category==='place'&&!known.includes(t.id)?{ko:'미지의 장소',en:'Unknown place'}[locale]:t.names[locale]]);
+    const checks:Record<string,[string,string]>={'調査':['조사','Investigation'],'発見運':['발견운','Discovery'],'獲物の追跡':['사냥감 추적','Tracking'],'獲物の解体':['가죽 채집','Skinning'],'海釣り':['바다낚시','Sea fishing'],'桟橋釣り':['부두 낚시','Pier fishing'],'危険からの回避':['위험 회피','Avoid danger'],'魔物との小競り合い':['마물과의 교전','Skirmish'],'仲間との現地任務':['동료와 현장 임무','Field mission with companions']};
+    for(const [source,labels] of Object.entries(checks))entries.push([source,labels[locale==='ko'?0:1]]);
+    entries.push(['未確認の配合 ',{ko:'미확인 조합 ',en:'Unidentified mixture '}[locale]]);
     entries.push(['値段交渉（目標以下）',{ko:'가격 흥정 · 목표 이하',en:'Bargaining · roll at or below target'}[locale]]);
     for(const context of Object.values(FANTASY_CONTEXT_NAMES))entries.push([context.ja,context[locale]]);
     for(const m of FANTASY_MAPS)entries.push([m.name.ja,m.name[locale]]);
@@ -279,14 +349,15 @@ export function fantasyLogText(text:string,locale:NpcLocale,character:FantasyCha
     for(const r of FANTASY_RECIPES) {const term=FANTASY_TERMS.find(t=>t.id===r.output);entries.push([r.name,term?.names[locale]??r.name]);}
     for(const r of FANTASY_LODGINGS)entries.push([r.name.ja,r.name[locale]]);
     for(const m of FANTASY_DINING)entries.push([m.name.ja,m.name[locale]]);
-    return replaceLabels(raw,entries).replaceAll('の仕事',locale==='ko'?' 작업':' work').replaceAll('の探索',locale==='ko'?' 탐색':' exploration');
+    for(const formula of FANTASY_ALCHEMY_FORMULAS)entries.push([formula.names.ja,formula.names[locale]]);
+    return replaceLabels(raw,entries).replaceAll('の仕事',locale==='ko'?' 작업':' work').replaceAll('の探索',locale==='ko'?' 탐색':' exploration').replaceAll('の狩猟',locale==='ko'?' 사냥':' hunt');
   };
   if(locale==='ja')return names(text);
   const pick=(ko:string,en:string)=>locale==='ko'?ko:en;
   const specialty=fantasySpecializationText(text,locale)??fantasyTerrainText(text,locale);
   if(specialty)return names(specialty);
   const roll=parseFantasyRoll(text);
-  if(roll)return `${names(roll.label)}: ${roll.dice.length}D${roll.sides} [${roll.dice.join(', ')}]${roll.rule==='single'?'':` → ${roll.kept}`} ${roll.modifier>=0?'+':'−'}${Math.abs(roll.modifier)} = ${roll.total} / DC${roll.dc} → ${roll.success?pick('성공','Success'):pick('실패','Failure')}`;
+  if(roll)return `${fantasyLogText(roll.label,locale,character)}: ${roll.dice.length}D${roll.sides} [${roll.dice.join(', ')}]${roll.rule==='single'?'':` → ${roll.kept}`} ${roll.modifier>=0?'+':'−'}${Math.abs(roll.modifier)} = ${roll.total} / DC${roll.dc} → ${roll.success?pick('성공','Success'):pick('실패','Failure')}`;
   const event=FANTASY_EVENTS.find(e=>text===`${e.name}：${e.description}`);
   if(event){const tr=fantasyEventText(event,locale);return `${tr.name}: ${tr.description}`;}
   const outcome=FANTASY_EVENTS.flatMap(e=>e.choices).find(ch=>text.startsWith(ch.success+' ')||text.startsWith(ch.failure+' '));
@@ -294,10 +365,13 @@ export function fantasyLogText(text:string,locale:NpcLocale,character:FantasyCha
   let m:RegExpMatchArray|null;
   if((m=text.match(/^(.+)：d20=(\d+)、補正([+-]\d+)、合計(-?\d+) \/ DC(\d+) → (成功|失敗)$/)))return `${names(m[1]).replace('の仕事',pick(' 일하기',' work')).replace('の探索',pick(' 탐색',' exploration')).replace('発見運',pick('발견운','Discovery')).replace('危険からの回避',pick('위험 회피','Avoid danger')).replace('魔物との小競り合い',pick('마물과의 교전','Skirmish'))}: d20=${m[2]} ${m[3]} = ${m[4]} / DC${m[5]} → ${m[6]==='成功'?pick('성공','Success'):pick('실패','Failure')}`;
   const patterns:[RegExp,(m:RegExpMatchArray)=>string][]=[
+    [/^神殿で治療を受け、金貨(\d+)枚を支払った。$/,m=>pick(`신전에서 치료받고 ${m[1]} G를 지불했다.`,`Received temple treatment for ${m[1]} G.`)],
     [/^ギルドで(.+)行きの護衛依頼を受注した。到着後に金貨(\d+)枚。$/,m=>pick(`${names(m[1])}행 호위를 배정받았다. 도착 후 +${m[2]} G.`,`Accepted escort to ${names(m[1])}. +${m[2]} G on arrival.`)],
     [/^護衛に出発した。(.+)まで([\d.]+)時間。到着後に金貨(\d+)枚。$/,m=>pick(`${names(m[1])}행 호위에 출발했다. 게임 ${m[2]}시간 · 도착 후 +${m[3]} G.`,`Departed as escort to ${names(m[1])}. ${m[2]} game hours · +${m[3]} G on arrival.`)],
     [/^護衛を完了し、金貨(\d+)枚の報酬を受け取った。$/,m=>pick(`호위 완료. ${m[1]} G를 받았다.`,`Escort completed. Received ${m[1]} G.`)],
     [/^護衛依頼を辞退した。報酬は受け取っていない。$/,()=>pick('호위 배정을 포기했다. 보수는 받지 않았다.','Abandoned the escort. No pay received.')],
+    [/^護衛依頼を辞退した。報酬は受け取らず、違約金(\d+)枚（支払い(\d+)枚）を負った。$/,m=>pick(`호위 배정을 포기했다. 보수는 받지 못하고 위약금 ${m[1]} G(지불 ${m[2]} G)를 부담했다.`,`Abandoned the escort. No pay, and a ${m[1]} G penalty (${m[2]} G paid).`)],
+    [/^仲間の調査結果を共有され、証拠を確認した。$/,()=>pick('동료의 조사 결과를 공유받아 증거를 확인했다.','Shared a companion’s investigation and confirmed the evidence.')],
     [/^旧仕様の転移予約を解除した。位置・金貨・所持品は変更していない。$/,()=>pick('이전 방식의 전이문 예약이 취소되었다. 위치·금화·소지품은 그대로다.','Canceled a legacy gate reservation. Location, gold and inventory are preserved.')],
     [/^神殿で静かに祈った。司祭の熟練\+(\d+)、悪名-(\d+)。$/,m=>pick(`신전에서 기도했다.${+m[1]?` 사제 숙련 +${m[1]}.`:''}${+m[2]?` 악명 -${m[2]}.`:''}`,`Prayed at the temple.${+m[1]?` Priest proficiency +${m[1]}.`:''}${+m[2]?` Notoriety -${m[2]}.`:''}`)],
     [/^「(.+)」を読み、知識を記録した。$/,m=>pick(`『${names(m[1])}』을 정독했다.`,`Studied “${names(m[1])}”.`)],
@@ -364,3 +438,4 @@ export function fantasyLogText(text:string,locale:NpcLocale,character:FantasyCha
   };
   return fixed[text]?pick(...fixed[text]):names(text);
 }
+import { fantasyInteriorMapText } from '../../../shared/fantasy-interior-maps.ts';

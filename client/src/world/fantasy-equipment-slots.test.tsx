@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { createRequire } from 'node:module';
+import { applyFantasyAction, newFantasyProfile } from '../../../shared/fantasy-engine.ts';
+const require = createRequire(import.meta.url), react = require('react') as typeof import('react'), snapshot = react.useSyncExternalStore;
+react.useSyncExternalStore = (subscribe, value) => snapshot(subscribe, value, value);
+const { FantasyEquipmentPanel } = require('./FantasyEquipmentPanel.tsx') as typeof import('./FantasyEquipmentPanel.tsx');
+const { setLocale } = require('../locale.ts') as typeof import('../locale.ts');
+test('equipment panel shows both ring positions and all wearable slots with inactive shield reason', () => {
+  const c = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', gender: 'female', name: 'Slots' }, () => .5).profile.character!;
+  c.inventory['ruby-ring'] = 2; c.inventory['iron-shield'] = 1;
+  c.equipment = { ring1: 'ruby-ring', ring2: 'ruby-ring', offhand: 'iron-shield' };
+  setLocale('en');
+  const html = renderToStaticMarkup(createElement(FantasyEquipmentPanel, { c, blocked: false, onAction: () => {}, onInventory: () => {} }));
+  for (const label of ['Head', 'Upper body', 'Legs', 'Feet', 'Ring 1', 'Ring 2', 'Necklace', 'Gloves', 'Artifact']) assert.ok(html.includes(`<h3>${label}</h3>`), label);
+  assert.equal((html.match(/<b>Ruby Ring<\/b>/g) ?? []).length, 2);
+  assert.ok(html.includes('Shields require Warrior'));
+});

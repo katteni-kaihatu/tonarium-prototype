@@ -28,7 +28,7 @@ export function recordFantasyDeath(profile: FantasyProfile, cause: string, atSea
   profile.generation ??= 1;
   const location = atSea ? 'sea' : c.location;
   profile.death = { location, hour: c.hour, cause: cause.slice(0, 160) };
-  c.hp = 0; profile.event = null; delete profile.activity;
+  c.hp = 0; profile.event = null; delete profile.activity; delete c.lastDawnPledge; delete c.carrying; delete c.returnLantern;
   profile.pastLives ??= [];
   profile.pastLives.push({ generation: profile.generation, name: c.name, race: c.race, job: c.job, level: c.level,
     hour: c.hour, location, cause: profile.death.cause, visited: [...c.visited], completed: [...c.completed], jobXp: { ...c.jobXp },

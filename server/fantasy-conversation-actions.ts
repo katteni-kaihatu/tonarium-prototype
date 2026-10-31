@@ -1,3 +1,5 @@
+import { fantasyRankBenefitActionValid, fantasyRankBenefitActionError, fantasyRankBenefits } from '../shared/fantasy-rank-benefits.ts';
+import { fantasyRankBookClaimError } from '../shared/fantasy-rank-rewards.ts';
 import type { FantasyAction, FantasyProfile, FantasyResult } from '../shared/fantasy.ts';
 import { FANTASY_WORLD_TIME_RATE } from '../shared/fantasy.ts';
 import type { NpcId, NpcLocale } from '../shared/npc.ts';
@@ -27,10 +29,28 @@ interface Pending {
   revision: number; generation: number; lifeStartedAt?: number; location?: string; quote?: string; marketKey?: string;
 }
 const TTL = 120_000;
-const ALLOWED = new Set(['draw', 'keep', 'skip', 'travel', 'explore', 'work', 'craft', 'accept', 'complete', 'abandon', 'sell', 'buy', 'use', 'skill', 'event', 'rest', 'lodge', 'eat', 'job', 'learn', 'equip', 'unequip', 'haggle', 'read', 'gather', 'hunt', 'skin', 'fish', 'boat', 'command', 'magicPrepare', 'magicCast', 'alchemy', 'wear', 'terrain', 'investigate', 'escortAccept', 'escortAbandon', 'finishVoyage']);
+const ALLOWED = new Set(['rankBenefitClaim','rankBenefitReturn','rankBookClaim','draw', 'keep', 'skip', 'travel', 'explore', 'work', 'craft', 'accept', 'complete', 'abandon', 'sell', 'buy', 'use', 'skill', 'event', 'rest', 'lodge', 'eat', 'job', 'learn', 'equip', 'unequip', 'haggle', 'read', 'gather', 'hunt', 'skin', 'fish', 'boat', 'command', 'magicPrepare', 'magicCast', 'alchemy', 'wear', 'terrain', 'investigate', 'escortAccept', 'escortAbandon', 'finishVoyage']);
 const normalized = (text: string) => text.normalize('NFKC').toLocaleLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
 const yes = (text: string) => /^(?:yes|yesplease|confirm|confirmed|doit|goahead|ok|okay|sure|응|응해줘|응진행해|응진행해줘|네|네해주세요|네부탁해요|예|좋아|좋아요|확인|진행해|진행해줘|해주세요|부탁해요|はい|うん|お願いします|お願い|実行して|進めて)$/.test(normalized(text));
 const no = (text: string) => /^(?:no|nothanks|cancel|stop|never mind|nevermind|아니|아니요|취소|취소해|취소해줘|그만|안할래|いいえ|キャンセル|やめて|中止)$/.test(normalized(text));
+function transactionYes(text: string, action: FantasyAction): boolean {
+  const query = normalized(text);
+  if (action.type === 'buy') return /^(?:살게|살게요|구매할게|구매할게요|구매해줘|그거줘|그거주세요|그걸로주세요|그걸살게|buyit|illbuyit|takethose|買います|それを買います|それください)$/u.test(query);
+  if (action.type === 'lodge') return /^(?:빌릴게|빌릴게요|묵을게|묵을게요|그방으로할게|그방으로해주세요|예약해줘|rentit|bookit|illtaketheroom|泊まります|その部屋でお願いします)$/u.test(query);
+  if (action.type === 'accept') return /^(?:맡을게|맡을게요|수락할게|수락할게요|수락해줘|그의뢰받을게|acceptit|illtakeit|takethecontract|受けます|引き受けます|その依頼を受けます)$/u.test(query);
+  return false;
+}
+
+function rankInstitutionAllows(context: FantasyConversationActionContext, action: FantasyAction): boolean {
+  if(!['rankBookClaim','rankBenefitClaim','rankBenefitReturn'].includes(action.type))return true;
+  const c=context.profile.character,npc=NPC_PUBLIC.find(npc=>npc.id===context.speaker);if(!c||!npc||npc.homeLocation!==c.location)return false;
+  if(action.type==='rankBookClaim')return npc.building===(action.source==='priest'?'temple':'guild')&&!fantasyRankBookClaimError(c,action.source,action.skill);
+  if(fantasyRankBenefitActionValid(action)){
+    const benefit=[...fantasyRankBenefits(c,'adventurer'),...fantasyRankBenefits(c,'priest')].find(benefit=>benefit.claim===action.benefit);
+    return !!benefit&&npc.building===(benefit.source==='priest'?'temple':'guild')&&!fantasyRankBenefitActionError(c,action);
+  }
+  return false;
+}
 
 function registered(action: FantasyAction, profile: FantasyProfile): boolean {
   if (action.type === 'job') return FANTASY_JOBS.some(job => job.id === action.job);
@@ -93,6 +113,13 @@ export class FantasyConversationActions {
           : quoted.key === 'unavailable' ? this.say(context.locale,'그 물건은 지금 거래하기 어려워.','I can’t trade that item just now.','その品物は今は取引できません。') : quoted.text;
       }
     }
+    if(action.type==='rankBookClaim')return this.say(context.locale,'무료 교본 한 권입니다. 선택 후에는 바꿀 수 없습니다. 이 교본을 받으시겠어요?','This one manual is free. The choice cannot be changed afterward. Would you like it?','無料の教本1冊です。選んだ後の変更はできません。この教本を受け取りますか？');
+    if(fantasyRankBenefitActionValid(action)&&context.profile.character){
+      const c=context.profile.character,benefit=[...fantasyRankBenefits(c,'adventurer'),...fantasyRankBenefits(c,'priest')].find(entry=>entry.claim===action.benefit);
+      if(action.type==='rankBenefitReturn')return this.say(context.locale,'길드 대여품 두 개를 돌려받고 보증금 30G를 환급해 드릴게요.','Return both guild loan items and I will refund the 30G deposit.','ギルド貸出品を両方返すと、保証金30Gを返金します。');
+      if(benefit)return benefit.descriptions[context.locale];
+    }
+    if (action.type === 'accept' && context.speaker !== 'gm') return this.say(context.locale,'맡는 데 따로 비용은 없어. 일을 마친 뒤 보고해 줘.','There is no acceptance fee. Report back when the work is done.','受注に費用はかかりません。仕事が終わったら報告してください。');
     const c = context.profile.character, locale = context.locale;
     const item = (id: string) => FANTASY_ITEMS.find(item => item.id === id);
     const name = (id: string) => item(id)?.names?.[locale] ?? FANTASY_MAPS.find(map => map.item === id)?.name[locale] ?? item(id)?.name ?? id;
@@ -137,8 +164,8 @@ export class FantasyConversationActions {
   propose(context: FantasyConversationActionContext, proposals: readonly FantasyConversationActionChoice[]): { text: string } {
     const key = this.key(context); this.pending.delete(key);
     if (!this.valid(context)) return { text: '' };
-    if (context.profile.activity || context.profile.death) return { text: this.voice(context, ['지금은 새 게임 행동을 시작할 수 없습니다.', 'You cannot start another gameplay action now.', '今は新しいゲーム行動を始められません。'], ['지금은 다른 일을 시작하기 어렵겠어. 준비가 되면 다시 이야기하자.', 'Let us wait until you are ready to begin something else.', '今は別のことを始めるのは難しそうですね。準備が整ってから話しましょう。']) };
-    const choices = proposals.filter(choice => choice && typeof choice.label === 'string' && choice.label.trim() && choice.label.length <= 200 && isFantasyAction(choice.action) && ALLOWED.has(choice.action.type) && registered(choice.action, context.profile)
+    if (context.profile.activity || context.profile.character?.returnLantern || context.profile.death) return { text: this.voice(context, ['지금은 새 게임 행동을 시작할 수 없습니다.', 'You cannot start another gameplay action now.', '今は新しいゲーム行動を始められません。'], ['지금은 다른 일을 시작하기 어렵겠어. 준비가 되면 다시 이야기하자.', 'Let us wait until you are ready to begin something else.', '今は別のことを始めるのは難しそうですね。準備が整ってから話しましょう。']) };
+    const choices = proposals.filter(choice => choice && typeof choice.label === 'string' && choice.label.trim() && choice.label.length <= 200 && isFantasyAction(choice.action) && ALLOWED.has(choice.action.type) && registered(choice.action, context.profile) && rankInstitutionAllows(context,choice.action)
       && (context.speaker === 'gm' || !['job', 'learn'].includes(choice.action.type) || 'npcId' in choice.action && choice.action.npcId === context.speaker && (choice.action.type !== 'job' || choice.action.via === 'npc'))).slice(0, 20).map(choice => ({ action: structuredClone(choice.action), label: choice.label.trim() }));
     if (!choices.length) return { text: '' };
     const candidate = choices.length === 1 ? 0 : context.query ? selection(context.query, choices) : undefined;
@@ -155,13 +182,13 @@ export class FantasyConversationActions {
     if (!pending || !this.valid(context)) return { handled: false };
     if (no(context.text)) { this.pending.delete(key); return { handled: true, text: this.voice(context, ['행동을 취소했습니다.', 'Action canceled.', '行動を取り消しました。'], ['알겠어. 이번에는 진행하지 않을게.', 'All right. We will leave it for now.', 'わかりました。今回は見送りましょう。']) }; }
     const selected = pending.selected === undefined ? selection(context.text, pending.choices) : undefined;
-    if (!yes(context.text) && selected === undefined) return { handled: false };
+    if (!yes(context.text) && !(pending.selected !== undefined && transactionYes(context.text, pending.choices[pending.selected].action)) && selected === undefined) return { handled: false };
     const c = context.profile.character;
     if (this.now() >= pending.expiresAt || pending.locale !== context.locale || pending.revision !== context.profile.revision || pending.generation !== (context.profile.generation ?? 1) || pending.lifeStartedAt !== c?.lifeStartedAt || pending.location !== c?.location) {
       this.pending.delete(key);
       return { handled: true, text: this.voice(context, ['시간이 지났거나 상태가 바뀌었습니다. 행동을 다시 요청해 주세요.', 'The proposal expired or your state changed. Ask for the action again.', '提案の期限が切れたか状態が変わりました。行動をもう一度頼んでください。'], ['아까와 사정이 달라졌네. 원하는 것을 다시 말해 줄래?', 'Things have changed since we spoke. Could you tell me what you need again?', '先ほどとは事情が変わりましたね。希望をもう一度教えてもらえますか？']) };
     }
-    if (context.profile.activity || context.profile.death) { this.pending.delete(key); return { handled: true, text: this.voice(context, ['지금은 새 게임 행동을 시작할 수 없습니다.', 'You cannot start another gameplay action now.', '今は新しいゲーム行動を始められません。'], ['지금은 다른 일을 시작하기 어렵겠어. 준비가 되면 다시 이야기하자.', 'Let us wait until you are ready to begin something else.', '今は別のことを始めるのは難しそうですね。準備が整ってから話しましょう。']) }; }
+    if (context.profile.activity || context.profile.character?.returnLantern || context.profile.death) { this.pending.delete(key); return { handled: true, text: this.voice(context, ['지금은 새 게임 행동을 시작할 수 없습니다.', 'You cannot start another gameplay action now.', '今は新しいゲーム行動を始められません。'], ['지금은 다른 일을 시작하기 어렵겠어. 준비가 되면 다시 이야기하자.', 'Let us wait until you are ready to begin something else.', '今は別のことを始めるのは難しそうですね。準備が整ってから話しましょう。']) }; }
     if (pending.selected === undefined) {
       if (selected !== undefined && selected >= 0) { pending.selected = selected; pending.quote = this.quote(context, pending.choices[selected].action); pending.marketKey = context.marketQuote?.(pending.choices[selected].action)?.key; }
       return { handled: true, text: this.question(context, pending) };

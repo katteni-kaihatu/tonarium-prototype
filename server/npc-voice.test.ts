@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NPC_PUBLIC, type NpcLocale } from '../shared/npc.ts';
+import { NPC_FRONTIER_PUBLIC } from '../shared/npc-frontier.ts';
 import { fantasyNpcVoice, fantasyGmVoice, fantasyNpcSocialReply } from '../shared/fantasy-dialogue-voice.ts';
 import { npcSystemPrompt, NpcChat } from './npc.ts';
 import { FantasyGmChat } from './fantasy-gm-chat.ts';
@@ -14,7 +15,10 @@ interface Body { messages: { role: string; content: string }[]; stream: boolean;
 const response = () => new Response(JSON.stringify({ model: 'voice-prompt-test', choices: [{ message: { content: 'A quiet moment is possible.' } }] }), { headers: { 'Content-Type': 'application/json' } });
 
 test('all registered residents receive authored role, personality and speech guidance instead of one shared anonymous voice', () => {
-  assert.equal(NPC_PUBLIC.length, 137);
+  const frontierIds = new Set(NPC_FRONTIER_PUBLIC.map(npc => npc.id));
+  assert.equal(NPC_PUBLIC.filter(npc => !frontierIds.has(npc.id)).length, 159);
+  assert.deepEqual(NPC_PUBLIC.filter(npc => frontierIds.has(npc.id)).map(npc => npc.id).sort(), [...frontierIds].sort());
+  assert.equal(NPC_PUBLIC.length, 159 + NPC_FRONTIER_PUBLIC.length);
   for (const npc of NPC_PUBLIC) for (const locale of locales) {
     const voice = fantasyNpcVoice(npc.id, 'stranger', locale, false);
     assert.ok(voice.length > 30, `${npc.id}:${locale}`);

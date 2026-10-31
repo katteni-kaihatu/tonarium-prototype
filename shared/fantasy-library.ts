@@ -1,14 +1,17 @@
+import { FANTASY_MIRACLE_BOOKS } from './fantasy-miracle-catalog.ts';
+import { fantasyMagicBookPassage } from './fantasy-magic-discovery.ts';
 import type { NpcLocale } from './npc.ts';
 import { type FantasyCheckContext, type FantasySkill, type FantasyStat } from './fantasy.ts';
 import { FANTASY_JOBS, FANTASY_RACES, FANTASY_RECIPES } from './fantasy-data.ts';
 import { FANTASY_CANON_FACTS, FANTASY_TERMS, fantasyTermName } from './fantasy-lore.ts';
-import { FANTASY_DINING, FANTASY_LODGINGS } from './fantasy-life.ts';
+import { FANTASY_DINING, FANTASY_LODGINGS } from './fantasy-lodging-catalog.ts';
 import { fantasySkillName } from './fantasy-skill-names.ts';
 import { FANTASY_BODY_TRAITS, FANTASY_CONTEXT_NAMES, fantasyBodyTraits, fantasyContextBonus } from './fantasy-physiology.ts';
 import { FANTASY_STARTING_GOLD, FANTASY_STARTING_INVENTORY } from './fantasy-starting-kit.ts';
 import { FANTASY_MANA_PRINCIPLES, FANTASY_MANA_USE_THRESHOLDS } from './fantasy-mana.ts';
 import { FANTASY_SKILL_FIELD_BOOKS } from './fantasy-skill-expansion.ts';
 import { fantasyJobDiscoveryInsertionIndices, fantasyJobDiscoveryPassages } from './fantasy-job-discovery.ts';
+import { FANTASY_RUNE_BOOKS } from './fantasy-rune-books.ts';
 
 export interface FantasyLibraryBook {
   id: string;
@@ -30,7 +33,7 @@ function fieldBook(id: string, title: Passage, passages: Passage[]): FantasyLibr
     '本を閉じても、すぐに腕が身に付くわけではない。記された教えを活かすには、自分の生業の経験や、関わる術技の修練が要る。師に学ぶ術もあれば、何度も試みて悟る術もある。ほかの生業を読んだだけで、その腕まで得たと思ってはならない。',
   ]]);
   for (const locale of ['ko','en','ja'] as const) {
-    book.body[locale].push(...FANTASY_JOBS.filter(job => FANTASY_SKILL_FIELD_BOOKS[id]?.includes(job.id)).map(job => `${job.names[locale]}: ${job.skills.filter(skill => skill.unlock?.kind === 'book' && skill.unlock.book === id).map(skill => fantasySkillName(skill,locale)).join(', ')}`));
+    book.body[locale].push(...FANTASY_JOBS.filter(job => FANTASY_SKILL_FIELD_BOOKS[id]?.includes(job.id)).map(job => `${job.names[locale]}: ${job.skills.filter(skill => !skill.retired&&skill.unlock?.kind === 'book' && skill.unlock.book === id).map(skill => fantasySkillName(skill,locale)).join(', ')}`));
   }
   return book;
 }
@@ -61,6 +64,8 @@ const readings: FantasyLibraryBook[] = [
     ['냄새와 겉모양은 누구나 살필 수 있지만 작은 차이의 해석에는 배운 감별이 필요하다. 책에서 보존 이야기를 읽었다고 손에 든 음식의 정확한 나이를 알 수는 없다. 의심이 남으면 따로 두고 다른 재료를 쓴다.', 'Anyone can inspect smell and appearance, but interpreting fine differences takes appraisal. Reading about preservation does not reveal the exact age of food in your pack. Set doubtful supplies aside.', '匂いと見た目は誰も見られるが、細かな差の解釈には鑑別が要る。保存の話を読んでも手元の食物の正確な経過時間は分からない。疑わしければ分けて別の材を使う。'],
   ]),
   fieldBook('remedies-and-rites', ['약과 의식의 절차', 'Procedures for Remedies and Rites', '薬と儀式の手順'], [
+    ['마시는 약의 기록에는 약초 두 개와 붉은잎 하나로 회복약을, 약초 하나와 은빛풀 하나로 해독약을 만드는 배합이 남아 있다. 이 두 배합을 다른 재료의 결과까지 알려 주는 기록으로 받아들이지 말라.', 'The drinking remedies record two exact mixtures: two herbs and one redleaf make a healing potion, while one herb and one silverweed make an antidote. These two records do not identify the results of other ingredients.', '飲み薬の記録には二つの正確な配合がある。薬草二つと赤葉一つで回復薬、薬草一つと銀草一つで解毒薬を作る。ほかの素材の結果まで示す記録ではない。'],
+    ['첫 배합 기록에는 투척병에 붉은잎 하나와 도마뱀 가죽 하나를 넣으면 화염 폭약이 된다고 적혀 있다. 같은 투척병에 약초 하나와 곰 가죽 하나를 넣으면 수호 강장제가 된다. 용기나 재료를 바꾼 배합은 별개의 실험으로 기록한다.', 'The first reaction notes pair one redleaf with one lizard hide in a flask to make a Fire Bomb. One herb with one bear hide in the same flask makes a Ward Tonic. A different vessel or additional reagent belongs in a separate experiment.', '最初の反応記録では投擲瓶に赤葉一つとトカゲの皮一つを合わせて火炎爆薬を作る。同じ投擲瓶に薬草一つと熊の皮一つを合わせると守護の強壮剤になる。容器や素材を変えた配合は別の実験として記す。'],
     ['연금술사의 반응 기록과 사제의 의식 기록은 같은 문서가 아니다. 그러나 출처를 확인하고 정해진 순서를 지키며, 모르는 결과를 성공이라 선언하지 않는 태도는 함께 배울 수 있다.', 'An alchemist’s reaction notes and a priest’s rites are different records. Both can teach care with sources and order, and the refusal to declare an unknown result a success.', '錬金術師の反応記録と司祭の儀式記録は同じではない。それでも出典と順を守り、不明な結果を成功と宣言しない姿勢は共に学べる。'],
     ['치유의 말은 무제한 생명을 약속하지 않는다. 지친 사람을 쉬게 하고, 위험한 흐름을 거두고, 감당하지 못하면 더 배운 이에게 넘긴다. 성실한 봉사와 좋은 기록은 강한 한 번의 선언보다 오래 남는다.', 'Words of healing promise no unlimited life. Let the weary rest, recover unsafe flows and call a more experienced hand when needed. Careful service and honest records outlast a single grand declaration.', '癒やしの言葉は無限の命を約束しない。疲れた人を休ませ、危うい流れを戻し、及ばなければ学びの深い者へ渡す。誠実な奉仕と記録は大きな宣言より長く残る。'],
   ]),
@@ -191,6 +196,8 @@ const clockRules: Record<NpcLocale, string[]> = {
 
 function skillText(skill: FantasySkill, locale: NpcLocale): string {
   const name = fantasySkillName(skill, locale);
+  if(skill.utility)return `${name} (MP ${skill.mp}): ${skill.descriptions?.[locale]??skill.description}`;
+  if(skill.restore==='mp')return `${name} (MP ${skill.mp}): `+{ko:`MP를 최대 ${skill.power} 회복한다.`,en:`Restore up to ${skill.power} MP.`,ja:`MPを最大${skill.power}回復する。`}[locale];
   const stat = skill.stat ? labels[locale][skill.stat] : { ko: '해당 능력', en: 'the relevant attribute', ja: '対応する能力' }[locale];
   const effect = {
     ko: { check: `${stat} 판정 +${skill.power}`, heal: `HP ${skill.power} 회복`, guard: `받는 피해 ${skill.power} 경감`, reward: `보상 +${skill.power}`, travel: `이동 시간 ${skill.power}시간 단축(최소 1시간)` },
@@ -215,7 +222,7 @@ function arts(locale: NpcLocale): string[] {
       return `${race.names[locale]}: ${fantasyBodyTraits({ race: race.id }).map(body => body.names[locale]).join(', ')}. ${changes.map(change => `${FANTASY_CONTEXT_NAMES[change.context][locale]} ${change.value > 0 ? '+' : ''}${change.value}`).join(', ') || { ko: '추가 상황 보정 없음', en: 'No context modifier', ja: '追加状況補正なし' }[locale]}.`;
     }),
     ...FANTASY_RACES.map(race => `${race.names[locale]} — ${race.skills.map(skill => skillText(skill, locale)).join(' ')}`),
-    ...FANTASY_JOBS.map(job => `${fantasyTermName(job.id, locale)} — ${job.skills.map(skill => skillText(skill, locale)).join(' ')}`),
+    ...FANTASY_JOBS.map(job => `${fantasyTermName(job.id, locale)} — ${job.skills.filter(skill=>!skill.retired).map(skill => skillText(skill, locale)).join(' ')}`),
   ];
 }
 
@@ -244,7 +251,25 @@ function pantry(locale: NpcLocale): string[] {
   ];
 }
 
-export const FANTASY_LIBRARY_BOOKS: FantasyLibraryBook[] = [
+export const FANTASY_TEMPLE_DOCTRINE_BOOKS = ['temple-vigil-liturgy','temple-pilgrimage-testimonies','temple-oath-commentary'] as const;
+const templeDoctrine = [
+  reading('temple-vigil-liturgy',['성소의 긴 등불','The Sanctuary’s Long Vigil','聖所の長い灯'],[
+    ['병상의 등불은 가장 약한 숨을 먼저 비춘다. 기도는 상처의 이름을 듣는 데서 시작한다.','The bedside lamp first lights the faintest breath. Prayer begins by listening to the name of a wound.','病床の灯は最も弱い息を先に照らす。祈りは傷の名を聞くことから始まる。'],
+    ['한 사람을 돌보느라 놓친 또 다른 손을 기억하라. 교대와 휴식도 돌봄의 일부다.','Remember the other hand missed while tending one person. Taking turns and resting are also parts of care.','一人の世話で見落とした別の手を忘れぬこと。交代と休息も看護の一部である。'],
+    ['새벽에 물을 갈며 밤을 지킨 이의 말을 들으라. 약을 삼켰는지, 무엇이 두려웠는지 다음 돌봄을 맡을 사람에게 빠짐없이 전한다.','When changing the water at dawn, listen to the night watcher. Tell the next caregiver whether the medicine was taken and what frightened the patient.','夜明けに水を替えるとき、夜を守った者の話を聞くこと。薬を飲めたか、何を恐れたか、次の看護を担う者へ漏らさず伝える。']]),
+  reading('temple-pilgrimage-testimonies',['순례자의 다섯 아침','Five Mornings of a Pilgrim','巡礼者の五つの朝'],[
+    ['눈 덮인 성소와 모래의 성소는 다른 인사를 건넸다. 문을 여는 이가 달라도 아픈 이를 맞는 자리는 남겨 두었다.','Snowbound and desert sanctuaries offered different greetings. Whoever opened the door, a place remained for the suffering.','雪の聖所と砂の聖所では挨拶が違った。それでも病む人を迎える場所は残されていた。'],
+    ['먼 곳의 가르침을 배울수록 고향의 작은 약속을 가볍게 여기지 말라.','The more distant teachings you learn, the more carefully you should keep the small promises of home.','遠い教えを学ぶほど、故郷の小さな約束を軽んじてはならない。'],
+    ['순례자는 빈 그릇을 돌려주기 전에 씻고, 다음 길손을 위해 마른 장작을 남겼다. 머문 자리에 남긴 작은 수고가 서로 다른 성소를 잇는 인사가 되었다.','The pilgrim washed the borrowed bowl and left dry firewood for the next traveler. Small acts of care became a greeting shared by distant sanctuaries.','巡礼者は借りた椀を洗い、次の旅人へ乾いた薪を残した。宿した場所に残す小さな働きが、遠い聖所を結ぶ挨拶となった。']]),
+  reading('temple-oath-commentary',['지킨 약속의 무게','The Weight of a Kept Promise','守った約束の重み'],[
+    ['서약은 이루지 못할 일을 크게 말하는 자랑이 아니다. 맡은 일을 마치고 돌아와 이름을 남기는 책임이다.','An oath is no boast of impossible deeds. It is the responsibility to finish accepted work and return to give an account.','誓いは成し得ぬ大業の自慢ではない。引き受けた務めを終え、戻って報告する責任である。'],
+    ['약속을 지키지 못했다면 숨기지 말고 말하라. 정직한 고백 뒤에는 새로 봉사할 길이 있다.','If you could not keep a promise, say so openly. Honest confession leaves a path to serve again.','約束を守れなければ隠さず語ること。正直な告白の先には再び奉仕する道がある。'],
+    ['함께 서약한 이는 서로의 증인이자 짐을 나누는 이웃이다. 동료가 지쳤다면 맡은 일을 살피고, 도울 수 없는 몫은 사실대로 알린다.','Those who swear together are witnesses and neighbors who share a burden. When a companion tires, review the work and speak honestly about what help you can offer.','共に誓う者は証人であり、荷を分け合う隣人である。仲間が疲れたら務めを確かめ、助けられぬ分も正直に伝える。']]),
+];
+
+export const FANTASY_LIBRARY_BOOKS: FantasyLibraryBook[] = [...templeDoctrine,
+  ...FANTASY_RUNE_BOOKS,
+  ...FANTASY_MIRACLE_BOOKS,
   {
     id: 'traveler-guide', title: { ko: '여행자 입문서', en: 'A Traveler’s Handbook', ja: '旅人の手引き' }, body: {
       ko: [startingSupplies('ko'), ...clockRules.ko, '세계 지도는 방문한 곳이나 소유 지도를 사용해 기록한 곳만 표시한다. 안개 너머의 경로는 현재 위치에서 가까운 미지의 길을 따라 탐사하며 알아간다. 도서관에서 지명을 읽는 것만으로 지도는 열리지 않는다.', '지도는 시장에서 구입한 다음 소지품에서 사용한다. 지역별 작은 지도와 항로 단편이 서로 다른 범위를 기록하며 판매 거점도 다르다. 지도에 실린 지역과 직접 방문한 지역은 구분된다.', '거점에 도착하면 그곳에 실제로 있는 건물에 들어간다. 시장·대장간·연금술 공방·탑·여관·식당·도서관·길드는 도시마다 다르다. 도서관도 소장한 책만 제공한다.', '이동과 일, 탐사 등 활동은 시간이 지나며 허기와 피로를 쌓는다. 0은 가볍고 편한 상태, 100은 심하게 배고프거나 지친 상태다. 수치가 높으면 능력 판정이 불리해진다.', '무료 야영은 8시간 쉬어 최대 HP의 20%·MP의 15%와 피로 15를 회복한다. 식사는 따로 필요하다. 야영에는 도난이나 습격 같은 위험이 있고, 안전한 도시와 위험 지역의 확률도 다르다.', ...FANTASY_LODGINGS.map(room => `${room.name.ko}: ${room.cost}G·${duration(room.hours, 'ko')}, 최대 HP ${Math.round(room.hpRecovery * 100)}%·MP ${Math.round(room.mpRecovery * 100)}% 회복, 피로 ${room.fatigueRecovery} 감소.`), '음식은 허기를, 잠은 피로를 주로 해결한다. 휴식 중에도 식량은 변하고 배가 고파진다. 잠자리 값은 금화 G로 치르며, 여덟 시간의 충분한 잠은 다음 여정을 위한 좋은 밑천이다.'],
@@ -282,6 +307,7 @@ export const FANTASY_LIBRARY_BOOKS: FantasyLibraryBook[] = [
 ];
 
 for (const book of FANTASY_LIBRARY_BOOKS) if (book.inGame !== false) {
+  for (const locale of ['ko', 'en', 'ja'] as const) { const passage = fantasyMagicBookPassage(book.id, locale); if (passage) book.body[locale].push(passage); }
   const passages = fantasyJobDiscoveryPassages(book.id);
   const positions = fantasyJobDiscoveryInsertionIndices(book.id, Math.min(...Object.values(book.body).map(body => body.length)), passages.ko.length);
   for (const locale of ['ko', 'en', 'ja'] as const) passages[locale].forEach((passage, index) => book.body[locale].splice(positions[index] + index, 0, passage));

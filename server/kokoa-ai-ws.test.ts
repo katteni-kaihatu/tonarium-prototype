@@ -11,6 +11,7 @@ import { WebSocket } from 'ws';
 import { COMPAT_VERSION } from '../shared/protocol.ts';
 import { applyFantasyAction, newFantasyProfile } from '../shared/fantasy-engine.ts';
 import { testServerEnv } from './test-db.ts';
+import { markFantasyPlatformDataCurrent } from './fantasy-platform-reset.ts';
 
 test('live NPC and GM sockets use authenticated external HTTPS and ignore retired device AI messages', { timeout: 30_000 }, async t => {
   const directory = await mkdtemp(join(tmpdir(), 'tonarium-kokoa-ws-'));
@@ -35,7 +36,8 @@ test('live NPC and GM sockets use authenticated external HTTPS and ignore retire
   const upstreamPort = (upstream.address() as net.AddressInfo).port;
   const listener = net.createServer(); await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve));
   const port = (listener.address() as net.AddressInfo).port; await new Promise<void>(resolve => listener.close(() => resolve()));
-  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], { env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, KOKOAAI_BASEURL: `https://127.0.0.1:${upstreamPort}/v1`, KOKOAAI_MODEL: 'lfm3-1.7b', KOKOAAI_APIKEY: 'websocket-test-only', NODE_EXTRA_CA_CERTS: fileURLToPath(new URL('./fixtures/kokoa-test-cert.pem', import.meta.url)), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  markFantasyPlatformDataCurrent(directory);
+  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], { env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, KOKOAAI_BASEURL: `https://127.0.0.1:${upstreamPort}/v1`, KOKOAAI_MODEL: 'lfm3-1.7b', KOKOAAI_APIKEY: 'websocket-test-only', NODE_EXTRA_CA_CERTS: fileURLToPath(new URL('./fixtures/kokoa-test-cert.pem', import.meta.url)), LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
   let logs = ''; child.stdout.on('data', data => { logs += String(data); }); child.stderr.on('data', data => { logs += String(data); });
   const sockets: WebSocket[] = [];
   t.after(async () => {
@@ -51,14 +53,18 @@ test('live NPC and GM sockets use authenticated external HTTPS and ignore retire
     throw Error('KokoaAI socket test timed out: ' + logs);
   }
   await until(() => logs.includes('server on') ? true : undefined);
-  type Message = { t: string; requestId?: string; source?: string; model?: string; text?: string; error?: string; reply?: { text: string } };
+  type Message = { t: string; profile?: typeof profiles.alice; requestId?: string; source?: string; model?: string; text?: string; error?: string; reply?: { text: string } };
   async function peer(id: string) {
     const socket = new WebSocket(`ws://127.0.0.1:${port}/ws`); sockets.push(socket);
     const messages: Message[] = []; socket.on('message', raw => messages.push(JSON.parse(String(raw))));
     await new Promise<void>((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject); });
     const send = (message: unknown) => socket.send(JSON.stringify(message));
-    send({ t: 'hello', compat: COMPAT_VERSION, id, name: id }); send({ t: 'join', sid: 'world' });
-    await until(() => messages.find(message => message.t === 'fantasyProfile'));
+    send({ t: 'hello', compat: COMPAT_VERSION, id, name: id });
+    await until(() => messages.find(message => message.t === 'snapshot'));
+    assert.equal(messages.some(message => message.t === 'fantasyProfile'), false);
+    send({ t: 'join', sid: 'world' });
+    const current = await until(() => messages.find(message => message.t === 'fantasyProfile'));
+    assert.equal(current.profile?.character?.name, id);
     return { messages, send };
   }
   const alice = await peer('alice'), bob = await peer('bob');

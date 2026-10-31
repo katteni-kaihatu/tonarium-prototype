@@ -102,8 +102,8 @@ test('shared original shop inventory is finite, concurrent stale purchases fail 
   const bBefore = structuredClone(s.profiles.get('b')); assert.equal(step(s, 'b', { type: 'shopBuy', building: 'market', item: 'herb', count: 1, revision: initial.revision }).error, 'stale'); assert.deepEqual(s.profiles.get('b'), bBefore);
   assert.equal(step(s, 'a', { type: 'shopBuy', building: 'market', item: 'herb', count: 1, revision: quote(s).revision }).error, 'stock');
   assert.equal(s.profiles.get('a')!.character!.gold, beforeGold - initial.unitPrice * initial.count);
-  step(s, 'a', { type: 'sync' }, 18); assert.equal(quote(s, 'a', 'herb', 18).count, initial.count);
-  const rev = s.ledger.revision; step(s, 'a', { type: 'sync' }, 18); assert.equal(s.ledger.revision, rev);
+  step(s, 'a', { type: 'sync' }, 24); assert.equal(quote(s, 'a', 'herb', 24).count, initial.count);
+  const rev = s.ledger.revision; step(s, 'a', { type: 'sync' }, 24); assert.equal(s.ledger.revision, rev);
 });
 test('each settlement and facility has independent stock, and buying from nonexistent buildings is impossible', () => {
   const s = setup(), initial = quote(s); step(s, 'a', { type: 'shopBuy', building: 'market', item: 'herb', count: 1, revision: initial.revision });
@@ -152,4 +152,16 @@ test('busy traders may cancel and receive no items or gold', () => {
 test('commerce journal entries localize item names and exchange outcomes in all three languages', () => {
   for (const locale of ['ko', 'en', 'ja'] as const) { assert.ok(fantasyEconomyLogText('상점에서 herb ×2 구매 · -10G', locale)); assert.ok(fantasyEconomyLogText('아라와 물품 교환을 마쳤습니다.', locale)); }
   assert.match(fantasyEconomyLogText('상점에서 herb ×2 구매 · -10G', 'en'), /^Bought/); assert.match(fantasyEconomyLogText('상점에 herb ×2 판매 · +4G', 'ja'), /売却/); assert.equal(fantasyEconomyLogText('other', 'en'), 'other');
+});
+
+test('a stopped traveler on a road is not listed as a same-town trade partner', () => {
+  const s=setup();s.profiles.get('b')!.character!.travelPosition={from:'hearth',to:'greenwood',fraction:.5};
+  assert.deepEqual(fantasyEconomyState(s.ledger,s.profiles,'a',{hour:12,peers:['a','b']}).peers,[]);
+  assert.equal(step(s,'a',{type:'open',peer:'b'}).error,'unavailable');
+});
+
+test('shared stock resets only at the next global game day, not every six hours',()=>{
+ const s=setup();const initial=quote(s,'a','herb',12);assert.equal(step(s,'a',{type:'shopBuy',building:'market',item:'herb',count:1,revision:initial.revision},12).error,undefined);
+ assert.equal(fantasyEconomyState(s.ledger,s.profiles,'b',{hour:17,peers:['a','b']}).shops.find(shop=>shop.building==='market')!.restockAt,24);
+ assert.equal(quote(s,'b','herb',17).count,initial.count-1);assert.equal(quote(s,'b','herb',23).count,initial.count-1);assert.equal(quote(s,'b','herb',24).count,initial.count);
 });

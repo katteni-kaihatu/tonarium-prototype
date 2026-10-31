@@ -1,4 +1,5 @@
 import type { FantasyLocation } from './fantasy.ts';
+import { FANTASY_NAVAL_MONSTERS } from './fantasy-naval-catalog.ts';
 
 type Text=[ko:string,en:string,ja:string];
 type L=Record<'ko'|'en'|'ja',string>;
@@ -6,6 +7,7 @@ export interface FantasyMonster {
   id:string;names:L;name:string;descriptions:L;description:string;tier:1|2|3|4|5|6|7|8;
   dc:number;damage:number;kinds:FantasyLocation['kind'][];minDanger?:number;
   loot:{item:string;weight:number}[];hide?:string;skinCount?:number;meat?:number;
+  navalOnly?:true;
 }
 const l=([ko,en,ja]:Text):L=>({ko,en,ja});
 const materials=(...items:string[])=>items.map((item,index)=>({item,weight:Math.max(1,6-index*2)}));
@@ -16,7 +18,7 @@ function m(id:string,title:Text,body:Text,tier:FantasyMonster['tier'],kinds:Fant
 /** Hostile encounter targets, not moral classifications of playable ancestries. */
 export const FANTASY_MONSTERS:FantasyMonster[]=[
   m('meadow-slime',['초원슬라임','Meadow Slime','草原スライム'],['젖은 풀밭에 모이는 작은 점액 생물.','A small gelatinous creature gathering in damp grass.','湿った草地に集まる小さな粘体。'],1,['forest','coast'],['herb','wood']),
-  m('reed-slime',['갈대슬라임','Reed Slime','葦スライム'],['갈대 물길의 얕은 곳에 뭉쳐 통행을 막는다.','Clusters in shallow reed channels and blocks passage.','葦水路の浅瀬に固まり通行を塞ぐ。'],1,['swamp','coast'],['herb','fish']),
+  m('reed-slime',['갈대슬라임','Reed Slime','葦スライム'],['갈대 물길의 얕은 곳에 뭉쳐 통행을 막는다.','Clusters in shallow reed channels and blocks passage.','葦水路の浅瀬に固まり通行を塞ぐ。'],1,['swamp','coast'],['herb','fish','marsh-slime-gel']),
   m('cave-slime',['동굴슬라임','Cave Slime','洞窟スライム'],['축축한 돌틈에 달라붙어 움직이는 점액 생물.','A gelatinous creature moving along wet stone cracks.','湿った岩の隙間に付いて動く粘体。'],1,['cave','ruin'],['ore','crystal']),
   m('small-rat',['들쥐 무리','Field Rat Swarm','野鼠の群れ'],['보관된 식량 주변에 모여 길손을 위협하는 쥐 무리.','Rats gathering around stored food and threatening travelers.','貯蔵食の周りに集まり旅人を脅かす鼠の群れ。'],1,['forest','city','ruin'],['herb','wood'],{meat:1}),
   m('thorn-beetle',['가시등딱정벌레','Thornback Beetle','棘背甲虫'],['단단한 등으로 나뭇잎 사이를 밀고 다니는 큰 벌레.','A large beetle pushing through leaves with its hard back.','硬い背で葉の間を押し進む大きな虫。'],1,['forest','swamp'],['herb','spice']),
@@ -36,11 +38,11 @@ export const FANTASY_MONSTERS:FantasyMonster[]=[
   m('giant-bat',['거대박쥐','Giant Bat','大蝙蝠'],['좁은 동굴 위쪽에서 갑자기 내려오는 큰 박쥐.','A large bat swooping from the roof of narrow caverns.','狭い洞の天井から急に降りる大蝙蝠。'],3,['cave','ruin'],['meat','crystal'],{meat:1}),
   m('forest-bear',['사나운 숲곰','Fierce Forest Bear','猛る森熊'],['둥지 가까운 길에서 사람을 위협하는 큰 곰.','A large bear threatening travelers near its den.','巣に近い道で人を威嚇する大熊。'],3,['forest','mountain','snow'],['meat','herb'],{hide:'bear-hide',skinCount:1,meat:3}),
   m('mud-golem',['진흙골렘','Mud Golem','泥ゴーレム'],['늪과 유적의 진흙이 뭉쳐 움직이는 둔중한 형체.','A heavy moving form of marsh and ruin mud.','沼や遺跡の泥が固まり動く重い形。'],3,['swamp','ruin'],['ore','crystal']),
-  m('stone-troll',['바위트롤','Stone Troll','岩トロル'],['산길의 바위를 밀어 길을 가로막는 거대한 트롤.','A huge troll pushing rocks across mountain roads.','山道の岩を押し道を塞ぐ巨大なトロル。'],4,['mountain','cave'],['ore','gem','meat'],{meat:2}),
+  m('stone-troll',['바위트롤','Stone Troll','岩トロル'],['산길의 바위를 밀어 길을 가로막는 거대한 트롤.','A huge troll pushing rocks across mountain roads.','山道の岩を押し道を塞ぐ巨大なトロル。'],4,['mountain','cave'],['ore','gem','meat','troll-marrow'],{meat:2}),
   m('marsh-troll',['늪트롤','Marsh Troll','沼トロル'],['젖은 갈대밭을 헤집고 다니는 큰 트롤.','A large troll tearing through wet reedbeds.','濡れた葦原をかき分ける大きなトロル。'],4,['swamp','forest'],['herb','meat','spice'],{meat:2}),
   m('armored-orc',['오크 중장 습격병','Armored Orc Raider','重装オーク襲撃兵'],['두꺼운 방어구를 갖춘 습격단의 전투원.','A raiding-band fighter in thick armor.','厚い防具を備えた襲撃団の戦闘員。'],4,['mountain','ruin','volcano'],['ingot','ore']),
   m('wight',['무덤 망자','Barrow Wight','塚の亡者'],['오래된 매장지 주변에서 적대적으로 움직이는 망자.','A hostile undead figure moving around old burial places.','古い埋葬地の周囲で敵対的に動く亡者。'],4,['ruin','cave','snow'],['relic','crystal']),
-  m('flame-lizard',['화염도마뱀','Flame Lizard','火蜥蜴'],['뜨거운 암석 사이에서 길을 위협하는 큰 도마뱀.','A large lizard threatening paths among heated rocks.','熱い岩の間で道を脅かす大蜥蜴。'],4,['volcano','desert','mountain'],['crystal','meat'],{hide:'lizard-hide',skinCount:1,meat:2}),
+  m('flame-lizard',['화염도마뱀','Flame Lizard','火蜥蜴'],['뜨거운 암석 사이에서 길을 위협하는 큰 도마뱀.','A large lizard threatening paths among heated rocks.','熱い岩の間で道を脅かす大蜥蜴。'],4,['volcano','desert','mountain'],['crystal','meat','salamander-gland'],{hide:'lizard-hide',skinCount:1,meat:2}),
   m('ice-wolf',['서리늑대','Frost Wolf','霜狼'],['흰 털로 눈길에 섞여 나타나는 사나운 늑대.','A fierce pale wolf blending into snowy roads.','白い毛で雪道に紛れる荒い狼。'],4,['snow','mountain'],['meat','crystal'],{hide:'wolf-hide',skinCount:1,meat:2}),
   m('stone-golem',['유적 돌골렘','Ruin Stone Golem','遺跡の石ゴーレム'],['옛 통로를 지키듯 움직이는 단단한 돌 인형.','A solid stone figure moving as though guarding an old passage.','古い通路を守るように動く硬い石人形。'],4,['ruin','cave','tower'],['ore','gem','crystal']),
   m('ogre',['황야 오우거','Wildland Ogre','荒野のオーガ'],['길가의 큰 바위를 무기처럼 휘두르는 괴력의 괴물.','A powerful creature swinging roadside boulders like weapons.','道端の大岩を武器のように振るう怪力の魔物。'],5,['forest','mountain','desert'],['ingot','meat'],{meat:2}),
@@ -63,6 +65,15 @@ export const FANTASY_MONSTERS:FantasyMonster[]=[
   m('ancient-frost-dragon',['고대 서리용','Ancient Frost Dragon','古き霜竜'],['깊은 설원의 길을 차지한 오래되고 위험한 용.','An old and dangerous dragon occupying deep snow routes.','深い雪道を占める古く危険な竜。'],8,['snow','mountain'],['gem','crystal','relic'],{meat:3}),
   m('ancient-storm-dragon',['고대 폭풍용','Ancient Storm Dragon','古き嵐竜'],['먼 섬의 높은 바위를 차지한 오래된 용.','An old dragon occupying high rocks on distant islands.','遠い島の高岩を占める古い竜。'],8,['island','mountain'],['crystal','gem','relic'],{meat:3}),
   m('void-chimera',['공허빛 키메라','Void-Lit Chimera','虚光のキマイラ'],['형체의 가장자리가 흐릿하게 보이는 위험한 합성 괴수.','A dangerous composite beast whose edges appear indistinct.','輪郭が曖昧に見える危険な合成怪獣。'],8,['ruin','tower','cave'],['relic','crystal','gem']),
+  m('ruin-stone-sentinel',['유적 돌 보초','Ruin Stone Sentinel','遺跡の石番兵'],['망루의 인장을 지키는 관절식 돌 보초. 느리지만 좁은 길에서 단단히 버틴다.','An articulated stone sentry guarding a watchtower seal, slow but sturdy in narrow passages.','見張り城の印を守る関節式の石番兵。遅いが狭い道で堅く踏みとどまる。'],4,['ruin'],['ore','relic'],{minDanger:3}),
+  m('crystal-cave-spider',['수정 동굴거미','Crystal Cave Spider','晶洞蜘蛛'],['푸른 결정 사이에 투명한 실을 치고 물길의 진동을 감지하는 큰 거미.','A large spider weaving clear threads among blue crystals and sensing movement in underground streams.','青い結晶の間に透ける糸を張り、地下水路の振動を探る大蜘蛛。'],3,['cave'],['crystal','silk'],{minDanger:3}),
+  m('archive-warden',['고대 서고 수호자','Ancient Archive Warden','古書庫の守り手'],['별 지도의 기록을 지키는 마력 갑주. 침입자를 구속하는 빛의 문양을 펼친다.','An enchanted suit of armor guarding star-chart records and projecting binding arcane sigils.','星図の記録を守る魔力の鎧。侵入者を縛る光の紋様を展開する。'],5,['ruin','cave'],['relic','crystal'],{minDanger:3}),
+  m('frost-moth',['서리나방 무리','Frost Moth Swarm','霜蛾の群れ'],['눈 덮인 바위의 체온을 빼앗는 큰 나방 무리. 날개의 가루를 연금 재료로 회수한다.','Large moths draining warmth near snow-covered rocks; their wing dust is a reagent.','雪岩のそばで熱を奪う大蛾の群れ。翅の粉を錬金素材として回収する。'],3,['snow','mountain'],['frost-moth-dust','herb']),
+  m('thunder-beetle',['뇌각 딱정벌레','Thunder Beetle','雷甲虫'],['고지대와 섬에 사는 큰 갑충. 단단한 껍질을 조합과 장갑에 쓴다.','A large highland and island beetle; its shell is used in mixtures and gloves.','高地や島の大甲虫。硬い殻を調合と手袋に使う。'],3,['mountain','island'],['thunder-beetle-shell','ore']),
+  m('basilisk',['폐허 바실리스크','Ruin Basilisk','遺跡バジリスク'],['모래와 폐허를 누비는 독성 파충류. 담즙을 조심스럽게 회수할 수 있다.','A venomous reptile roaming sand and ruins; its bile can be recovered carefully.','砂と遺跡を巡る有毒の爬虫類。胆汁を慎重に回収できる。'],4,['desert','ruin'],['basilisk-bile','lizard-hide'],{hide:'lizard-hide',skinCount:1}),
+  m('marsh-wisp',['늪 도깨비불','Marsh Wisp','沼の鬼火'],['젖은 폐허 위에 떠도는 적대적 마력 덩어리. 흩어지면 빛나는 이슬을 남긴다.','A hostile mana cluster drifting over wet ruins, leaving luminous dew when dispersed.','濡れた遺跡を漂う敵対的な魔力塊。散ると光る雫を残す。'],4,['swamp','ruin'],['wisp-dew','crystal']),
+  m('manticore',['산길 만티코어','Mountain Manticore','山道マンティコア'],['긴 꼬리와 강한 힘줄로 절벽길을 위협하는 합성 맹수.','A composite predator threatening cliffs with a long tail and strong sinews.','長い尾と強い腱で崖道を脅かす合成の猛獣。'],5,['desert','mountain'],['manticore-sinew','meat'],{meat:2}),
+  ...FANTASY_NAVAL_MONSTERS,
 ];
 
 export const fantasyMonsterById=(id:string):FantasyMonster|undefined=>FANTASY_MONSTERS.find(monster=>monster.id===id);

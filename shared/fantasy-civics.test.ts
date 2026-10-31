@@ -24,7 +24,8 @@ function theft() { return run(setup(), 'a', { type: 'npcCrime', npc: 'rin', kind
 
 test('civic catalog contains every real resident and validates bounded persistent social records', () => {
   const s = setup(); assert.equal(s.error, undefined); assert.equal(validFantasyCivicLedger(s.ledger), true);
-  assert.equal(Object.keys(s.ledger.npcs).length, NPC_PUBLIC.length); assert.equal(Object.keys(s.ledger.towns).length, 20);
+  assert.equal(Object.keys(s.ledger.npcs).length, NPC_PUBLIC.filter(npc=>!npc.travelOnly).length); assert.equal(Object.keys(s.ledger.towns).length, 20);
+  assert.ok(NPC_PUBLIC.filter(npc=>npc.travelOnly).every(npc=>!s.ledger.npcs[npc.id]));
   assert.ok(s.ledger.notices.length <= 80); assert.ok(Object.values(s.ledger.npcs).every(npc => npc.location === NPC_PUBLIC.find(entry => entry.id === npc.npc)!.homeLocation));
   for (const locale of ['ko', 'en', 'ja'] as const) assert.ok(s.ledger.notices.every(entry => !!entry.text[locale]));
   for (const mutate of [(l: FantasyCivicLedger) => { l.towns.hearth.council = 99; }, (l: FantasyCivicLedger) => { l.npcs.rin.location = 'mooncity'; },

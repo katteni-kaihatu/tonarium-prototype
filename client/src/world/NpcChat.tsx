@@ -7,9 +7,6 @@ import { scrollChatBottom } from './chat-scroll.ts';
 import { useLocale } from '../locale.ts';
 import { ReasonButton } from './FantasyActionButton.tsx';
 import { FANTASY_TERMS } from '../../../shared/fantasy-lore.ts';
-import type { FantasyAction } from '../../../shared/fantasy.ts';
-import { realDuration } from './FantasyActivity.tsx';
-import { FANTASY_JOBS } from '../../../shared/fantasy-data.ts';
 import { NpcPortrait as Portrait } from './NpcPortrait.tsx';
 
 const COPY = {
@@ -79,9 +76,8 @@ export function NpcChat({compact=false,messenger=false,npcIds,initialNpcId}:{com
   const fantasyPending=useStore((s)=>s.fantasyPending||(!!s.fantasyProfile?.activity||!!s.fantasyProfile?.combatId));
   const activityBlocked=(compact||messenger)&&fantasyPending;
   const activityReason={ko:'현재 활동을 마친 뒤 대화할 수 있습니다.',en:'Finish your current activity before talking.',ja:'現在の活動を終えてから会話できます。'}[locale];
-  const character=useStore((s)=>s.fantasyProfile?.character);
   const scroll=useRef<HTMLDivElement>(null);
-  const t={...COPY[locale],name:npc.name[locale],role:npc.role[locale],place:FANTASY_TERMS.find((term)=>term.category==='place'&&term.id===npc.homeLocation)?.names[locale]??npc.homeLocation,thinking:{ko:`${npc.name[locale]}이(가) 대답을 생각하고 있어요…`,en:`${npc.name[locale]} is thinking of a reply…`,ja:`${npc.name[locale]}が返事を考えています…`}[locale],welcome:{ko:`${npc.name[locale]}에게 말을 걸어보세요.`,en:`Take a seat. Talk to ${npc.name[locale]}.`,ja:`${npc.name[locale]}と話してみましょう。`}[locale]};
+  const t={...COPY[locale],name:npc.name[locale],role:npc.role[locale],place:npc.travelOnly?{ko:'여행길',en:'On the road',ja:'旅路'}[locale]:FANTASY_TERMS.find((term)=>term.category==='place'&&term.id===npc.homeLocation)?.names[locale]??npc.homeLocation,thinking:{ko:`${npc.name[locale]}이(가) 대답을 생각하고 있어요…`,en:`${npc.name[locale]} is thinking of a reply…`,ja:`${npc.name[locale]}が返事を考えています…`}[locale],welcome:{ko:`${npc.name[locale]}에게 말을 걸어보세요.`,en:`Take a seat. Talk to ${npc.name[locale]}.`,ja:`${npc.name[locale]}と話してみましょう。`}[locale]};
   const labels={ko:{select:'대화할 NPC',age:'세',female:'여성',male:'남성',profile:'인물 정보'},en:{select:'Choose an NPC',age:' years',female:'Female',male:'Male',profile:'Character profile'},ja:{select:'話す相手',age:'歳',female:'女性',male:'男性',profile:'人物の情報'}}[locale];
   useEffect(()=>{scrollChatBottom(scroll.current);},[messages,pending,error,partial?.text]);
   useEffect(()=>{if(!pending&&started.current){if(!error)setElapsed((performance.now()-started.current)/1000);started.current=0;}},[pending,error]);
@@ -115,5 +111,3 @@ export function NpcPrototype({onStart}:{onStart:()=>void}){
   return <div className="npc-prototype"><NpcChat/></div>;
 }
 import { registerNpcRequest, quickNpcQuestion, npcRequestOwner } from './npc-request-tracker.ts';
-import { FANTASY_MENTOR_SKILLS } from '../../../shared/fantasy-apprenticeship.ts';
-import { FANTASY_MANA_EXERCISES } from '../../../shared/fantasy-mana.ts';

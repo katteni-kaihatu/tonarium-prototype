@@ -21,6 +21,18 @@ test('selling quotes separate only food condition batches and retain the invento
   const missingChoice = fantasySell(c, { item: 'bread' }); assert.ok(missingChoice.error); assert.deepEqual(c, before);
 });
 
+test('sales use effective food age so preservation does not refresh or misprice older batches', () => {
+  const c = character(); c.inventory.bread = 3;
+  c.foodLots = [
+    { id: 'old-preserved', item: 'bread', count: 1, createdAt: 100, preservedHours: 88.2, preservationAt: 198 },
+    { id: 'new-stale', item: 'bread', count: 1, createdAt: 160 },
+    { id: 'spoiled', item: 'bread', count: 1, createdAt: 100 },
+  ];
+  assert.deepEqual(fantasySaleGroups(c, 'bread').map(group => [group.quality, group.count, group.unitPrice, group.canSell]), [['fresh', 1, 2, true], ['stale', 1, 1, true], ['spoiled', 1, 0, false]]);
+  assert.equal(fantasySell(c, { item: 'bread', quality: 'fresh' }).price, 2);
+  assert.deepEqual(c.foodLots.map(lot => lot.id), ['new-stale', 'spoiled']);
+});
+
 test('only the selected condition is sold and an exhausted or newly spoiled condition cannot consume a different batch', () => {
   const c = character(), originalGold = c.gold;
   assert.equal(fantasySell(c, { item: 'bread', quality: 'stale' }).price, 1);

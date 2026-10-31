@@ -1,0 +1,26 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { FantasyStore } from './fantasy-store.ts';
+import { applyFantasyAction, newFantasyProfile } from '../shared/fantasy-engine.ts';
+const plot = 'hearth-residence';
+test('installed furniture and bed rest survive atomic save failures, restart and repeated world ticks', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fantasy-furniture-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true })); const file = path.join(dir, 'fantasy.json');
+  const p = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', gender: 'female', name: 'Carpenter' }, () => .99).profile;
+  p.character!.gold = 5000; p.character!.hour = 25; p.character!.location = 'hearth'; p.character!.fatigue = 100; p.character!.inventory['furniture-bed'] = 1;
+  fs.writeFileSync(file, JSON.stringify({ a: p })); let hour = 25, fail = false;
+  const load = () => new FantasyStore(file, { worldHour: () => hour, onError: () => {}, save: (target, body) => { if (fail) throw new Error('Injected furniture save failure'); fs.writeFileSync(target, body); } });
+  let store = load(); assert.equal(store.loadError, undefined); assert.equal(store.propertyRequest('a', { type: 'buy', plot, revision: 0, requestId: 'buy' }).error, undefined);
+  const place = { type: 'furnish' as const, plot, revision: 1, requestId: 'place-bed', item: 'furniture-bed' }, before = fs.readFileSync(file, 'utf8'), profile = store.profile('a');
+  fail = true; assert.equal(store.propertyRequest('a', place).error, 'save-failed'); assert.deepEqual(store.profile('a'), profile); assert.equal(store.propertyState('a').owned[0].furniture, undefined); assert.equal(fs.readFileSync(file, 'utf8'), before);
+  fail = false; assert.equal(store.propertyRequest('a', place).error, undefined); assert.equal(store.profile('a').character!.inventory['furniture-bed'] ?? 0, 0); assert.equal(store.propertyState('a').owned[0].furniture?.length, 1);
+  store = load(); assert.equal(store.loadError, undefined); assert.equal(store.propertyRequest('a', place).error, undefined); assert.equal(store.propertyState('a').owned[0].furniture?.length, 1);
+  assert.equal(store.propertyRequest('a', { type: 'use', plot, revision: 2, requestId: 'rest' }).error, undefined); assert.equal(store.profile('a').activity?.endsAt, 33);
+  const scheduled = store.profile('a'), saved = fs.readFileSync(file, 'utf8'); hour = 33; fail = true; assert.ok(store.tick(new Set()).some(update => !!update.error)); assert.deepEqual(store.profile('a'), scheduled); assert.equal(fs.readFileSync(file, 'utf8'), saved);
+  fail = false; assert.ok(store.tick(new Set()).some(update => !update.error)); assert.equal(store.profile('a').character!.fatigue, 15); const rested = store.profile('a');
+  store = load(); assert.equal(store.loadError, undefined); store.tick(new Set()); assert.deepEqual(store.profile('a'), rested); assert.equal(store.propertyState('a').owned[0].furniture?.length, 1);
+  const remove = { type: 'unfurnish' as const, plot, revision: 3, requestId: 'remove-bed', item: 'furniture-bed' };
+  assert.equal(store.propertyRequest('a', remove).error, undefined); assert.equal(store.profile('a').character!.inventory['furniture-bed'], 1); assert.equal(store.propertyRequest('a', remove).error, undefined); assert.equal(store.profile('a').character!.inventory['furniture-bed'], 1);
+});

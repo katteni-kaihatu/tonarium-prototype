@@ -1,16 +1,21 @@
 import type { FantasyAction, FantasyCharacter, FantasyQuest } from './fantasy.ts';
 import type { NpcLocale } from './npc.ts';
 import { FANTASY_TASK_QUESTS, type FantasyTaskObjective, type FantasyTaskQuest } from './fantasy-task-quests.ts';
+import { FANTASY_DUNGEON_QUESTS } from './fantasy-dungeon-catalog.ts';
+import { fantasyDungeonObjectiveLabel, fantasyDungeonQuestProgress, fantasyDungeonQuestReady, type FantasyDungeonObjective } from './fantasy-dungeon.ts';
 
 const task = (quest: FantasyQuest | string): FantasyTaskQuest | undefined => FANTASY_TASK_QUESTS.find(value => value.id === (typeof quest === 'string' ? quest : quest.id));
-export const fantasyTaskObjective = (quest: FantasyQuest | string): FantasyTaskObjective | undefined => task(quest)?.objective;
-export const fantasyTaskObjectiveLabel = (quest: FantasyQuest, locale: NpcLocale): string | undefined => task(quest)?.objectiveLabels[locale];
-export function fantasyTaskProgress(character: Pick<FantasyCharacter, 'taskProgress'> & Partial<Pick<FantasyCharacter, 'completed'>>, quest: FantasyQuest | string): number {
+const dungeonQuest = (quest: FantasyQuest | string) => typeof quest === 'string' ? FANTASY_DUNGEON_QUESTS.find(q => q.id === quest) : quest.objective?.type === 'dungeon' ? quest : undefined;
+export const fantasyTaskObjective = (quest: FantasyQuest | string): FantasyTaskObjective | FantasyDungeonObjective | undefined => task(quest)?.objective ?? dungeonQuest(quest)?.objective as FantasyDungeonObjective | undefined;
+export const fantasyTaskObjectiveLabel = (quest: FantasyQuest, locale: NpcLocale): string | undefined => task(quest)?.objectiveLabels[locale] ?? fantasyDungeonObjectiveLabel(quest, locale);
+export function fantasyTaskProgress(character: Pick<FantasyCharacter, 'taskProgress'> & Partial<Pick<FantasyCharacter, 'completed' | 'dungeon'>>, quest: FantasyQuest | string): number {
+  const dungeon = dungeonQuest(quest); if (dungeon) return character.completed?.includes(dungeon.id) ? dungeon.objective!.count : fantasyDungeonQuestProgress(character, dungeon);
   const target = task(quest), value = character.taskProgress?.[target?.id ?? '']?.progress;
   if (target && character.completed?.includes(target.id)) return target.objective.count;
   return target && Number.isSafeInteger(value) && value! >= 0 ? Math.min(target.objective.count, value!) : 0;
 }
 export function fantasyTaskReady(character: FantasyCharacter, quest: FantasyQuest | string): boolean {
+  const dungeon = dungeonQuest(quest); if (dungeon) return fantasyDungeonQuestReady(character, dungeon);
   const target = task(quest);
   return !!target && character.quests.includes(target.id) && !character.completed.includes(target.id)
     && validFantasyTaskProgress(character) && fantasyTaskProgress(character, target) >= target.objective.count;

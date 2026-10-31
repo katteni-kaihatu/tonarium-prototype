@@ -12,7 +12,7 @@ import { FANTASY_QUESTS } from './fantasy-data.ts';
 
 function profile() {
   const p = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', gender: 'female', name: '순례 사제' }, () => .99).profile;
-  const c = p.character!; c.job = 'priest'; c.jobXp.priest = 30; c.gold = 500; c.hour = 0;
+  const c = p.character!; c.job = 'priest'; c.jobXp.priest = 30; c.gold = 500; c.hour = 12;
   c.visited = ['hearth', 'suncourt', 'greenwood']; c.readBooks = ['traveler-guide']; c.quests = ['quest-herbalist']; c.inventory.herb = 3;
   return p;
 }
@@ -20,7 +20,7 @@ function qualified() {
   let p = profile();
   p = applyFantasyAction(p, { type: 'priestVow', quest: 'quest-herbalist' }, () => .99).profile;
   p = applyFantasyAction(p, { type: 'complete', quest: 'quest-herbalist' }, () => .99).profile;
-  for (let day = 1; day <= 4; day++) { p.character!.hour = day * 24; assert.equal(applyFantasyPrayer(p.character!).error, undefined); }
+  for (let day = 1; day <= 4; day++) { p.character!.hour = day * 24 + 12; assert.equal(applyFantasyPrayer(p.character!).error, undefined); }
   p.character!.readBooks = ['traveler-guide', 'remedies-and-rites'];
   return p;
 }
@@ -63,7 +63,7 @@ test('actual quest reporting fulfills a vow while abandonment records an unrewar
 
 test('daily prayer is capped as faith evidence and cannot substitute for service, study, pilgrimage or vows', () => {
   const c = profile().character!; c.readBooks = []; c.visited = ['hearth'];
-  for (let day = 0; day < 40; day++) { c.hour = day * 24; applyFantasyPrayer(c); }
+  for (let day = 0; day < 40; day++) { c.hour = day * 24 + 12; applyFantasyPrayer(c); }
   assert.equal(c.priestGrowth!.prayerDays.length, 30); assert.equal(fantasyPriestGrowthStatus(c).eligible, false);
   assert.ok(fantasyPriestActionError(c, { type: 'priestBranch', branch: 'care' }));
   const copy = structuredClone(c); assert.ok(applyFantasyPrayer(c).error); assert.deepEqual(c, copy);
@@ -75,7 +75,7 @@ test('qualified priest chooses one path and pays for changes at a trusted temple
   assert.equal(applyFantasyPriestAction(c, { type: 'priestBranch', branch: 'care' }).error, undefined);
   deepen(c);
   const gold = c.gold; c.skillXp = { 'priest-care-mercy': 8 }; const xp = c.jobXp.priest;
-  assert.equal(fantasyPriestSkills(c).length, 2); assert.ok(applyFantasyPriestAction(c, { type: 'priestBranch', branch: 'ward' }).error);
+  assert.deepEqual(fantasyPriestSkills(c).map(skill => skill.id).sort(), ['priest-care-hands', 'priest-care-holy-strike', 'priest-care-mercy']); assert.ok(applyFantasyPriestAction(c, { type: 'priestBranch', branch: 'ward' }).error);
   c.hour += 24; c.location = 'greenwood'; assert.ok(applyFantasyPriestAction(c, { type: 'priestBranch', branch: 'ward' }).error);
   c.location = 'hearth'; c.gold = 119; assert.ok(applyFantasyPriestAction(c, { type: 'priestBranch', branch: 'ward' }).error);
   c.gold = gold; assert.equal(applyFantasyPriestAction(c, { type: 'priestBranch', branch: 'ward' }).error, undefined);
@@ -114,8 +114,8 @@ test('temple trust is local and malformed or unearned priest records are rejecte
 
 test('a veteran with completed services can qualify without an impossible new vow on exhausted quests', () => {
   const c = profile().character!;
-  c.quests = []; c.completed = FANTASY_QUESTS.filter(quest => quest.giver === 'hearth' && ['herb', 'meal', 'potion', 'antidote', 'jerky', 'bread'].includes(quest.item)).slice(0, 3).map(quest => quest.id);
-  assert.equal(c.completed.length, 3); c.hour = 24; applyFantasyPrayer(c); syncFantasyPriestGrowth(c);
+  c.quests = []; c.completed = FANTASY_QUESTS.filter(quest => quest.giver === 'hearth' && fantasyPriestServiceQuest(quest.id) && ['herb', 'meal', 'potion', 'antidote', 'jerky', 'bread'].includes(quest.item)).slice(0, 3).map(quest => quest.id);
+  assert.equal(c.completed.length, 3); c.hour = 36; applyFantasyPrayer(c); syncFantasyPriestGrowth(c);
   assert.equal(fantasyPriestGrowthStatus(c).vows, 0); assert.equal(fantasyPriestGrowthStatus(c).eligible, true);
   assert.equal(applyFantasyPriestAction(c, { type: 'priestBranch', branch: 'pilgrim' }).error, undefined);
   assert.equal(validFantasyPriestGrowth(c), true);
@@ -177,4 +177,18 @@ test('a priest learns of a path only after its actual library reading finishes, 
   const halfway = advanceFantasyWorld(started.profile, 108.5).profile; assert.ok(!fantasyPriestDiscoveredBranches(halfway.character!).some(branch => branch.id === 'care'));
   const done = advanceFantasyWorld(halfway, 109).profile; assert.ok(fantasyPriestDiscoveredBranches(done.character!).some(branch => branch.id === 'care'));
   assert.ok(!fantasyPriestSkills(done.character!).some(skill => skill.id === 'priest-care-mercy')); assert.equal(done.character!.priestGrowth!.branch, undefined);
+});
+
+test('combat support faith accepts canonical proof while rejecting forged duplicated and over-budget evidence',()=>{
+ const c=profile().character!;syncFantasyPriestGrowth(c);const before=fantasyPriestGrowthStatus(c).faith;
+ c.priestGrowth!.support=[{battle:'aid',day:0,points:2,hour:12}];c.combatVictories={'service:aid':12};
+ assert.equal(fantasyPriestGrowthStatus(c).faith,before+2);assert.ok(validFantasyPriestGrowth(c));
+ for(const mode of ['proof','duplicate','points','day','future','unknown','daily','lifetime'] as const){const copy=structuredClone(c),support=copy.priestGrowth!.support!;
+  if(mode==='proof')delete copy.combatVictories!['service:aid'];if(mode==='duplicate')support.push({...support[0]});
+  if(mode==='points')(support[0] as {points:number}).points=3;if(mode==='day')support[0].day=1;
+  if(mode==='future')support[0].hour=13;if(mode==='unknown')Object.assign(support[0],{extra:true});
+  if(mode==='daily'||mode==='lifetime'){const count=mode==='daily'?3:21;support.length=0;copy.hour=count*24;for(let i=0;i<count;i++){const hour=mode==='daily'?12:i*24;support.push({battle:`b${i}`,day:Math.floor(hour/24),points:2,hour});copy.combatVictories![`service:b${i}`]=hour;}}
+  assert.equal(validFantasyPriestGrowth(copy),false,mode);
+ }
+ const legacy=structuredClone(c);delete legacy.priestGrowth!.support;delete legacy.combatVictories;assert.ok(validFantasyPriestGrowth(legacy));assert.equal(fantasyPriestGrowthStatus(legacy).faith,before);
 });

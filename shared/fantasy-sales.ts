@@ -3,6 +3,8 @@ import { FANTASY_ITEMS } from './fantasy-data.ts';
 import { FANTASY_MAPS, canSellItem } from './fantasy-town.ts';
 import { foodMeta, type FantasyFoodQuality } from './fantasy-life.ts';
 import { fantasySpendItem } from './fantasy-equipment.ts';
+import { fantasyFoodLotAge } from './fantasy-food-preservation.ts';
+import { FANTASY_INTERIOR_MAP_ITEM, fantasyInteriorMapValue, takeFantasyInteriorMap } from './fantasy-interior-map-catalog.ts';
 
 type Locale = 'ko' | 'en' | 'ja';
 export type FantasySaleReason = 'location' | 'equipped' | 'spoiled';
@@ -27,7 +29,7 @@ export function fantasySaleBasePrice(item: string): number {
 export function fantasyFoodLotQuality(character: Pick<FantasyCharacter, 'hour'>, lot: FantasyFoodLot): FantasyFoodQuality | undefined {
   const meta = foodMeta(lot.item);
   if (!meta) return undefined;
-  const age = Math.max(0, character.hour - lot.createdAt);
+  const age = fantasyFoodLotAge(character.hour, lot);
   return age > meta.shelfLife ? 'spoiled' : age >= meta.shelfLife * .65 ? 'stale' : 'fresh';
 }
 export function fantasySaleDisabledReason(group: Pick<FantasySaleGroup, 'reason'>, locale: Locale = 'ja'): string | undefined {
@@ -45,6 +47,10 @@ export function fantasySaleGroups(character: FantasyCharacter, onlyItem?: string
       const reason = !local ? 'location' : group.reason;
       result.push({ ...group, item, unitPrice, canSell: !reason && unitPrice > 0, ...(reason ? { reason } : {}) });
     };
+    if (item === FANTASY_INTERIOR_MAP_ITEM) {
+      for (const copy of character.interiorMaps ?? []) make({ key: `${item}:copy:${copy.id}`, instance: copy.id, count: 1, unitPrice: Math.max(1, Math.floor(fantasyInteriorMapValue(copy) / 2)), gearQuality: copy.quality });
+      continue;
+    }
     if (foodMeta(item)) {
       for (const quality of ['fresh', 'stale', 'spoiled'] as const) {
         const lots = character.foodLots.filter(lot => lot.item === item && lot.count > 0 && fantasyFoodLotQuality(character, lot) === quality);
@@ -56,8 +62,9 @@ export function fantasySaleGroups(character: FantasyCharacter, onlyItem?: string
     const gear = (character.gear ?? []).filter(instance => instance.item === item);
     for (const instance of gear) make({ key: `${item}:gear:${instance.id}`, instance: instance.id, count: 1, gearQuality: instance.quality, ...(equipped.has(instance.id) ? { reason: 'equipped' } : {}) });
     const plain = Math.max(0, count - gear.length);
-    const wornPlain = character.outfit === item || Object.entries(character.equipment ?? {}).some(([slot, value]) => value === item && !character.equippedGear?.[slot as keyof NonNullable<FantasyCharacter['equippedGear']>]);
-    if (plain > 0) make({ key: `${item}:plain`, count: plain, ...(wornPlain && plain === 1 ? { reason: 'equipped' } : {}) });
+    const wornCopies = Object.entries(character.equipment ?? {}).filter(([slot, value]) => value === item && !character.equippedGear?.[slot as keyof NonNullable<FantasyCharacter['equippedGear']>]).length;
+    const wornPlain = Math.max(wornCopies, character.outfit === item ? 1 : 0);
+    if (plain > 0) make({ key: `${item}:plain`, count: plain, ...(wornPlain && plain <= wornPlain ? { reason: 'equipped' } : {}) });
   }
   return result;
 }
@@ -67,6 +74,13 @@ export function fantasySell(character: FantasyCharacter, selection: FantasySaleS
   if (!item) return fail('品物が見つかりません。');
   if (!canSellItem(character, selection.item)) return fail(REASONS.location.ja);
   if ((character.inventory[selection.item] ?? 0) < 1) return fail('その品物を持っていません。');
+  if (selection.item === FANTASY_INTERIOR_MAP_ITEM) {
+    const copy = character.interiorMaps?.find(copy => copy.id === selection.instance);
+    if (!copy || selection.quality) return fail('売却する地図の写しを選んでください。');
+    const price = Math.max(1, Math.floor(fantasyInteriorMapValue(copy) / 2));
+    if (!Number.isSafeInteger(character.gold + price) || !takeFantasyInteriorMap(character, copy.id)) return fail('地図の写しを確認できません。');
+    character.gold += price; return { price, name: item.name, instance: copy.id };
+  }
   const food = foodMeta(selection.item);
   if (food) {
     if (selection.instance) return fail('食品の個体ではなく、売却する状態のまとまりを選んでください。');

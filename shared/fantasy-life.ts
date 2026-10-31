@@ -1,5 +1,9 @@
-import type { FantasyCharacter, FantasyFoodLot } from './fantasy.ts';
+import { fantasyHasJob } from './fantasy-careers.ts';
+import { FANTASY_BAD_COOKING_SENSE } from './fantasy-freeform-cooking-catalog.ts';
+export { FANTASY_LODGINGS, FANTASY_DINING } from './fantasy-lodging-catalog.ts';
+import type { FantasyCharacter } from './fantasy.ts';
 import { FANTASY_ITEMS, FANTASY_JOBS } from './fantasy-data.ts';
+import { fantasyFoodLotAge } from './fantasy-food-preservation.ts';
 
 type Labels = Record<'ko' | 'en' | 'ja', string>;
 export type FantasyFoodQuality = 'fresh' | 'stale' | 'spoiled';
@@ -11,18 +15,6 @@ export const FANTASY_FOOD_META: FantasyFoodMeta[] = [
   { item: 'jerky', shelfLife: 168, nutrition: 32 },
   { item: 'meal', shelfLife: 24, nutrition: 38 },
   ...FANTASY_ITEMS.filter(item => item.food && !['meat', 'fish', 'bread', 'jerky', 'meal'].includes(item.id)).map(item => ({ item: item.id, ...item.food! })),
-];
-
-export const FANTASY_LODGINGS = [
-  { id: 'common' as const, name: { ko: '공동 객실', en: 'Common room', ja: '相部屋' }, cost: 8, hours: 8, fatigueRecovery: 45, hpRecovery: 0.55, mpRecovery: 0.4 },
-  { id: 'private' as const, name: { ko: '개인 객실', en: 'Private room', ja: '個室' }, cost: 20, hours: 8, fatigueRecovery: 75, hpRecovery: 0.8, mpRecovery: 0.75 },
-  { id: 'suite' as const, name: { ko: '특실', en: 'Suite', ja: '特別室' }, cost: 50, hours: 8, fatigueRecovery: 100, hpRecovery: 1, mpRecovery: 1 },
-];
-
-export const FANTASY_DINING = [
-  { id: 'simple' as const, name: { ko: '간단한 식사', en: 'Simple meal', ja: '軽い食事' }, cost: 5, hours: .5, nutrition: 30, hp: 5, mp: 0 },
-  { id: 'hearty' as const, name: { ko: '든든한 식사', en: 'Hearty meal', ja: 'しっかりした食事' }, cost: 12, hours: .5, nutrition: 60, hp: 15, mp: 5 },
-  { id: 'feast' as const, name: { ko: '풍성한 만찬', en: 'Feast', ja: '贅沢な食事' }, cost: 25, hours: .5, nutrition: 100, hp: 30, mp: 15 },
 ];
 
 export const foodMeta = (item: string) => FANTASY_FOOD_META.find(food => food.item === item);
@@ -71,16 +63,30 @@ export function migrateFantasyLife(character: FantasyCharacter): FantasyCharacte
 }
 
 export function canInspectFood(character: FantasyCharacter): boolean {
-  return character.job === 'cook' && !!FANTASY_JOBS.find(job => job.id === 'cook')?.skills.some(skill => skill.id === 'cook-sense' && skill.kind === 'passive');
+  return fantasyHasJob(character,'cook') && !!FANTASY_JOBS.find(job => job.id === 'cook')?.skills.some(skill => skill.id === 'cook-sense' && skill.kind === 'passive');
 }
 
 export function foodDetails(character: FantasyCharacter, item: string) {
   const meta = foodMeta(item);
   if (!meta) return undefined;
   const lot = character.foodLots?.filter(entry => entry.item === item && entry.count > 0).sort((a, b) => a.createdAt - b.createdAt)[0];
-  const age = Math.max(0, character.hour - (lot?.createdAt ?? character.hour));
+  const age = lot ? fantasyFoodLotAge(character.hour, lot) : 0;
   const quality: FantasyFoodQuality = age > meta.shelfLife ? 'spoiled' : age >= meta.shelfLife * 0.65 ? 'stale' : 'fresh';
   return { age, shelfLife: meta.shelfLife, nutrition: meta.nutrition, quality };
+}
+
+// Match reconciliation's FIFO consumption, checking every portion in the recipe.
+export function fantasyHasSpoiledIngredients(character: FantasyCharacter, inputs: Readonly<Record<string, number>>): boolean {
+  return Object.entries(inputs).some(([item, count]) => {
+    const meta = foodMeta(item); if (!meta) return false;
+    let remaining = count;
+    for (const lot of character.foodLots.filter(lot => lot.item === item && lot.count > 0).sort((a, b) => a.createdAt - b.createdAt)) {
+      if (remaining <= 0) break;
+      if (fantasyFoodLotAge(character.hour, lot) > meta.shelfLife) return true;
+      remaining -= Math.min(remaining, lot.count);
+    }
+    return false;
+  });
 }
 
 const SENSE: Record<FantasyFoodQuality, { appearance: Labels; smell: Labels }> = {
@@ -104,5 +110,7 @@ export function foodSense(character: FantasyCharacter, item: string): { appearan
     appearance: { ko: '식품으로 분류되지 않는다.', en: 'This is not classified as food.', ja: '食品として分類されていない。' },
     smell: { ko: '식품의 냄새를 판단할 수 없다.', en: 'There is no food aroma to assess.', ja: '食品としての匂いは判断できない。' },
   };
-  return { ...structuredClone(SENSE[details.quality]), ...(canInspectFood(character) ? { known: details } : {}) };
+  const penalty = FANTASY_ITEMS.find(entry => entry.id === item)?.foodPenalty;
+  const intrinsic = Object.hasOwn(FANTASY_BAD_COOKING_SENSE, item) ? FANTASY_BAD_COOKING_SENSE[item as keyof typeof FANTASY_BAD_COOKING_SENSE] : penalty ? FANTASY_BAD_COOKING_SENSE[penalty.status === 'poison' ? 'toxic-dish' : penalty.status === 'weakness' ? 'gritty-dish' : 'charred-dish'] : undefined;
+  return { ...structuredClone(details.quality !== 'spoiled' && intrinsic ? intrinsic : SENSE[details.quality]), ...(canInspectFood(character) ? { known: details } : {}) };
 }

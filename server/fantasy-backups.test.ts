@@ -6,13 +6,15 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { FantasyBackups, createFantasyBackupSave, fantasyBackupFiles } from './fantasy-backups.ts';
+import { markFantasyPlatformDataCurrent, resetFantasyPlatformData, FANTASY_PLATFORM_RESET_MARKER } from './fantasy-platform-reset.ts';
 
 const sha=(value:Uint8Array)=>createHash('sha256').update(value).digest('hex');
 function fixture(t:{after:(fn:()=>void)=>void},extra:Partial<ConstructorParameters<typeof FantasyBackups>[0]>={}){
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'tonarium-backup-'));
   t.after(()=>{assert.equal(path.dirname(directory),os.tmpdir());assert.ok(path.basename(directory).startsWith('tonarium-backup-'));fs.rmSync(directory,{recursive:true,force:true});});
   const files=fantasyBackupFiles(directory);let now=Date.UTC(2026,9,27,12);
-  for(const[key,file]of Object.entries(files))fs.writeFileSync(file,JSON.stringify(key==='accounts'?{version:1,accounts:[],sessions:[],claims:[]}:{kind:key,revision:1}));
+  for(const[key,file]of Object.entries(files))if(key!=='platform-reset')fs.writeFileSync(file,JSON.stringify({kind:key,revision:1}));
+  markFantasyPlatformDataCurrent(directory);
   const options={dataDirectory:directory,files,required:['world','clock'],now:()=>now,...extra};
   return{directory,files,options,backups:new FantasyBackups(options),now:()=>now,advance:(ms:number)=>{now+=ms;}};
 }
@@ -48,19 +50,34 @@ test('restoration has a read-only preview, checks current hashes and preserves c
   assert.equal(f.backups.status().recoveryRequired,false);
 });
 
-test('full restoration clears snapshot login sessions and claim codes without changing credentials or source hashes',t=>{
-  const f=fixture(t),account={id:'account-id',username:'traveler',principal:'fantasy:12345678-1234-4234-8234-123456789abc',salt:'salt',passwordHash:'password-proof',recoveryHash:'recovery-proof',createdAt:1};
-  const ledger={version:1,accounts:[account],sessions:[{key:'revoked-cookie',account:'account-id',expiresAt:999999}],claims:[{key:'consumed-code',principal:account.principal,expiresAt:999999}]};
-  fs.writeFileSync(f.files.accounts,JSON.stringify(ledger));const snapshot=f.backups.checkpoint('manual',true)!;
-  const source=fs.readFileSync(path.join(f.backups.directory,snapshot.id,'accounts.json')),manifestHash=snapshot.files.accounts!.sha256;
-  assert.equal(sha(source),manifestHash);assert.deepEqual(JSON.parse(source.toString()),ledger);
-  const plan=f.backups.previewRestore(snapshot.id),restored=Buffer.from(JSON.stringify({...ledger,sessions:[],claims:[]}));
-  assert.equal(plan.changes.find(change=>change.key==='accounts')!.restoredHash,sha(restored));assert.equal(sha(fs.readFileSync(f.files.accounts)),manifestHash);
+test('new backups exclude old credentials and restore the current platform marker with progress',t=>{
+  const f=fixture(t);
+  fs.writeFileSync(path.join(f.directory,'fantasy-accounts.json'),'legacy-credentials-that-must-not-be-backed-up');
+  const snapshot=f.backups.checkpoint('manual',true)!;
+  assert.equal('accounts' in snapshot.files,false);
+  assert.equal(fs.existsSync(path.join(f.backups.directory,snapshot.id,'accounts.json')),false);
+  assert.equal(f.files['platform-reset'],path.join(f.directory,FANTASY_PLATFORM_RESET_MARKER));
+  assert.ok(snapshot.files['platform-reset']);
+  const marker=fs.readFileSync(f.files['platform-reset']);
+  fs.writeFileSync(f.files.world,JSON.stringify({kind:'world',revision:2}));
+  fs.unlinkSync(f.files['platform-reset']);
   f.backups.restore(snapshot.id,{apply:true});
-  const actual=JSON.parse(fs.readFileSync(f.files.accounts,'utf8'));assert.deepEqual(actual.accounts,[account]);assert.deepEqual(actual.sessions,[]);assert.deepEqual(actual.claims,[]);
-  assert.equal(sha(fs.readFileSync(f.files.accounts)),sha(restored));assert.equal(sha(fs.readFileSync(path.join(f.backups.directory,snapshot.id,'accounts.json'))),manifestHash);
-  const before=f.backups.list().find(entry=>entry.reason==='before-restore')!;
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.backups.directory,before.id,'accounts.json'),'utf8')),ledger);
+  assert.deepEqual(fs.readFileSync(f.files['platform-reset']),marker);
+  resetFantasyPlatformData(f.directory);
+  assert.equal(JSON.parse(fs.readFileSync(f.files.world,'utf8')).revision,1);
+});
+
+test('restore refuses snapshots without a valid completion marker before changing any saves',t=>{
+  for(const marker of [undefined,'{}']){
+    const f=fixture(t),file=f.files['platform-reset'];
+    if(marker===undefined)fs.unlinkSync(file);else fs.writeFileSync(file,marker);
+    const snapshot=f.backups.checkpoint('manual',true)!;
+    fs.writeFileSync(f.files.world,JSON.stringify({revision:2}));
+    const before=fs.readFileSync(f.files.world);
+    assert.throws(()=>f.backups.restore(snapshot.id,{apply:true}),/valid completed platform reset marker/u);
+    assert.deepEqual(fs.readFileSync(f.files.world),before);
+    assert.equal(f.backups.list()[0].restorable,false);
+  }
 });
 
 test('live runtime lease prevents concurrent world starts, manual snapshots and restoration',t=>{
@@ -83,11 +100,11 @@ test('retention keeps bounded recent snapshots and the latest snapshot on distin
   for(const id of [...days.values()].slice(-2))assert.ok(list.some(entry=>entry.id===id));
 });
 
-test('missing snapshot files never remove newly created account data',t=>{
-  const f=fixture(t);fs.unlinkSync(f.files.accounts);const snapshot=f.backups.checkpoint('startup',true)!;
-  fs.writeFileSync(f.files.accounts,JSON.stringify({version:1,accounts:{owner:{}}}));
-  assert.throws(()=>f.backups.previewRestore(snapshot.id),/lacks existing save accounts/u);
-  assert.ok(fs.readFileSync(f.files.accounts,'utf8').includes('owner'));
+test('missing snapshot files never remove newly created world data',t=>{
+  const f=fixture(t);fs.unlinkSync(f.files.community);const snapshot=f.backups.checkpoint('startup',true)!;
+  fs.writeFileSync(f.files.community,JSON.stringify({owner:{}}));
+  assert.throws(()=>f.backups.previewRestore(snapshot.id),/lacks existing save community/u);
+  assert.ok(fs.readFileSync(f.files.community,'utf8').includes('owner'));
 });
 
 test('interrupted restoration blocks startup until explicit rollback restores the preserved originals',t=>{

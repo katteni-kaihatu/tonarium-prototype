@@ -1,0 +1,6 @@
+export const FANTASY_GUILD_SUPPLY_DISCOUNT = .05;
+export const FANTASY_GUILD_SUPPLY_RANK_DISCOUNT = .02;
+export const FANTASY_GUILD_SUPPLY_DISCOUNT_GRADE = 4;
+export function fantasyGuildSupplyPriceMultiplier(grade: number): number {
+  return (1-FANTASY_GUILD_SUPPLY_DISCOUNT)*(grade>=FANTASY_GUILD_SUPPLY_DISCOUNT_GRADE?1-FANTASY_GUILD_SUPPLY_RANK_DISCOUNT:1);
+}

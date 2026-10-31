@@ -8,9 +8,10 @@ import type { FantasyProfile } from './fantasy.ts';
 const home = 'hearth-residence', farm = 'hearth-farmland', shop = 'hearth-commercial';
 function person(name: string): FantasyProfile {
   const p = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', gender: 'female', name }, () => .5).profile;
-  Object.assign(p.character!, { gold: 5000, hour: 25, location: 'hearth' }); p.character!.inventory = { wood: 100, ore: 100, herb: 100 }; return p;
+  Object.assign(p.character!, { gold: 5000, hour: 25, location: 'hearth', bag: 'canvas-bag-3', magicBags: ['arcane-bag-3', 'arcane-bag-3'] });
+  p.character!.inventory = { wood: 50, ore: 50, herb: 100, 'canvas-bag-3': 1, 'arcane-bag-3': 2 }; return p;
 }
-function fixture(plot = home) { return applyFantasyPropertyCommand(newFantasyPropertyLedger(), { a: person('Alice'), b: person('Bob'), c: person('Cara') }, 'a', { type: 'buy', plot, revision: 0, requestId: 'buy' }, 25); }
+function fixture(plot = home) { const result = applyFantasyPropertyCommand(newFantasyPropertyLedger(), { a: person('Alice'), b: person('Bob'), c: person('Cara') }, 'a', { type: 'buy', plot, revision: 0, requestId: 'buy' }, 25); assert.equal(result.error, undefined); return result; }
 let sequence = 0;
 function act(s: FantasyPropertyChange, actor: string, type: string, plot = home, extra: Record<string, unknown> = {}, at = 25) {
   const result = applyFantasyPropertyCommand(s.ledger, s.profiles, actor, { type, plot, revision: s.ledger.plots[plot].revision, requestId: `request-${++sequence}`, ...extra } as FantasyPropertyCommand, at);
@@ -55,8 +56,8 @@ test('coownership is consensual, adds use rights, and sale needs every owner app
   assert.deepEqual(s.ledger.plots[home].extension!.shares, []); assert.equal(s.ledger.plots[home].owner!.user, 'c');
 });
 test('construction spends exact materials and time before granting a bounded completion benefit', () => {
-  let s = fixture(farm); s = act(s, 'a', 'build', farm, { blueprint: 'irrigation' });
-  assert.equal(s.profiles.a.character!.inventory.wood, 95); assert.equal(s.profiles.a.character!.inventory.ore, 99); assert.equal(s.ledger.plots[farm].extension!.level, 0);
+  let s = fixture(farm); const stock = { ...s.profiles.a.character!.inventory }; s = act(s, 'a', 'build', farm, { blueprint: 'irrigation' });
+  assert.equal(s.profiles.a.character!.inventory.wood, stock.wood - 5); assert.equal(s.profiles.a.character!.inventory.ore, stock.ore - 1); assert.equal(s.ledger.plots[farm].extension!.level, 0);
   s = tick(s, 28.99); assert.equal(s.ledger.plots[farm].extension!.level, 0);
   s = tick(s, 29); assert.equal(s.ledger.plots[farm].extension!.level, 1);
   const base = applyFantasyPropertyUse(s.profiles.a, farm).profile, herbs = base.character!.inventory.herb;
@@ -85,12 +86,12 @@ test('estate auction proceeds stay with the old life and never credit a replacem
   s = act(s, 'b', 'auctionStart', home, { price: 100 }); s = act(s, 'c', 'bid', home, { amount: 100 }); const before = s.profiles.a.character!.gold;
   s = tick(s, 49); assert.equal(s.profiles.a.character!.gold, before); assert.equal(s.ledger.plots[home].extension!.credits[0].estate, true); assert.equal(s.ledger.plots[home].extension!.credits[0].amount, 100);
 });
-test('automated work consumes finite stocked inputs and prepaid wages, never runs indefinitely or grants practice', () => {
-  let s = fixture(shop); const herbs = s.profiles.a.character!.inventory.herb; const xp = structuredClone(s.profiles.a.character!.jobXp);
-  s = act(s, 'a', 'autoStock', shop, { count: 3 }); assert.equal(s.profiles.a.character!.inventory.herb, herbs - 3);
-  s = act(s, 'a', 'autoToggle', shop, { enabled: true }); const before = s.profiles.a.character!.gold; s = tick(s, 37);
-  assert.equal(s.ledger.plots[shop].extension!.automation!.stock, 0); assert.equal(s.ledger.plots[shop].extension!.automation!.wages, 0); assert.ok(s.profiles.a.character!.gold > before); assert.deepEqual(s.profiles.a.character!.jobXp, xp);
-  const earned = s.profiles.a.character!.gold; s = tick(s, 45); assert.equal(s.profiles.a.character!.gold, earned);
+test('automated farmland consumes finite stocked inputs and prepaid wages, never runs indefinitely or grants practice', () => {
+  let s = fixture(farm); const herbs = s.profiles.a.character!.inventory.herb; const xp = structuredClone(s.profiles.a.character!.jobXp);
+  s = act(s, 'a', 'autoStock', farm, { count: 3 }); assert.equal(s.profiles.a.character!.inventory.herb, herbs - 3);
+  s = act(s, 'a', 'autoToggle', farm, { enabled: true }); const before = s.profiles.a.character!.gold; s = tick(s, 37);
+  assert.equal(s.ledger.plots[farm].extension!.automation!.stock, 0); assert.equal(s.ledger.plots[farm].extension!.automation!.wages, 0); assert.equal(s.profiles.a.character!.gold, before); assert.equal(s.profiles.a.character!.inventory.herb, herbs + 3); assert.deepEqual(s.profiles.a.character!.jobXp, xp);
+  const earned = s.profiles.a.character!.inventory.herb; s = tick(s, 45); assert.equal(s.profiles.a.character!.inventory.herb, earned); assert.equal(s.profiles.a.character!.gold, before);
 });
 test('bargaining produces a private reputation based quote and requires explicit purchase approval', () => {
   const base = { ledger: newFantasyPropertyLedger(), profiles: { a: person('Alice'), b: person('Bob') }, changed: false };
@@ -122,21 +123,21 @@ test('a deceased bidder is not replaced by a new life and their escrow remains a
   assert.equal(s.ledger.plots[home].extension!.credits.find(c => c.user === 'b')!.estate, true);
 });
 test('unused automated supplies and wages can be recovered after pausing without duplication', () => {
-  let s = fixture(shop), gold = s.profiles.a.character!.gold, herb = s.profiles.a.character!.inventory.herb;
-  s = act(s, 'a', 'autoStock', shop, { count: 2 }); s = act(s, 'a', 'autoToggle', shop, { enabled: true });
-  const blocked = applyFantasyPropertyCommand(s.ledger, s.profiles, 'a', { type: 'autoWithdraw', plot: shop, revision: s.ledger.plots[shop].revision, requestId: 'active-stock', count: 2 }, 25); assert.equal(blocked.error, 'occupied');
-  s = act(s, 'a', 'autoToggle', shop, { enabled: false }); s = act(s, 'a', 'autoWithdraw', shop, { count: 2 });
-  assert.equal(s.profiles.a.character!.gold, gold); assert.equal(s.profiles.a.character!.inventory.herb, herb); assert.equal(s.ledger.plots[shop].extension!.automation!.stock, 0);
+  let s = fixture(farm), gold = s.profiles.a.character!.gold, herb = s.profiles.a.character!.inventory.herb;
+  s = act(s, 'a', 'autoStock', farm, { count: 2 }); s = act(s, 'a', 'autoToggle', farm, { enabled: true });
+  const blocked = applyFantasyPropertyCommand(s.ledger, s.profiles, 'a', { type: 'autoWithdraw', plot: farm, revision: s.ledger.plots[farm].revision, requestId: 'active-stock', count: 2 }, 25); assert.equal(blocked.error, 'occupied');
+  s = act(s, 'a', 'autoToggle', farm, { enabled: false }); s = act(s, 'a', 'autoWithdraw', farm, { count: 2 });
+  assert.equal(s.profiles.a.character!.gold, gold); assert.equal(s.profiles.a.character!.inventory.herb, herb); assert.equal(s.ledger.plots[farm].extension!.automation!.stock, 0);
 });
 test('forged approval identities, unbacked wages and impossible discount quotes fail saved-ledger validation', () => {
   let s = act(fixture(), 'a', 'shareOffer', home, { target: 'Bob', percent: 30 }); s = act(s, 'b', 'shareAccept'); s = act(s, 'a', 'list', home, { price: 100 });
   const bad = structuredClone(s.ledger); bad.plots[home].extension!.sale!.approved.push('forged'); assert.equal(validFantasyPropertyLedger(bad), false);
-  const stocked = act(fixture(shop), 'a', 'autoStock', shop, { count: 1 }); stocked.ledger.plots[shop].extension!.automation!.wages = 100; assert.equal(validFantasyPropertyLedger(stocked.ledger), false);
+  const stocked = act(fixture(farm), 'a', 'autoStock', farm, { count: 1 }); stocked.ledger.plots[farm].extension!.automation!.wages = 100; assert.equal(validFantasyPropertyLedger(stocked.ledger), false);
   const quoted = act({ ledger: newFantasyPropertyLedger(), profiles: { a: person('Alice') }, changed: false }, 'a', 'bargain'); quoted.ledger.plots[home].extension!.bargain!.price = 1; assert.equal(validFantasyPropertyLedger(quoted.ledger), false);
 });
 test('offline operation and auction settlement logs use the world settlement time without advancing personal snapshots', () => {
-  let business = act(fixture(shop), 'a', 'autoStock', shop, { count: 1 }); business = act(business, 'a', 'autoToggle', shop, { enabled: true }); business = tick(business, 29);
-  assert.equal(business.profiles.a.character!.hour, 25); assert.equal(business.profiles.a.log.findLast(e => e.text.startsWith('property:credit:'))!.hour, 29);
+  const business = fixture(shop), blocked = applyFantasyPropertyCommand(business.ledger, business.profiles, 'a', { type: 'autoStock', plot: shop, revision: business.ledger.plots[shop].revision, requestId: 'commercial-automation', count: 1 }, 25);
+  assert.equal(blocked.error, 'not-owner'); assert.deepEqual(blocked.ledger, business.ledger); assert.deepEqual(blocked.profiles, business.profiles);
   let farming = act(fixture(farm), 'a', 'autoStock', farm, { count: 1 }); farming = act(farming, 'a', 'autoToggle', farm, { enabled: true }); farming = tick(farming, 29);
   assert.equal(farming.profiles.a.character!.hour, 25); assert.equal(farming.profiles.a.log.findLast(e => e.text.startsWith('property:autoHarvest:'))!.hour, 29);
   let auction = act(fixture(), 'a', 'auctionStart', home, { price: 100 }); auction = act(auction, 'b', 'bid', home, { amount: 100 }); auction = tick(auction, 49);

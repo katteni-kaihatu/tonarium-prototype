@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { NPC_PUBLIC, type NpcLocale } from '../shared/npc.ts';
+import { NPC_PUBLIC as ALL_NPCS, type NpcLocale } from '../shared/npc.ts';
 import type { FantasyCharacter } from '../shared/fantasy.ts';
 import { FANTASY_LOCATIONS } from '../shared/fantasy-data.ts';
 import { fantasyBuildings } from '../shared/fantasy-town.ts';
 import { FANTASY_COMMUNITY_PROJECTS, type FantasyCommunityError, type FantasyCommunityProjectId, type FantasyCommunityRequest, type FantasyCommunityState } from '../shared/fantasy-community.ts';
+const NPC_PUBLIC=ALL_NPCS.filter(npc=>!npc.travelOnly);
 
 interface Project { location: string; kind: FantasyCommunityProjectId; total: number }
 interface Notice { id: number; hour: number; location: string; kind: FantasyCommunityProjectId; npcIds: string[] }

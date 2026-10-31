@@ -1,3 +1,4 @@
+import { benchmarkOrder } from '../scripts/fantasy-balance-fixtures.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -5,10 +6,11 @@ import {
   submitFantasyCombatOrder, validFantasyCombatState, type FantasyCombatOptions, type FantasyCombatOrder, type FantasyCombatPlayer, type FantasyCombatState,
 } from './fantasy-combat.ts';
 import { FANTASY_COMBAT_ENEMIES } from './fantasy-combat-catalog.ts';
-import { applyFantasyAction, newFantasyProfile } from './fantasy-engine.ts';
-import { runFantasyElderBenchmark } from './fantasy-elder-benchmark-fixture.ts';
+import { applyFantasyAction, fantasyStats, newFantasyProfile } from './fantasy-engine.ts';
+import { fantasyElderBenchmarkSquad, runFantasyElderBenchmark } from './fantasy-elder-benchmark-fixture.ts';
 import { fantasyCombatPlayer, fantasyCombatSupplies } from '../server/fantasy-combat-adapter.ts';
-import type { FantasyProfile } from './fantasy.ts';
+import { fantasyAdventurerGrade, fantasyCombatPower } from './fantasy-adventurer.ts';
+import type { FantasyAction, FantasyProfile } from './fantasy.ts';
 
 const names = (value: string) => ({ ko: value, en: value, ja: value });
 function player(index = 0): FantasyCombatPlayer {
@@ -95,7 +97,8 @@ test('guard reduces real damage and allied wards act before faster enemies and c
 test('an announced enemy guard protects against faster players in the same round', () => {
   const first = battle(1, 42, { enemies: [{ id: 'enemy-1', template: 'monster-stone-golem' }] });
   first.fighters[0].stats.agility = 100;
-  const second = structuredClone(first); second.round = 2;
+  const second = structuredClone(first); second.round = 3;
+  assert.equal(fantasyCombatTelegraph(second.fighters[1], second.round, 'en'), 'It is preparing to guard.');
   const exposed = choose(first, 'u-0', { type: 'attack', target: 'enemy-1' }).state;
   const guarded = choose(second, 'u-0', { type: 'attack', target: 'enemy-1' }).state;
   const openDamage = first.fighters[1].hp - exposed.fighters[1].hp, guardedDamage = second.fighters[1].hp - guarded.fighters[1].hp;
@@ -264,44 +267,65 @@ test('corrupt, forged or privacy-bearing saved battle fields are rejected withou
 });
 
 function simulate(seed: number, profiles: Map<string, FantasyProfile>, template: string) {
-  let state = createFantasyCombat({ id: 'balance-sample', location: 'ashpeak', source: template.includes('elder-dragon') ? 'apex:apex-elder-dragon' : `hunt:${template}`,
-    hour: 12, seed, players: [...profiles].map(([id, p]) => fantasyCombatPlayer(p, id)), enemies: [{ id: 'foe', template }] });
-  let potions = 0;
-  for (let step = 0; state.status === 'active' && step < 80; step++) {
-    const round = state.round, inputs = state.fighters.filter(f => f.side === 'players' && f.hp > 0 && !f.fled).map(fighter => {
-      const c = profiles.get(fighter.userId!)!.character!, threat = state.fighters.find(f => f.side === 'enemies' && livingForTest(f))!;
-      const injured = state.fighters.filter(f => f.side === 'players' && livingForTest(f) && f.stats.hp - f.hp >= 45).sort((a, b) => a.hp / a.stats.hp - b.hp / b.stats.hp)[0];
-      const healing = fighter.skills.find(skill => skill.kind === 'heal' && fighter.mp >= skill.mp);
-      let order: FantasyCombatOrder;
-      if (template.includes('elder-dragon') && round % 3 === 0 || fighter.hp < fighter.stats.hp * .5) order = { type: 'guard' };
-      else if (healing && injured) order = { type: 'skill', skill: healing.id, target: injured.id };
-      else if (fighter.hp < fighter.stats.hp * .75 && (c.inventory['hp-potion-4'] ?? 0) > 0) order = { type: 'item', item: 'hp-potion-4', target: fighter.id };
-      else if (healing && fighter.mp < 20 && (c.inventory['mp-potion-4'] ?? 0) > 0) order = { type: 'item', item: 'mp-potion-4', target: fighter.id };
-      else order = { type: 'attack', target: threat.id };
-      return { user: fighter.userId!, order };
-    });
-    for (const input of inputs) {
-      const result = submitFantasyCombatOrder(state, input.user, state.revision, input.order, state.hour, fantasyCombatSupplies(profiles, [...profiles.keys()]));
-      assert.equal(result.error, undefined); state = result.state;
-      for (const item of result.spentItems) { profiles.get(item.userId)!.character!.inventory[item.item] -= item.count; potions++; }
+  let state = createFantasyCombat({ id: 'balance-sample', location: 'hearth', source: `hunt:${template}`,
+    hour: 12, seed, tactical:true, players: [...profiles].map(([id,p])=>fantasyCombatPlayer(p,id)), enemies:[{id:'foe',template}] });
+  let potions=0;
+  for(let step=0;state.status==='active'&&step<80;step++){
+    const inputs=state.fighters.filter(f=>f.side==='players'&&livingForTest(f)).map(fighter=>({user:fighter.userId!,order:benchmarkOrder(state,'prepared',fantasyCombatSupplies(profiles,[...profiles.keys()]),undefined,fighter.userId!)}));
+    for(const input of inputs){
+      const result=submitFantasyCombatOrder(state,input.user,state.revision,input.order,state.hour,fantasyCombatSupplies(profiles,[...profiles.keys()]));
+      assert.equal(result.error,undefined);assert.ok(validFantasyCombatState(result.state));state=result.state;
+      for(const item of result.spentItems){profiles.get(item.userId)!.character!.inventory[item.item]-=item.count;potions++;}
     }
   }
-  return { status: state.status, rounds: state.round, survivors: state.fighters.filter(f => f.side === 'players' && livingForTest(f)).length, potions, enemyRemaining: state.fighters.find(f => f.side === 'enemies')!.hp };
+  return {status:state.status,rounds:state.round,survivors:state.fighters.filter(f=>f.side==='players'&&livingForTest(f)).length,potions,enemyRemaining:state.fighters.find(f=>f.side==='enemies')!.hp};
 }
+
 const livingForTest = (fighter: FantasyCombatState['fighters'][number]) => fighter.hp > 0 && !fighter.fled;
 
-test('actual human profiles can handle an introductory slime', () => {
-  const fresh = applyFantasyAction(newFantasyProfile(), { type: 'create', name: 'Human beginner', source: 'human', gender: 'female' }, () => .5).profile;
+test('a prepared beginner adventurer can handle an introductory slime using a real guild job, earned ordinary weapon and rest', () => {
+  let fresh = applyFantasyAction(newFantasyProfile(), { type: 'create', name: 'Human beginner', source: 'human', gender: 'female' }, () => .5).profile;
+  const preparation: FantasyAction[] = [{ type: 'job', job: 'adventurer', via: 'guild' }, { type: 'work' }, { type: 'buy', item: 'blade' }, { type: 'equip', item: 'blade' }, { type: 'rest' }];
+  for (const action of preparation) {
+    const next = applyFantasyAction(fresh, action, () => .999);
+    assert.equal(next.error, undefined, JSON.stringify({action,hour:fresh.character!.hour})); fresh = next.profile;
+  }
+  assert.equal(fresh.character!.job, 'adventurer'); assert.equal(fresh.character!.level, 1);
+  assert.equal(fresh.character!.equipment!.weapon, 'blade'); assert.equal(fresh.character!.inventory.blade, 1);
+  assert.equal(fresh.character!.gold, 1); assert.equal(fresh.character!.hp, fantasyStats(fresh.character!).hp);
   const intro = [1, 2, 3, 4, 5].map(seed => simulate(seed, new Map([['solo', structuredClone(fresh)]]), 'monster-cave-slime'));
-  assert.ok(intro.filter(result => result.status === 'victory').length >= 4);
+  assert.ok(intro.filter(result => result.status === 'victory').length >= 4, JSON.stringify(intro));
+  assert.ok(intro.every(result => result.status !== 'active'));
 });
 
-test('the fixed legal pre-apex crafting benchmark stays near fifty percent over one hundred seeds with ordinary gear at a major disadvantage', t => {
+test('the fixed benchmark actually knows and exposes every declared prepared mage spell', () => {
+  for (const fine of [false, true]) {
+    const squad = fantasyElderBenchmarkSquad(fine), mage = squad.get('member-2')!;
+    assert.equal(mage.character!.specialization!.spells!.length, 3);
+    assert.deepEqual(fantasyCombatPlayer(mage, 'member-2').skills.filter(skill => skill.id.startsWith('prepared-spell-')).map(skill => skill.id), ['prepared-spell-1', 'prepared-spell-2', 'prepared-spell-3']);
+  }
+});
+test('fine gear improves the legacy level-twenty advanced party efficiency even when both gear sets can win', t => {
   const seeds = Array.from({ length: 100 }, (_, index) => index + 1), prepared = runFantasyElderBenchmark(true, seeds), ordinary = runFantasyElderBenchmark(false, seeds);
   const preparedWins = prepared.filter(result => result.status === 'victory').length, ordinaryWins = ordinary.filter(result => result.status === 'victory').length;
-  assert.ok(preparedWins >= 45 && preparedWins <= 55, `Normal top crafting equipment: ${preparedWins}/100`);
-  assert.ok(ordinaryWins <= 5, `Ordinary materials and no gems: ${ordinaryWins}/100`);
+  assert.ok(preparedWins >= ordinaryWins, `Advanced-path party gear comparison: ${preparedWins}/100 vs ${ordinaryWins}/100`);
+  // 通常職の等級6単独戦に対する5%上限を、6人の上位職編成へ流用しない。
   assert.ok([...prepared, ...ordinary].every(result => result.status !== 'active'));
-  assert.ok(prepared.reduce((sum, result) => sum + result.remaining, 0) < ordinary.reduce((sum, result) => sum + result.remaining, 0));
-  t.diagnostic(JSON.stringify({ benchmark: 'six humans, level 20, fixed skills and recovery stock, two summons, unchanged automatic policy', seeds: [1, 100], preparedWins, ordinaryWins }));
+  assert.ok(prepared.reduce((sum, result) => sum + result.remaining, 0) <= ordinary.reduce((sum, result) => sum + result.remaining, 0));
+  const efficiency = (results: typeof prepared) => results.reduce((sum, result) => ({ rounds: sum.rounds + result.rounds, potions: sum.potions + result.potions, survivors: sum.survivors + result.survivors }), { rounds: 0, potions: 0, survivors: 0 });
+  const preparedEfficiency = efficiency(prepared), ordinaryEfficiency = efficiency(ordinary);
+  assert.ok(preparedEfficiency.rounds < ordinaryEfficiency.rounds, `Fine gear must shorten total combat rounds: ${JSON.stringify({preparedEfficiency,ordinaryEfficiency})}`);
+  assert.ok(preparedEfficiency.potions < ordinaryEfficiency.potions, `Fine gear must reduce total potion consumption: ${JSON.stringify({preparedEfficiency,ordinaryEfficiency})}`);
+  assert.ok(preparedEfficiency.survivors >= ordinaryEfficiency.survivors, `Fine gear must not reduce aggregate survivors: ${JSON.stringify({preparedEfficiency,ordinaryEfficiency})}`);
+  for (const fine of [true, false]) {
+    const expected = fine ? prepared : ordinary;
+    assert.deepEqual(runFantasyElderBenchmark(fine, [1, 42, 100]), expected.filter(result => [1, 42, 100].includes(result.seed)));
+  }
+  const squad = fantasyElderBenchmarkSquad(true), before = structuredClone([...squad]);
+  const input = { id: 'legacy-party-snapshot', source: 'apex:apex-elder-dragon', location: 'ashpeak', hour: 108, seed: 42, tactical: true, players: [...squad].map(([id, p]) => fantasyCombatPlayer(p, id)), enemies: [{ id: 'foe', template: 'monster-elder-dragon' }] };
+  const snapshot = createFantasyCombat(input);
+  assert.equal(snapshot.scaling.participantIds.length, 6); assert.deepEqual(createFantasyCombat(input), snapshot); assert.deepEqual([...squad], before);
+  const grades = [...squad].map(([id, p]) => { const actor = fantasyCombatPlayer(p, id); return { job: p.character!.job, level: p.character!.level, path: p.character!.jobPaths?.[p.character!.job]?.path, grade: fantasyAdventurerGrade(actor.stats,actor), power: fantasyCombatPower(actor.stats,actor) }; });
+  assert.ok(grades.some(entry => entry.path !== undefined));
+  t.diagnostic(JSON.stringify({ benchmark: 'legacy advanced-path six-human party efficiency; excluded by latest normal-job solo balance scope', seeds: [1, 100], preparedWins, ordinaryWins, preparedEfficiency, ordinaryEfficiency, grades }));
 });

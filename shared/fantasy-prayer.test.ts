@@ -3,22 +3,23 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { applyFantasyAction, newFantasyProfile, startFantasyActivity, advanceFantasyWorld } from './fantasy-engine.ts';
+import { applyFantasyAction, fantasyStats, newFantasyProfile, startFantasyActivity, advanceFantasyWorld } from './fantasy-engine.ts';
 import { applyFantasyPrayer, fantasyPrayerDisabledReason, fantasyPrayerStatus, validFantasyPrayer } from './fantasy-prayer.ts';
 import { FantasyStore } from '../server/fantasy-store.ts';
 
 function character(job = 'priest') {
   const c = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', gender: 'female', name: '기도 검증' }, () => .999).profile.character!;
-  c.job = job; c.jobXp[job] = 0; c.hour = 25; c.location = 'hearth'; return c;
+  c.job = job; c.jobXp[job] = 0; c.hour = 36; c.location = 'hearth';
+  const stats = fantasyStats(c); c.hp = stats.hp; c.mp = stats.mp; return c;
 }
 
 test('prayer awards priest practice only once on each shared world calendar day', () => {
   const c = character(); c.proficiencyUse = { key: 'work:priest', hour: 24, repeats: 20 };
   const result = applyFantasyPrayer(c);
   assert.deepEqual(result, { priestXp: 3, notorietyReduction: 0, day: 1 }); assert.equal(c.jobXp.priest, 3); assert.equal(c.lastPrayerDay, 1);
-  c.hour = 47.99; const before = structuredClone(c);
+  c.hour = 41.99; const before = structuredClone(c);
   assert.ok(applyFantasyPrayer(c).error); assert.deepEqual(c, before);
-  c.hour = 48; assert.equal(applyFantasyPrayer(c).priestXp, 3); assert.equal(c.jobXp.priest, 6); assert.equal(c.lastPrayerDay, 2);
+  c.hour = 60; assert.equal(applyFantasyPrayer(c).priestXp, 3); assert.equal(c.jobXp.priest, 6); assert.equal(c.lastPrayerDay, 2);
 });
 
 test('repentance reduces existing notoriety slightly without granting money, standing or free profession mastery', () => {
@@ -54,14 +55,16 @@ test('shared-time prayer rewards settle after completion, survive reload and can
   assert.equal(finished.activity, undefined); assert.equal(finished.character!.lastPrayerDay, 1); assert.equal(finished.character!.jobXp.priest, 3); assert.equal(finished.character!.notoriety, 1);
   const reopened = new FantasyStore(file, { worldHour: () => hour }); assert.equal(reopened.loadError, undefined);
   const blocked = reopened.apply('alice', reopened.profile('alice').revision, { type: 'pray' }); assert.ok(blocked.error); assert.equal(blocked.profile.character!.jobXp.priest, 3);
-  hour = 48; reopened.synchronize('alice'); const again = reopened.apply('alice', reopened.profile('alice').revision, { type: 'pray' }, () => .5); assert.equal(again.error, undefined);
+  hour = 60; reopened.synchronize('alice'); const again = reopened.apply('alice', reopened.profile('alice').revision, { type: 'pray' }, () => .5); assert.equal(again.error, undefined);
   hour += .5; const nextDay = reopened.synchronize('alice').profile; assert.equal(nextDay.character!.jobXp.priest, 6); assert.equal(nextDay.character!.notoriety, 0);
 });
 
-test('a prayer crossing midnight consumes only the completed calendar day and leaves its source untouched', () => {
-  const p = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', gender: 'female', name: '자정 기도' }, () => .999).profile;
-  p.character = character(); p.character.hour = 23.75; const before = structuredClone(p);
-  const started = startFantasyActivity(p, { type: 'pray' }, 23.75, () => .5); assert.equal(started.error, undefined); assert.deepEqual(p, before);
-  const completed = advanceFantasyWorld(started.profile, 24.25).profile; assert.equal(completed.character!.lastPrayerDay, 1); assert.equal(completed.character!.jobXp.priest, 3);
+test('a daytime prayer may finish after closing, but a new prayer waits for the next open daytime', () => {
+  const p = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', gender: 'female', name: '마감 전 기도' }, () => .999).profile;
+  p.character = character(); p.character.hour = 17.75; const before = structuredClone(p);
+  const started = startFantasyActivity(p, { type: 'pray' }, 17.75, () => .5); assert.equal(started.error, undefined); assert.deepEqual(p, before);
+  const completed = advanceFantasyWorld(started.profile, 18.25).profile; assert.equal(completed.character!.lastPrayerDay, 0); assert.equal(completed.character!.jobXp.priest, 3);
   assert.ok(startFantasyActivity(completed, { type: 'pray' }, 24.25).error);
+  const nextDay = startFantasyActivity(completed, { type: 'pray' }, 30, () => .5); assert.equal(nextDay.error, undefined);
+  const done = advanceFantasyWorld(nextDay.profile, 30.5).profile; assert.equal(done.character!.lastPrayerDay, 1); assert.equal(done.character!.jobXp.priest, 6);
 });

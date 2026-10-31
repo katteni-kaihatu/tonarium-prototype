@@ -73,6 +73,11 @@ DB のテーブルを変えるときは `server/db/schema.ts` を直して `npm 
 
 ## 主な機能
 
+- [自由配合の料理・有害な失敗作](docs/fantasy-freeform-cooking.md)
+- [五枠の料理・反復製作・倉庫利用](docs/fantasy-five-slot-cooking.md)
+- [料理・倉庫・NPC連携の検証結果と残る範囲](docs/fantasy-cooking-validation-2026-10-30.md)
+- [新料理114種・食材19種と配合一覧](docs/fantasy-cuisine-expanded-list.md)
+
 - 開発の方向性（目的・大事にする体験・依頼の受け止め方）→ [docs/direction.md](docs/direction.md)
 - 개발용 공유 시스템·아이템 ID 카탈로그 → [공유 시스템 문서 폴더](docs/shared-systems/README.md)
 - 코드로 맵을 만드는 순서와 복사 가능한 연결 예제 → [add-world 사용법](.claude/skills/add-world/SKILL.md)
@@ -93,13 +98,26 @@ DB のテーブルを変えるときは `server/db/schema.ts` を直して `npm 
 - 2D の画面（距離ごとのプレイヤー・アイテムのリスト、顔、通知・チャット、ウィンドウ、試験中のマップ、スマホ・PWA）→ [docs/screens.md](docs/screens.md)
 - 3D 空間（FPS 風の操作、ワールドの切り替え、ガーデン、街（マンション・電車・エレベーター）、お絵描きアバター、配信ディスプレイ）→ [docs/3d.md](docs/3d.md)
 - 悠久の旅路（45地域、51種族、38職業、個人メイン18章と48の連続調査、共有依頼、熟練・制作・狩猟、共通の季節時計、ローカルAIのNPC・GM）→ [docs/fantasy.md](docs/fantasy.md)
-- 悠久の旅路の専用アカウント・別端末への復帰・復旧コード → [docs/fantasy-accounts.md](docs/fantasy-accounts.md)。世界・アカウントの定期バックアップ、復元と旧人物の所有者移行 → [docs/fantasy-backups.md](docs/fantasy-backups.md)
+- 悠久の旅路は Tonarium のログインを共用。今回の初回起動で旧 RPG アカウント・人物・所持品・進行と RPG 専用バックアップを永久初期化し、完了後の進行は保持する → [ログインと初期化の対象](docs/fantasy-accounts.md)。新しい世界保存・完了印の定期バックアップと復元 → [docs/fantasy-backups.md](docs/fantasy-backups.md)
 - RPG のブラウザ・認証済み多人数・復元障害・外部同期・戦闘の追加検証と範囲 → [docs/fantasy-feasible-validation.md](docs/fantasy-feasible-validation.md)
 - RPG の行動・AI 診断ログと運営用の会話検索・書き出し → [docs/fantasy-diagnostics.md](docs/fantasy-diagnostics.md)
 - RPG 診断・AI 品質・TLS/WSS・非公開ファイルの追加検証 → [docs/fantasy-predeploy-diagnostics-validation.md](docs/fantasy-predeploy-diagnostics-validation.md)
 - 새벽너머의 항로 전체 시나리오（全18章・48場面の依頼人の事情、証拠、失敗と再調査、次の手掛かり。結末を含む）→ [docs/fantasy-voyage-scenario.md](docs/fantasy-voyage-scenario.md)
-- 판타지 파티（最大6人・個別同意の共同移動と調査、専用チャット、承認付き共有品、戦闘への途中参加）→ [docs/fantasy-party.md](docs/fantasy-party.md)。人数別補正は [戦闘バランス](docs/fantasy-party-combat-plan.md)
-- 판타지 전투（1〜6人のターン戦闘、10×8マス・遮蔽・射程、自分の部下と召喚体の個別指示、物語8戦、明示挑戦の最上位4種）→ [docs/fantasy-combat.md](docs/fantasy-combat.md)、[63種の相手と基礎能力](docs/fantasy-combat-monsters.md)
+- 판타지 파티（最大6人・個別同意の共同移動と調査、専用チャット、承認付き共有品、リーダー提案と参加・辞退・不参加）→ [docs/fantasy-party.md](docs/fantasy-party.md)。人数別補正は [戦闘バランス](docs/fantasy-party-combat-plan.md)
+- 모험가 길드의 사제·범죄 직업 등록 제한과 기존 등급 비활성화 → [길드 등록 대상](docs/fantasy-guild-eligibility-2026-10-31.md)
+- 미개척 대륙 원정·밀항·생존·최초 클리어 유물·장비 부위·해안 안개 → [구현과 검증](docs/fantasy-frontier-2026-10-31.md)
+- 갑판·해양 몬스터·촉수·선상 작살 → [해상 전투](docs/fantasy-naval-combat-2026-10-31.md)
+- 계절 의복·냉기/보온 도구·야영 방수·이동 중 장비 교체·스탯 효과 표시 → [계절·날씨 대응](docs/fantasy-weather-equipment-2026-10-31.md)
+- 의뢰 소속·신전/뒷골목 성장·혼합 파티 균등 보수·전투 공헌 및 경제 검사 → [의뢰·파티 v9](docs/fantasy-institutions-v9-2026-10-31.md)
+- 주직업(전투) 1개 + 서브직업(생산·생활) 1개 동시 사용, 상인길드·주민 가공 의뢰·고용 NPC 생산 및 역할 검증 → [직업·생산 의뢰 v8](docs/fantasy-dual-careers-artisans-2026-10-31.md)
+- 판타지 전투（1〜6人のターン戦闘、10×8マス・遮蔽・射程、自分の部下と召喚体の個別指示、物語8戦、明示挑戦の最上位4種）→ [docs/fantasy-combat.md](docs/fantasy-combat.md)、[相手と基礎能力](docs/fantasy-combat-monsters.md)、[職業・種族の戦闘機能](docs/fantasy-combat-capabilities.md)、[敵の予告攻撃と追加移動](docs/fantasy-enemy-attacks.md)、[パーティ役割を保つ職業調整v7](docs/fantasy-combat-roles-2026-10-31-v7.md)、[合算22区間の目標調整v6](docs/fantasy-combat-targets-2026-10-31-v6.md)、[職業・種族の偏差調整v5](docs/fantasy-combat-variance-2026-10-31-v5.md)、[v4検証](docs/fantasy-combat-validation-2026-10-30-v4.md)、[引継ぎ交差検証](docs/fantasy-cross-verification.md)
+- 魔法陣2/4/6ルーン、司祭の治癒・奇跡、瀕死、錬金薬液、写本、家具、鞄と夜の競売 → [docs/fantasy-runic-circles.md](docs/fantasy-runic-circles.md)
+- 同一ルーンの重複、錬金の発見、持続する戦場効果、無作為の遺跡・野営・交代見張り、上位10位 → [原理と保存仕様](docs/fantasy-expeditions-and-discoveries.md)。依頼時にまとめて行う[検査待ち一覧](docs/fantasy-validation-backlog.md)
+- 職業・種族の攻撃形状、槍・大剣・長弓と体格の射程差、直線・扇形・ブレスの範囲予告 → [攻撃形状と技能表](docs/fantasy-attack-shapes.md)
+- 身体特性の拡張、自然の攻撃技、貫通突進・接近攻撃・射撃位置への移動 → [身体と機動技能](docs/fantasy-body-and-mobility-skills.md)
+- 遺跡の内部地図、制作素材と身体の拡張、邸宅・倉庫・雇用と季節の商売 → [統合仕様](docs/fantasy-estates-workshops-and-maps.md)、[内部地図](docs/fantasy-interior-maps.md)、[制作と身体](docs/fantasy-workshop-and-body-expansion.md)、[事業と雇用](docs/fantasy-businesses.md)、[雇用戦闘員](docs/fantasy-worker-companions.md)
+- 地形・季節・旅の進行に合わせた配色、画面端の装飾、文字の可読性 → [docs/fantasy-terrain-ui.md](docs/fantasy-terrain-ui.md)
+- 遺跡・洞窟探索、発見して学ぶ合成魔法、地図商人、世界共通の日次在庫と夜間営業 → [docs/fantasy-dungeons-magic.md](docs/fantasy-dungeons-magic.md)
 - 悠久の旅路の公式設定・種族と文化 → [docs/world-bible.md](docs/world-bible.md)、実装済み内容と残る範囲 → [docs/fantasy-expansion-plan.md](docs/fantasy-expansion-plan.md)、農地・商業・居住48区画の取引と利用 → [docs/fantasy-property-plan.md](docs/fantasy-property-plan.md)
 - 悠久の旅路のモンスター58種 → [docs/fantasy-monster-list.md](docs/fantasy-monster-list.md)、司祭独自の信仰成長と四つの道 → [docs/priest-growth-plan.md](docs/priest-growth-plan.md)
 - 職業の専門分野（一般145・司祭4、取得条件は非公開）→ [専門分野の規則](docs/fantasy-job-paths.md)、[全149分野の一覧](docs/fantasy-job-advancement-candidates.md)
@@ -124,3 +142,12 @@ DB のテーブルを変えるときは `server/db/schema.ts` を直して `npm 
 
 - ファンタジーワールド専用の言語選択と廃止したブラウザAIの整理: [docs/browser-ai-support.md](docs/browser-ai-support.md)
 - NPC別の上半身イラストと制作記録: [docs/npc-portraits.md](docs/npc-portraits.md)
+- RPGの遅延読み込み・処理時間と計測方法: [docs/fantasy-performance.md](docs/fantasy-performance.md)
+
+
+- 사제의 신전 전용 성직 등급·길드 등록 제외 및 기관 혜택 → [성직 등급](docs/fantasy-clergy-ranks-and-benefits-2026-10-30.md).
+- 길드 승급·NPC 대화 거래·사망 확인·몬스터 균형 최신 반영 → [통합 기록](docs/fantasy-guild-dialogue-handoff-2026-10-30.md) (승률 실측 및 검증은 요청 시 실행).
+- 판타지 최신 요청/재개 기록: [성자·전투·착용 개편](docs/fantasy-saint-combat-handoff.md) (검증은 사용자 요청 시 일괄 실행).
+
+
+- [Fantasy: rank benefits, camping, retreats, supplementary bags and travel burden — implementation handoff (unverified)](docs/fantasy-rank-camp-bags-handoff-2026-10-30.md)

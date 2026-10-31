@@ -54,7 +54,8 @@ test('a body action alone waits for a separate wagon order, and a deadline leave
   assert.equal(deadline.state.escort!.order, undefined); assert.equal(deadline.state.escort!.orderedBy, undefined);
 });
 test('killing the attackers alone does not finish an escort; the living wagon must reach the actual exit', () => {
-  let state = battle(); state = choose(state, 'u-0', { type: 'skill', skill: 'fire', target: 'enemy' }); state = choose(state, 'u-0', { type: 'escort', order: { type: 'guard' } });
+  let state = battle(); state.fighters.find(fighter => fighter.side === 'enemies')!.hp = 1; assert.ok(validFantasyCombatState(state));
+  state = choose(state, 'u-0', { type: 'skill', skill: 'fire', target: 'enemy' }); state = choose(state, 'u-0', { type: 'escort', order: { type: 'guard' } });
   assert.equal(state.fighters.find(f => f.side === 'enemies')!.hp, 0); assert.equal(state.status, 'active');
   for (let n = 0; n < 5 && state.status === 'active'; n++) { const tile = fantasyEscortAdvanceTile(state); assert.ok(tile); state = guardedRound(state, tile); }
   assert.equal(state.status, 'victory'); assert.ok(fantasyEscortAtExit(state)); assert.ok(fantasyEscortBattleWon(state)); assert.ok(validFantasyCombatState(state));

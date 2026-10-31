@@ -1,0 +1,16 @@
+.fr-black-market { display: grid; gap: 12px; min-width: 0; }
+.fr-black-market h2, .fr-black-market h3, .fr-black-market p { margin: 0; }
+.fr-black-market-note { padding: 10px; border-left: 3px solid var(--fr-line, #c7ceb8); font-size: .9em; line-height: 1.55; }
+.fr-black-market-lots { display: grid; gap: 12px; }
+.fr-black-market-lot { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--fr-line, #c7ceb8); border-radius: 9px; background: var(--fr-paper, #faf8eb); overflow-wrap: anywhere; }
+.fr-black-market-lot h3 { font-size: 1em; line-height: 1.45; }
+.fr-black-market-price { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.fr-black-market-price strong { font-size: 1.25em; font-variant-numeric: tabular-nums; }
+.fr-black-market-price span { font-size: .85em; }
+.fr-black-market-bid, .fr-black-market-bid label { display: grid; gap: 7px; min-width: 0; }
+.fr-black-market input { min-height: 44px; width: 100%; min-width: 0; box-sizing: border-box; padding: 8px; font-size: 16px; color: inherit; background: transparent; border: 1px solid var(--fr-line, #c7ceb8); border-radius: 6px; }
+.fr-black-market button { min-height: 44px; white-space: normal; }
+.fr-black-market summary { cursor: pointer; padding: 7px 0; }
+.fr-black-market-history { display: grid; gap: 7px; margin: 10px 0 0; padding-left: 20px; }
+.fr-black-market-history li > span { margin-right: 10px; }
+.fr-black-market-history b { white-space: nowrap; font-variant-numeric: tabular-nums; }

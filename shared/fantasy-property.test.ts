@@ -110,6 +110,22 @@ test('using farmland is a timed reservation and harvest does not happen before c
   const done = advanceFantasyWorld(started.profile, 29).profile;
   assert.equal(done.activity, undefined); assert.equal(done.character!.inventory.herb, before + 2); assert.ok(done.character!.jobXp.farmer > 0);
 });
+
+test('property practice and proficiency rewards follow the active life job and cannot train unrelated careers', () => {
+  const p = acquire(farm).profiles.a, c = p.character!;
+  c.job = 'warrior'; c.lifeJob = 'farmer'; c.jobXp = { warrior: 600, farmer: 100, cook: 1000 };
+  const before = c.inventory.herb ?? 0, trained = applyFantasyPropertyUse(p, farm);
+  assert.equal(trained.profile.character!.inventory.herb, before + 3);
+  assert.equal(trained.profile.character!.jobXp.farmer, 103);
+  assert.equal(trained.profile.character!.jobXp.warrior, 600);
+  assert.equal(trained.profile.character!.jobXp.cook, 1000);
+  for (const lifeJob of ['cook', undefined]) {
+    const unrelated = structuredClone(p); unrelated.character!.lifeJob = lifeJob;
+    const result = applyFantasyPropertyUse(unrelated, farm);
+    assert.equal(result.profile.character!.inventory.herb, before + 2);
+    assert.deepEqual(result.profile.character!.jobXp, c.jobXp);
+  }
+});
 test('farmland yields follow relevant proficiency and repeated use gives diminishing mastery', () => {
   let p = acquire(farm).profiles.a; p.character!.job = 'farmer'; p.character!.jobXp.farmer = 100;
   const before = p.character!.inventory.herb ?? 0, first = applyFantasyPropertyUse(p, farm);

@@ -1,9 +1,11 @@
 import type { FantasyCharacter } from './fantasy.ts';
 import type { NpcLocale } from './npc.ts';
 import { FANTASY_JOB_PATH_CATALOG } from './fantasy-job-path-catalog.ts';
+import { FANTASY_RELICS } from './fantasy-relic-catalog.ts';
 
 const BOOKS: Record<string, string[]> = {
   adventurer: ['archive-records', 'field-signs', 'sylvara-journal', 'quiet-sword'],
+  ranger: ['field-signs', 'lantern-fox', 'staff-and-footwork', 'kazaran-journal'],
   hunter: ['field-signs', 'lantern-fox', 'staff-and-footwork', 'kazaran-journal'],
   bard: ['tin-pot-king', 'argument-of-hats', 'archive-records', 'weather-in-a-bottle'],
   mage: ['mirrorwake-voyage', 'mana-primer', 'weather-in-a-bottle', 'stone-and-flame', 'mana-shapes'],
@@ -224,9 +226,11 @@ const STORIES: Record<string, Story> = {
   ],
 };
 const PATHS = [...FANTASY_JOB_PATH_CATALOG, ...PRIEST_PATHS];
-export function fantasyJobPathDiscovered(c: Pick<FantasyCharacter, 'readBooks' | 'jobPaths' | 'priestGrowth'>, path: string): boolean {
+export function fantasyJobPathDiscovered(c: Pick<FantasyCharacter, 'readBooks' | 'jobPaths' | 'priestGrowth' | 'occult' | 'blackMarketStudies'>, path: string): boolean {
   if (Object.values(c.jobPaths ?? {}).some(record => record.path === path)) return true;
   if (c.priestGrowth?.branch && path === `priest-${c.priestGrowth.branch}`) return true;
+  if (path === 'mage-star') return !!c.occult?.starObservations.length;
+  if (FANTASY_RELICS.some(relic => relic.path === path && (c.occult?.usedRelics.includes(relic.id) || c.blackMarketStudies?.includes(relic.id)))) return true;
   const book = FANTASY_JOB_DISCOVERY_BOOKS[path]; return !!book && !!c.readBooks?.includes(book);
 }
 export function fantasyJobDiscoveryPassages(book: string): Record<NpcLocale, string[]> {

@@ -1,5 +1,8 @@
 import type { FantasySpecializationState } from './fantasy-specializations.ts';
 import type { FantasyPriestGrowth, FantasyPriestBranch } from './fantasy-priest-growth.ts';
+import type { FantasyMagicKnowledge } from './fantasy-magic-discovery.ts';
+import type { FantasyDungeonState, FantasyDungeonAction } from './fantasy-dungeon.ts';
+import type { FantasyInteriorMapAction, FantasyInteriorMapCopy } from './fantasy-interior-maps.ts';
 
 export type FantasyGender = 'male' | 'female' | 'none';
 /** 実時間1分あたりのゲーム内分。全参加者で同じ速度を共有する。 */
@@ -16,6 +19,9 @@ export type FantasyCheckContext = 'narrow-space' | 'trap' | 'deep-water' | 'high
 export type FantasyStats = Record<'hp' | 'mp' | 'strength' | 'agility' | 'intelligence' | 'luck' | 'vitality', number> & Partial<Record<'dexterity' | 'charisma', number>>;
 
 export interface FantasySkill {
+  restore?:'mp';
+  utility?:string;
+  retired?:boolean;
   id: string;
   name: string;
   names?: Record<'ko' | 'en' | 'ja', string>;
@@ -70,7 +76,7 @@ export interface FantasyLocation {
   id: string;
   name: string;
   region: string;
-  land: 'aurelia' | 'noctis' | 'sylvara' | 'kazaran' | 'islands';
+  land: 'aurelia' | 'noctis' | 'sylvara' | 'kazaran' | 'islands' | 'frontier';
   names?: Record<'ko' | 'en' | 'ja', string>;
   descriptions?: Record<'ko' | 'en' | 'ja', string>;
   x: number;
@@ -87,7 +93,7 @@ export interface FantasyRoute {
   mode: 'land' | 'sea' | 'gate';
   hours: number;
 }
-export type FantasyEquipmentSlot = 'weapon' | 'offhand' | 'armor' | 'accessory';
+export type FantasyEquipmentSlot = 'weapon' | 'offhand' | 'head' | 'body' | 'legs' | 'feet' | 'ring1' | 'ring2' | 'necklace' | 'gloves' | 'artifact' | 'armor' | 'accessory';
 export interface FantasyGearInstance {
   id: string; item: string; quality: 1 | 2 | 3 | 4 | 5; createdAt: number;
   bonuses?: Partial<FantasyStats>; guard?: number; check?: number; material?: string; gem?: string;
@@ -97,6 +103,8 @@ export interface FantasyTimedEffect {
   diceFaces?: 'odd' | 'lower'; dicePenalty?: number;
 }
 export interface FantasyItem {
+  craftOnly?:boolean;
+  combatUse?:Omit<import('./fantasy-combat.ts').FantasyCombatSkill,'id'|'names'|'mp'>;
   id: string; name: string; price: number; description: string;
   names?: Record<'ko' | 'en' | 'ja', string>; descriptions?: Record<'ko' | 'en' | 'ja', string>;
   category?: string; tier?: 1 | 2 | 3 | 4 | 5;
@@ -107,11 +115,14 @@ export interface FantasyItem {
   sellJobs?: string[]; buyJobs?: string[];
   drop?: { kinds?: FantasyLocation['kind'][]; chance: number; minDanger?: number };
   food?: { shelfLife: number; nutrition: number };
+  foodPenalty?: { fatigue: number; status?: 'poison' | 'weakness' };
   light?: boolean;
   wear?: { warmth: number; cooling: number; waterproof: number };
+  weatherTool?: { warmth?: number; cooling?: number; waterproof?: number; campOnly?: boolean };
 }
-export interface FantasyRecipe { id: string; name: string; job: string; inputs: Record<string, number>; output: string; count: number; dc: number }
+export interface FantasyRecipe { id: string; name: string; job: string; inputs: Record<string, number>; output: string; count: number; dc: number;requiresBook?:string;requiresLocations?:string[] }
 export type FantasyQuestObjective =
+  | { type: 'dungeon'; site: string; goal: 'inspect' | 'clear'; count: number }
   | { type: 'hunt'; monster?: string; count: number }
   | { type: 'gather'; resource: 'herbs' | 'wood' | 'minerals' | 'gems'; count: number }
   | { type: 'craft'; recipe: string; count: number }
@@ -122,6 +133,7 @@ export interface FantasyQuest {
   names?: Record<'ko' | 'en' | 'ja', string>; descriptions?: Record<'ko' | 'en' | 'ja', string>;
   races?: string[]; families?: string[]; building?: string;
   jobs?: string[];
+  institution?: import('./fantasy-institutions.ts').FantasyInstitution;
   requiresCompleted?: string[];
   issuer?: string;
   reportAt?: string;
@@ -144,7 +156,7 @@ export interface FantasyEvent {
   races?: string[]; families?: string[]; locations?: string[];
 }
 export interface FantasyLog { id: number; hour: number; text: string; kind: 'story' | 'success' | 'failure' | 'system' }
-export interface FantasyFoodLot { id: string; item: string; count: number; createdAt: number }
+export interface FantasyFoodLot { id: string; item: string; count: number; createdAt: number; preservedHours?:number; preservationAt?:number }
 export interface FantasyManaState {
   stage: 0 | 1 | 2 | 3 | 4;
   mastery: number;
@@ -163,12 +175,17 @@ export interface FantasyCharacter {
   race: string;
   gender: FantasyGender;
   job: string;
+  lifeJob?: string;
   level: number;
   xp: number;
   gold: number;
   hp: number;
+  /** Current job maximum-HP formula; absent only in legacy saves. */
+  jobHpVersion?: 1;
   mp: number;
   location: string;
+  /** Authoritative road position, also retained when a journey is interrupted. */
+  travelPosition?: FantasyTravelPosition;
   hour: number;
   fatigue: number;
   hunger: number;
@@ -178,6 +195,7 @@ export interface FantasyCharacter {
   quests: string[];
   completed: string[];
   visited: string[];
+  seen?: string[];
   jobXp: Record<string, number>;
   buff: { stat?: FantasyStat; power: number; effect: FantasySkill['effect']; skill?: string; mp?: number; diceFaces?: 'steady' | 'even' | 'upper'; dice?: number; expiresAt?: number } | null;
   equipment?: Partial<Record<FantasyEquipmentSlot, string>>;
@@ -186,6 +204,25 @@ export interface FantasyCharacter {
   reputation?: { lands: Record<string, number>; regions: Record<string, number>; towns: Record<string, number> };
   bargains?: Partial<Record<'room' | 'food' | 'goods', { location: string; discount: number; expiresAt: number; nextAt: number }>>;
   mana?: FantasyManaState;
+  magicKnowledge?: FantasyMagicKnowledge;
+  manaRecoveryAt?:number;
+  utilityPractice?:import('./fantasy-world-utilities.ts').FantasyUtilityPractice;
+  bag?:string;
+  pendingLoot?:Record<string,import('./fantasy-bags.ts').FantasyPendingLoot>;
+  productionClaims?:string[];
+  interiorMaps?: FantasyInteriorMapCopy[];
+  blackMarketClues?:string[];
+  blackMarketStudies?:string[];
+  circleKnowledge?: import('./fantasy-magic-circle.ts').FantasyCircleKnowledge;
+  alchemyKnowledge?: import('./fantasy-alchemy-discovery.ts').FantasyAlchemyKnowledge;
+  occult?: import('./fantasy-occult.ts').FantasyOccultState;
+  downed?: import('./fantasy-downed.ts').FantasyDownedState;
+  miracles?: import('./fantasy-miracles.ts').FantasyMiracleKnowledge;
+  lastDawnPledge?: {combat:string;generation:number};
+  soulAfflictions?: import('./fantasy-miracle-combat.ts').FantasySoulAffliction[];
+  carrying?: import('./fantasy-carry-return.ts').FantasyCarryState;
+  returnLantern?: import('./fantasy-carry-return.ts').FantasyReturnLanternState;
+  dungeon?: FantasyDungeonState;
   learnedSkills?: string[];
   skillXp?: Record<string, number>;
   practice?: Partial<Record<'explore' | 'craft' | 'gather' | 'hunt' | 'fish' | 'command', number>>;
@@ -200,8 +237,20 @@ export interface FantasyCharacter {
   lifeStartedAt?: number;
   birthBonuses?: Partial<FantasyStats>;
   outfit?: string;
-  lastHunt?: { id: string; location: string; hour: number; success: boolean };
-  contracts?: Record<string, { offerId: string; issuer: string; boardLocation: string; acceptedAt: number; expiresAt: number; progress: number; gold: number }>;
+  lastHunt?: { id: string; location: string; hour: number; success: boolean; count?:number; receipt?:string };
+  contracts?: Record<string, import('./fantasy-contracts.ts').FantasyContractGrant>;
+  magicBags?: string[];
+  retreatMemories?: import('./fantasy-retreats.ts').FantasyRetreatMemory[];
+  rankBenefits?: import('./fantasy-rank-benefits.ts').FantasyRankBenefitsState;
+  rankBookRewards?: import('./fantasy-rank-rewards.ts').FantasyRankBookRewards;
+  guildProgress?: import('./fantasy-guild-progression.ts').FantasyGuildProgress;
+  underworld?: import('./fantasy-underworld.ts').FantasyUnderworldProgress;
+  contractParties?: Record<string,import('./fantasy-party-contracts.ts').FantasyPartyContractRecord>;
+  guildAssessment?: {grade:import('./fantasy-adventurer.ts').FantasyAdventurerGrade;score:number;assessedAt:number};
+  encounterTier?:import('./fantasy-adventurer.ts').FantasyRegularEncounterTier;
+  equipmentVersion?: 1;
+  expedition?: import('./fantasy-expedition.ts').FantasyExpeditionProgress;
+  monsterSites?:string[];
   notoriety?: number;
   lastPrayerDay?: number;
   priestGrowth?: FantasyPriestGrowth;
@@ -209,6 +258,7 @@ export interface FantasyCharacter {
   taskProgress?: Record<string, { acceptedAt: number; progress: number; lastAt: number }>;
   escort?: { id: string; from: string; destination: string; hours: number; reward: number; acceptedAt: number; defense?: 'pending' | 'cleared' };
   escortHistory?: Record<string, number>;
+  escortPenalty?: { amount: number; paid: number; hour: number; destination: string };
   voyageEnding?: { hour: number };
   voyageDecisions?: Record<string, { choice: string; hour: number }>;
   combatStoryVersion?: 1;
@@ -246,10 +296,28 @@ export interface FantasyActivity {
   endsAt: number;
   /** Persisted deterministic roll stream; never a precomputed visible result. */
   seed: number;
+  camp?: import('./fantasy-camping.ts').FantasyCampProgress;
+  cookingMage?: boolean;
+  cooking?: { completed: number };
+  retreatCamp?: import('./fantasy-retreats.ts').FantasyRetreatCampSnapshot;
   work?: FantasyWorkProgress;
+  travel?: FantasyTravelState;
 }
+export interface FantasyTravelPosition { from: string; to: string; fraction: number; transport?: 'ship' | 'working-ship' | 'airship' | 'gate'; remainingHours?: number }
+export interface FantasyTravelLeg { from: string; to: string; transport: string; hours: number; cost: number; startFraction?: number }
+export interface FantasyTravelState { legs: FantasyTravelLeg[]; paid: number; ambushChecked: number; ambushStartedAt?: number }
 export interface FantasyWorkProgress { completed: number; successes: number; gold: number; xp: number; totalSteps?: 8 | 16 }
 export type FantasyAction =
+    | import('./fantasy-cooking.ts').FantasyCookingAction
+  | import('./fantasy-alchemy-synthesis.ts').FantasyAlchemyComposeAction
+  | {type:'bagEquip';item:string}
+  | {type:'bagClaim'}
+  | import('./fantasy-occult.ts').FantasyOccultAction
+  | {type:'magicCompose';slot:number;core:string;runes:string[]}
+  | {type:'downedCare';method:'potion'|'temple'}
+  | FantasyDungeonAction
+  | FantasyInteriorMapAction
+  | { type: 'templeTreat' }
   | { type: 'sync' }
   | { type: 'draw' }
   | { type: 'keep' }
@@ -261,13 +329,21 @@ export type FantasyAction =
   | { type: 'finishVoyage' }
   | { type: 'voyageDecision'; decision: string; choice: string }
   | { type: 'explore' }
-  | { type: 'rest' }
+  | { type: 'rest'; watch?: boolean }
   | { type: 'lodge'; room: 'common' | 'private' | 'suite' }
   | { type: 'eat'; meal: 'simple' | 'hearty' | 'feast' }
-  | { type: 'work' }
+  | { type: 'work'; career?: 'combat' | 'life' }
   | { type: 'pray' }
+  | { type: 'guildAssess' }
+  | import('./fantasy-underworld.ts').FantasyUnderworldAction
+  | { type: 'magicBagRemove'; slot: 0 | 1 }
+  | { type: 'campCook'; recipe: string }
+  | { type: 'rankBookClaim'; source: 'adventurer' | 'priest'; skill: string }
+  | import('./fantasy-rank-benefits.ts').FantasyRankBenefitAction
+  | { type: 'guildRaidStart';offer:string }
   | { type: 'propertyUse'; plot: string }
   | { type: 'advanceJob'; path: string }
+  | import('./fantasy-miracles.ts').FantasyMiracleAction
   | { type: 'priestVow'; quest: string }
   | { type: 'priestReleaseVow' }
   | { type: 'priestBranch'; branch: FantasyPriestBranch }
@@ -285,11 +361,13 @@ export type FantasyAction =
   | { type: 'complete'; quest: string }
   | { type: 'abandon'; quest: string }
   | { type: 'investigate'; quest: string; approach: FantasyMainApproach }
-  | { type: 'craft'; recipe: string; material?: string; gem?: string }
+  | { type: 'craft'; recipe: string; material?: string; gem?: string; workshop?: string }
+  | ({ type: 'commission' } & import('./fantasy-commissions.ts').FantasyCommissionRequest)
   | { type: 'sell'; item: string; instance?: string; quality?: 'fresh' | 'stale' | 'spoiled' }
-  | { type: 'buy'; item: string }
+  | { type: 'buy'; item: string; count?: number; building?: import('./fantasy-town.ts').FantasyBuildingId }
   | { type: 'use'; item: string }
-  | { type: 'equip'; item: string; instance?: string }
+  | { type: 'equip'; item: string; instance?: string; slot?: FantasyEquipmentSlot }
+  | { type: 'expeditionJoin'; route: 'guild' | 'smuggler' }
   | { type: 'unequip'; slot: FantasyEquipmentSlot }
   | { type: 'haggle'; service: 'room' | 'food' | 'goods' }
   | { type: 'manaTrain'; exercise: 'sense' | 'circulate' | 'shape' | 'release' | 'refine' }
@@ -299,7 +377,9 @@ export type FantasyAction =
   | { type: 'magicPrepare'; slot: number; element: string; form: string }
   | { type: 'magicCast'; slot: number }
   | { type: 'alchemy'; formula: string }
-  | { type: 'event'; choice: string };
+  | { type: 'event'; choice: string }
+  | { type: 'cancel' }
+  | { type: 'redirect'; destination: string; transport?: string };
 export interface FantasyTransport {
   id: string;
   name: string;
@@ -310,5 +390,6 @@ export interface FantasyTransport {
   available: boolean;
   reason?: string;
   path: string[];
+  legs?: FantasyTravelLeg[];
 }
 export interface FantasyResult { profile: FantasyProfile; error?: string; changed: boolean }

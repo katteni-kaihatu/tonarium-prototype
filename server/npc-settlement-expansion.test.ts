@@ -56,12 +56,16 @@ test('every new facility has its own local staff, each new settlement a resident
     assert.ok(buildings.some(building => building.id === 'inn'));
     assert.equal(locals.filter(npc => npc.building === 'residence').length, 1, location);
     for (const building of buildings) {
-      assert.equal(building.npcIds.length, 1, `${location}: ${building.id}`);
-      const staff = locals.find(npc => npc.id === building.npcIds[0]);
-      assert.equal(staff?.building, building.id); facilityStaff++;
+      assert.ok(building.npcIds.length >= 1, `${location}: ${building.id}`);
+      for (const id of building.npcIds) {
+        const staff = NPC_PUBLIC.find(npc => npc.id === id);
+        assert.equal(staff?.homeLocation, location);
+        assert.equal(staff?.building, building.id);
+      }
+      facilityStaff++;
     }
   }
-  assert.equal(facilityStaff, 33);
+  assert.equal(facilityStaff, 38);
   for (const npc of NPC_SETTLEMENT_EXPANSION.filter(npc => npc.building !== 'residence')) assert.ok(fantasyBuildings({ location: npc.homeLocation }).some(building => building.id === npc.building && building.npcIds.includes(npc.id)), npc.id);
 });
 
