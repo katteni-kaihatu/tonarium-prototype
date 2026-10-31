@@ -2,6 +2,7 @@ import { t, useLanguage, msg, type UiMessage } from '../../i18n/index.ts';
 import type { AntimatterSlice } from './types.ts';
 import { formatNumber } from './format.ts';
 import { s } from './styles.ts';
+import { LabArt } from './LabArt.tsx';
 
 export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (message: UiMessage) => void }) {
   useLanguage();
@@ -29,7 +30,7 @@ export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (messag
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div className="ad-upgrade" style={{ background: 'linear-gradient(105deg, #202d49, #241e3a)', border: '1px solid #8572e64d', borderRadius: 14, padding: 10 }}>
         <div className="ad-upgrade-description">
-          <b>Dimension Boost / Shift</b>
+          <div className="ad-upgrade-heading"><LabArt kind="boost" size={40} /><b>Dimension Boost / Shift</b></div>
           <div className="ad-upgrade-status" style={s.muted}>
             <span>{t('adRequired')}: {t('adLabText13', boost.tier)}</span>
             <span className="ad-number">{formatNumber(boost.amount)}</span>
@@ -41,7 +42,7 @@ export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (messag
       </div>
       <div className="ad-upgrade" style={{ background: 'linear-gradient(105deg, #202d49, #241e3a)', border: '1px solid #8572e64d', borderRadius: 14, padding: 10 }}>
         <div className="ad-upgrade-description">
-          <b>Antimatter Galaxy</b>
+          <div className="ad-upgrade-heading"><LabArt kind="galaxy" size={40} /><b>Antimatter Galaxy</b></div>
           <div className="ad-upgrade-status" style={s.muted}>
             <span>{t('adRequired')}: {t('adLabText13', galaxy.tier)}</span>
             <span className="ad-number">{formatNumber(galaxy.amount)}</span>
@@ -53,7 +54,7 @@ export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (messag
       </div>
       <div className="ad-upgrade" style={{ background: 'linear-gradient(105deg, #202d49, #241e3a)', border: '1px solid #8572e64d', borderRadius: 14, padding: 10 }}>
         <div className="ad-upgrade-description">
-          <b>Dimensional Sacrifice</b>
+          <div className="ad-upgrade-heading"><LabArt kind="reactor" size={40} /><b>Dimensional Sacrifice</b></div>
           <div className="ad-upgrade-status" style={s.muted}>
             <span>{t('adMultiplier')} · {t('adLabText13', 8)}</span><span className="ad-number">×{formatNumber(sacrifice.boost)}</span>
             <span className="ad-upgrade-summary">{sacrifice.unlocked ? t('adLabText39') : t('adLabText40', sacrifice.boosts)}</span>
@@ -63,7 +64,7 @@ export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (messag
       </div>
       <div className="ad-upgrade" style={{ background: 'linear-gradient(105deg, #202d49, #241e3a)', border: '1px solid #8572e64d', borderRadius: 14, padding: 10 }}>
         <div className="ad-upgrade-description">
-          <b>Big Crunch（Infinity）</b>
+          <div className="ad-upgrade-heading"><LabArt kind="singularity" size={40} /><b>Big Crunch（Infinity）</b></div>
           <div className="ad-upgrade-status" style={s.muted}>
             <span className="ad-upgrade-summary">{infinity.can ? t('adLabText41', infinity.gain) : t('adLabText42')}</span>
             <span>IP</span><span className="ad-number">{formatNumber(game.infinityPoints)}</span>

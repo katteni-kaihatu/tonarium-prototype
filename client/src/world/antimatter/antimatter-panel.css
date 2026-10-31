@@ -80,8 +80,11 @@
 .ad-tickspeed-numbers { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
 .ad-upgrade { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; align-items: start; }
 .ad-upgrade-description { min-width: 0; overflow-wrap: anywhere; }
+.ad-upgrade-heading { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 8px; min-block-size: 40px; margin-bottom: 4px; }
+.ad-upgrade-heading > svg { display: block; width: 40px; height: 40px; }
 .ad-upgrade-status { display: grid; gap: 4px; }
-.ad-upgrade-status:has(> .ad-number) { grid-template-columns: minmax(0, 1fr) minmax(8ch, .7fr); }
+.ad-upgrade-status:has(> .ad-number) { grid-template-columns: minmax(0, 1fr) 13ch; }
+.ad-upgrade-status > span { min-block-size: 1.5em; }
 .ad-upgrade-status > .ad-number { text-align: right; }
 .ad-upgrade-summary { grid-column: 1 / -1; }
 .ad-upgrade > button { grid-column: 1 / -1; min-height: 36px; }
