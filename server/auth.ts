@@ -49,8 +49,14 @@ export function parseCookies(header: string | undefined): Record<string, string>
 
 /** 前段（Coolify）が付ける X-Forwarded-* を優先して、ブラウザから見た自分のオリジンを返す */
 export function requestOrigin(req: http.IncomingMessage) {
-  const proto = String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0].trim();
+  let proto = String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0].trim();
   const host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? 'localhost').split(',')[0].trim();
+  if (proto !== 'https' && req.headers.origin) {
+    try {
+      const browserOrigin = new URL(req.headers.origin);
+      if (browserOrigin.protocol === 'https:' && browserOrigin.host === host) proto = 'https';
+    } catch {}
+  }
   return /^[\w.:[\]-]+$/.test(host) ? `${proto === 'https' ? 'https' : 'http'}://${host}` : '';
 }
 
