@@ -229,6 +229,10 @@
 
 /* 下：ドック */
 .dock { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 24px; background: var(--dock); box-shadow: var(--shadow); color: var(--ink); }
+.world .hub-open .dock { position: relative; left: auto; bottom: auto; transform: none; width: 100%; min-width: 0; max-width: none; justify-content: safe center; padding: 12px; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; overflow-x: auto; overscroll-behavior: contain; }
+.hub-open .dock > * { flex-shrink: 0; }
+.popover.soundboard, .popover.emote-picker, .popover.volume { z-index: 47; }
+.world.locked .session-surface .dock { opacity: .4; pointer-events: none; }
 .dk { width: 52px; height: 52px; padding: 0; border: 0; border-radius: 16px; background: var(--dock2); color: var(--ink); }
 .dk:hover:not(:disabled) { background: var(--dock3); }
 .dk.muted { background: #FCE7E3; color: #A8321F; }
