@@ -144,16 +144,18 @@ function ItemRow({ item, d, band, heldBy, onMenu, menuOpen }: {
       <button className="pmain" data-popanchor onClick={(ev) => (key ? openWindow(key) : onMenu(ev.currentTarget.getBoundingClientRect()))}>
         {mark(big ? 32 : 22)}
         <span className="ptext">
-          <span className="pname">{label}{!big && status && <span className="pstat">{status}</span>}</span>
-          {big && status && <span className="pstat">{status}</span>}
+          <span className="pname" title={label}>{label}</span>
         </span>
+        {status && <span className="pstat">{status}</span>}
+        {item.kind === 'camera' && item.live && (
+          <span className="livechip" title={tr("ui607", nameOf(item.operator))}><i />LIVE</span>
+        )}
       </button>
-      {item.kind === 'camera' && item.live && (
-        <span className="livechip" title={tr("ui607", nameOf(item.operator))}><i />LIVE</span>
-      )}
-      {key && (open
-        ? <button className="showing" onClick={() => toggleFromList(key)} title={tr("ui608")}><Icon name="window" size={11} stroke={2.4} />{tr("ui609")}</button>
-        : <button className="openbtn" onClick={() => openWindow(key)}>{tr("ui598")}</button>)}
+      <span className="item-action">
+        {key && (open
+          ? <button className="showing" onClick={() => toggleFromList(key)} title={tr("ui608")}><Icon name="window" size={11} stroke={2.4} />{tr("ui609")}</button>
+          : <button className="openbtn" onClick={() => openWindow(key)}>{tr("ui598")}</button>)}
+      </span>
       <span className="dist">{heldBy === selfId ? tr("ui610") : formatDistance(d)}</span>
       <button
         className={`ib more ${menuOpen ? 'on' : ''}`} aria-label={tr("ui603", label)} aria-haspopup="menu" data-popanchor
