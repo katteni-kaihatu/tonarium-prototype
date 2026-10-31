@@ -10,7 +10,6 @@ import { ProfilePanel } from './ProfilePanel.tsx';
 import { ProgressPicker, ProgressSummary } from './ProgressPicker.tsx';
 import { LayerTabs } from './LayerTabs.tsx';
 import './antimatter-panel.css';
-import { LabBanner } from './LabArt.tsx';
 import { emitAdFeedback } from '../../ad/feedback.ts';
 import { AdPurchaseParticles } from './AdPurchaseParticles.tsx';
 import { AdBgmToggle } from '../../ad/AdBgmToggle.tsx';
@@ -40,26 +39,32 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
   }, [notice]);
 
   const { game, derived } = ad;
+  const activeTab = tab === 'layers' && !(game.infinities > 0) ? 'dimensions' : tab;
+  if (activeTab !== tab) setTab(activeTab);
   const offline = ad.offlineNotice;
   const offlineGained = offline && (offline.antimatterGained.mantissa ?? 0) !== 0 && offline.elapsedMs >= 5000;
 
   return (
     <div ref={root} className="ad-lab-panel" style={s.root} role="region" aria-label={t('mergeAdLab')} tabIndex={0}>
-      <div data-ad-core><LabBanner kind="reactor" eyebrow={t('adLabEyebrow')} title={t('adLabText8')} description={t('adLabText9')} /></div>
-      <div style={s.header}>
-        <span className="ad-resource-label">{t('adLabText1')}</span>
-        <span className="ad-resource-value" style={s.big}>{formatNumber(game.antimatter)}</span>
-        <span style={s.muted}>{t('adPerSecond', formatNumber(derived.antimatterPerSecond))}</span>
-        <span style={s.muted}>IP: {formatNumber(game.infinityPoints)}</span>
-        <span style={s.muted}>{t('adLabText2', game.dimensionalBoosts, game.galaxies)}</span>
-        <span style={{ flex: 1 }} />
-        <AdBgmToggle />
-        {ad.activeProfile && <span style={s.muted}>{ad.activeProfile.name}</span>}
+      <div className="ad-header" style={s.header}>
+        <div className="ad-resource" data-ad-core>
+          <span className="ad-resource-label">{t('adLabText1')}</span>
+          <span className="ad-resource-value ad-number" style={s.big}>{formatNumber(game.antimatter)}</span>
+          <span className="ad-number" style={s.muted}>{t('adPerSecond', formatNumber(derived.antimatterPerSecond))}</span>
+        </div>
+        <div className="ad-header-progress">
+          <span className="ad-number">IP: {formatNumber(game.infinityPoints)}</span>
+          <span>{t('adLabText2', game.dimensionalBoosts, game.galaxies)}</span>
+        </div>
+        <div className="ad-header-profile">
+          {ad.activeProfile && <span style={s.muted}>{ad.activeProfile.name}</span>}
+          <AdBgmToggle />
+        </div>
       </div>
       <div style={s.tabs} aria-label={t('adLabText10')}>
-        {TABS.map((item) => (
-          <button key={item.id} aria-pressed={item.id === tab} style={item.id === tab ? s.tabActive : s.tab} onClick={() => {
-            if (item.id === tab) return;
+        {TABS.filter(item => item.id !== 'layers' || game.infinities > 0).map((item) => (
+          <button key={item.id} aria-pressed={item.id === activeTab} style={item.id === activeTab ? s.tabActive : s.tab} onClick={() => {
+            if (item.id === activeTab) return;
             setTab(item.id);
             emitAdFeedback({ kind: 'navigate' });
           }}>{t(item.label)}</button>
@@ -76,11 +81,11 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
           }}>{t(source === 'local' ? 'adChooseLocal' : 'adChooseRemote')}</button>
         </div>)}
       </div>}
-      {tab === 'dimensions' && <DimensionList ad={ad} />}
-      {tab === 'actions' && <ActionBar ad={ad} notice={showNotice} />}
-      {tab === 'stats' && <StatsPanel ad={ad} notice={showNotice} />}
-      {tab === 'profiles' && <ProfilePanel ad={ad} notice={showNotice} />}
-      {tab === 'layers' && <LayerTabs ad={ad} />}
+      {activeTab === 'dimensions' && <DimensionList ad={ad} />}
+      {activeTab === 'actions' && <ActionBar ad={ad} notice={showNotice} />}
+      {activeTab === 'stats' && <StatsPanel ad={ad} notice={showNotice} />}
+      {activeTab === 'profiles' && <ProfilePanel ad={ad} notice={showNotice} />}
+      {activeTab === 'layers' && <LayerTabs ad={ad} />}
       <AdPurchaseParticles root={root} />
       {offlineGained && createPortal(
         <div style={s.modal} data-xr-surface="ad-offline" data-xr-layout="dialog" data-xr-min-width="512" data-xr-title={t('adLabText11')} onClick={() => ad.dismissOffline()}>

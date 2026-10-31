@@ -55,8 +55,12 @@ test('2D tabs and 3D exhibits render in three languages without changing saves o
       assert.ok(dimensions.includes(t('adLabText14')));
       const layers = renderToStaticMarkup(<LayerTabs ad={ad} />);
       assert.ok(layers.includes(t('adLabText147')));
+      assert.ok(layers.includes(t('adLocked')));
+      for (const html of [dimensions, layers]) assert.doesNotMatch(html, /[🔥🏆🔒]/u);
       const stats = renderToStaticMarkup(<StatsPanel ad={ad} notice={() => {}} />);
       assert.ok(stats.includes(t('adLabText133')));
+      assert.ok(stats.includes(t('adNotAchieved')));
+      assert.doesNotMatch(stats, /[🔥🏆🔒]/u);
       assert.ok(stats.includes('名前 {0} 플레이어'));
       for (const target of ['core', 'tickspeed', 'boost', 'galaxy', 'sacrifice', 'crunch', 'dimension-1', 'dimension-8', 'exhibit-infinity', 'exhibit-eternity', 'exhibit-reality', 'exhibit-celestials'] as const) {
         const space = panels(slice, target).space;
@@ -67,7 +71,7 @@ test('2D tabs and 3D exhibits render in three languages without changing saves o
     }
   } finally { setLanguage(previous); }
 });
-import { formatDuration } from './format.ts';
+import { formatDuration, formatNumber } from './format.ts';
 
 function harness(game: GameState) {
   let slice: AdSlice;
@@ -235,7 +239,10 @@ for (const language of ['ja', 'en', 'ko'] as const) {
             assert.equal(disabled(flat, target === 'boost' ? t('adLabText26') : t('adLabText28')), expected);
             assert.equal(disabled(space, target === 'boost' ? t('adLabText115') : t('adLabText119')), expected);
             assert.equal(target === 'boost' ? ad.derived.boost.can : ad.derived.galaxy.can, !expected);
-            assert.ok(flat.includes(t(target === 'boost' ? 'adLabText25' : 'adLabText27', req.tier, String(req.amount), req.tier, String(req.amount + offset), target === 'boost' ? game.dimensionalBoosts : game.galaxies)));
+            assert.ok(flat.includes(t('adRequired') + ': ' + t('adLabText13', req.tier)));
+            assert.match(flat, new RegExp('class="ad-number">' + req.amount + '</span>'));
+            assert.match(flat, new RegExp('class="ad-number">' + (req.amount + offset) + '</span>'));
+            assert.ok(flat.includes(t(target === 'boost' ? 'adLabText46' : 'adLabText47', target === 'boost' ? game.dimensionalBoosts : game.galaxies)));
             assert.ok(space.includes(t('adRequirementCurrentAmount', String(req.amount + offset))));
             assert.equal(disabled(panels(slice, target, false).space, target === 'boost' ? t('adLabText115') : t('adLabText119')), true);
           }
@@ -276,3 +283,40 @@ for (const language of ['ja', 'en', 'ko'] as const) {
   });
 
 }
+
+test('first Infinity unlocks upper layers and Research keeps the initial Crunch available in all languages', () => {
+  const previous = getLanguage();
+  try {
+    for (const [language, research] of [['ja', '研究開発'], ['en', 'Research'], ['ko', '연구개발']] as const) {
+      setLanguage(language);
+      assert.equal(t('adLabText5'), research);
+      const game = createNewGame(0);
+      game.antimatter = bigFromNumber(1.79e308);
+      const slice = harness(game);
+      const before = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
+      assert.ok(before.includes('>' + research + '</button>'));
+      assert.ok(!before.includes('>' + t('adLabText7') + '</button>'));
+      assert.equal(disabled(renderToStaticMarkup(<ActionBar ad={adaptAdSlice(slice)!} notice={() => {}} />), t('adLabText31')), false);
+      assert.equal(slice.adPrestige(), true);
+      assert.equal(slice.adGame!.infinities, 1);
+      const after = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
+      assert.ok(after.includes('>' + t('adLabText7') + '</button>'));
+      slice.adGame = createNewGame(0);
+      const restored = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
+      assert.ok(!restored.includes('>' + t('adLabText7') + '</button>'));
+    }
+  } finally { setLanguage(previous); }
+});
+
+test('number fixtures straddle actual suffix and exponent formatting boundaries', () => {
+  assert.equal(formatNumber(bigFromNumber(999)), '999');
+  assert.equal(formatNumber(bigFromNumber(1000)), '1.00K');
+  assert.equal(formatNumber(bigFromNumber(999999)), '1000.00K');
+  assert.equal(formatNumber(bigFromNumber(1000000)), '1.00M');
+  assert.equal(formatNumber(bigFromLog10(999)), '1.00mq');
+  assert.equal(formatNumber(bigFromLog10(1000)), '1.00e1000');
+  assert.equal(formatNumber(bigFromLog10(9999)), '1.00e9999');
+  assert.equal(formatNumber(bigFromLog10(10000)), '1.00e10000');
+  assert.equal(formatNumber(bigFromLog10(99999)), '1.00e99999');
+  assert.equal(formatNumber(bigFromLog10(100000)), '1.00e100000');
+});
