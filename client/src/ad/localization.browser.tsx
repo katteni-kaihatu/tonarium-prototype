@@ -11,6 +11,7 @@ import { AntimatterPanel } from '../world/antimatter/AntimatterPanel.tsx';
 import { AntimatterReadout } from '../view3d/AntimatterReadout.tsx';
 import { PanelBoard, AntimatterSpacePanel, type AdActions } from '../view3d/antimatterPanels.tsx';
 import { get, setAdBgmEnabled } from '../store.ts';
+import { formatNumber } from '../world/antimatter/format.ts';
 
 // Vite の開発用ページから実行する。実際の進行やサーバーには接続しない。
 function check(value: unknown, message: string): asserts value {
@@ -25,6 +26,90 @@ const draws = new WeakMap<HTMLCanvasElement, string[]>();
 const clipped = new WeakSet<HTMLCanvasElement>();
 let scene: Scene;
 function Probe() { scene = useThree(state => state.scene); return null; }
+
+async function verifyNumberLayouts(root: ReturnType<typeof createRoot>, host: HTMLElement) {
+  const originalWidth = host.style.width;
+  const language = getLanguage();
+  const pairs = [
+    [Math.log10(999), 3],
+    [Math.log10(999999), 6],
+    [Math.log10(999000000000000), 15],
+    [999, 1000],
+    [9999, 10000],
+    [99999, 100000],
+    [999999, 1000000],
+  ];
+  const measure = () => {
+    const panel = host.querySelector<HTMLElement>('.ad-lab-panel')!;
+    panel.scrollTop = 0;
+    const panelRect = panel.getBoundingClientRect();
+    const nodes = [...host.querySelectorAll<HTMLElement>('.ad-header, .ad-tickspeed, .ad-dimension-card, .ad-upgrade, button, .ad-dimension-numbers dd, .ad-resource > span')];
+    return nodes.map(node => {
+      const rect = node.getBoundingClientRect();
+      check(node.scrollWidth <= node.clientWidth + 1, 'No clipped content: ' + node.textContent);
+      check(rect.left >= panelRect.left && rect.right <= panelRect.right + 1, 'Content inside panel: ' + node.textContent);
+      return { top: rect.top - panelRect.top, left: rect.left - panelRect.left, height: rect.height, width: rect.width };
+    });
+  };
+  try {
+    for (const width of [320, 375, 390, 540, 1000]) {
+      host.style.width = width + 'px';
+      for (const language of ['ja', 'en', 'ko'] as const) {
+        flushSync(() => setLanguage(language));
+        for (const infinities of [0, 1]) {
+          for (const [before, after] of pairs) {
+            for (const view of ['dimensions', 'actions'] as const) {
+              let previous: ReturnType<typeof measure> | undefined;
+              // 往復更新で、一度だけの切替と繰り返し発生する跳ねを区別する。
+              for (const [index, exponent] of [before, after, before, after].entries()) {
+                const game = createNewGame(0);
+                game.dimensionalBoosts = 6;
+                game.infinities = infinities;
+                const value = bigFromLog10(exponent);
+                game.antimatter = value;
+                game.infinityPoints = value;
+                game.sacrificeBoost = value;
+                for (const dimension of game.dimensions) {
+                  dimension.amount = value;
+                  dimension.bought = index % 2 ? 1000 : 999;
+                }
+                let fixture: AdSlice;
+                fixture = createAdSlice(partial => Object.assign(fixture, partial), () => fixture);
+                fixture.adGame = game;
+                const ad = adaptAdSlice(fixture)!;
+                // コストと生産も同じ表示境界を通す。計算規則は本番に持ち込まない。
+                ad.derived.antimatterPerSecond = value;
+                ad.derived.tickspeedCost = value;
+                ad.derived.dimensions = ad.derived.dimensions.map(d => ({ ...d, cost: value, productionPerSecond: value }));
+                flushSync(() => root.render(<AntimatterPanel key={view} ad={ad} />));
+                if (view === 'actions') {
+                  const button = [...host.querySelectorAll('button')].find(button => button.textContent === t('adLabText5'))!;
+                  flushSync(() => button.click());
+                }
+                await pause();
+                check(host.querySelector('.ad-resource-value')?.textContent === formatNumber(value), 'Real format boundary shown');
+                const next = measure();
+                if (previous) {
+                  check(next.length === previous.length, 'Same layout elements');
+                  next.forEach((rect, i) => {
+                    for (const key of ['top', 'left', 'height', 'width'] as const) {
+                      check(Math.abs(rect[key] - previous![i][key]) < .6,
+                        [width, language, infinities, view, before, after, i, key].join(': '));
+                    }
+                  });
+                }
+                previous = next;
+              }
+            }
+          }
+        }
+      }
+    }
+  } finally {
+    host.style.width = originalWidth;
+    flushSync(() => setLanguage(language));
+  }
+}
 
 async function run() {
   const previous = getLanguage();
@@ -125,6 +210,18 @@ async function run() {
     check(infinityTab, 'Infinity layer available');
     flushSync(() => infinityTab.click());
     await cycle(() => check(host.textContent?.includes(t('adLabText71')), 'Selected Infinity layer retained'));
+    const unlockedGame = slice.adGame;
+    slice.adGame = createNewGame(0);
+    flushSync(() => root.render(<AntimatterPanel ad={adaptAdSlice(slice)!} />));
+    await pause();
+    check(tab()?.textContent === t('adLabText4'), 'Save replacement returns to dimensions');
+    check(![...host.querySelectorAll('button')].some(button => button.textContent === t('adLabText7')), 'Locked save hides layers');
+    check(!host.textContent?.includes(t('adLabText71')), 'Old layer body removed');
+    slice.adGame = unlockedGame;
+    flushSync(() => root.render(<AntimatterPanel ad={ad} />));
+    check(tab()?.textContent === t('adLabText4'), 'Reunlock does not restore hidden tab selection');
+    await click(t('adLabText7'));
+    check(!host.textContent?.includes(t('adLabText71')), 'Nested layer selection reset');
     await click(t('adLabText5'));
     await cycle(() => check(tab()?.textContent === t('adLabText5'), 'Actions tab retained'));
     const confirmations: string[] = [];
@@ -219,7 +316,8 @@ async function run() {
       const available = target === 'dimension-1' || (target === 'boost' ? snapshot.canBoost : target === 'galaxy' ? snapshot.canGalaxy : target === 'sacrifice' ? snapshot.canSacrifice : snapshot.canCrunch);
       await cycle(() => check([...host.querySelectorAll('button')].every(button => button.disabled === !available), `${target}: owner eligibility retained`));
     }
-    document.getElementById('result')!.textContent = 'PASS: mounted ja → en → ko → ja; tabs, inputs, notices, unchanged-number Canvas, disposal, ownership.\nVisual clipping and confirmation/cancellation in the full application still require manual inspection.';
+    await verifyNumberLayouts(root, host);
+    document.getElementById('result')!.textContent = 'PASS: mounted ja → en → ko → ja; tabs, inputs, notices, unchanged-number Canvas, disposal, ownership; number layout at 320/375/390/540/1000px in ja/en/ko before and after Infinity.\nVisual clipping and confirmation/cancellation in the full application still require manual inspection.';
   } finally {
     flushSync(() => root.unmount());
     // 途中で失敗したときも Three の購読とタイマーを残さない。

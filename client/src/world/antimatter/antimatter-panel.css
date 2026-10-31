@@ -21,12 +21,12 @@
 .ad-resource-label { color: #a9fff0; font-size: 10px; font-weight: 900; letter-spacing: .12em; }
 .ad-resource-value { color: #fff; text-shadow: 0 0 20px #7fffe366; overflow-wrap: anywhere; }
 .ad-dimensions { display: flex; flex-direction: column; gap: 9px; }
-.ad-dimension-card { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px; border: 1px solid #b7a0ff38; border-radius: 14px; background: linear-gradient(110deg, #56458235, #10182d99); }
+.ad-dimension-card { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 6px 8px; padding: 10px; border: 1px solid #b7a0ff38; border-radius: 14px; background: linear-gradient(110deg, #56458235, #10182d99); }
 .ad-dimension-card.is-locked { grid-template-columns: 64px minmax(0, 1fr); background: #14162b88; border-style: dashed; }
 .ad-dimension-card.is-affordable { border-color: #7fffe35c; }
-.ad-dimension-details { min-width: 0; overflow-wrap: anywhere; }
+.ad-dimension-details { display: contents; min-width: 0; overflow-wrap: anywhere; }
 .ad-dimension-title { font-weight: 800; }
-.ad-dimension-buy { display: flex; flex-direction: column; gap: 6px; max-width: 180px; min-width: 0; }
+.ad-dimension-buy { min-width: 0; }
 .ad-dimension-buy button:first-child { background: linear-gradient(115deg, #455cb777, #308c7c55) !important; }
 .ad-dimension-progress { height: 4px; margin-top: 8px; background: #ffffff15; border-radius: 4px; overflow: hidden; }
 .ad-dimension-progress > span { display: block; height: 100%; background: linear-gradient(90deg, #b6a2ff, #7fffe3); }
@@ -38,10 +38,6 @@
 .ad-dimension-reactor.is-locked { opacity: .4; }
 .ad-dimension-reactor.is-locked .ad-reactor-orbit { animation-play-state: paused; }
 @keyframes ad-reactor-turn { to { transform: rotate(360deg); } }
-@container (max-width: 460px) {
-  .ad-dimension-card { grid-template-columns: 60px minmax(0, 1fr); gap: 8px; padding: 10px; }
-  .ad-dimension-buy { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); max-width: none; }
-}
 @media (prefers-reduced-motion: reduce) {
   .ad-feedback-burst { display: none; }
   .ad-lab-panel *, .ad-lab-panel *::before, .ad-lab-panel *::after { animation: none !important; transition: none !important; }
@@ -64,3 +60,44 @@
 .ad-ranking-child .ad-ranking-name { padding-left: 24px; }
 .ad-ranking-self .ad-ranking-name { font-weight: 700; }
 .ad-ranking-scroll:focus-visible, .ad-ranking-controls button:focus-visible { outline: 2px solid #fff188; outline-offset: -2px; }
+
+/* 数値の長さではなくパネル幅で操作欄の位置を決める。 */
+.ad-header { grid-template-columns: minmax(0, 1fr); }
+.ad-resource, .ad-header-progress, .ad-header-profile { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.ad-header-profile { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.ad-header-profile button { grid-column: 2; }
+.ad-number { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ad-resource-value { min-block-size: 1.5em; }
+.ad-dimension-title { grid-column: 2; }
+.ad-dimension-numbers, .ad-dimension-details > div:not(.ad-dimension-title), .ad-dimension-buy { grid-column: 1 / -1; }
+.ad-dimension-numbers { display: grid; gap: 3px; margin: 0; min-width: 0; }
+.ad-dimension-numbers > div { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.ad-dimension-numbers dt { font-size: 12px; color: rgba(242,238,245,.65); overflow-wrap: anywhere; }
+.ad-dimension-numbers dd { margin: 0; min-width: 0; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ad-dimension-buy, .ad-tickspeed-buy { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; max-width: none; }
+.ad-dimension-buy button, .ad-tickspeed-buy button { min-height: 36px; }
+.ad-tickspeed { display: grid; gap: 8px; padding: 10px; border-radius: 10px; background: rgba(255,255,255,.04); }
+.ad-tickspeed-numbers { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.ad-upgrade { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; align-items: start; }
+.ad-upgrade-description { min-width: 0; overflow-wrap: anywhere; }
+.ad-upgrade-status { display: grid; gap: 4px; }
+.ad-upgrade-status:has(> .ad-number) { grid-template-columns: minmax(0, 1fr) minmax(8ch, .7fr); }
+.ad-upgrade-status > .ad-number { text-align: right; }
+.ad-upgrade-summary { grid-column: 1 / -1; }
+.ad-upgrade > button { grid-column: 1 / -1; min-height: 36px; }
+@container (min-width: 520px) {
+  .ad-header { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .ad-header-profile { grid-column: 1 / -1; }
+  .ad-tickspeed { grid-template-columns: minmax(0, 1fr) 180px; align-items: center; }
+  .ad-tickspeed-buy { grid-template-columns: minmax(0, 1fr); }
+  .ad-upgrade { grid-template-columns: minmax(0, 1fr) 150px; align-items: center; }
+  .ad-upgrade > button { grid-column: 2; }
+}
+@container (min-width: 680px) {
+  .ad-header { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); }
+  .ad-header-profile { grid-column: auto; grid-template-columns: minmax(0, 1fr); }
+  .ad-header-profile button { grid-column: 1; justify-self: start; }
+  .ad-dimension-card { grid-template-columns: 64px minmax(0, 1fr) 160px; gap: 10px; }
+  .ad-dimension-details { display: block; }
+  .ad-dimension-buy { grid-column: 3; grid-template-columns: minmax(0, 1fr); }
+}

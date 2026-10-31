@@ -5,7 +5,6 @@ import { t, useLanguage, msg, type UiMessage } from '../../i18n/index.ts';
 import type { AntimatterSlice } from './types.ts';
 import { formatDuration, formatFromLog10, formatNumber } from './format.ts';
 import { ACHIEVEMENT_DEFS, s } from './styles.ts';
-import { LabBanner } from './LabArt.tsx';
 
 export function StatsPanel({ ad, notice }: { ad: AntimatterSlice; notice: (message: UiMessage) => void }) {
   useLanguage();
@@ -27,7 +26,7 @@ export function StatsPanel({ ad, notice }: { ad: AntimatterSlice; notice: (messa
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <LabBanner kind="trophy" eyebrow={t('adRecordEyebrow')} title={t('adLabText58')} description={t('adLabText59', owned.size)} />
+      <h2 style={s.sectionTitle}>{t('adLabText58')} <span style={s.muted}>{t('adLabText59', owned.size)}</span></h2>
       <div>
         <h3 style={s.sectionTitle}>{t('adLabText43')}</h3>
         <div style={s.row}>
@@ -46,7 +45,7 @@ export function StatsPanel({ ad, notice }: { ad: AntimatterSlice; notice: (messa
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {defs.map((d) => (
             <div key={d.id} style={{ ...s.row, opacity: owned.has(d.id) ? 1 : 0.65, borderRadius: 10, padding: '10px 12px', background: owned.has(d.id) ? 'linear-gradient(110deg, #234143, #302744)' : '#182238', border: `1px solid ${owned.has(d.id) ? '#78edd95c' : '#66729333'}` }}>
-              <span>{owned.has(d.id) ? '🏆' : '🔒'} <b>{d.name}</b></span>
+              <span><Icon name={owned.has(d.id) ? 'check' : 'lock'} size={16} /> <span style={s.muted}>{t(owned.has(d.id) ? 'adAchieved' : 'adNotAchieved')}</span> <b>{d.name}</b></span>
               <span style={s.muted}>{d.desc}</span>
             </div>
           ))}
