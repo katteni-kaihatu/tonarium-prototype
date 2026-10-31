@@ -476,7 +476,7 @@ function HomePageView({ q }: { q: string }) {
   );
 }
 
-/** sheet はセッション中に重ねて開く形（SessionMenu） */
+/** sheet の高さと操作バーの領域は SessionMenu が確保する */
 export function Home({ sheet }: { sheet?: boolean }) {
   const page = useStore((s) => homePageOf(s.homePage));
   const timelineSide = useStore((s) => s.timelineSide);

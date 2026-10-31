@@ -2,8 +2,13 @@
 .phonetabs, .hmorebtn { display: none; }
 @media (max-width: 720px), (hover: none) and (pointer: coarse) and (max-width: 1024px) and (max-height: 540px) {
   .home, .home.sheet { padding: 12px 12px 84px; gap: 12px; }
-  .home.sheet { inset: 64px 0 0 0; border-radius: 20px 20px 0 0; }
-  .home.sheet:has(> .hevents) { grid-template-rows: minmax(0, 1fr); }
+  .home.sheet, .home.sheet:has(> .hevents) { padding: 0; gap: 0; grid-template-rows: minmax(0, 1fr) auto; }
+  .home.sheet > .hmain { grid-row: 1; grid-column: 1; overflow: hidden; padding: 12px; }
+  .hub-open .home.sheet > .hside { position: relative; grid-row: 2; grid-column: 1; left: auto; right: auto; bottom: auto; padding-bottom: 4px; }
+  .hub-open .home.sheet > .hside.open { position: absolute; inset: auto 0 0; max-height: 100%; padding-bottom: 8px; }
+  .home.sheet > .hmorebg { position: absolute; }
+  .world.phone .hub-open .dock { padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); border-radius: 0; }
+  .world:has(.hub-open) .phonetabs { visibility: hidden; }
   .home .hevents { display: none; }
   .hhead h1 { font-size: 22px; }
   .hsearch { order: 5; flex: 1 1 100%; }
@@ -29,7 +34,7 @@
   .world.phone .facestrip { left: 8px; right: 8px; top: 64px; bottom: auto; }
   .world.phone .facegrid { left: 8px; right: 8px; top: 64px; bottom: 130px; }
   .world.phone .winregion { left: 8px; right: 8px; top: 172px; bottom: 130px; }
-  .world.phone .dock { bottom: calc(68px + env(safe-area-inset-bottom)); padding: 6px; gap: 6px; border-radius: 18px; max-width: calc(100% - 16px); overflow-x: auto; }
+  .world.phone .session-surface:not(.hub-open) .dock { bottom: calc(68px + env(safe-area-inset-bottom)); padding: 6px; gap: 6px; border-radius: 18px; max-width: calc(100% - 16px); overflow-x: auto; }
   .world.phone .dk { width: 44px; height: 44px; border-radius: 13px; }
   .world.phone .dseg, .world.phone .dsep { display: none; }
   .world.phone .dk { flex-shrink: 0; }
@@ -54,7 +59,7 @@
   .world.phone .wname { min-width: 0; }
   .world.phone .phonetabs { left: auto; top: 8px; right: var(--phone-right); bottom: var(--phone-bottom); width: 72px; flex-direction: column; border-radius: 14px; padding: 4px; }
   .world.phone .phonetabs button { min-height: 44px; }
-  .world.phone .dock { left: calc((100% - 80px - var(--phone-right)) / 2); bottom: var(--phone-bottom); }
+  .world.phone .session-surface:not(.hub-open) .dock { left: calc((100% - 80px - var(--phone-right)) / 2); bottom: var(--phone-bottom); }
   .world.phone .nearlist, .world.phone .noticelog, .world.phone .facegrid { left: var(--phone-left); right: calc(88px + var(--phone-right)); top: 62px; bottom: calc(64px + var(--phone-bottom)); }
   .world.phone .facegrid { overflow-y: auto; justify-content: safe center; align-items: safe center; pointer-events: auto !important; }
   .world.phone .facestrip { left: var(--phone-left); right: auto; top: 62px; bottom: calc(120px + var(--phone-bottom)); width: 160px; overflow-y: auto; pointer-events: auto !important; }

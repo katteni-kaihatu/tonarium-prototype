@@ -166,10 +166,41 @@ export function Popover({ anchor, onClose, children, side = 'right', className =
       const ownAnchor = button && button.left === anchor.left && button.top === anchor.top;
       if (!ref.current?.contains(t) && !ownAnchor) close.current();
     };
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') close.current(); };
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      close.current();
+    };
     // 開いたクリック自体で閉じないよう、次のイベントから見る
-    const t = setTimeout(() => { window.addEventListener('pointerdown', down); window.addEventListener('keydown', key); });
-    return () => { clearTimeout(t); window.removeEventListener('pointerdown', down); window.removeEventListener('keydown', key); };
+    const t = setTimeout(() => { window.addEventListener('pointerdown', down); });
+    window.addEventListener('keydown', key, true);
+    return () => { clearTimeout(t); window.removeEventListener('pointerdown', down); window.removeEventListener('keydown', key, true); };
+  }, [anchor]);
+  useLayoutEffect(() => {
+    // DOMRect だけを保持する既存の呼び出しでも、配置変更後に古い位置へ残さない。
+    const trigger = [...document.querySelectorAll<HTMLElement>('[data-popanchor]')].find((el) => {
+      const rect = el.getBoundingClientRect();
+      return rect.left === anchor.left && rect.top === anchor.top && rect.width === anchor.width && rect.height === anchor.height;
+    });
+    let frame = 0;
+    const check = () => {
+      const rect = trigger?.getBoundingClientRect();
+      if (trigger && (!trigger.isConnected || !rect || rect.left !== anchor.left || rect.top !== anchor.top || rect.width !== anchor.width || rect.height !== anchor.height)) {
+        close.current();
+        return;
+      }
+      frame = requestAnimationFrame(check);
+    };
+    if (trigger) frame = requestAnimationFrame(check);
+    const resize = () => close.current();
+    window.addEventListener('resize', resize);
+    window.visualViewport?.addEventListener('resize', resize);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', resize);
+      window.visualViewport?.removeEventListener('resize', resize);
+    };
   }, [anchor]);
   // 実際の大きさが分かってから画面内に収める
   const [style, setStyle] = useState<React.CSSProperties>({ visibility: 'hidden' });
