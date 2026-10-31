@@ -592,7 +592,6 @@ export function WorldScreen() {
         {worldKind !== 'fantasy' && <FaceStrip />}
         {(worldKind !== 'fantasy' || fantasySocial || phone) && <NoticeLog />}
         {worldKind !== 'fantasy' && mode === '3d' ? <div className="view3d-hud"><KeyHelp /><StatusChips /></div> : <StatusChips />}
-        <Dock />
         {phone && <PhoneTabs />}
       </div>
       <AdAudio />
@@ -606,7 +605,7 @@ export function WorldScreen() {
       <ConfirmWorld />
       <ConfirmOpen />
       <ProfileCard />
-      <SessionMenu />
+      <SessionMenu><Dock /></SessionMenu>
       <HitFxLayer root={root} />
     </div>
   );
