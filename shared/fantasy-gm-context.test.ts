@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyFantasyAction, newFantasyProfile } from './fantasy-engine.ts';
+import { applyFantasyAction, newFantasyProfile, fantasyStats } from './fantasy-engine.ts';
 import { FANTASY_ITEMS, FANTASY_LOCATIONS, FANTASY_QUESTS } from './fantasy-data.ts';
 import { FANTASY_FOOD_META, reconcileFoodLots } from './fantasy-life.ts';
 import { fantasyConversationPlan, fantasyGmContext, fantasyGmTokenEstimate, type FantasyGmHistoryTurn } from './fantasy-gm-context.ts';
@@ -9,8 +9,9 @@ import { FANTASY_TERMS } from './fantasy-lore.ts';
 
 function player() {
   const p = applyFantasyAction(newFantasyProfile(), { type: 'create', name: '문답', gender: 'female', source: 'human' }, () => 0.999).profile;
-  p.character!.birthBonuses = {}; p.character!.hp = 100; p.character!.mp = 50;
+  p.character!.birthBonuses = {};
   p.character!.job = 'cook'; p.character!.jobXp.cook = 0;
+  p.character!.hp = fantasyStats(p.character!).hp; p.character!.mp = fantasyStats(p.character!).mp;
   p.character!.visited = FANTASY_LOCATIONS.map(place => place.id);
   p.character!.quests = FANTASY_QUESTS.filter(quest => !quest.races && !quest.families).map(quest => quest.id);
   p.character!.inventory = Object.fromEntries(FANTASY_ITEMS.map(item => [item.id, 2]));
@@ -34,7 +35,7 @@ test('large knowledge stays in budget while preserving current status and activi
     assert.ok(fantasyGmTokenEstimate(fantasyGmKnowledge(p, locale)) > 1800);
     const context = fantasyGmContext(p, locale, 'How long is my current activity?', history);
     assert.ok(total(context) <= 1800);
-    assert.ok(context.knowledge.includes('HP 100/100'));
+    assert.ok(context.knowledge.includes(`HP ${p.character!.hp}/${fantasyStats(p.character!).hp}`));
     assert.ok(context.knowledge.includes('12.000'));
     assert.ok(context.history.length <= 4);
   }
@@ -81,7 +82,7 @@ test('short input budgets preserve essential self and pending activity while pub
   for (const locale of ['ko', 'en', 'ja'] as const) {
     const context = fantasyGmContext(p, locale, 'current activity', [], { budget: 900 });
     assert.ok(total(context) <= 900);
-    assert.ok(context.knowledge.includes('HP 100/100'));
+    assert.ok(context.knowledge.includes(`HP ${p.character!.hp}/${fantasyStats(p.character!).hp}`));
     assert.ok(context.knowledge.includes('12.000'));
   }
   const lore = fantasyGmContext(p, 'en', 'What is known about the uncharted island voyage in this world?', []);
@@ -112,7 +113,7 @@ test('casual conversation never fills spare context with unrelated inventory, lo
   for (const [locale, query] of [['ko', '오늘은 좀 지쳐서 대화하고 싶어.'], ['en', 'A quiet evening sounds nice.'], ['ja', '今日は少し疲れました。']] as const) {
     const selected = fantasyGmContext(p, locale, query, []);
     assert.ok(total(selected) <= 550);
-    assert.ok(selected.knowledge.includes('HP 100/100'));
+    assert.ok(selected.knowledge.includes(`HP ${p.character!.hp}/${fantasyStats(p.character!).hp}`));
     assert.ok(selected.knowledge.includes('12.000'));
     assert.ok(!/Inventory:|소지품:|所持品:|Known quest:|아는 의뢰:|自分が知る依頼:|Public basics:|기초 공개 설정:|基本の公開設定:/.test(selected.knowledge));
   }

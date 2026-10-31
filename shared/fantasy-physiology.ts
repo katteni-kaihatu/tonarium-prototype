@@ -1,4 +1,6 @@
 import type { FantasyCharacter, FantasyCheckContext } from './fantasy.ts';
+import { FANTASY_EXTRA_COMBAT_BODY_TRAITS, FANTASY_EXTRA_RACE_COMBAT_TRAITS } from './fantasy-body-combat-catalog.ts';
+import { FANTASY_BODY_DIVERSITY_TRAITS, FANTASY_RACE_DIVERSITY_TRAITS } from './fantasy-body-diversity.ts';
 
 type Names = Record<'ko' | 'en' | 'ja', string>;
 export interface FantasyBodyTrait {
@@ -37,6 +39,8 @@ export const FANTASY_BODY_TRAITS: FantasyBodyTrait[] = [
   trait('coldproof', names('추위에 강한 몸', 'Cold-resistant body', '寒さに強い体'), names('추위에 강하지만 고열에 약하다. 피해 면역은 아니다.', 'Handles cold but dislikes heat. Does not grant damage immunity.', '寒さに強いが高熱は苦手。被害を無効化しない。'), { cold: 4, heat: -2 }),
   trait('keen', names('예민한 감각', 'Keen senses', '鋭い感覚'), names('미세한 흔적과 함정의 징후를 찾기 쉽다.', 'Picks up subtle traces and signs of traps.', '小さな痕跡や罠の兆候を見つけやすい。'), { 'keen-senses': 3, trap: 1 }),
   trait('ethereal', names('희미한 형체', 'Ethereal form', '希薄な姿'), names('틈과 물속 움직임에 유리하지만 무거운 물체를 다루기 어렵다. 벽을 통과하지 않는다.', 'Moves readily in gaps and water, but struggles with heavy loads. Cannot pass through walls.', '隙間や水中の動きに有利だが重い物は苦手。壁を通り抜けない。'), { 'narrow-space': 3, 'deep-water': 2, trap: 1, 'heavy-lifting': -3 }),
+  ...FANTASY_BODY_DIVERSITY_TRAITS,
+  ...FANTASY_EXTRA_COMBAT_BODY_TRAITS,
 ];
 
 export const FANTASY_RACE_BODY_TRAITS: Record<string, string[]> = {
@@ -54,6 +58,8 @@ export const FANTASY_RACE_BODY_TRAITS: Record<string, string[]> = {
   deerkin: ['light', 'keen'], goatkin: ['sturdy', 'keen', 'surefooted'], batkin: ['winged', 'keen', 'light'],
   windspirit: ['ethereal', 'light'], frostfairy: ['tiny', 'winged', 'coldproof'],
 };
+for (const [race, ids] of Object.entries(FANTASY_RACE_DIVERSITY_TRAITS)) if (Object.hasOwn(FANTASY_RACE_BODY_TRAITS, race)) FANTASY_RACE_BODY_TRAITS[race] = [...new Set([...FANTASY_RACE_BODY_TRAITS[race], ...ids])];
+for (const [race, ids] of Object.entries(FANTASY_EXTRA_RACE_COMBAT_TRAITS)) if (Object.hasOwn(FANTASY_RACE_BODY_TRAITS, race)) FANTASY_RACE_BODY_TRAITS[race] = [...new Set([...FANTASY_RACE_BODY_TRAITS[race], ...ids])];
 
 export function fantasyBodyTraits(character: Pick<FantasyCharacter, 'race'>): FantasyBodyTrait[] {
   const ids = Object.hasOwn(FANTASY_RACE_BODY_TRAITS, character.race) ? FANTASY_RACE_BODY_TRAITS[character.race] : [];

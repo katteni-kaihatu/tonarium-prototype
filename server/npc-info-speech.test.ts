@@ -60,6 +60,19 @@ test('every public glossary definition avoids report labels and fourth-wall curr
   }
 });
 
+test('frontier devices have natural spoken explanations that retain the exact recovery and weather amounts',()=>{
+  for(const [id,amounts] of [['frontier-room-service-button',['2.5','3']],['frontier-weather-remote',['1']]] as const){
+    const term=FANTASY_TERMS.find(term=>term.id===id)!,before=structuredClone(term);
+    for(const locale of locales){
+      const spoken=npcDefinitionSpeech('rin',locale,term);
+      assert.equal(npcBreaksFourthWall(spoken),false,`${id}/${locale}:${spoken}`);
+      assert.deepEqual(numbers(spoken),amounts);
+      assert.doesNotMatch(spoken,/\b(?:HP|MP)\b|\+\d/u);
+    }
+    assert.deepEqual(term,before);
+  }
+});
+
 test('currency and factual explanations express eight different priorities without changing the facts',()=>{
   const speakers=['rin','hearth-alia','borin','hearth-mira','hearth-iona','hearth-daren','redweave-voss','emberhall-pell'];
   for(const locale of locales)for(const id of ['gold','mana','herb']){

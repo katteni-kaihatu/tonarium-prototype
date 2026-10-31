@@ -6,12 +6,21 @@ import { FANTASY_LOCATIONS } from './fantasy-data.ts';
 import { FANTASY_STORY_COMBATS } from './fantasy-combat-stories.ts';
 import { fantasyCombatHuntOptions } from './fantasy-combat-challenges.ts';
 import { applyFantasyAction, newFantasyProfile } from './fantasy-engine.ts';
+import { fantasyMonsterCombatStats } from './fantasy-monster-balance.ts';
+import { fantasyMonsterSiteForProvocation } from './fantasy-monster-sites.ts';
+import type { FantasyAdventurerGrade } from './fantasy-adventurer.ts';
+import { FANTASY_NAVAL_MONSTERS, FANTASY_NAVAL_COMBAT_TEMPLATES, FANTASY_NAVAL_AUXILIARIES } from './fantasy-naval-catalog.ts';
 
-test('the combat bestiary preserves all forty-eight old monsters and adds ten monsters plus five human opponents', () => {
-  assert.equal(FANTASY_MONSTERS.length, 48); assert.equal(FANTASY_COMBAT_ENEMIES.length, 63);
-  assert.equal(new Set(FANTASY_COMBAT_ENEMIES.map(enemy => enemy.id)).size, 63);
+test('the combat bestiary preserves all registered monsters alongside ten variants and five human opponents', () => {
+  const navalMonsters = new Set(FANTASY_NAVAL_MONSTERS.map(monster => monster.id)), navalTemplates = new Set(FANTASY_NAVAL_COMBAT_TEMPLATES.map(enemy => enemy.id));
+  assert.equal(FANTASY_MONSTERS.filter(monster => !navalMonsters.has(monster.id)).length, 56);
+  assert.equal(FANTASY_COMBAT_ENEMIES.filter(enemy => !navalTemplates.has(enemy.id)).length, 71);
+  assert.equal(FANTASY_MONSTERS.length, 56 + FANTASY_NAVAL_MONSTERS.length);
+  assert.equal(FANTASY_COMBAT_ENEMIES.length, 71 + FANTASY_NAVAL_COMBAT_TEMPLATES.length);
+  assert.equal(new Set(FANTASY_COMBAT_ENEMIES.map(enemy => enemy.id)).size, FANTASY_COMBAT_ENEMIES.length);
   const oldIds = new Set(FANTASY_MONSTERS.map(monster => monster.id));
-  assert.equal(FANTASY_COMBAT_ENEMIES.filter(enemy => enemy.kind === 'monster' && !oldIds.has(enemy.id)).length, 10);
+  assert.equal(FANTASY_COMBAT_ENEMIES.filter(enemy => enemy.kind === 'monster' && !oldIds.has(enemy.id) && !enemy.auxiliary).length, 10);
+  assert.deepEqual(FANTASY_COMBAT_ENEMIES.filter(enemy => enemy.auxiliary).map(enemy => enemy.id).sort(), FANTASY_NAVAL_AUXILIARIES.map(enemy => enemy.id).sort());
   assert.equal(FANTASY_COMBAT_ENEMIES.filter(enemy => enemy.kind === 'human').length, 5);
   for (const old of FANTASY_MONSTERS) assert.deepEqual(fantasyCombatEnemy(old.id)!.names, old.names);
   assert.equal(fantasyCombatEnemy('not-a-monster'), undefined);
@@ -32,7 +41,10 @@ test('every opponent has localized presentation, concrete bounded stats and dist
     statShapes.add(JSON.stringify(enemy.stats)); patterns.add(enemy.pattern);
   }
   assert.ok(statShapes.size >= 20); assert.ok(patterns.size >= 8);
-  assert.ok(fantasyCombatEnemy('monster-meadow-slime')!.stats.hp < fantasyCombatEnemy('monster-elder-dragon')!.stats.hp / 20);
+  for (let tier = 2; tier <= 8; tier++) for (const role of ['slime', 'dragon', 'golem', 'beast'] as const) {
+    const lower = fantasyMonsterCombatStats((tier - 1) as FantasyAdventurerGrade, role), higher = fantasyMonsterCombatStats(tier as FantasyAdventurerGrade, role);
+    assert.ok(higher.hp > lower.hp, `${role}: tier${tier} HP`);
+  }
 });
 
 test('individual variation is drawn once, stays within eight percent plus integer rounding and never mutates a template', () => {
@@ -54,10 +66,16 @@ test('individual variation is drawn once, stays within eight percent plus intege
   assert.throws(() => createFantasyCombatEnemyStats('unknown'));
 });
 
-test('four apex opponents are absent from ordinary hunts and all main-story battles and have separate explicit warned provocations', () => {
+test('four apex opponents and seven rank-seven site bosses have eleven distinct map-gated provocations', () => {
   const apex = FANTASY_COMBAT_ENEMIES.filter(enemy => enemy.tier === 8);
-  assert.equal(apex.length, 4); assert.equal(FANTASY_APEX_PROVOCATIONS.length, 4);
-  assert.equal(new Set(FANTASY_APEX_PROVOCATIONS.map(action => action.enemy)).size, 4);
+  assert.equal(apex.length, 4); assert.equal(FANTASY_APEX_PROVOCATIONS.length, 11);
+  assert.equal(new Set(FANTASY_APEX_PROVOCATIONS.map(action => action.enemy)).size, 11);
+  assert.equal(FANTASY_APEX_PROVOCATIONS.filter(action => fantasyCombatEnemy(action.enemy)!.tier === 7).length, 7);
+  for (const action of FANTASY_APEX_PROVOCATIONS) {
+    const enemy = fantasyCombatEnemy(action.enemy)!, site = fantasyMonsterSiteForProvocation(action.id)!;
+    assert.ok(site, action.id); assert.equal(site.enemy, enemy.id); assert.equal(site.location, action.location);
+    assert.ok(enemy.tier === 7 || enemy.tier === 8);
+  }
   const p = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', name: 'Observer', gender: 'female' }, () => .5).profile;
   for (const enemy of apex) {
     assert.equal(enemy.provocationOnly, true); assert.equal(enemy.rank, 'boss'); assert.ok(enemy.reward.honor);
@@ -85,10 +103,25 @@ test('human opponents have an actual hostile cause and never classify all people
   }
 });
 
-test('elder dragon tuning changes only its HP while the other three apex stat lines and challenge rewards stay intact', () => {
-  assert.deepEqual(fantasyCombatEnemy('monster-elder-dragon')!.stats, { hp: 1700, mp: 132, attack: 99, defense: 44, agility: 24, intelligence: 40, accuracy: 83, magicResist: 32 });
-  for (const id of ['monster-ancient-frost-dragon', 'monster-ancient-storm-dragon']) assert.deepEqual(fantasyCombatEnemy(id)!.stats, { hp: 1100, mp: 132, attack: 99, defense: 44, agility: 24, intelligence: 40, accuracy: 83, magicResist: 32 });
-  assert.deepEqual(fantasyCombatEnemy('monster-void-chimera')!.stats, { hp: 1080, mp: 110, attack: 99, defense: 40, agility: 26, intelligence: 25, accuracy: 83, magicResist: 32 });
-  const elder = fantasyCombatEnemy('monster-elder-dragon')!; assert.equal(elder.provocationOnly, true); assert.equal(elder.reward.xp, 320); assert.equal(elder.reward.gold, 0);
+test('all apex species use the fixed tier-eight policy and retain their distinct challenges and rewards', () => {
+  for (const id of ['monster-elder-dragon', 'monster-ancient-frost-dragon', 'monster-ancient-storm-dragon']) assert.deepEqual(fantasyCombatEnemy(id)!.stats, fantasyMonsterCombatStats(8, 'dragon', id));
+  assert.deepEqual(fantasyCombatEnemy('monster-void-chimera')!.stats, fantasyMonsterCombatStats(8, 'beast', 'monster-void-chimera'));
+  const elder = fantasyCombatEnemy('monster-elder-dragon')!;
+  assert.notDeepEqual(fantasyCombatEnemy('monster-ancient-frost-dragon')!.stats, elder.stats);
+  assert.notDeepEqual(fantasyCombatEnemy('monster-void-chimera')!.stats, elder.stats);
+  assert.equal(elder.provocationOnly, true); assert.equal(elder.reward.xp, 320); assert.equal(elder.reward.gold, 0);
   assert.deepEqual(elder.reward.materials, [{ item: 'elder-dragon-scale', count: 2 }]); assert.equal(elder.reward.honor?.id, 'honor-ember-oath');
+});
+
+
+test('fixed species profiles require their own tier and return isolated stats for later encounters', () => {
+  const id = 'monster-elder-dragon', baseline = structuredClone(fantasyCombatEnemy(id)!.stats);
+  const wrongTier = fantasyMonsterCombatStats(6, 'dragon', id);
+  assert.deepEqual(wrongTier, fantasyMonsterCombatStats(6, 'dragon'));
+  assert.notDeepEqual(wrongTier, baseline);
+  const altered = fantasyMonsterCombatStats(8, 'dragon', id);
+  altered.hp = 1; altered.attack = 1;
+  assert.deepEqual(fantasyMonsterCombatStats(8, 'dragon', id), baseline);
+  assert.deepEqual(fantasyCombatEnemy(id)!.stats, baseline);
+  assert.deepEqual(createFantasyCombatEnemyStats(id, () => .5).stats, baseline);
 });

@@ -1,3 +1,5 @@
+import { FANTASY_FRONTIER_ARTIFACTS } from './fantasy-frontier-artifacts.ts';
+import { FANTASY_EQUIPMENT_ITEMS, FANTASY_EQUIPMENT_RECIPES } from './fantasy-equipment-catalog.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FANTASY_ITEMS, FANTASY_JOBS, FANTASY_LOCATIONS, FANTASY_RECIPES } from './fantasy-data.ts';
@@ -25,11 +27,11 @@ function step(profile: FantasyProfile, action: FantasyAction, rng = high) {
   return result.profile;
 }
 
-test('expanded item and recipe catalogs keep the original IDs and remain within the prototype scope', () => {
+test('expanded item and recipe catalogs keep original IDs, register additions once and retain complete localized definitions', () => {
   assert.equal(FANTASY_EXPANDED_ITEMS.length, 97);
-  assert.equal(FANTASY_ITEMS.length, 165);
+  assert.equal(FANTASY_ITEMS.length, 1130 + FANTASY_FRONTIER_ARTIFACTS.length + FANTASY_EQUIPMENT_ITEMS.length);
   assert.equal(FANTASY_EXPANDED_RECIPES.length, 20);
-  assert.equal(FANTASY_RECIPES.length, 86);
+  assert.equal(FANTASY_RECIPES.length, 212 + FANTASY_EQUIPMENT_RECIPES.length);
   assert.equal(new Set(FANTASY_ITEMS.map(item => item.id)).size, FANTASY_ITEMS.length);
   assert.equal(new Set(FANTASY_RECIPES.map(recipe => recipe.id)).size, FANTASY_RECIPES.length);
   for (const id of ['herb', 'ore', 'wood', 'fish', 'crystal', 'relic', 'meal', 'potion', 'ingot', 'blade', 'spice', 'silk', 'antidote', 'gem', 'meat', 'bread', 'jerky']) assert.ok(FANTASY_ITEMS.some(item => item.id === id));
@@ -64,7 +66,7 @@ test('every expanded item can be bought at a real facility, found in its terrain
     assert.ok(sold || item.drop || FANTASY_RECIPES.some(recipe => recipe.output === item.id), item.id);
   }
   for (const item of FANTASY_ITEMS.filter(item => item.category === 'artifact')) {
-    assert.ok(item.drop && item.drop.chance <= 0.06 && (item.drop.minDanger ?? 0) >= 3);
+    assert.ok(FANTASY_FRONTIER_ARTIFACTS.some(reward=>reward.id===item.id)?item.drop===undefined:item.drop && item.drop.chance <= 0.06 && (item.drop.minDanger ?? 0) >= 3);
     assert.ok(FANTASY_LOCATIONS.every(location => !canBuyItem({ location: location.id }, item.id)));
   }
 });

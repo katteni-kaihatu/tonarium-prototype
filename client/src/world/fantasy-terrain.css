@@ -1,0 +1,80 @@
+.fantasy-panel[data-fr-terrain],.fr-messenger[data-fr-terrain]{
+  background:var(--fr-paper);color:var(--fr-ink);border-color:var(--fr-border);
+  box-shadow:0 12px 50px color-mix(in srgb,var(--fr-character-bg) 22%,transparent);
+  transition:background-color 1.6s ease,color 1.6s ease,border-color 1.6s ease;
+}
+.fantasy-panel[data-fr-terrain]{isolation:isolate}
+.fantasy-panel[data-fr-terrain]>.fr-terrain-ambience{z-index:2;mask-image:linear-gradient(to right,#000,transparent 34px,transparent calc(100% - 34px),#000),linear-gradient(to bottom,#000,transparent 12px,transparent calc(100% - 22px),#000)}
+.fantasy-panel[data-fr-terrain]>.fr-header,.fantasy-panel[data-fr-terrain]>.fr-game-layout,.fantasy-panel[data-fr-terrain]>.fr-footer{position:relative;z-index:1}
+.fantasy-panel[data-fr-terrain]>.fr-header,.fantasy-panel[data-fr-terrain]>.fr-footer{z-index:3}
+.fantasy-panel[data-fr-terrain] :where(.fr-header,.fr-footer,.fr-center,.fr-detail,.fr-detail>nav,.fr-map-caption,.fr-latest,.fr-card,.fr-transport,.fr-event,.fr-chat-history article,.fr-btn,button,input,select,textarea),
+.fr-messenger[data-fr-terrain] :where(.fr-messenger-bar,.npc-experience,.npc-scene,.npc-conversation,.npc-message,.npc-composer,button,textarea){
+  transition:background-color 1.6s ease,color 1.6s ease,border-color 1.6s ease;
+}
+.fantasy-panel[data-fr-terrain] :is(.fr-header,.fr-footer,.fr-detail,.fr-detail>nav,.fr-event,.fr-chat-form,.fr-race-result,.fr-codex,.fr-creation-form input,.fr-creation-form select,.fr-family-controls input,.fr-family-controls select){background:var(--fr-surface);color:var(--fr-ink);border-color:var(--fr-border)}
+.fantasy-panel[data-fr-terrain] :is(.fr-center,.fr-map-caption,.fr-latest,.fr-transport,.fr-card,.fr-tags span,.fr-tag,.fr-chat-history article,.fr-codex-grid article,.fr-race-sources button,.fr-family-chips button,.fr-buildings>button,.fr-npc-visit,.fr-book-list button){background:var(--fr-surface-alt);color:var(--fr-ink);border-color:var(--fr-border)}
+.fantasy-panel[data-fr-terrain] :is(.fr-chat-history article.you,.fr-detail-content input,.fr-detail-content select,.fr-detail-content textarea){background:var(--fr-surface);color:var(--fr-ink);border-color:var(--fr-border)}
+.fantasy-panel[data-fr-terrain] :is(.fr-title small,.fr-clock,.fr-eyebrow,.fr-footer,.fr-loading,.fr-muted,.fr-transport p,.fr-transport small,.fr-transport-price,.fr-transport-price span+span,.fr-card small,.fr-inventory-row small,.fr-journal time,.fr-shop-row b,.fr-food-observation,.fr-food-known,.fr-skill-row small,.fr-service-row small,.fr-service-row>b,.fr-npc-visit small,.fr-npc-visit>span,.fr-buildings>button>span,.fr-buildings>button>b,.fr-book-list span,.fr-event details,.fr-event-choices span,.fr-chat-history article>b,.fr-creation-form label,.fr-creation-story p,.fr-creation-facts,.fr-skill-brief>span,.fr-skill-brief p,.fr-roll-row>span,.fr-roll-row>span b,.fr-prob,.fr-family-chips small,.fr-detail-content small){color:var(--fr-muted)}
+.fantasy-panel[data-fr-terrain] :is(.fr-detail>nav button,.fr-text-button,.fr-party-manage>summary){color:var(--fr-ink)}
+.fantasy-panel[data-fr-terrain] .fr-header button,.fr-messenger[data-fr-terrain] .npc-top button{background:var(--fr-surface);color:var(--fr-ink);border-color:var(--fr-border)}
+.fantasy-panel[data-fr-terrain] .fr-header-actions{padding-right:120px}
+.fantasy-panel[data-fr-terrain] .fr-header button[aria-pressed=true],.fr-messenger[data-fr-terrain] .npc-top button[aria-pressed=true],.fr-messenger[data-fr-terrain] .npc-top button.active{background:var(--fr-surface-alt);color:var(--fr-ink)}
+.fantasy-panel[data-fr-terrain] .fr-detail>nav button.on{background:var(--fr-accent);color:var(--fr-accent-ink)}
+.fantasy-panel[data-fr-terrain] :is(.fr-detail-toggle,.fr-chat-prompts button,.fr-btn,.fr-detail-content button:not(.fr-text-button),.fr-race-sources button){background:var(--fr-surface);color:var(--fr-ink);border-color:var(--fr-border)}
+.fantasy-panel[data-fr-terrain] :is(.fr-btn,.fr-detail-toggle,.fr-race-sources button):hover:not(:disabled){background:var(--fr-surface-alt);color:var(--fr-ink)}
+.fantasy-panel[data-fr-terrain] :is(.fr-btn.primary,.fr-race-sources button.chosen,.fr-family-chips button[aria-pressed=true],.fr-detail-content button[aria-pressed=true],.fr-detail-content button[aria-selected=true]){background:var(--fr-accent);color:var(--fr-accent-ink);border-color:var(--fr-accent)}
+.fantasy-panel[data-fr-terrain] .fr-btn.primary:hover:not(:disabled){background:var(--fr-accent);color:var(--fr-accent-ink)}
+.fantasy-panel[data-fr-terrain] :is(button,input,select,textarea):focus-visible,.fr-messenger[data-fr-terrain] :is(button,textarea):focus-visible{outline:3px solid var(--fr-muted);outline-offset:3px}
+.fantasy-panel[data-fr-terrain] :is(input,textarea)::placeholder,.fr-messenger[data-fr-terrain] textarea::placeholder{color:var(--fr-muted);opacity:1}
+.fantasy-panel[data-fr-terrain] :is(button,.fr-btn):disabled,.fr-messenger[data-fr-terrain] :is(button,.fr-btn):disabled{opacity:1;background:var(--fr-surface-alt);color:var(--fr-muted);border-color:var(--fr-border);border-style:dashed;filter:none;cursor:not-allowed}
+.fantasy-panel[data-fr-terrain] button :is(small,span,b),.fr-messenger[data-fr-terrain] button :is(small,span,b){color:inherit}
+.fantasy-panel[data-fr-terrain] .fr-character{background:var(--fr-character-bg);color:var(--fr-character-ink);transition:background-color 1.6s ease,color 1.6s ease}
+.fantasy-panel[data-fr-terrain] .fr-character :is(.fr-eyebrow,.fr-meter b,.fr-xp,.fr-character-bottom,.fr-character-bottom small,.fr-character-job span),.fantasy-panel[data-fr-terrain] .fr-character>p{color:var(--fr-character-muted)}
+.fantasy-panel[data-fr-terrain] .fr-character :is(.fr-stat-grid b,.fr-wallet b,.fr-character-bottom b){color:var(--fr-character-ink)}
+.fantasy-panel[data-fr-terrain] .fr-character .fr-buff{color:var(--fr-character-ink)!important}
+.fantasy-panel[data-fr-terrain] .fr-character-seal{color:var(--fr-character-ink);border-color:var(--fr-character-muted);background:var(--fr-character-bg);box-shadow:0 0 0 5px color-mix(in srgb,var(--fr-character-muted) 12%,transparent)}
+.fantasy-panel[data-fr-terrain] .fr-character meter,.fantasy-panel[data-fr-terrain] .fr-character meter::-webkit-meter-bar{background:var(--fr-border)}
+.fantasy-panel[data-fr-terrain] .fr-detail-content{font-size:15.5px;line-height:1.8;padding:24px}
+.fantasy-panel[data-fr-terrain] .fr-detail>nav button{font-size:14px;padding:8px 10px;min-height:38px}
+.fantasy-panel[data-fr-terrain] .fr-detail-content :is(.fr-btn,input,select,textarea){font-size:14.5px}
+.fantasy-panel[data-fr-terrain] .fr-detail-content :where(small,.fr-muted){font-size:12px;line-height:1.6}
+.fantasy-panel[data-fr-terrain] .fr-detail-content h2{font-size:25px}
+.fantasy-panel[data-fr-terrain] .fr-detail-content h3{font-size:17px}
+.fantasy-panel[data-fr-terrain] .fr-detail-content.fr-npc-content{padding:0}
+@container(min-width:1001px){.fantasy-panel[data-fr-terrain] .fr-game-layout:has(.fr-detail.open){grid-template-columns:185px minmax(260px,14fr) minmax(340px,11fr)}}
+@container(min-width:701px) and (max-width:1000px){.fantasy-panel[data-fr-terrain] .fr-game-layout:has(.fr-detail.open){grid-template-columns:minmax(0,14fr) minmax(0,11fr)}}
+.fantasy-panel[data-fr-terrain] .fr-creation{background:var(--fr-paper)}
+.fantasy-panel[data-fr-terrain] .fr-map-key{background:var(--fr-surface);color:var(--fr-ink)}
+.fantasy-panel[data-fr-terrain] .fr-map-zoom{background:var(--fr-surface);color:var(--fr-ink);border-color:var(--fr-border)}
+.fantasy-panel[data-fr-terrain] .fr-map-heading{color:var(--fr-ink)}
+.fantasy-panel[data-fr-terrain] .fr-map{background:var(--fr-surface-alt);transition:background-color 1.6s ease}
+.fr-messenger[data-fr-terrain] .fr-messenger-bar{background:var(--fr-character-bg);color:var(--fr-character-ink)}
+.fr-messenger[data-fr-terrain] .fr-messenger-bar small{color:var(--fr-character-muted);opacity:1}
+.fr-messenger[data-fr-terrain] .fr-messenger-bar button{background:transparent;color:var(--fr-character-ink)}
+.fr-messenger[data-fr-terrain] .npc-experience{--npc-ink:var(--fr-ink);--npc-paper:var(--fr-paper);--npc-gold:var(--fr-gold);background:var(--fr-paper);color:var(--fr-ink)}
+.fr-messenger[data-fr-terrain] :is(.npc-arch,.npc-scene-floor){background:var(--fr-surface-alt);border-color:var(--fr-border)}
+.fr-messenger[data-fr-terrain] .npc-window{background:var(--fr-surface);border-color:var(--fr-border)}
+.fr-messenger[data-fr-terrain] .npc-window i{border-color:var(--fr-border)}
+.fr-messenger[data-fr-terrain] :is(.npc-top,.npc-conversation,.npc-message,.npc-composer){background:var(--fr-surface);color:var(--fr-ink);border-color:var(--fr-border)}
+.fr-messenger[data-fr-terrain] :is(.npc-scene,.npc-message.you){background:var(--fr-surface-alt);color:var(--fr-ink);border-color:var(--fr-border)}
+.fr-messenger[data-fr-terrain] :is(.npc-persona>span,.npc-persona h1 small,.npc-profile,.npc-source,.npc-message>span,.npc-composer small,.npc-chat-footer,.npc-chat-footer button,.npc-chat-footer>span,.npc-empty,.npc-ready){color:var(--fr-muted);opacity:1}
+.fr-messenger[data-fr-terrain] :is(.npc-connection,.npc-empty>p){color:var(--fr-muted)}
+.fr-messenger[data-fr-terrain] :is(.npc-composer textarea,.npc-persona h1,.npc-message p){color:var(--fr-ink)}
+.fr-messenger[data-fr-terrain] :is(.fr-btn,.npc-examples button){background:var(--fr-surface-alt);color:var(--fr-ink);border-color:var(--fr-border)}
+.fr-messenger[data-fr-terrain] .npc-composer .npc-send{background:var(--fr-accent);color:var(--fr-accent-ink);border-color:var(--fr-accent)}
+.fr-messenger[data-fr-terrain] .npc-composer .npc-send:disabled{background:var(--fr-surface-alt);color:var(--fr-muted);opacity:1}
+@container(max-width:700px){
+  .fantasy-panel[data-fr-terrain] .fr-header{flex-wrap:wrap;gap:10px;padding:14px}
+  .fantasy-panel[data-fr-terrain] .fr-title{min-width:0}
+  .fantasy-panel[data-fr-terrain] .fr-title h1{white-space:nowrap;font-size:22px}
+  .fantasy-panel[data-fr-terrain] .fr-title small{white-space:nowrap;font-size:8px}
+  .fantasy-panel[data-fr-terrain] .fr-header-actions{flex-basis:100%;flex-wrap:wrap;gap:6px;padding-right:0}
+  .fantasy-panel[data-fr-terrain] .fr-header-actions button{white-space:nowrap;min-height:34px}
+}
+@container(max-width:700px){
+  .fantasy-panel[data-fr-terrain] .fr-detail-content{padding:18px}
+  .fantasy-panel[data-fr-terrain] .fr-detail-content :is(.fr-service-row,.fr-shop-row,.fr-inventory-row){flex-wrap:wrap;gap:8px}
+}
+@media(prefers-reduced-motion:reduce){
+  .fantasy-panel[data-fr-terrain],.fr-messenger[data-fr-terrain],.fantasy-panel[data-fr-terrain] :where(*),.fr-messenger[data-fr-terrain] :where(*){transition:none!important}
+}

@@ -1,3 +1,5 @@
+import { fantasyHasJob } from './fantasy-careers.ts';
+import { fantasyRegisteredGuildGrade } from './fantasy-guild-progression.ts';
 import type { FantasyCharacter } from './fantasy.ts';
 import { FANTASY_LOCATIONS } from './fantasy-data.ts';
 import { fantasyBuildings } from './fantasy-town.ts';
@@ -35,7 +37,7 @@ export function fantasyCanHaggle(character: FantasyCharacter, service: FantasyTr
 export function fantasyHaggle(character: FantasyCharacter, service: FantasyTradeService, rng: () => number) {
   if (!fantasyCanHaggle(character, service)) return null;
   const { score } = fantasyReputation(character);
-  const charisma = character.job === 'merchant' || character.job === 'leader' || character.job === 'bard' ? 8 : 0;
+  const charisma = fantasyHasJob(character,'merchant') || character.job === 'leader' || character.job === 'bard' ? 8 : 0;
   const chance = Math.max(.1, Math.min(.85, .25 + score * .005 + charisma / 100));
   const target = Math.floor(chance * 100);
   const roll = 1 + Math.floor(Math.max(0, Math.min(1 - Number.EPSILON, Number(rng()) || 0)) * 100);
@@ -46,10 +48,11 @@ export function fantasyHaggle(character: FantasyCharacter, service: FantasyTrade
   return { success, discount, chance, roll, target };
 }
 
-export function fantasyPrice(character: Pick<FantasyCharacter, 'location' | 'hour' | 'bargains'>, base: number, service: FantasyTradeService): number {
+export function fantasyPrice(character: Pick<FantasyCharacter, 'location' | 'hour' | 'bargains' | 'guildProgress'>, base: number, service: FantasyTradeService): number {
   const bargain = character.bargains?.[service];
   const discount = bargain?.location === character.location && bargain.expiresAt > character.hour ? Math.max(0, Math.min(.2, bargain.discount)) : 0;
-  return Math.max(1, Math.ceil(base * (1 - discount)));
+  const guildDiscount=service==='room'&&fantasyRegisteredGuildGrade(character)>=5?.05:0;
+  return Math.max(1, Math.ceil(base * (1 - Math.min(.25,discount+guildDiscount))));
 }
 
 export function validFantasyReputation(character: FantasyCharacter): boolean {

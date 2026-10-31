@@ -54,6 +54,13 @@ test('sale and profession explanations follow current place and equipped invento
   c.location='hearth';c.inventory.blade=1;c.equipment={weapon:'blade'};
   assert.match(actionHelp(c,{type:'sell',item:'blade'},'en')!,/Unequip/);
 });
+test('profession hints recognize an independently selected life career beside combat',()=>{
+  const c=player();c.job='warrior';c.lifeJob='cook';
+  for(const locale of ['ko','en','ja'] as const){
+    assert.ok(actionHelp(c,{type:'job',job:'cook'},locale));
+    assert.equal(actionHelp(c,{type:'job',job:'tailor'},locale),undefined);
+  }
+});
 test('item and skill details expose their actual restorative and passive effects',()=>{
   const potion=FANTASY_ITEMS.find(item=>item.id==='potion')!,bread=FANTASY_ITEMS.find(item=>item.id==='bread')!;
   assert.ok(itemUseEffectText(potion,'ko').some(text=>/HP \+35/.test(text)));

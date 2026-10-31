@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NPC_PUBLIC, type NpcLocale } from './npc.ts';
+import { FANTASY_ARTISANS } from './fantasy-artisan-catalog.ts';
+import { NPC_ARTISAN_PRIVATE } from '../server/npc-artisan-profiles.ts';
 import { FANTASY_ITEMS } from './fantasy-data.ts';
 import { foodMeta } from './fantasy-life.ts';
 import { npcBreaksFourthWall } from '../server/npc-speech.ts';
@@ -61,4 +63,16 @@ test('preference replies disclose only the selected fixed public fact', () => {
   assert.deepEqual(npcPreferenceFacts('invented-npc', 'en'), []);
   assert.equal(npcPreferenceReply('rin', 'xx' as NpcLocale, 'What do you like'), undefined);
   assert.equal(npcPreferenceReply('rin', 'ko', '좋아하는 걸 주면 얼마나 친해져'), undefined);
+});
+
+test('artisan preferences are canonical public facts and exclude their localized private notes', () => {
+  for (const artisan of FANTASY_ARTISANS) for (const locale of locales) {
+    assert.ok(NPC_PREFERENCES[artisan.id]);
+    const facts = npcPreferenceFacts(artisan.id, locale);
+    assert.equal(facts.length, 3);
+    const reply = npcPreferenceReply(artisan.id, locale, NPC_PREFERENCE_QUESTIONS.likes[locale][0])!;
+    assert.equal(reply, `${facts[0]} ${facts[1]}`);
+    assert.ok(!reply.includes(NPC_ARTISAN_PRIVATE[artisan.id][locale]));
+    assert.ok(!JSON.stringify(facts).includes(NPC_ARTISAN_PRIVATE[artisan.id][locale]));
+  }
 });

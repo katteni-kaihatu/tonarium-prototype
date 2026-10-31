@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { FANTASY_LOCATIONS, FANTASY_ROUTES } from './fantasy-data.ts';
 import { advanceFantasyWorld, applyFantasyAction, fantasyTransports, newFantasyProfile, startFantasyActivity } from './fantasy-engine.ts';
 import { FANTASY_SETTLEMENTS, FANTASY_MAPS, fantasyBuildings, fantasyFrontierLocations, fantasyKnownLocations, fantasyLibraryHoldings } from './fantasy-town.ts';
 import { FANTASY_LIBRARY_BOOKS } from './fantasy-library.ts';
 import { FANTASY_TERMS } from './fantasy-lore.ts';
+import { FANTASY_MAINLAND_COASTS } from './fantasy-map-geometry.ts';
 
 const ids = ['inkstone-city','pinewatch','reedcross','canopy-hall','mossbrook','leafshade','sunloom','wellrest','rockshade'];
 const fresh = (location: string) => {
@@ -24,11 +24,7 @@ test('every inhabited city, village and port provides an actual inn without fill
 });
 
 test('new settlements are localized, separated and placed within their visible continent coastlines',()=>{
-  const source=readFileSync(new URL('../client/src/world/FantasyMap.tsx',import.meta.url),'utf8');
-  const polygons=Object.fromEntries([['noctis','east'],['sylvara','southWest'],['kazaran','southEast']].map(([land,key])=>{
-    const numbers=source.match(new RegExp(`const ${key} = '([^']+)'`))![1].match(/-?\d+(?:\.\d+)?/g)!.map(Number);
-    return [land,Array.from({length:numbers.length/2},(_,i)=>[numbers[i*2],numbers[i*2+1]])];
-  }));
+  const polygons=Object.fromEntries(Object.entries(FANTASY_MAINLAND_COASTS).map(([land,coast])=>[land,coast.map(point=>[point.x,point.y])]));
   for(const id of ids){
     const place=FANTASY_LOCATIONS.find(place=>place.id===id)!;
     const points=polygons[place.land];let inside=false;

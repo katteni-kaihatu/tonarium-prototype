@@ -1,3 +1,4 @@
+import { markFantasyPlatformDataCurrent } from './fantasy-platform-reset.ts';
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,6 +13,8 @@ import { FantasyStore, type FantasyGroupInvestigationPlan } from './fantasy-stor
 import { applyFantasyAction, fantasyStats, newFantasyProfile } from '../shared/fantasy-engine.ts';
 import { FANTASY_PARTY_MAX_MEMBERS, FANTASY_PARTY_TTL_MS, fantasyPartyErrorText, isFantasyPartyCommand, type FantasyPartyState } from '../shared/fantasy-party.ts';
 import type { FantasyProfile } from '../shared/fantasy.ts';
+import type { FantasyDungeonAction } from '../shared/fantasy-dungeon.ts';
+import { fantasyTestAcceptHunt } from './fantasy-test-combat-access.ts';
 import { testServerEnv } from './test-db.ts';
 
 const quest = 'main-night-01';
@@ -71,7 +74,7 @@ test('every member chooses their own approach and the leader cannot start or rea
   assert.equal(f.party.state('p0').canStart,true);assert.equal(f.party.state('p1').canStart,false);assert.equal(f.writes(),0);
 });
 
-test('passive clock revisions preserve consent and one atomic save starts independent same-duration personal investigations',t=>{
+test('passive clock revisions preserve consent and one atomic save starts personal checks with shared investigation proof',t=>{
   const f=fixture(t);f.create();f.join('p1');f.ready('p0');f.ready('p1');const before=f.store.profile('p0').revision;
   f.setHour(8.1);f.store.tick(new Set(['p0','p1']));assert.equal(f.store.profile('p0').character!.hour,8.1);
   const clockView=f.store.profile('p0');clockView.revision=before+3;f.actors.get('p0')!.override=clockView;assert.equal(f.party.state('p0').canStart,true);f.actors.get('p0')!.override=undefined;
@@ -80,7 +83,7 @@ test('passive clock revisions preserve consent and one atomic save starts indepe
   for(const update of result.updates!){assert.equal(update.profile.activity!.startedAt,8.1);assert.equal(update.profile.activity!.endsAt,8.6);assert.equal(update.profile.character!.mainTrials![quest].proofs.length,0);}
   assert.equal(f.party.state('p0').members.some(member=>member.ready),false);
   f.setHour(8.6);f.store.tick(new Set(['p0','p1']));
-  const a=f.store.profile('p0'),b=f.store.profile('p1');assert.equal(a.character!.mainTrials![quest].proofs.length,1);assert.equal(b.character!.mainTrials![quest].proofs.length,0);
+  const a=f.store.profile('p0'),b=f.store.profile('p1');assert.equal(a.character!.mainTrials![quest].proofs.length,1);assert.equal(b.character!.mainTrials![quest].proofs.length,1);
   assert.ok(a.character!.xp>0);assert.equal(b.character!.xp,0);assert.equal(a.character!.gold,b.character!.gold);assert.ok(!b.log.some(log=>log.text.endsWith(':success］。')));
   const settled=JSON.stringify({a,b});f.store.tick(new Set(['p0','p1']));assert.equal(JSON.stringify({a:f.store.profile('p0'),b:f.store.profile('p1')}),settled);
 });
@@ -95,7 +98,7 @@ test('completion-save failure publishes no partial clue or XP and deterministic 
   const f=fixture(t);f.create();f.join('p1');f.ready('p0');f.ready('p1');assert.equal(f.request('p0',{type:'start'}).error,undefined);
   const before={a:f.store.profile('p0'),b:f.store.profile('p1')},bytes=fs.readFileSync(f.file,'utf8');f.setHour(8.5);f.fail(true);
   const failed=f.store.tick(new Set(['p0','p1']));assert.ok(failed.every(update=>!!update.error));assert.deepEqual({a:f.store.profile('p0'),b:f.store.profile('p1')},before);assert.equal(fs.readFileSync(f.file,'utf8'),bytes);
-  f.fail(false);f.store.tick(new Set(['p0','p1']));const a=f.store.profile('p0'),b=f.store.profile('p1');assert.equal(a.character!.mainTrials![quest].proofs.length,1);assert.equal(b.character!.mainTrials![quest].proofs.length,0);
+  f.fail(false);f.store.tick(new Set(['p0','p1']));const a=f.store.profile('p0'),b=f.store.profile('p1');assert.equal(a.character!.mainTrials![quest].proofs.length,1);assert.equal(b.character!.mainTrials![quest].proofs.length,1);
   const reloaded=new FantasyStore(f.file,{worldHour:()=>8.5});assert.deepEqual(reloaded.profile('p0'),a);assert.deepEqual(reloaded.profile('p1'),b);assert.equal(reloaded.tick(new Set()).length,0);
 });
 
@@ -141,23 +144,33 @@ test('different personal voyage decisions survive the group reservation and are 
 });
 
 test('real WebSocket party requests enforce session boundaries, individual consent and recipient-only profile updates',async t=>{
-  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'fantasy-party-ws-')),profiles=Object.fromEntries(['alice','bob','carol'].map(id=>{const p=player(`Secret-${id}`);p.character!.inventory.potion=1;p.character!.hp=50;p.character!.combatVictories={'story:main-night-01:field':8};return[id,p];}));
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'fantasy-party-ws-')),profiles=Object.fromEntries(['alice','bob','carol','town-alice','town-bob','town-carol'].map(id=>{const p=player(`Secret-${id}`);p.character!.inventory.potion=1;p.character!.hp=50;p.character!.combatVictories={'story:main-night-01:field':8};if(id.startsWith('town-'))p.character!.location='hearth';return[id,p];}));
   fs.writeFileSync(path.join(directory,'fantasy.json'),JSON.stringify(profiles));fs.writeFileSync(path.join(directory,'fantasy-clock.json'),JSON.stringify({version:1,hour:8,wallTime:Date.now()+3600000}));
   const sessions=path.join(directory,'sessions.json');fs.writeFileSync(sessions,JSON.stringify({name:'Party integration',sessions:[{id:'one',name:'One',world:'fantasy'},{id:'two',name:'Two',world:'fantasy'}]}));
   const listener=net.createServer();await new Promise<void>(resolve=>listener.listen(0,'127.0.0.1',resolve));const port=(listener.address() as net.AddressInfo).port;await new Promise<void>(resolve=>listener.close(()=>resolve()));
-  const child=spawn(process.execPath,['--import','tsx','server/index.ts','--dev'],{env:{...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1',NODE_ENV:'test',FANTASY_ACCOUNT_TEST_BYPASS:'1',SERVER_PORT:String(port),DATA_DIR:directory,SESSIONS_FILE:sessions,LIVEKIT_URL:'',LIVEKIT_API_KEY:'',LIVEKIT_API_SECRET:'',KOKOAAI_APIKEY: ''},stdio:['ignore','pipe','pipe']});
+  markFantasyPlatformDataCurrent(directory);
+  const child=spawn(process.execPath,['--import','tsx','server/index.ts','--dev'],{env:{...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1',NODE_ENV:'test',SERVER_PORT:String(port),DATA_DIR:directory,SESSIONS_FILE:sessions,LIVEKIT_URL:'',LIVEKIT_API_KEY:'',LIVEKIT_API_SECRET:'',KOKOAAI_APIKEY: ''},stdio:['ignore','pipe','pipe']});
   let output='';child.stdout.on('data',data=>{output+=String(data);});child.stderr.on('data',data=>{output+=String(data);});const sockets:WebSocket[]=[];
   t.after(async()=>{for(const socket of sockets)socket.terminate();child.kill();if(child.exitCode===null&&!child.signalCode)await new Promise<void>(resolve=>{const timer=setTimeout(()=>{child.kill('SIGKILL');resolve();},3000);child.once('exit',()=>{clearTimeout(timer);resolve();});});assert.equal(path.dirname(path.resolve(directory)),path.resolve(os.tmpdir()));assert.ok(path.basename(directory).startsWith('fantasy-party-ws-'));fs.rmSync(directory,{recursive:true,force:true});});
   async function until<T>(read:()=>T|undefined):Promise<T>{const deadline=Date.now()+12000;while(Date.now()<deadline){const value=read();if(value!==undefined)return value;if(child.exitCode!==null)throw Error(output);await new Promise(resolve=>setTimeout(resolve,15));}throw Error(`Party WS timeout: ${output}`);}
   async function client(id:string,session:string){
-    let ws:WebSocket|undefined;const deadline=Date.now()+12000;
+    let ws:WebSocket|undefined;const deadline=Date.now()+45000;
     while(!ws&&Date.now()<deadline){const attempt=new WebSocket(`ws://127.0.0.1:${port}/ws`);const opened=await new Promise<boolean>(resolve=>{attempt.once('open',()=>resolve(true));attempt.once('error',()=>resolve(false));});if(opened)ws=attempt;else{attempt.terminate();await new Promise(resolve=>setTimeout(resolve,25));}}
-    assert.ok(ws,output);sockets.push(ws);ws.on('error',()=>{});
-    const messages:({t:string;state?:FantasyPartyState;profile?:FantasyProfile;error?:string})[]=[];ws.on('message',raw=>{messages.push(JSON.parse(String(raw)));});
-    const send=(message:unknown)=>ws!.send(JSON.stringify(message));send({t:'hello',compat: COMPAT_VERSION,id,name:`Public-${id}`});await until(()=>messages.find(message=>message.t==='fantasyPartyState'));const joinedAt=messages.length;send({t:'join',sid:session});send({t:'fantasyPartyRequest',command:{type:'sync'}});await until(()=>messages.slice(joinedAt).find(message=>message.t==='fantasyPartyState'&&!message.error));
+    assert.ok(ws,`Test server did not accept WebSocket connections before the startup deadline. ${output}`);sockets.push(ws);ws.on('error',()=>{});
+    const messages:({t:string;state?:FantasyPartyState&{players?:{id:string;name:string}[]};profile?:FantasyProfile;error?:string})[]=[];ws.on('message',raw=>{messages.push(JSON.parse(String(raw)));});
+    const send=(message:unknown)=>ws!.send(JSON.stringify(message));send({t:'hello',compat: COMPAT_VERSION,id,name:`Public-${id}`});await until(()=>messages.find(message=>message.t==='snapshot'));const joinedAt=messages.length;send({t:'join',sid:session});send({t:'fantasyPartyRequest',command:{type:'sync'}});await until(()=>messages.slice(joinedAt).find(message=>message.t==='fantasyPartyState'&&!message.error));
     return{messages,send,state:(predicate:(state:FantasyPartyState)=>boolean)=>until(()=>[...messages].reverse().find(message=>message.t==='fantasyPartyState'&&message.state&&predicate(message.state))?.state),error:(error:string,start=0)=>until(()=>messages.slice(start).find(message=>message.t==='fantasyPartyState'&&message.error===error))};
   }
   const a=await client('alice','one'),b=await client('bob','one'),c=await client('carol','two');
+  const townA=await client('town-alice','one'),townB=await client('town-bob','one');await client('town-carol','two');
+  const town=await until(()=>[...townA.messages].reverse().find(message=>message.t==='fantasyTownPresence'&&message.state?.players?.some(player=>player.id==='town-bob'))?.state);
+  assert.deepEqual(town.players!.map(player=>player.id).sort(),['town-alice','town-bob']);
+  assert.ok(town.players!.every(player=>Object.keys(player).sort().join(',')==='id,name'));
+  assert.ok(!JSON.stringify(town).includes('Secret-'));assert.ok(!town.players!.some(player=>player.id==='town-carol'));
+  const departingAt=townA.messages.length;townB.send({t:'fantasyAction',revision:profiles['town-bob'].revision,action:{type:'travel',destination:'oldwatch',transport:'foot'}});
+  await until(()=>townB.messages.find(message=>message.profile?.activity?.action.type==='travel'));
+  const departed=await until(()=>townA.messages.slice(departingAt).find(message=>message.t==='fantasyTownPresence'&&!message.state?.players?.some(player=>player.id==='town-bob'))?.state);
+  assert.deepEqual(departed.players!.map(player=>player.id),['town-alice']);assert.ok(departed.players!.every(player=>Object.keys(player).sort().join(',')==='id,name'));
   a.send({t:'fantasyPartyRequest',command:{type:'create'}});await a.state(state=>!!state.id);
   a.send({t:'fantasyPartyRequest',command:{type:'invite',target:'carol'}});await a.error('not-found');
   a.send({t:'fantasyPartyRequest',command:{type:'invite',target:'bob'}});const invitation=(await b.state(state=>state.invitations.length===1))!.invitations[0];
@@ -176,5 +189,61 @@ test('real WebSocket party requests enforce session boundaries, individual conse
     for(const message of client.messages.filter(message=>message.t==='fantasyProfile'))assert.equal(message.profile!.character!.name,`Secret-${id}`);
     for(const message of client.messages.filter(message=>message.t==='fantasyPartyState'))for(const secret of ['Secret-','main-night','oldwatch','inventory','voyageDecisions'])assert.ok(!JSON.stringify(message.state).includes(secret));
   }
-  const leftAt=a.messages.length;b.send({t:'leave'});await until(()=>a.messages.slice(leftAt).find(message=>message.state?.members.length===1));
+  for(const [client,profile] of [[a,ownA],[b,ownB]] as const){const at=client.messages.length;client.send({t:'fantasyAction',revision:profile.revision,action:{type:'cancel'}});await until(()=>client.messages.slice(at).find(message=>message.profile&&!message.profile.activity));}
+  await new Promise(resolve=>setTimeout(resolve,1100)); // Start the next workflow in a fresh authoritative request-rate window.
+  const dungeon = async(action:FantasyDungeonAction)=>{
+    const atA=a.messages.length,atB=b.messages.length;a.send({t:'fantasyPartyRequest',command:{type:'readyDungeon',action}});
+    const proposal=(await a.state(state=>state.dungeonProposal?.action.type===action.type))!.dungeonProposal!;
+    b.send({t:'fantasyPartyRequest',command:{type:'dungeonDecision',proposal:proposal.id,revision:proposal.revision,accept:true}});
+    await a.state(state=>state.dungeonProposal?.id===proposal.id&&!!state.canStartDungeon);a.send({t:'fantasyPartyRequest',command:{type:'startDungeon'}});
+    const pa=await until(()=>a.messages.slice(atA).find(message=>!!message.profile)?.profile),pb=await until(()=>b.messages.slice(atB).find(message=>!!message.profile)?.profile);
+    assert.equal(pa.character!.dungeon!.active!.site,pb.character!.dungeon!.active!.site);assert.equal(pa.character!.dungeon!.active!.room,pb.character!.dungeon!.active!.room);return[pa,pb];
+  };
+  const entered=await dungeon({type:'dungeonEnter',site:'oldwatch'});assert.equal(entered[0].character!.dungeon!.active!.room,'entrance');
+  const moved=await dungeon({type:'dungeonMove',room:'barracks'});assert.equal(moved[1].character!.dungeon!.active!.room,'barracks');
+  const inspected=await dungeon({type:'dungeonInspect'});assert.ok(inspected.every(profile=>profile.character!.dungeon!.sites.oldwatch.inspected.includes('barracks')));
+  a.send({t:'fantasyPartyRequest',command:{type:'readyCombat',source:'dungeon',target:'oldwatch:barracks'}});
+  const battleProposal=(await a.state(state=>state.combatProposal?.source==='dungeon'))!.combatProposal!;
+  b.send({t:'fantasyPartyRequest',command:{type:'combatDecision',proposal:battleProposal.id,revision:battleProposal.revision,decision:'accept'}});
+  await a.state(state=>!!state.canStartCombat&&state.combatProposal?.id===battleProposal.id);const battleAtA=a.messages.length,battleAtB=b.messages.length;a.send({t:'fantasyPartyRequest',command:{type:'startCombat'}});
+  const battleA=await until(()=>a.messages.slice(battleAtA).find(message=>message.profile?.combatId)?.profile),battleB=await until(()=>b.messages.slice(battleAtB).find(message=>message.profile?.combatId)?.profile);assert.equal(battleA.combatId,battleB.combatId);
+  for(const client of [a,b])for(const message of client.messages.filter(message=>message.t==='fantasyPartyState'))for(const secret of ['inventory','voyageDecisions','damage','disarm'])assert.ok(!JSON.stringify(message.state).includes(`"${secret}"`));
+  const leftAt=a.messages.length;b.send({t:'leave'});await until(()=>a.messages.slice(leftAt).find(message=>message.t==='fantasyPartyState'&&message.state?.members.length===1));
+});
+
+test('the founder leads, can hand leadership over and remove a member',t=>{
+  const f=fixture(t,3);f.create();f.join('p1');f.join('p2');
+  const leader=(id:string)=>f.party.state(id).members.find(member=>member.isLeader)?.id;
+  assert.equal(leader('p2'),'p0');
+  assert.equal(f.request('p1',{type:'transferLeader',target:'p1'}).error,'leader-only');
+  assert.equal(f.request('p0',{type:'transferLeader',target:'p0'}).error,'incompatible');
+  assert.equal(f.request('p0',{type:'transferLeader',target:'ghost'}).error,'incompatible');
+  assert.equal(f.request('p0',{type:'transferLeader',target:'p1'}).error,undefined);
+  assert.equal(leader('p0'),'p1');
+  assert.equal(f.request('p0',{type:'kick',target:'p2'}).error,'leader-only');
+  assert.equal(f.request('p1',{type:'kick',target:'p1'}).error,'incompatible');
+  assert.equal(f.request('p1',{type:'kick',target:'p0'}).error,undefined);
+  assert.deepEqual(f.party.state('p1').members.map(member=>member.id),['p1','p2']);
+  assert.equal(f.party.state('p0').id,null);
+  assert.equal(isFantasyPartyCommand({type:'transferLeader',target:'p1'}),true);
+  assert.equal(isFantasyPartyCommand({type:'kick',target:'p1'}),true);
+  assert.equal(isFantasyPartyCommand({type:'kick'}),false);
+  assert.equal(isFantasyPartyCommand({type:'kick',target:'p1',extra:1}),false);
+});
+
+test('members can decline or sit out of a proposed battle and the leader cannot start with nobody',t=>{
+  const f=fixture(t,3,p=>fantasyTestAcceptHunt(p,'monster-skeleton-guard'));f.create();f.join('p1');f.join('p2');
+  const decision=(id:string)=>f.party.state('p0').members.find(member=>member.id===id)?.combatDecision;
+  assert.equal(f.request('p0',{type:'startCombat'}).error,'not-ready');
+  assert.equal(f.request('p0',{type:'readyCombat',source:'hunt',target:'monster-skeleton-guard'}).error,undefined);
+  let proposal=f.party.state('p1').combatProposal!;
+  assert.equal(f.request('p1',{type:'combatDecision',proposal:proposal.id,revision:proposal.revision,decision:'decline'}).error,undefined);
+  assert.equal(f.party.state('p0').combatProposal,undefined);
+  assert.equal(f.request('p0',{type:'readyCombat',source:'hunt',target:'monster-skeleton-guard'}).error,undefined);proposal=f.party.state('p1').combatProposal!;
+  assert.equal(f.request('p1',{type:'combatDecision',proposal:proposal.id,revision:proposal.revision,decision:'sit-out'}).error,undefined);
+  assert.equal(decision('p1'),'sit-out');
+  assert.equal(f.request('p0',{type:'startCombat'}).error,'not-ready');
+  assert.equal(isFantasyPartyCommand({type:'combatDecision',proposal:proposal.id,revision:proposal.revision,decision:'accept'}),true);
+  assert.equal(isFantasyPartyCommand({type:'combatDecision',decision:'maybe'}),false);
+  assert.equal(isFantasyPartyCommand({type:'combatDecision',decision:'accept',target:'x'}),false);
 });

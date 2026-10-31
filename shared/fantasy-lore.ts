@@ -48,6 +48,7 @@ const places: Record<string, Translation> = {
   'mushroom-isle': ['거대버섯섬', 'Mushroom Isle', '집채만 한 버섯과 독특한 향신료가 있는 섬.', 'An island of house-sized mushrooms and unusual spices.'],
   'storm-isle': ['천둥종섬', 'Stormbell Isle', '폭풍을 알리는 종과 오래된 등대의 섬.', 'An island with a storm-warning bell and an old lighthouse.'],
   'echo-isle': ['메아리섬', 'Echo Isle', '노래가 멀리 울리고 여행자와 어부가 쉬는 섬.', 'An island where songs carry and travelers meet fishers.'],
+  'starfall-isle':['별내림섬','Starfall Isle','밤이면 고대 관측환과 바다에 별의 궤적이 비치는 섬.','An island where starlight traces ancient observation rings and the sea.','夜には古い観測環と海に星の軌跡が映る島。'],
 };
 
 const races: Record<string, Translation> = {
@@ -72,6 +73,7 @@ const jobs: Record<string, Translation> = {
   cook: ['요리사', 'Cook', '각지의 재료로 사람을 먹이고 요리 의뢰를 맡는다.', 'Feeds people with regional ingredients and cooking commissions.'],
   alchemist: ['연금술사', 'Alchemist', '약초와 광물을 연구하고 약과 촉매를 조합한다.', 'Studies herbs and minerals to make remedies and catalysts.'],
   priest: ['사제', 'Priest', '신전에서 신을 섬기고 기도와 성법으로 사람들을 돌본다.', 'Serves a deity at a temple and cares for people through prayer and sacred arts.'],
+  ranger: ['레인저', 'Ranger', '흔적과 함정을 살피고 활로 탐사대의 길을 지킨다.', 'Reads tracks and traps and guards expeditions with a bow.'],
   hunter: ['사냥꾼', 'Hunter', '흔적을 읽고 야생의 자원과 마을의 안전을 지킨다.', 'Reads tracks and protects wild resources and settlements.'],
   bard: ['음유시인', 'Bard', '노래와 기록된 이야기를 모아 사람들에게 전한다.', 'Collects songs and recorded stories and shares them.'],
   mage: ['마법사', 'Mage', '마력과 고대 문자를 연구한다.', 'Studies mana and ancient writing.'],

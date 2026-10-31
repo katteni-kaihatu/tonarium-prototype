@@ -1,0 +1,132 @@
+.fr-terrain-ambience {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+  contain: paint;
+}
+
+.fr-terrain-ambience *,
+.fr-terrain-ambience *::before,
+.fr-terrain-ambience *::after {
+  pointer-events: none;
+}
+
+.fr-terrain-ambience .fr-terrain-ambience__scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transition: opacity 1600ms ease-in-out;
+}
+
+.fr-terrain-ambience .fr-terrain-ambience__art {
+  position: absolute;
+  display: block;
+  width: clamp(90px, 13vw, 164px);
+  height: auto;
+  opacity: .23;
+}
+
+.fr-terrain-ambience .fr-terrain-ambience__left { left: -8px; }
+.fr-terrain-ambience .fr-terrain-ambience__right { right: -8px; transform: scaleX(-1); }
+.fr-terrain-ambience .fr-terrain-ambience__tree { bottom: -9px; opacity: .31; }
+.fr-terrain-ambience .fr-terrain-ambience__tree.fr-terrain-ambience__right { width: clamp(76px, 11vw, 136px); bottom: 18%; opacity: .22; }
+.fr-terrain-ambience .fr-terrain-ambience__bottom { bottom: -6px; left: 0; width: 100%; }
+.fr-terrain-ambience .fr-terrain-ambience__water { height: 74px; opacity: .25; }
+.fr-terrain-ambience .fr-terrain-ambience__island-water { height: 49px; }
+.fr-terrain-ambience .fr-terrain-ambience__snowbank { height: 76px; opacity: .56; }
+.fr-terrain-ambience .fr-terrain-ambience__frost { top: 0; width: clamp(94px, 16vw, 175px); opacity: .38; }
+.fr-terrain-ambience .fr-terrain-ambience__palm { bottom: 10px; width: clamp(92px, 12vw, 144px); }
+.fr-terrain-ambience .fr-terrain-ambience__dunes { height: 90px; opacity: .3; }
+.fr-terrain-ambience .fr-terrain-ambience__ridge { height: 132px; }
+.fr-terrain-ambience .fr-terrain-ambience__stone { top: 0; height: 100%; width: clamp(70px, 10vw, 120px); }
+.fr-terrain-ambience .fr-terrain-ambience__reeds { bottom: 0; opacity: .3; }
+.fr-terrain-ambience .fr-terrain-ambience__ruins { bottom: 0; width: clamp(68px, 9vw, 114px); opacity: .18; }
+.fr-terrain-ambience .fr-terrain-ambience__tower { top: 8%; height: 75%; width: 68px; opacity: .16; }
+.fr-terrain-ambience .fr-terrain-ambience__town { bottom: 4px; width: clamp(80px, 10vw, 128px); opacity: .18; }
+
+.fr-terrain-ambience .fr-terrain-ambience__waves {
+  animation: fr-terrain-ambience-wave 18s ease-in-out infinite alternate;
+}
+
+.fr-terrain-ambience .fr-terrain-ambience__mist {
+  position: absolute;
+  bottom: -20px;
+  left: -5%;
+  width: 110%;
+  height: 76px;
+  opacity: .09;
+  background: radial-gradient(ellipse at 10% 100%, var(--fta-light), transparent 40%), radial-gradient(ellipse at 96% 100%, var(--fta-light), transparent 35%);
+  animation: fr-terrain-ambience-mist 24s ease-in-out infinite alternate;
+}
+
+.fr-terrain-ambience .fr-terrain-ambience__particles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, black 0, black 3%, transparent 20%, transparent 80%, black 97%, black 100%);
+}
+
+.fr-terrain-ambience .fr-terrain-ambience__particle {
+  position: absolute;
+  display: block;
+  width: 12px;
+  height: 15px;
+  color: var(--fta-leaf);
+  opacity: .28;
+  animation: fr-terrain-ambience-drift var(--fta-duration) linear var(--fta-delay) infinite;
+}
+
+.fr-terrain-ambience .fr-terrain-ambience__particle svg { display: block; width: 100%; height: 100%; }
+.fr-terrain-ambience .fr-terrain-ambience__particle--maple { color: var(--fta-warm); width: 16px; height: 18px; opacity: .42; }
+.fr-terrain-ambience .fr-terrain-ambience__particle--snow { width: 3px; height: 3px; border-radius: 50%; background: var(--fta-snow); opacity: .58; }
+.fr-terrain-ambience .fr-terrain-ambience__particle--rain { width: 1px; height: 13px; background: var(--fta-light); opacity: .21; animation-name: fr-terrain-ambience-rain; }
+.fr-terrain-ambience .fr-terrain-ambience__particle--sand { width: 2px; height: 2px; border-radius: 50%; background: var(--fta-light); animation-name: fr-terrain-ambience-sand; }
+.fr-terrain-ambience .fr-terrain-ambience__particle--ember { width: 2px; height: 3px; background: var(--fta-warm); border-radius: 50%; opacity: .4; animation-name: fr-terrain-ambience-ember; }
+.fr-terrain-ambience .fr-terrain-ambience__scene[data-weather-muted] .fr-terrain-ambience__particles { opacity: .45; }
+.fr-terrain-ambience .fr-terrain-ambience__scene[data-night="true"] .fr-terrain-ambience__art { opacity: .2; }
+
+@keyframes fr-terrain-ambience-drift {
+  0% { transform: translate(0, -65px) rotate(var(--fta-turn)); opacity: 0; }
+  18% { opacity: .35; }
+  80% { opacity: .28; }
+  100% { transform: translate(18px, 140px) rotate(calc(var(--fta-turn) + 120deg)); opacity: 0; }
+}
+
+@keyframes fr-terrain-ambience-rain {
+  0% { transform: translate(0, -80px) rotate(12deg); opacity: 0; }
+  20%, 75% { opacity: .22; }
+  100% { transform: translate(-18px, 180px) rotate(12deg); opacity: 0; }
+}
+
+@keyframes fr-terrain-ambience-wave { to { transform: translateX(16px) translateY(3px); } }
+@keyframes fr-terrain-ambience-mist { to { transform: translate(12px, -6px); opacity: .13; } }
+@keyframes fr-terrain-ambience-sand {
+  from { transform: translate(-5px, 10px); opacity: 0; }
+  30%, 70% { opacity: .3; }
+  to { transform: translate(25px, -18px); opacity: 0; }
+}
+@keyframes fr-terrain-ambience-ember {
+  from { transform: translate(0, 38px); opacity: 0; }
+  30% { opacity: .4; }
+  to { transform: translate(15px, -100px); opacity: 0; }
+}
+
+@media (max-width: 600px) {
+  .fr-terrain-ambience .fr-terrain-ambience__particle:nth-child(n + 5) { display: none; }
+  .fr-terrain-ambience .fr-terrain-ambience__art { max-width: 90px; opacity: .19; }
+  .fr-terrain-ambience .fr-terrain-ambience__bottom { max-width: none; }
+  .fr-terrain-ambience .fr-terrain-ambience__tree.fr-terrain-ambience__right { bottom: 5%; }
+  .fr-terrain-ambience .fr-terrain-ambience__water { height: 38px; }
+  .fr-terrain-ambience .fr-terrain-ambience__ridge { height: 74px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fr-terrain-ambience *,
+  .fr-terrain-ambience *::before,
+  .fr-terrain-ambience *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

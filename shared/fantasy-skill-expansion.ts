@@ -33,6 +33,9 @@ const PLANS: Plan[] = [
   p('alchemist', 'intelligence', 'dexterity', 'alchemist-mixture', 'craft', 'arts-handbook', 'remedies-and-rites', 'arcane', [
     ['용액의 층 관찰','Solution Layers','溶液層の観察'], ['작은 방울 계량','Measured Drops','小滴の計量'], ['촉매 회수 습관','Catalyst Recovery','触媒回収の習慣'], ['비산 방지 막','Splash Ward','飛散を防ぐ膜'], ['잔류 흔적 읽기','Read Residue','残留跡を読む'], ['반응 순서 정리','Order the Reaction','反応順の整理'], ['안정된 조합 지식','Stable Mixture Lore','安定調合の知識'], ['최종 반응 제어','Final Reaction Control','最終反応の制御'],
   ]),
+  p('ranger', 'agility', 'dexterity', 'ranger-aim', 'explore', 'staff-and-footwork', 'field-signs', 'field', [
+    ['숨죽인 발자국','Quiet Footprints','音を抑えた足跡'], ['덫의 장력 살피기','Read the Trap Tension','罠の張りを確かめる'], ['위험선의 기억','Memory of Hazard Lines','危険線の記憶'], ['숲지기의 엄호','Warden’s Cover','森番の援護'], ['돌아올 표식 남기기','Mark the Return','帰路の目印'], ['흔들림 없는 활시위','Steady Bowstring','揺れぬ弦'], ['오랜 경계의 감각','Seasoned Vigil','長い警戒の勘'], ['숨은 우회로 찾기','Find the Hidden Detour','隠れた迂回路を探す'],
+  ]),
   p('hunter', 'agility', 'intelligence', 'hunter-focus', 'hunt', 'staff-and-footwork', 'field-signs', 'field', [
     ['낮은 흔적 찾기','Low-Track Reading','低い足跡探し'], ['바람 아래 접근','Downwind Approach','風下の接近'], ['숲의 안전거리','Forest Caution','森の間合い'], ['위험에서 몸 낮추기','Duck from Danger','危険に身を伏せる'], ['돌아오는 숲길','The Returning Trail','帰りの森道'], ['복잡한 흔적 분리','Separate Tangled Tracks','絡む痕跡の分離'], ['오랜 순찰의 감각','Seasoned Patrol Sense','長い巡回の勘'], ['소리 없는 먼걸음','Silent Long Stride','音なき長い歩み'],
   ]),
@@ -183,7 +186,7 @@ function build(plan: Plan): ExpandedSkill[] {
     sacred ? ['heal',32,undefined] : field ? ['travel',3,undefined] : ['check',6,plan.primary],
   ];
   const unlocks: Unlock[] = [
-    {kind:'job',xp:30}, {kind:'skill',skill:plan.baseActive,xp:5}, {kind:'book',book:plan.basicBook,jobXp:100}, {kind:'mentor',jobXp:100},
+    {kind:'job',xp:30}, {kind:'skill',skill:plan.baseActive,xp:5}, {kind:'book',book:plan.basicBook,jobXp:100}, plan.job === 'ranger' ? {kind:'book',book:'lantern-fox',jobXp:100} : {kind:'mentor',jobXp:100},
     {kind:'condition',condition:plan.condition,count:6}, {kind:'skill',skill:`job-${plan.job}-advanced-2`,xp:20}, {kind:'job',xp:600}, {kind:'book',book:plan.fieldBook,jobXp:250},
   ];
   return plan.titles.map((title,index) => { const [effect,power,stat] = effects[index]; const passive=index%2===0; const id=`job-${plan.job}-advanced-${index+1}`, diceFaces=DICE_TECHNIQUES[id]; const names=l(title), base=description(effect,power,stat,passive), descriptions=diceFaces?diceDescription(base,diceFaces,passive):base; return {id,names,name:names.ja,descriptions,description:descriptions.ja,kind:passive?'passive':'active',effect,power,mp:passive?0:[0,5,0,7,0,9,0,12][index],...(stat?{stat}:{}),...(diceFaces?{diceFaces}:{}),unlock:unlocks[index]}; });

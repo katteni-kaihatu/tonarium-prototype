@@ -1,3 +1,4 @@
+import { fantasyHasJob } from './fantasy-careers.ts';
 import { FANTASY_JOB_PATH_FIELDS as FIELDS, FANTASY_JOB_PATH_PLANS as PLANS } from './fantasy-job-path-catalog.ts';
 import type { FantasyAction, FantasyCharacter, FantasySkill, FantasyStat } from './fantasy.ts';
 import { FANTASY_JOBS } from './fantasy-data.ts';
@@ -21,7 +22,7 @@ export interface FantasyJobPathCombatArt {
 export interface FantasyJobPathCombatPassive { attack?: number; accuracy?: number; defense?: number; magicResist?: number }
 const COMBAT_ARTS = new Map<string, FantasyJobPathCombatArt>();
 const COMBAT_PASSIVES = new Map<string, FantasyJobPathCombatPassive>();
-const COMBAT_JOBS = new Set(['adventurer', 'hunter', 'bard', 'mage', 'leader', 'warrior', 'knight', 'spearfighter', 'archer', 'scout', 'pugilist', 'spellblade', 'shieldbearer', 'summoner', 'thief', 'smuggler', 'assassin', 'bandit', 'spy', 'crimeboss']);
+const COMBAT_JOBS = new Set(['adventurer', 'hunter', 'ranger', 'bard', 'mage', 'leader', 'warrior', 'knight', 'spearfighter', 'archer', 'scout', 'pugilist', 'spellblade', 'shieldbearer', 'summoner', 'thief', 'smuggler', 'assassin', 'bandit', 'spy', 'crimeboss']);
 const support = (kind: 'heal' | 'guard', power: number, mp: number): FantasyJobPathCombatArt => ({ kind, power, mp, range: 'magic' });
 function combatArt(job: string, index: number, field: FieldId): FantasyJobPathCombatArt | undefined {
   if (!COMBAT_JOBS.has(job)) return undefined;
@@ -32,7 +33,7 @@ function combatArt(job: string, index: number, field: FieldId): FantasyJobPathCo
   if (['defense', 'armor', 'sacred', 'earth'].includes(field)) return support('guard', job === 'summoner' ? 7 : 6, 8);
   if (job === 'knight' && index === 2) return support('guard', 6, 7);
   let range: FantasyJobPathCombatArt['range'] = ['mage', 'summoner'].includes(job) || job === 'pugilist' && index === 1 || job === 'archer' && index === 2 ? 'magic'
-    : ['hunter', 'archer'].includes(job) || field === 'throwing' || job === 'scout' && index === 0 || job === 'summoner' && index === 2 ? 'ranged' : 'melee';
+    : ['hunter', 'ranger', 'archer'].includes(job) || field === 'throwing' || job === 'scout' && index === 0 || job === 'summoner' && index === 2 ? 'ranged' : 'melee';
   if (job === 'summoner' && index === 1) range = 'melee';
   if (job === 'summoner' && index === 2) range = 'ranged';
   if (job === 'spellblade' && index === 2) range = 'magic';
@@ -102,7 +103,12 @@ export const FANTASY_JOB_PATHS: FantasyJobPath[] = Object.entries(PLANS).flatMap
 const pathOf = (id: string) => FANTASY_JOB_PATHS.find(path => path.id === id);
 function ready(c: FantasyCharacter, path: FantasyJobPath): boolean {
   const skill = FANTASY_JOBS.find(job => job.id === path.job)?.skills.find(skill => skill.id === REQUIREMENTS.get(path.id));
-  return !!skill && (c.jobXp[path.job] ?? 0) >= 100 && fantasySkillUnlocked({ ...c, job: path.job }, skill);
+  if (!skill || (c.jobXp[path.job] ?? 0) < 100) return false;
+  const current = { ...c, job: path.job };
+  if (!skill.retired) return fantasySkillUnlocked(current, skill);
+  if (skill.unlock?.kind !== 'mentor' || c.jobPaths?.[path.job]?.path === path.id) return fantasySkillUnlocked(current, { ...skill, retired: false });
+  const recovery = FANTASY_JOBS.find(job => job.id === path.job)?.skills.find(skill => skill.restore === 'mp' && !skill.retired);
+  return !!recovery && fantasySkillUnlocked(current, recovery) && (c.skillXp?.[recovery.id] ?? 0) >= 4;
 }
 const ERRORS = {
   invalid: l(['알려진 전문 분야를 선택하세요.', 'Choose a known specialization.', '知られている専門分野を選んでください。']),
@@ -115,8 +121,8 @@ const ERRORS = {
   cooldown: l(['지금은 전문 분야를 다시 바꿀 수 없습니다.', 'You cannot change specialization again yet.', '今は専門分野を変更し直せません。']),
 };
 export function fantasyJobPathError(c: FantasyCharacter, pathId: string, locale: NpcLocale = 'ja'): string | undefined {
-  const path = pathOf(pathId), previous = c.jobPaths?.[c.job];
-  const error = !path ? 'invalid' : c.job !== path.job ? 'job' : c.hp <= 0 ? 'unwell' : previous?.path === pathId ? 'same'
+  const path = pathOf(pathId), previous = c.jobPaths?.[path?.job??c.job];
+  const error = !path ? 'invalid' : !fantasyHasJob(c,path.job) ? 'job' : c.hp <= 0 ? 'unwell' : previous?.path === pathId ? 'same'
     : !fantasyJobPathDiscovered(c, pathId) ? 'undiscovered' : !ready(c, path) ? 'locked' : previous && c.hour - previous.hour < FANTASY_JOB_PATH_CHANGE_COOLDOWN ? 'cooldown'
       : previous && c.gold < FANTASY_JOB_PATH_CHANGE_COST ? 'gold' : undefined;
   return error ? ERRORS[error][locale] : undefined;
@@ -124,8 +130,9 @@ export function fantasyJobPathError(c: FantasyCharacter, pathId: string, locale:
 export function fantasyJobPathHours(_action?: FantasyAction): number { return 1; }
 export function applyFantasyJobPath(c: FantasyCharacter, pathId: string): { error?: string; message?: string } {
   const error = fantasyJobPathError(c, pathId); if (error) return { error };
-  const cost = c.jobPaths?.[c.job] ? FANTASY_JOB_PATH_CHANGE_COST : 0;
-  c.gold -= cost; (c.jobPaths ??= {})[c.job] = { path: pathId, hour: c.hour }; c.buff = null;
+  const job=pathOf(pathId)!.job;
+  const cost = c.jobPaths?.[job] ? FANTASY_JOB_PATH_CHANGE_COST : 0;
+  c.gold -= cost; (c.jobPaths ??= {})[job] = { path: pathId, hour: c.hour }; c.buff = null;
   return { message: `jobpath:advance:${pathId}:${cost}` };
 }
 export function fantasyJobPathSkills(c: FantasyCharacter): FantasySkill[] {

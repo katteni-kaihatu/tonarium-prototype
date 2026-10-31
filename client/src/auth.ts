@@ -1,6 +1,7 @@
 import { get, set } from './store.ts';
 import { connectWs } from './net/ws.ts';
 import { isElectron } from './updateBridge.ts';
+import { clearFantasyAccountPrivateState } from './world/fantasy-account-state.ts';
 
 export type AccountKind = 'misskey' | 'guest' | 'dev';
 export interface Account { id: string; kind: AccountKind; username: string | null; name: string }
@@ -45,7 +46,7 @@ export async function fetchAuth(): Promise<AuthInfo> {
 /** 起動時の確認と更新後の復元が同時に呼ぶことがあるので、2 回目は何もしない */
 export function enter(account: Account) {
   if (get().joined) return;
-  set({ selfId: account.id, selfName: account.name, selfGuest: account.kind === 'guest', selfUsername: account.kind === 'misskey' ? account.username : null, joined: true });
+  set({ ...clearFantasyAccountPrivateState([get().selfId, account.id]), selfId: account.id, selfName: account.name, selfGuest: account.kind === 'guest', selfUsername: account.kind === 'misskey' ? account.username : null, joined: true });
   // AD の進行は Tonarium のアカウントに紐付けて始める
   get().adBindTonarium(account.id, account.name);
   connectWs();
@@ -101,6 +102,7 @@ export async function renameSelf(name: string) {
 }
 
 export async function logout() {
+  set({ ...clearFantasyAccountPrivateState([get().selfId]), wsReady: false });
   await post('/auth/logout');
   if (devAs) { try { sessionStorage.removeItem(DEV_KEY); } catch { /* ignore */ } }
   location.reload();

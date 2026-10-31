@@ -1,3 +1,4 @@
+import { fantasyCombatMoveAttempt } from './fantasy-combat-move-attempt.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { addFantasyCombatParticipant, advanceFantasyCombat, createFantasyCombat, fantasyCombatOrderError, isFantasyCombatOrder, submitFantasyCombatOrder, validFantasyCombatState, type FantasyCombatOrder, type FantasyCombatPlayer } from './fantasy-combat.ts';
@@ -32,7 +33,8 @@ test('movement uses real reachable paths, occupancy, walls, turn movement and ch
   assert.equal(fantasyCombatMoveRange(actor), 3);
   assert.equal(fantasyCombatOrderError(state, 'u-0', { type: 'moveTo', tile: { x: 5, y: 1 } }), 'blocked');
   assert.equal(fantasyCombatOrderError(state, 'u-0', { type: 'moveTo', tile: { x: 4, y: 0 } }), 'blocked');
-  assert.equal(fantasyCombatOrderError(state, 'u-0', { type: 'moveTo', tile: { x: 0, y: 7 } }), 'blocked');
+  assert.equal(fantasyCombatOrderError(state, 'u-0', { type: 'moveTo', tile: { x: 0, y: 7 } }), undefined);
+  assert.ok(fantasyCombatMoveAttempt(state,actor,{x:0,y:7})!.extra > 0);
   assert.equal(fantasyCombatOrderError(state, 'u-0', { type: 'moveTo', tile: { x: 4, y: 1 } }), 'unnecessary');
   const path = fantasyCombatPath(state, actor, { x: 2, y: 2 }); assert.equal(path?.length, 4);
   const next = order(state, 'u-0', { type: 'moveTo', tile: { x: 2, y: 2 } }); assert.deepEqual(next.fighters[0].tile, { x: 2, y: 2 });

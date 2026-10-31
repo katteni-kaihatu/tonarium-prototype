@@ -1,3 +1,4 @@
+import { markFantasyPlatformDataCurrent } from './fantasy-platform-reset.ts';
 import { readFantasySavedProfiles } from './fantasy-test-saved-profiles.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -72,8 +73,8 @@ test('expired legitimate max-resource effects are pruned and clamped once during
 });
 
 test('new action payloads validate exact operator fields and reject supplied rewards or invented slots', () => {
-  for (const action of [{ type: 'manaTrain', exercise: 'sense' }, { type: 'learn', skill: 'mentor-parry', npcId: 'hearth-galen' }, { type: 'equip', item: 'blade' }, { type: 'unequip', slot: 'offhand' }, { type: 'haggle', service: 'food' }]) assert.ok(isFantasyAction(action));
-  for (const action of [{ type: 'manaTrain', exercise: 'grant' }, { type: 'manaTrain', exercise: 'sense', mastery: 20 }, { type: 'learn', skill: 'mentor-focus', npcId: {} }, { type: 'equip', item: 'blade', stats: {} }, { type: 'unequip', slot: 'head' }, { type: 'haggle', service: 'all', discount: 1 }]) assert.equal(isFantasyAction(action), false);
+  for (const action of [{ type: 'manaTrain', exercise: 'sense' }, { type: 'learn', skill: 'mentor-parry', npcId: 'hearth-galen' }, { type: 'equip', item: 'blade' }, { type: 'unequip', slot: 'offhand' }, { type: 'unequip', slot: 'head' }, { type: 'equip', item: 'ruby-ring', slot: 'ring2' }, { type: 'haggle', service: 'food' }]) assert.ok(isFantasyAction(action));
+  for (const action of [{ type: 'manaTrain', exercise: 'grant' }, { type: 'manaTrain', exercise: 'sense', mastery: 20 }, { type: 'learn', skill: 'mentor-focus', npcId: {} }, { type: 'equip', item: 'blade', stats: {} }, { type: 'unequip', slot: 'invented-slot' }, { type: 'haggle', service: 'all', discount: 1 }]) assert.equal(isFantasyAction(action), false);
 });
 
 test('effective MP use grows mana only after the reserved action completes and survives restart once', t => {
@@ -122,10 +123,12 @@ test('creation always starts unassigned and profession acquisition is validated 
   assert.equal(invalidNpc.changed, false);
   const learned = store.apply('learner', created.profile.revision, { type: 'job', job: 'cook', via: 'npc', npcId: 'rin' });
   assert.equal(learned.error, undefined);
-  assert.equal(learned.profile.character!.job, 'cook');
+  assert.equal(learned.profile.character!.job, 'unassigned');
+  assert.equal(learned.profile.character!.lifeJob, 'cook');
   const gm = store.apply('learner', learned.profile.revision, { type: 'job', job: 'assassin', via: 'gm' });
   assert.equal(gm.error, undefined);
   assert.equal(new FantasyStore(file).profile('learner').character!.job, 'assassin');
+  assert.equal(new FantasyStore(file).profile('learner').character!.lifeJob, 'cook');
   for (const action of [{ type: 'job', job: 'cook', via: 'hack' }, { type: 'job', job: 'cook', npcId: {} }, { type: 'job', job: 'cook', via: ['gm'] }, { type: 'job', job: 'cook', character: {} }]) assert.equal(isFantasyAction(action), false);
 });
 
@@ -157,7 +160,8 @@ test('two users share one clock and a reserved action never jumps time or grants
   now += 60_000;
   const finished = store.tick(new Set(['alice', 'bob']));
   assert.ok(finished.some(update => update.user === 'alice'));
-  assert.equal(store.profile('alice').character!.job, 'cook');
+  assert.equal(store.profile('alice').character!.job, 'unassigned');
+  assert.equal(store.profile('alice').character!.lifeJob, 'cook');
   assert.equal(store.profile('alice').activity, undefined);
   assert.equal(store.profile('alice').character!.hour, 9);
   assert.equal(store.profile('bob').character!.hour, 9);
@@ -550,8 +554,8 @@ test('valid drafts, fixed genders, buffs, events and level growth reload unchang
   const stoneDraft = newFantasyProfile();
   stoneDraft.draft = { remaining: 4, candidate: 'stoneborn', kept: null };
   const stone = applyFantasyAction(stoneDraft, { type: 'create', name: '石の旅人', gender: 'female', source: 'candidate', job: 'blacksmith' }).profile;
-  stone.character!.job = 'blacksmith';
-  stone.character!.jobXp = { blacksmith: 0 };
+  stone.character!.lifeJob = 'blacksmith';
+  stone.character!.jobXp = { unassigned: 0, blacksmith: 0 };
   const event = applyFantasyAction(created, { type: 'work' }, () => 0).profile;
   const buff = applyFantasyAction(stone, { type: 'skill', skill: 'stoneborn-echo' }).profile;
   let leveled = created;
@@ -738,8 +742,9 @@ test('home WebSocket authenticates session context and shares committed progress
   await new Promise<void>((resolve) => listener.listen(0, '127.0.0.1', resolve));
   const port = (listener.address() as net.AddressInfo).port;
   await new Promise<void>((resolve) => listener.close(() => resolve()));
+  markFantasyPlatformDataCurrent(directory);
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], {
-    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' },
+    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = '';
@@ -770,36 +775,41 @@ test('home WebSocket authenticates session context and shares committed progress
     await new Promise<void>((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject); });
     const send = (message: unknown) => socket.send(JSON.stringify(message));
     send({ t: 'hello', compat: COMPAT_VERSION, id, name: id });
-    await until(() => received.find((message) => message.t === 'fantasyProfile'));
+    await until(() => received.find((message) => message.t === 'snapshot'));
     const takeProfile = async (from: number) => until(() => received.slice(from).find((message) => message.t === 'fantasyProfile'));
-    return { socket, received, send, takeProfile };
+    const barrier = async () => { const from = received.length; send({ t: 'hello', compat: COMPAT_VERSION, id, name: id }); await until(() => received.slice(from).find(message => message.t === 'snapshot')); };
+    return { socket, received, send, takeProfile, barrier };
   };
   const alice = await peer('alice');
   const second = await peer('alice');
   const bob = await peer('bob');
   let from = alice.received.length;
   alice.send({ t: 'fantasyAction', revision: 0, action: { type: 'draw' } });
-  const outside = await alice.takeProfile(from);
-  assert.ok(outside.error);
-  assert.equal(outside.profile?.draft.remaining, 5);
+  await alice.barrier();
+  assert.equal(alice.received.slice(from).some(message => message.t === 'fantasyProfile'), false);
   from = alice.received.length;
   alice.send({ t: 'fantasyGmChat', requestId: 'gm-outside', text: 'Hello', locale: 'en', profile: { gold: 99999 } });
-  const deniedGm = await until(() => alice.received.slice(from).find(message => message.requestId === 'gm-outside'));
-  assert.equal(deniedGm.error, 'invalid');
+  await alice.barrier();
+  assert.equal(alice.received.slice(from).some(message => message.requestId === 'gm-outside'), false);
   from = alice.received.length;
   alice.send({ t: 'join', sid: 'room-test' });
   alice.send({ t: 'fantasyAction', revision: 0, action: { type: 'sync' } });
-  assert.ok((await alice.takeProfile(from)).error);
+  await alice.barrier();
+  assert.equal(alice.received.slice(from).some(message => message.t === 'fantasyProfile'), false);
   from = alice.received.length;
   const secondFrom = second.received.length;
   const bobProfiles = bob.received.filter((message) => message.t === 'fantasyProfile').length;
   alice.send({ t: 'join', sid: 'fantasy-test' });
+  const entered = await until(() => alice.received.slice(from).find(message => message.t === 'fantasyProfile'));
+  assert.equal(entered.profile?.draft.remaining, 5);
+  assert.equal(entered.profile?.revision, 0);
+  from = alice.received.length;
   alice.send({ t: 'fantasyAction', revision: 0, action: { type: 'draw' } });
   const committed = await alice.takeProfile(from);
   assert.equal(committed.error, undefined);
   assert.equal(committed.profile?.revision, 1);
   assert.equal(committed.profile?.draft.remaining, 4);
-  assert.deepEqual((await second.takeProfile(secondFrom)).profile, committed.profile);
+  assert.deepEqual((await until(() => second.received.slice(secondFrom).find(message => message.profile?.revision === committed.profile!.revision))).profile, committed.profile);
   assert.equal(bob.received.filter((message) => message.t === 'fantasyProfile').length, bobProfiles);
   from = second.received.length;
   second.send({ t: 'fantasyAction', revision: 0, action: { type: 'draw' } });

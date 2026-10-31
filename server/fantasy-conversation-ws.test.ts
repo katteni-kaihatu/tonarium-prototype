@@ -1,3 +1,4 @@
+import { markFantasyPlatformDataCurrent } from './fantasy-platform-reset.ts';
 import { readFantasySavedProfiles } from './fantasy-test-saved-profiles.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,8 +35,9 @@ async function isolated(t: TestContext, location = 'hearth') {
   fs.writeFileSync(sessions, JSON.stringify({ name: 'Conversation test', sessions: [{ id: 'test-world', name: 'Isolated world', world: 'fantasy' }] }));
   const listener = net.createServer(); await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve));
   const port = (listener.address() as net.AddressInfo).port; await new Promise<void>(resolve => listener.close(() => resolve()));
+  markFantasyPlatformDataCurrent(directory);
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], {
-    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', FANTASY_ACCOUNT_TEST_BYPASS: '1', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
+    env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV: 'test', SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions,
       LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -66,7 +68,7 @@ async function isolated(t: TestContext, location = 'hearth') {
   await new Promise<void>((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject); });
   const send = (message: unknown) => socket.send(JSON.stringify(message));
   send({ t: 'hello', compat: COMPAT_VERSION, id: 'alice', name: 'Conversation Test' });
-  await until(() => messages.find(message => message.t === 'fantasyProfile'));
+  await until(() => messages.find(message => message.t === 'snapshot'));
   send({ t: 'join', sid: 'test-world' });
   send({ t: 'fantasyAction', revision: profile.revision, action: { type: 'sync' } });
   await until(() => messages.find(message => message.t === 'fantasyProfile' && message.profile?.character && !message.error));
@@ -90,8 +92,13 @@ test('innkeeper questions use the actual rooms and meals without AI or changing 
     assert.doesNotMatch(reply.text ?? '', /트리플|펜션|world bible|official record|공식.*기록|설정집|サーバー|設定集/i);
   }
   const corrected = await request({ t: 'npcChat', npcId: 'rin', requestId: 'invented-room', text: '특별 할인 객실은 뭔가요?', locale: 'ko' });
-  assert.equal(corrected.source, 'canon'); assert.match(corrected.text ?? '', /없|아니|잘못/);
+  assert.equal(corrected.source, 'canon'); assert.equal(corrected.error, undefined); assert.deepEqual(corrected.actions ?? [], []);
+  for (const room of FANTASY_LODGINGS) assert.ok(corrected.text?.includes(room.name.ko));
+  assert.doesNotMatch(corrected.text ?? '', /특별 할인 객실/);
   assert.doesNotMatch(corrected.text ?? '', /공식|설정집|서버|AI|게임|플레이어|버튼/);
+  const unselected = await request({ t: 'npcChat', npcId: 'rin', requestId: 'invented-room-yes', text: '응', locale: 'ko' });
+  assert.deepEqual(unselected.actions ?? [], []);
+  assert.deepEqual(read(), before, 'An unknown room and an unqualified yes cannot reserve a room or start a discount negotiation');
   const meal = await request({ t: 'npcChat', npcId: 'rin', requestId: 'inn-meals', text: '어떤 식사를 주문할 수 있어?', locale: 'ko' });
   assert.equal(meal.source, 'canon'); for (const food of FANTASY_DINING) assert.ok(meal.text?.includes(food.name.ko));
   const after = read(); assert.equal(after.revision, before.revision); assert.equal(after.character!.gold, before.character!.gold); assert.deepEqual(after.character!.inventory, before.character!.inventory); assert.equal(after.activity, undefined);

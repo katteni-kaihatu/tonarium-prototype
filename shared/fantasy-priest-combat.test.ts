@@ -9,11 +9,11 @@ import { createFantasyCombat, fantasyCombatOrderError, submitFantasyCombatOrder,
 const active = { care: 'priest-care-mercy', ward: 'priest-ward-aegis', oath: 'priest-oath-clarity', pilgrim: 'priest-pilgrim-lantern' } as const;
 function priest(branch: FantasyPriestBranch) {
   let p = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', name: 'Faith Keeper', gender: 'female' }, () => .99).profile;
-  const c = p.character!; c.job = 'priest'; c.jobXp.priest = 30; c.hour = 0; c.gold = 500;
+  const c = p.character!; c.job = 'priest'; c.jobXp.priest = 30; c.hour = 12; c.gold = 500;
   c.visited = ['hearth', 'suncourt', 'greenwood']; c.readBooks = ['traveler-guide', 'remedies-and-rites', 'quiet-sword', 'words-and-promises']; c.quests = ['quest-herbalist']; c.inventory.herb = 3;
   p = applyFantasyAction(p, { type: 'priestVow', quest: 'quest-herbalist' }).profile;
   p = applyFantasyAction(p, { type: 'complete', quest: 'quest-herbalist' }).profile;
-  for (let day = 1; day <= 4; day++) { p.character!.hour = day * 24; applyFantasyPrayer(p.character!); }
+  for (let day = 1; day <= 4; day++) { p.character!.hour = day * 24 + 12; applyFantasyPrayer(p.character!); }
   const choice = applyFantasyAction(p, { type: 'priestBranch', branch }); assert.equal(choice.error, undefined); p = choice.profile;
   p.character!.hour = 108; p.character!.level = 10; p.character!.location = 'reedfen'; p.character!.visited.push('reedfen'); p.character!.inventory.lantern = 1;
   p.character!.hp = fantasyStats(p.character!).hp; p.character!.mp = fantasyStats(p.character!).mp; return p;
@@ -39,10 +39,10 @@ function round(state: FantasyCombatState, own: FantasyCombatOrder, ally: Fantasy
 }
 
 test('four priest branches expose exactly their learned active and a distinct bounded combat role', () => {
-  for (const branch of Object.keys(active) as FantasyPriestBranch[]) {
+  for (const branch of Object.keys(active) as (keyof typeof active)[]) {
     const p = priest(branch), actor = fantasyCombatPlayer(p, 'priest'), own = actor.skills.find(skill => skill.id === active[branch])!;
     assert.ok(own); assert.equal(own.kind, branch === 'care' ? 'heal' : branch === 'oath' ? 'focus' : 'guard');
-    for (const other of Object.keys(active) as FantasyPriestBranch[]) if (other !== branch) assert.ok(!actor.skills.some(skill => skill.id === active[other]));
+    for (const other of Object.keys(active) as (keyof typeof active)[]) if (other !== branch) assert.ok(!actor.skills.some(skill => skill.id === active[other]));
     assert.equal(fantasyPriestSkills(p.character!).filter(skill => skill.kind === 'passive').length, 1);
     assert.ok(fantasyPriestCombatSkill(own.id, 999)!.power <= (branch === 'oath' ? 15 : 100));
   }

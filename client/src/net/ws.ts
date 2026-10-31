@@ -11,7 +11,7 @@ import { applyAvatars } from '../sessionView.ts';
 import { get, recompute, set, showToast, spawnPoint } from '../store.ts';
 import { wsSessionQuery } from '../auth.ts';
 import { msg as uiMsg } from '../i18n/index.ts';
-import { fantasyAccountDisconnected, fantasyAccountIdentityUpdate, fantasyPrivateMessagesAllowed } from '../world/fantasy-account-state.ts';
+import { fantasyAccountDisconnected, fantasyPrivateMessagesAllowed } from '../world/fantasy-account-state.ts';
 import { appendFantasyGmResponse, clearFantasyGmLife, fantasyGmRequestOwner } from '../world/fantasy-gm-history.ts';
 import { clearNpcRequests, consumeNpcRequest, npcRequestOwner } from '../world/npc-request-tracker.ts';
 
@@ -70,11 +70,12 @@ export function connectWs() {
   let openedAt = 0;
   g.__tonariumWs = ws;
   ws.onopen = () => {
+    if (g.__tonariumWs !== ws) return;
     openedAt = performance.now();
     retry = 0;
     set({ wsConnected: true, wsReady: false });
     const s = get();
-    // 本人はログインのセッションで決まる（fantasy のアカウントで動いていても、つなぎ直すとホームの本人に戻る）
+    // 本人は Tonarium のログインセッションで決まる。
     send({ t: 'hello', compat: COMPAT_VERSION });
     if (s.session) {
       send({ t: 'join', sid: s.session });
@@ -82,20 +83,15 @@ export function connectWs() {
       startSessionSync();
     }
   };
-  ws.onmessage = (e) => onMessage(JSON.parse(e.data) as ServerMsg);
+  ws.onmessage = (e) => { if (g.__tonariumWs === ws) onMessage(JSON.parse(e.data) as ServerMsg); };
   ws.onclose = (event) => {
+    if (g.__tonariumWs !== ws) return;
     for (const request of sessionRequests.values()) request.reject(new Error(uiSource('ui471')));
     console.warn('[home-ws] closed', { code: event.code, reason: event.reason, wasClean: event.wasClean,
       connectedSeconds: openedAt ? Math.round((performance.now() - openedAt) / 1000) : 0 });
     stopSessionSync(true);
     const current = get();
-    const accountReset = current.fantasyAccount || current.fantasyHomeId || current.session && current.worldBy[current.session] === 'fantasy'
-      ? fantasyAccountDisconnected(current)
-      : { fantasyAccount: null, fantasyAccountReady: false, fantasyAccountError: null };
-    set({ wsConnected: false, wsReady: false, fantasyRealm: null, fantasyRealmPending: false, fantasyRealmError: null, dialogueProgress: {}, fantasyPending: false, fantasyTestResetAllowed: false, fantasyParty: null, fantasyPartyError: null, fantasyPartyPending: false, fantasyProperties: null, fantasyPropertyError: null, fantasyPropertyPending: false, fantasyCombat: null, fantasyCombatError: null, fantasyCombatPending: false, ...accountReset });
-    if (get().npcPending) set({ npcPending: false, npcRequestId: null, npcError: 'unavailable', npcErrorContext: null });
-    if (get().gmPending) set({ gmPending: false, gmRequestId: null, gmError: 'unavailable', gmErrorLocale: null });
-    if (get().communityPending) set({ communityPending: false, communityError: 'unavailable' });
+    set({ ...fantasyAccountDisconnected(current), wsConnected: false, wsReady: false });
     if (get().session) set({ sync: 'unavailable', syncError: uiSource('ui472') });
     // ログインが切れた（ほかのタブでログアウトした・期限切れ）ときは、つなぎ直しても断られるので入口からやり直す
     if (event.code === 4401) { location.reload(); return; }
@@ -172,25 +168,8 @@ export function applySessionSnapshot(snap: SessionSnapshot) {
 }
 
 export function onMessage(msg: ServerMsg) {
-  if (['fantasyProfile', 'fantasyLegacies', 'fantasyContractBoard', 'fantasyPartyState', 'fantasyRealmState', 'fantasyPropertyState', 'fantasyCombatState', 'communityState', 'fantasyDialogueChunk', 'fantasyGmReply'].includes(msg.t) && !fantasyPrivateMessagesAllowed(get())) return;
+  if (['fantasyGuildGreeting', 'fantasyTownPresence', 'fantasyProfile', 'fantasyLegacies', 'fantasyRanking', 'fantasyContractBoard', 'fantasyPartyState', 'fantasyRealmState', 'fantasyPropertyState', 'fantasyCombatState', 'communityState', 'fantasyDialogueChunk', 'fantasyGmReply', 'npcReply', 'fantasyTestMode'].includes(msg.t) && !fantasyPrivateMessagesAllowed(get())) return;
   switch (msg.t) {
-    case 'fantasyAccountState': {
-      const previous = get(), next = fantasyAccountIdentityUpdate(previous, msg);
-      if (next.changed) stopSessionSync();
-      set(next.patch);
-      recompute();
-      if (next.changed && get().session && get().wsConnected) {
-        startSessionSync();
-        if (get().voice !== 'off') {
-          const sid = get().session!, id = get().selfId;
-          void import('./livekit.ts').then(({ connectVoice }) => {
-            const current = get();
-            if (current.session === sid && current.selfId === id && current.wsConnected && current.voice !== 'off') return connectVoice(sid);
-          });
-        }
-      }
-      return;
-    }
     case 'systemState':
       if (msg.sid === get().session) {
         receiveSystems(msg.sid, msg.view, msg.error);
@@ -339,6 +318,7 @@ export function onMessage(msg: ServerMsg) {
       set({ survivorProfile: msg.profile });
       return;
     case 'fantasyProfile':
+      if (msg.profile.activity?.action.type === 'travel' || msg.profile.death || get().fantasyProfile?.character?.location !== msg.profile.character?.location || get().fantasyProfile?.generation !== msg.profile.generation) set({ fantasyTownPresence: null });
       if (get().fantasyProfile && (get().fantasyProfile!.generation ?? 1) !== (msg.profile.generation ?? 1)) {
         clearFantasyGmLife(get().selfId);
         clearNpcRequests(get().selfId);
@@ -353,6 +333,15 @@ export function onMessage(msg: ServerMsg) {
     case 'fantasyLegacies':
       set({ fantasyLegacies: msg.records });
       return;
+    case 'fantasyRanking':
+      set({ fantasyRanking: msg.rows });
+      return;
+    case 'fantasyGuildGreeting': {
+      const state=get(),profile=state.fantasyProfile;
+      if(!profile?.character||profile.death||profile.character.location!==msg.location||(profile.generation??1)!==msg.generation||state.npcMessages.some(entry=>entry.id===msg.id))return;
+      set(s=>({fantasyGuildGreeting:{id:msg.id,npcId:msg.npcId,location:msg.location,generation:msg.generation,locale:msg.locale},npcMessages:[...s.npcMessages,{id:msg.id,role:'assistant' as const,text:msg.text,npcId:msg.npcId,locale:msg.locale,source:'canon' as const}].slice(-72)}));
+      return;
+    }
     case 'fantasyContractBoard':
       set({ fantasyContractBoard: msg.board, fantasyContractError: msg.error ?? null });
       return;
@@ -361,6 +350,9 @@ export function onMessage(msg: ServerMsg) {
       return;
     case 'fantasyPartyState':
       set({ fantasyParty: msg.state, fantasyPartyError: msg.error ?? null, fantasyPartyPending: false });
+      return;
+    case 'fantasyTownPresence':
+      set({ fantasyTownPresence: msg.state.location === get().fantasyProfile?.character?.location && !get().fantasyProfile?.death && get().fantasyProfile?.activity?.action.type !== 'travel' ? msg.state : null });
       return;
     case 'fantasyRealmState':
       set({ fantasyRealm: msg.state, fantasyRealmPending: false, fantasyRealmError: msg.error ?? null });

@@ -48,9 +48,14 @@ test('historical healer proficiency and scheduled learning migrate even while an
   const errors: unknown[] = [];
   const restored = new FantasyStore(file, { onError: error => errors.push(error) }).profile('traveler');
   assert.deepEqual(errors, []);
-  assert.equal(restored.character!.job, 'merchant');
+  assert.equal(restored.character!.job, 'unassigned');
+  assert.equal(restored.character!.lifeJob, 'merchant');
   assert.deepEqual(restored.character!.jobXp, { unassigned: 0, merchant: 12, priest: 9 });
   assert.deepEqual(restored.activity?.action, { type: 'job', job: 'priest', via: 'gm' });
+  const completed = applyFantasyAction({ ...restored, activity: undefined }, { type: 'job', job: 'priest', via: 'gm' }, () => .99);
+  assert.equal(completed.error, undefined); assert.equal(completed.profile.character!.job, 'priest');
+  assert.equal(completed.profile.character!.lifeJob, 'merchant');
+  assert.equal(completed.profile.character!.jobXp.merchant, 12);
 });
 
 test('invalid legacy proficiency remains a corrupt save instead of being repaired into valid progress', t => {

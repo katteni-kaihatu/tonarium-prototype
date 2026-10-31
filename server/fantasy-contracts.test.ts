@@ -8,6 +8,8 @@ import { applyFantasyAction, newFantasyProfile } from '../shared/fantasy-engine.
 import type { FantasyProfile } from '../shared/fantasy.ts';
 import { FANTASY_QUESTS } from '../shared/fantasy-data.ts';
 import { NPC_PUBLIC } from '../shared/npc.ts';
+import { fantasyQuestInstitution } from '../shared/fantasy-institutions.ts';
+import { fantasyQuestGrade } from '../shared/fantasy-quest-grades.ts';
 import { fantasyContractCandidates, fantasyContractIssuer, fantasyContractErrorText, fantasyPersonalQuest, type FantasyContractGrant, type FantasyContractVisibleOffer } from '../shared/fantasy-contracts.ts';
 
 function file(t: { after(fn: () => void): void }) {
@@ -16,6 +18,7 @@ function file(t: { after(fn: () => void): void }) {
 }
 function actor(id: string): FantasyContractActor & { character: NonNullable<FantasyProfile['character']> } {
   const profile = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', name: id, gender: 'female' }, () => .999).profile;
+  profile.character!.job='warrior';profile.character!.jobXp.warrior=0;profile.character!.guildProgress={version:1,grade:1,completedAtGrade:0,creditedQuests:[]};
   return { id, session: 'fantasy', world: 'fantasy', character: profile.character! };
 }
 function opening(service: FantasyContracts, user: ReturnType<typeof actor>, mode: 'exclusive' | 'raid' = 'exclusive') {
@@ -32,15 +35,34 @@ function committed(user: ReturnType<typeof actor>, offer: FantasyContractVisible
   return profile;
 }
 
+test('guild named commissions do not turn resident requests into formal guild commissions', t => {
+  const service = new FantasyContracts(file(t)), user = actor('named-institution');
+  const quest = FANTASY_QUESTS.find(q => q.id === 'approved-quest-aurelia-2')!;
+  assert.equal(fantasyQuestInstitution(quest), 'personal');
+  user.character.location = quest.giver;
+  user.character.guildProgress!.grade = fantasyQuestGrade(quest);
+  let generated = 0;
+  for (let day = 0; day < 32; day++) {
+    const now = day * 24 + 8;
+    user.character.hour = now;
+    const offer = service.namedCommission(user, now, day);
+    if (!offer) continue;
+    generated++;
+    assert.equal(fantasyQuestInstitution(FANTASY_QUESTS.find(q => q.id === offer.quest)!), 'guild');
+  }
+  assert.ok(generated > 0);
+});
+
 test('seeded postings are shared across users, have real local issuers and never publish personal story chapters', t => {
   const service = new FantasyContracts(file(t)); const alice = actor('alice'); const bob = actor('bob');
   const a = service.state(alice, 8)!; const b = service.state(bob, 8)!;
-  assert.deepEqual(a, b); assert.ok(a.offers.length <= 3);
+  assert.deepEqual(a, b);
+  for(const source of ['guild','temple','underworld','personal'])assert.ok(a.offers.filter(o=>fantasyQuestInstitution(FANTASY_QUESTS.find(q=>q.id===o.quest)!)===source).length<=3);
   for (const offer of a.offers) {
     const quest = FANTASY_QUESTS.find(q => q.id === offer.quest)!;
     assert.equal(fantasyPersonalQuest(quest), false);
     assert.ok(NPC_PUBLIC.some(npc => npc.id === offer.issuer && npc.homeLocation === quest.giver));
-    assert.equal(offer.expiresAt - offer.createdAt, 12); assert.equal(offer.deadline - offer.createdAt, 36);
+    assert.equal(offer.expiresAt - offer.createdAt, 2); assert.equal(offer.deadline - offer.createdAt, 36);
   }
   assert.deepEqual(new FantasyContracts((service as unknown as { file: string }).file).state(alice, 8), a);
 });
@@ -61,23 +83,35 @@ test('exclusive claim is persisted before profile mutation and concurrent or rep
 });
 
 test('only explicitly cooperative raids let multiple players join the same offer', t => {
-  const saved = file(t); const alice = actor('alice'); const bob = actor('bob');
-  const initial = opening(new FantasyContracts(saved), alice);
-  const quest = FANTASY_QUESTS.find(quest => quest.id === initial.offer.quest)!; const prior = quest.group; const objective = quest.objective;
-  quest.group = true; quest.objective = { type: 'hunt', monster: 'monster-goblin-raider', count: 4 };
-  try {
-    const service = new FantasyContracts(`${saved}.raid`); const { offer, now } = opening(service, alice, 'raid');
-    for (const user of [alice, bob]) {
-      const result = service.claim(user, { quest: offer.quest, offer: offer.id }, now, grant => ({ profile: committed(user, offer, grant), changed: true }));
-      assert.equal(result.error, undefined);
-    }
-    assert.equal(service.state(actor('carol'), now)!.offers.find(value => value.id === offer.id)!.participants, 2);
-    alice.character.location = quest.destination;
-    service.recordHunt(alice, 2, now, 'raid:one', 'monster-goblin-raider');
-    assert.equal(service.progress('alice', offer.id), 2); assert.equal(service.progress('bob', offer.id), 2);
-    service.recordHunt(alice, 2, now, 'raid:one', 'monster-goblin-raider');
-    assert.equal(service.progress('bob', offer.id), 2);
-  } finally { if (prior === undefined) delete quest.group; else quest.group = prior; if (objective === undefined) delete quest.objective; else quest.objective = objective; }
+  const saved = file(t), alice = actor('alice'), bob = actor('bob'), profiles = new Map<string, FantasyProfile>();
+  const service = new FantasyContracts(saved, { lookup: user => profiles.get(user) });
+  const { offer, now } = opening(service, alice, 'raid'), quest = FANTASY_QUESTS.find(quest => quest.id === offer.quest)!;
+  assert.equal(quest.group, true); assert.equal(quest.objective?.type, 'hunt');
+  const monster = quest.objective!.type === 'hunt' ? quest.objective!.monster! : '';
+  for (const user of [alice, bob]) {
+    user.character.hour = now;
+    const result = service.claim(user, { quest: offer.quest, offer: offer.id }, now, grant => {
+      assert.deepEqual(grant, JSON.parse(JSON.stringify(grant)), 'A pending raid grant must have the same shape after persistence');
+      const profile = committed(user, offer, grant); profiles.set(user.id, profile); user.character = profile.character!;
+      return { profile, changed: true };
+    });
+    assert.equal(result.error, undefined);
+  }
+  assert.equal(service.state(actor('carol'), now)!.offers.find(value => value.id === offer.id)!.participants, 2);
+  const startsAt = offer.startsAt!; assert.ok(startsAt > now);
+  for (const user of [alice, bob]) user.character.location = quest.destination;
+  assert.equal(service.raidOffer(alice, offer.id, startsAt - .25), undefined);
+  assert.equal(service.markRaidStarted(offer.id, startsAt - .25), false);
+  assert.equal(service.recordHunt(alice, 2, now, 'raid:before-start', monster), true);
+  assert.equal(service.progress('alice', offer.id), 0); assert.equal(service.progress('bob', offer.id), 0);
+  for (const user of [alice, bob]) user.character.hour = startsAt;
+  assert.deepEqual(service.raidOffer(alice, offer.id, startsAt)!.participants.sort(), ['alice', 'bob']);
+  assert.equal(service.markRaidStarted(offer.id, startsAt), true); assert.equal(service.markRaidStarted(offer.id, startsAt), false);
+  assert.equal(service.recordHunt(alice, 2, startsAt, 'raid:one', monster), true);
+  assert.equal(service.progress('alice', offer.id), 2); assert.equal(service.progress('bob', offer.id), 2);
+  service.recordHunt(alice, 2, startsAt, 'raid:one', monster); assert.equal(service.progress('bob', offer.id), 2);
+  const restarted = new FantasyContracts(saved, { lookup: user => profiles.get(user) }); assert.equal(restarted.loadError, undefined);
+  assert.equal(restarted.progress('alice', offer.id), 2); assert.equal(restarted.progress('bob', offer.id), 2);
 });
 
 test('profile save rejection rolls back the reservation and a different player may then claim it', t => {
@@ -118,7 +152,7 @@ test('guild membership, current location, ancestry and profession remain authori
   const no = () => { throw new Error('Unqualified claim must not reach profile mutation'); };
   assert.equal(service.claim({ ...alice, session: null }, { quest: offer.quest, offer: offer.id }, now, no).error, 'invalid');
   const outside = actor('outside'); outside.character.location = 'greenwood';
-  assert.equal(service.claim(outside, { quest: offer.quest, offer: offer.id }, now, no).error, 'guildOnly');
+  assert.equal(service.claim(outside, { quest: offer.quest, offer: offer.id }, now, no).error, 'conditions');
   assert.equal(service.claim(alice, { quest: 'made-up', offer: offer.id }, now, no).error, 'expired');
   assert.equal(service.state({ ...alice, world: 'city' }, now), null);
 });
@@ -130,7 +164,10 @@ test('recorded hunts lower regional pressure, deduplicate receipts and pressure 
   const after = service.state(hunter, 8)!.environment;
   assert.equal(after.monsterPressure, before - 20); assert.ok(after.bountyMultiplier < 1);
   service.recordHunt(hunter, 10, 8, 'hunt:1'); assert.equal(service.state(hunter, 8)!.environment.monsterPressure, after.monsterPressure);
-  assert.equal(new FantasyContracts(saved).state(hunter, 14)!.environment.monsterPressure, after.monsterPressure + 2);
+  for (const [now, recovered] of [[9.99, 0], [10, 2], [12, 4], [14, 6], [40, 20]]) {
+    hunter.character.hour = now;
+    assert.equal(new FantasyContracts(saved).state(hunter, now)!.environment.monsterPressure, Math.min(50, after.monsterPressure + recovered));
+  }
 });
 
 test('depleted hunting grounds suppress new bounty postings without cancelling existing contracts and recover over time', t => {

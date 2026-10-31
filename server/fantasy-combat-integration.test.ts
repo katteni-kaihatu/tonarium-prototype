@@ -1,3 +1,6 @@
+import { markFantasyPlatformDataCurrent } from './fantasy-platform-reset.ts';
+import { learnFantasyMagicBook } from '../shared/fantasy-magic-discovery.ts';
+import { fantasyTestClearRoute } from '../shared/fantasy-combat-test-tactics.ts';
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,7 +15,7 @@ import { FantasyParty, type FantasyPartyActor } from './fantasy-party.ts';
 import { applyFantasyAction, fantasyStats, newFantasyProfile } from '../shared/fantasy-engine.ts';
 import { fantasyCombatPlayer, fantasyCombatSupplies } from './fantasy-combat-adapter.ts';
 import { fantasyCombatOrderError, submitFantasyCombatOrder, validFantasyCombatState, type FantasyCombatState, type FantasyCombatOrder } from '../shared/fantasy-combat.ts';
-import { fantasyCombatDistance, fantasyCombatMoveRange, fantasyCombatPath } from '../shared/fantasy-combat-tactics.ts';
+import { fantasyCombatDistance, fantasyCombatMoveRange, fantasyCombatPath, fantasyCombatWithinRange } from '../shared/fantasy-combat-tactics.ts';
 import { fantasyCombatEnemy, FANTASY_APEX_PROVOCATIONS } from '../shared/fantasy-combat-catalog.ts';
 import { fantasyMainInvestigationError } from '../shared/fantasy-main-trials.ts';
 import { FANTASY_ITEMS, FANTASY_RACES, FANTASY_QUESTS } from '../shared/fantasy-data.ts';
@@ -24,21 +27,40 @@ import { createFantasyGear, fantasyEquipGear } from '../shared/fantasy-equipment
 import { foodMeta, reconcileFoodLots } from '../shared/fantasy-life.ts';
 import { fantasySpellCapacity } from '../shared/fantasy-specializations.ts';
 import type { FantasyProfile } from '../shared/fantasy.ts';
+import { fantasyTestAcceptHunt, fantasyTestReadLocalMonsterMaps } from './fantasy-test-combat-access.ts';
 import { testServerEnv } from './test-db.ts';
 
 function player(name: string, level = 12, location = 'greenwood', job = 'warrior'): FantasyProfile {
   const p = applyFantasyAction(newFantasyProfile(), { type: 'create', name, source: 'human', gender: 'female' }, () => .5).profile, c = p.character!;
-  p.generation = 1; c.level = level; c.job = job; c.jobXp[job] = 0; c.location = location; c.visited = [...new Set(['hearth', location])]; c.hour = 12;
+  p.generation = 1; c.level = level; c.job = job; if (['mage', 'priest'].includes(job)) for (const book of ['mana-primer', 'advanced-mana-forms', 'stone-and-flame', 'remedies-and-rites']) learnFantasyMagicBook(c, book); c.jobXp[job] = 0; c.location = location; c.visited = [...new Set(['hearth', location])]; c.hour = 12;
   c.inventory.potion = 3; c.inventory.lantern = 1; c.hp = fantasyStats(c).hp; c.mp = fantasyStats(c).mp;
-  return p;
+  return fantasyTestReadLocalMonsterMaps(location === 'greenwood' ? fantasyTestAcceptHunt(p) : location === 'oldwatch' ? fantasyTestAcceptHunt(p, 'monster-skeleton-guard') : p);
 }
 function fixture(t: TestContext, input: Record<string, FantasyProfile> = { a: player('A'), b: player('B') }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fantasy-battle-')); t.after(() => { assert.equal(path.dirname(path.resolve(dir)), path.resolve(os.tmpdir())); assert.ok(path.basename(dir).startsWith('fantasy-battle-')); fs.rmSync(dir, { recursive: true, force: true }); });
   const file = path.join(dir, 'fantasy.json'); fs.writeFileSync(file, JSON.stringify(input)); let hour = 12, fail = false, writes = 0;
-  const store = new FantasyStore(file, { combatEnabled: true, worldHour: () => hour, onError: () => {}, save: (file, text) => { if (fail) throw new Error('Test failure'); writes++; fs.writeFileSync(file, text); } });
+  const makeStore = () => new FantasyStore(file, { combatEnabled: true, worldHour: () => hour, onError: () => {}, save: (file, text) => { if (fail) throw new Error('Test failure'); writes++; fs.writeFileSync(file, text); } }); let store = makeStore();
   assert.equal(store.loadError, undefined);
   const plan = (user: string, source: FantasyCombatPlan['source'] = 'hunt', target = 'monster-forest-wolf', confirm?: boolean): FantasyCombatPlan => ({ user, source, target, session: 'same', generation: store.profile(user).generation ?? 1, location: store.profile(user).character!.location, ...(confirm !== undefined ? { confirm } : {}) });
-  return { store, file, plan, time: (value: number) => { hour = value; }, fail: (value: boolean) => { fail = value; }, writes: () => writes };
+  return { get store() { return store; }, reload: () => { store = makeStore(); assert.equal(store.loadError, undefined); }, file, plan, time: (value: number) => { hour = value; }, fail: (value: boolean) => { fail = value; }, writes: () => writes };
+}
+
+function closeRanks(f: ReturnType<typeof fixture>, initial: FantasyCombatState, lastBlow = false, remoteOwner = false): FantasyCombatState {
+  // Arrange the close-range accounting boundary through a valid saved fixture; generated terrain has separate coverage.
+  const saved = JSON.parse(fs.readFileSync(f.file, 'utf8')), state: FantasyCombatState = saved.combats[initial.id].state;
+  state.battlefield!.obstacles = [];
+  state.battlefield!.blocked = [];
+  let players = 0, enemies = 0;
+  const positions = [{ x: 4, y: 1 }, { x: 5, y: 2 }, { x: 5, y: 0 }, { x: 6, y: 1 }, { x: 4, y: 2 }, { x: 4, y: 0 }];
+  for (const actor of state.fighters) {
+    if (actor.side === 'players') { actor.tile = remoteOwner && players === 0 ? { x: 1, y: 6 } : positions[players]; players++; }
+    else actor.tile = { x: 5, y: ++enemies };
+    // These cases test a finishing-round boundary, not a level's ability to one-shot a full-health enemy.
+    if (lastBlow && actor.side === 'enemies') actor.hp = 1;
+  }
+  for (const [index, unit] of (state.units ?? []).entries()) unit.tile = { x: 6, y: index * 2 };
+  assert.ok(validFantasyCombatState(state)); fs.writeFileSync(f.file, JSON.stringify(saved)); f.reload();
+  return f.store.combat(initial.fighters.find(fighter => fighter.userId)!.userId!, 'same')!;
 }
 function approachOrAttack(state: FantasyCombatState, user: string): FantasyCombatOrder {
   const actor = state.fighters.find(f => f.userId === user)!, target = state.fighters.find(f => f.side === 'enemies' && f.hp > 0 && !f.fled)!;
@@ -46,10 +68,10 @@ function approachOrAttack(state: FantasyCombatState, user: string): FantasyComba
   if (!fantasyCombatOrderError(state, user, attack)) return attack;
   const reach = actor.range === 'melee' ? 1 : actor.range === 'ranged' ? 7 : 8;
   const paths = Array.from({ length: 80 }, (_, index) => ({ x: index % 10, y: Math.floor(index / 10) })).flatMap(tile => {
-    if (!target.tile || fantasyCombatDistance(tile, target.tile) > reach) return [];
+    if (!target.tile || !fantasyCombatWithinRange(state, { ...actor, tile }, target, actor.range)) return [];
     const path = fantasyCombatPath(state, actor, tile); return path && path.length > 1 ? [path] : [];
   }).sort((a, b) => a.length - b.length);
-  if (!paths[0]) return { type: 'guard' };
+  if (!paths[0]) return fantasyTestClearRoute(state, user) ?? { type: 'guard' };
   const action: FantasyCombatOrder = { type: 'moveTo', tile: paths[0][Math.min(paths[0].length - 1, fantasyCombatMoveRange(actor))] };
   assert.equal(fantasyCombatOrderError(state, user, action), undefined); return action;
 }
@@ -69,7 +91,7 @@ test('a party battle saves one shared public snapshot with independent owners an
   const f = fixture(t), started = f.store.startCombat([f.plan('a'), f.plan('b')], () => .5);
   assert.equal(started.error, undefined); const state = started.state!; assert.equal(state.scaling.participantIds.length, 2); assert.equal(validFantasyCombatState(state), true);
   assert.equal(f.store.profile('a').combatId, state.id); assert.equal(f.store.profile('b').combatId, state.id);
-  const target = state.fighters.find(f => f.side === 'enemies')!, first = f.store.combatOrder('a', 'same', state.id, state.revision, { type: 'attack', target: target.id });
+  const target = state.fighters.find(f => f.side === 'enemies')!, first = f.store.combatOrder('a', 'same', state.id, state.revision, approachOrAttack(state, 'a'));
   assert.equal(first.error, undefined); assert.equal(first.state!.revision, state.revision); assert.equal(first.state!.round, 1);
   const restored = new FantasyStore(f.file, { combatEnabled: true, worldHour: () => 12, onError: () => {} }); assert.equal(restored.loadError, undefined);
   assert.deepEqual(restored.combat('a', 'same'), first.state); assert.deepEqual(restored.combat('b', 'same'), first.state);
@@ -86,7 +108,7 @@ test('foreign users, other sessions, stale rounds and duplicate owner slots cann
   assert.equal(f.store.combatOrder('outsider', 'same', state.id, state.revision, { type: 'guard' }).error, 'not-owner');
   assert.equal(f.store.combatOrder('a', 'other', state.id, state.revision, { type: 'guard' }).error, 'not-owner');
   assert.equal(f.store.combatOrder('a', 'same', state.id, state.revision + 1, { type: 'guard' }).error, 'stale');
-  assert.equal(f.store.combatOrder('a', 'same', state.id, state.revision, { type: 'attack', target }).error, undefined);
+  assert.equal(f.store.combatOrder('a', 'same', state.id, state.revision, approachOrAttack(state, 'a')).error, undefined);
   assert.equal(f.store.combatOrder('a', 'same', state.id, state.revision, { type: 'guard' }).error, 'already-ordered');
   assert.equal(f.store.profile('a').character!.gold, before.character!.gold);
   assert.ok(f.store.apply('a', f.store.profile('a').revision, { type: 'rest' }).error);
@@ -128,7 +150,7 @@ test('a fast party story victory opens the passage for manual final-round partic
       p.character!.location = 'oldwatch'; p.character!.visited.push('oldwatch'); return [user, p];
     }));
     const f = fixture(t, profiles), before = new Map(users.map(user => [user, f.store.profile(user)]));
-    let state = f.store.startCombat(users.map(user => f.plan(user, 'story', 'main-night-01')), () => .5).state!;
+    let state = closeRanks(f, f.store.startCombat(users.map(user => f.plan(user, 'story', 'main-night-01')), () => .5).state!, true);
     const target = state.fighters.find(fighter => fighter.side === 'enemies')!.id;
     for (const user of users.filter(user => !idle || user !== 'f')) {
       const result = f.store.combatOrder(user, 'same', state.id, state.revision, approachOrAttack(state, user)); assert.equal(result.error, undefined); state = result.state!;
@@ -157,11 +179,11 @@ test('apex fights need local inspection and personal confirmation and cannot be 
   const started = f.store.startCombat([f.plan('a', 'apex', apex.id, true)], () => .5); assert.equal(started.error, undefined); assert.equal(started.state!.source, `apex:${apex.id}`);
 });
 
-test('lawful opponents react to an explicit challenge, never just a criminal profession', t => {
+test('lawful opponents require a real encounter and never spawn from a criminal profession or free challenge', t => {
   const f = fixture(t, { a: player('Thief', 20, 'hearth', 'thief') }); assert.equal(f.store.combat('a', 'same'), null);
   assert.ok(f.store.startCombat([f.plan('a', 'challenge', 'human-watch-patrol')]).error); assert.equal(f.store.profile('a').character!.notoriety ?? 0, 0);
-  const result = f.store.startCombat([f.plan('a', 'challenge', 'human-watch-patrol', true)], () => .3); assert.equal(result.error, undefined);
-  const c = f.store.profile('a').character!; assert.equal(c.notoriety, 4); assert.equal(c.reputation!.regions.hearth, -4);
+  const before = f.store.profile('a'); assert.ok(f.store.startCombat([f.plan('a', 'challenge', 'human-watch-patrol', true)], () => .3).error);
+  assert.deepEqual(f.store.profile('a'), before); assert.equal(before.character!.notoriety ?? 0, 0);
 });
 
 test('choosing armed resistance in a watch encounter adds crime consequences without blaming the profession alone', t => {
@@ -181,14 +203,14 @@ test('party combat requires every member to consent and never mixes an investiga
   assert.equal(party.request('a', { type: 'create' }).error, undefined); party.request('a', { type: 'invite', target: 'b' }); const invitation = party.state('b').invitations[0]; party.request('b', { type: 'respond', invite: invitation.id, accept: true });
   assert.equal(party.request('a', { type: 'readyCombat', source: 'hunt', target: 'monster-forest-wolf' }).error, undefined);
   assert.equal(party.request('a', { type: 'startCombat' }).error, 'not-ready'); assert.equal(party.request('b', { type: 'startCombat' }).error, 'leader-only');
-  assert.equal(party.request('b', { type: 'readyCombat', source: 'hunt', target: 'monster-forest-wolf' }).error, undefined); assert.equal(party.state('a').canStart, false); assert.equal(party.state('a').canStartCombat, true);
+  const proposal = party.state('b').combatProposal!; assert.equal(party.request('b', { type: 'combatDecision', proposal: proposal.id, revision: proposal.revision, decision: 'accept' }).error, undefined); assert.equal(party.state('a').canStart, false); assert.equal(party.state('a').canStartCombat, true);
   assert.equal(party.request('a', { type: 'startCombat' }).error, undefined); assert.equal(f.store.profile('a').combatId, f.store.profile('b').combatId);
 });
 
-test('only learned combat abilities and prepared mage spells enter public snapshots; potion cures stay typed', t => {
+test('only learned combat abilities and profession-appropriate prepared spells enter public snapshots; potion cures stay typed', t => {
   const merchant = player('Merchant', 5, 'hearth', 'merchant'); merchant.character!.jobXp.merchant = 600;
   const snapshot = fantasyCombatPlayer(merchant, 'm'); assert.ok(!snapshot.skills.some(skill => skill.id.startsWith('merchant-') && skill.kind === 'attack'));
-  const mage = player('Mage', 8, 'hearth', 'mage'); mage.character!.specialization = { spells: [{ slot: 1, element: 'light', form: 'mend' }] };
+  const mage = player('Priest', 8, 'hearth', 'priest'); mage.character!.specialization = { spells: [{ slot: 1, element: 'light', form: 'mend' }] };
   assert.ok(fantasyCombatPlayer(mage, 'g').skills.some(skill => skill.id === 'prepared-spell-1' && skill.kind === 'heal'));
   const cure = FANTASY_ITEMS.find(item => item.use?.cure?.includes('poison')); assert.ok(cure); mage.character!.inventory[cure.id] = 1;
   assert.deepEqual(fantasyCombatSupplies(new Map([['g', mage]]), ['g']).supplies!.g[cure.id].cleanse, cure.use!.cure!.filter(id => ['poison', 'burn', 'frost'].includes(id)));
@@ -220,16 +242,16 @@ test('ordinary fighting never levels a production trade, while effective alchemi
   assert.ok(f.store.profile('a').character!.jobXp.alchemist > 0); assert.equal(f.store.profile('a').character!.inventory.potion, 2);
 });
 
-test('effective prepared spells grow the existing mage proficiency and unlock its second and third slots', t => {
+test('effective prepared support spells grow the existing priest proficiency and unlock its second and third slots', t => {
   for (const xp of [29, 99]) {
-    const p = player('Prepared caster', 12, 'greenwood', 'mage'); p.character!.hp = 20; p.character!.jobXp.mage = xp;
+    const p = player('Prepared caster', 12, 'greenwood', 'priest'); p.character!.hp = 20; p.character!.jobXp.priest = xp;
     p.character!.specialization = { spells: [{ slot: 1, element: 'light', form: 'mend' }] };
     const f = fixture(t, { a: p }), beforeCapacity = fantasySpellCapacity(f.store.profile('a').character!), state = f.store.startCombat([f.plan('a')], () => .5).state!, own = state.fighters.find(fighter => fighter.userId === 'a')!;
     const result = f.store.combatOrder('a', 'same', state.id, state.revision, { type: 'skill', skill: 'prepared-spell-1', target: own.id }); assert.equal(result.error, undefined);
-    const c = f.store.profile('a').character!; assert.ok(c.jobXp.mage > xp); assert.equal(fantasySpellCapacity(c), beforeCapacity + 1);
+    const c = f.store.profile('a').character!; assert.ok(c.jobXp.priest > xp); assert.equal(fantasySpellCapacity(c), beforeCapacity + 1);
     assert.ok((c.mana?.useXp ?? 0) > 0); assert.equal(c.skillXp?.['prepared-spell-1'], undefined);
   }
-  const p = player('Unneeded spell', 12, 'greenwood', 'mage'); p.character!.jobXp.mage = 29; p.character!.specialization = { spells: [{ slot: 1, element: 'light', form: 'mend' }] };
+  const p = player('Unneeded spell', 12, 'greenwood', 'priest'); p.character!.jobXp.priest = 29; p.character!.specialization = { spells: [{ slot: 1, element: 'light', form: 'mend' }] };
   const f = fixture(t, { a: p }), state = f.store.startCombat([f.plan('a')], () => .5).state!, own = state.fighters.find(fighter => fighter.userId === 'a')!, before = f.store.profile('a');
   assert.equal(f.store.combatOrder('a', 'same', state.id, state.revision, { type: 'skill', skill: 'prepared-spell-1', target: own.id }).error, 'unnecessary');
   assert.deepEqual(f.store.profile('a'), before);
@@ -245,7 +267,7 @@ test('legacy saves keep old investigation reservations and cancel only old autom
 });
 
 test('successful victory retries publish no partial XP, money or materials after a failed final save', t => {
-  const f = fixture(t, { a: player('Finisher', 40) }), state = f.store.startCombat([f.plan('a')], () => .5).state!, before = f.store.profile('a'), target = state.fighters.find(f => f.side === 'enemies')!.id;
+  const f = fixture(t, { a: player('Finisher', 40) }), state = closeRanks(f, f.store.startCombat([f.plan('a')], () => .5).state!, true), before = f.store.profile('a'), target = state.fighters.find(f => f.side === 'enemies')!.id;
   f.fail(true); const failed = f.store.combatOrder('a', 'same', state.id, state.revision, { type: 'attack', target });
   assert.equal(failed.error, 'save-failed'); assert.deepEqual(f.store.profile('a'), before); assert.deepEqual(f.store.combat('a', 'same'), state);
   f.fail(false); const won = f.store.combatOrder('a', 'same', state.id, state.revision, { type: 'attack', target });
@@ -267,8 +289,9 @@ test('real potion stock is consumed atomically and a failed round never consumes
 
 test('late automatic guards cannot turn one early hit into a full fight reward', t => {
   const idle = player('Idle', 12, 'oldwatch'); idle.character!.inventory['oak-bow'] = 1; idle.character!.equipment = { ...idle.character!.equipment, weapon: 'oak-bow' };
-  const f = fixture(t, { a: player('Active', 30, 'oldwatch'), b: idle });
-  const initial = f.store.profile('b'); let state = f.store.startCombat([f.plan('a', 'hunt', 'monster-stone-golem'), f.plan('b', 'hunt', 'monster-stone-golem')], () => .5).state!;
+  // 報酬権利の検査。新しい敵技でも能動参加者が戦闘を完遂できる体力を用意する。
+  const f = fixture(t, { a: player('Active', 35, 'oldwatch'), b: idle });
+  const initial = f.store.profile('b'); let state = f.store.startCombat([f.plan('a', 'hunt', 'monster-skeleton-guard'), f.plan('b', 'hunt', 'monster-skeleton-guard')], () => .5).state!;
   state = attackRound(f.store, state); let time = 12;
   for (let i = 0; state.status === 'active' && i < 30; i++) {
     const target = state.fighters.find(f => f.side === 'enemies' && f.hp > 0)!.id;
@@ -299,7 +322,7 @@ test('world deadlines auto-guard without growth, keep food time moving and block
 test('direct companion orders preserve the owner action and atomically train real command use without extra loot slots', t => {
   const p = player('Commander', 12, 'greenwood', 'leader');
   p.character!.specialization = { companies: { troop: { members: [{ id: 'troop-scout', condition: 'ready', hp: 24, assigned: true, missions: 0 }] } } };
-  const f = fixture(t, { a: p }), initial = f.store.startCombat([f.plan('a')], () => .5).state!, companion = initial.units![0];
+  const f = fixture(t, { a: p }), initial = closeRanks(f, f.store.startCombat([f.plan('a')], () => .5).state!), companion = initial.units![0];
   assert.equal(initial.units?.length, 1); assert.equal(initial.scaling.participantIds.length, 1);
   const waiting = f.store.combatOrder('a', 'same', initial.id, initial.revision, { type: 'guard' }); assert.equal(waiting.error, undefined);
   assert.equal(waiting.state!.round, 1); assert.deepEqual(waiting.state!.orders.a, { type: 'guard' });
@@ -318,8 +341,9 @@ test('delayed oath focus preserves its source across saves and grants real-use g
   c.jobXp.priest = 1000; c.completed = FANTASY_QUESTS.filter(quest => !quest.chapter && !quest.requiresCompleted?.length && fantasyQuestRecordEligible(c, quest) && fantasyPriestServiceQuest(quest.id)).slice(0, 6).map(quest => quest.id);
   c.readBooks = FANTASY_READABLE_LIBRARY_BOOKS.map(book => book.id); c.visited.push('suncourt'); syncFantasyPriestGrowth(c);
   assert.equal(applyFantasyPriestAction(c, { type: 'priestBranch', branch: 'oath' })!.error, undefined);
-  const f = fixture(t, { a: witness, b: player('Ally', 12, 'hearth') });
-  let state = f.store.startCombat([f.plan('a', 'challenge', 'human-watch-patrol', true), f.plan('b', 'challenge', 'human-watch-patrol', true)], () => .5).state!;
+  const allyProfile = player('Ally', 12, 'hearth'); witness.event = allyProfile.event = 'encounter-watch';
+  const f = fixture(t, { a: witness, b: allyProfile });
+  let state = closeRanks(f, f.store.startCombat([f.plan('a', 'encounter', 'encounter-watch'), f.plan('b', 'encounter', 'encounter-watch')], () => .5).state!);
   const ally = state.fighters.find(fighter => fighter.userId === 'b')!, clarity = state.fighters.find(fighter => fighter.userId === 'a')!.skills.find(skill => skill.id === 'priest-oath-clarity')!;
   assert.equal(clarity.kind, 'focus');
   state = f.store.combatOrder('a', 'same', state.id, state.revision, { type: 'skill', skill: clarity.id, target: ally.id }).state!;
@@ -340,31 +364,35 @@ test('delayed oath focus preserves its source across saves and grants real-use g
 test('an unused body guard or skipped body attack cannot double companion command proficiency', t => {
   for (const body of ['guard', 'attack'] as const) {
     let p = player('Fast command', 1, 'hearth', 'leader'); p.character!.jobXp.leader = 600; p = applyFantasyAction(p, { type: 'accept', quest: 'main-night-01' }).profile;
-    // 冷気を受けた低敏捷の指揮官より斥候が先に動く。
+    // The chilled commander acts after the scout. An unused guard stays outside enemy reach.
     p.character!.race = 'elder-dragon'; p.character!.gender = 'female';
     p.character!.location = 'oldwatch'; p.character!.visited.push('oldwatch');
     p.character!.inventory['steel-sword'] = 1;
     const weapon = createFantasyGear(p.character!, 'steel-sword', () => .999, 'starsteel-ingot', 'ruby')!; assert.equal(fantasyEquipGear(p.character!, 'steel-sword', weapon.id), undefined);
     addFantasyStatus(p.character!, 'frost');
     p.character!.specialization = { companies: { troop: { members: [{ id: 'troop-scout', condition: 'ready', hp: 24, assigned: true, missions: 0 }] } } };
-    const f = fixture(t, { a: p }), state = f.store.startCombat([f.plan('a', 'story', 'main-night-01')], () => .5).state!, own = state.fighters.find(fighter => fighter.userId === 'a')!, unit = state.units![0], enemy = state.fighters.find(fighter => fighter.side === 'enemies')!;
+    const f = fixture(t, { a: p }), state = closeRanks(f, f.store.startCombat([f.plan('a', 'story', 'main-night-01')], () => .5).state!, true, body === 'guard'), own = state.fighters.find(fighter => fighter.userId === 'a')!, unit = state.units![0], enemy = state.fighters.find(fighter => fighter.side === 'enemies')!;
     const before = f.store.profile('a').character!.jobXp.leader;
     const action: FantasyCombatOrder = body === 'attack' ? { type: 'attack', target: enemy.id } : { type: 'guard' };
     const pending = f.store.combatOrder('a', 'same', state.id, state.revision, action); assert.equal(pending.error, undefined);
     const won = f.store.combatOrder('a', 'same', state.id, state.revision, { type: 'unit', unit: unit.id, order: { type: 'attack', target: enemy.id } });
     assert.equal(won.error, undefined); assert.equal(won.state!.status, 'victory');
+    if (body === 'guard') assert.equal(won.state!.fighters.find(fighter => fighter.id === own.id)!.hp, own.hp, 'body guard was unused');
+    else assert.ok(!won.state!.logs.some(log => log.presentation?.kind === 'attack' && log.presentation.actor === own.id), 'body attack was skipped');
     assert.equal(won.state!.units![0].contribution.effectiveActions, 1, `${body}: ${JSON.stringify(won.state!.logs)}`);
-    assert.equal(won.state!.fighters.find(fighter => fighter.id === own.id)!.contribution.effectiveActions, 1, body);
+    assert.equal(won.state!.fighters.find(fighter => fighter.id === own.id)!.contribution.effectiveActions, 1, `${body}: ${JSON.stringify(won.state!.logs)}`);
     assert.equal(f.store.profile('a').character!.jobXp.leader - before, 3, body); assert.equal(f.store.profile('a').character!.practice?.command, 1);
   }
 });
 
 test('real combat WebSockets enforce party consent, session ownership, turn slots, private profiles and busy NPC dialogue', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fantasy-combat-ws-')), profiles = { alice: player('Secret-alice', 12, 'hearth'), bob: player('Secret-bob', 12, 'hearth'), carol: player('Secret-carol', 12, 'hearth') };
+  for (const profile of Object.values(profiles)) profile.event = 'encounter-watch';
   fs.writeFileSync(path.join(directory, 'fantasy.json'), JSON.stringify(profiles)); fs.writeFileSync(path.join(directory, 'fantasy-clock.json'), JSON.stringify({ version: 1, hour: 12, wallTime: Date.now() + 3600000 }));
   const sessions = path.join(directory, 'sessions.json'); fs.writeFileSync(sessions, JSON.stringify({ name: 'Combat integration', sessions: [{ id: 'one', name: 'One', world: 'fantasy' }, { id: 'two', name: 'Two', world: 'fantasy' }] }));
   const listener = net.createServer(); await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve)); const port = (listener.address() as net.AddressInfo).port; await new Promise<void>(resolve => listener.close(() => resolve()));
-  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], { env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV:'test',FANTASY_ACCOUNT_TEST_BYPASS:'1',SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  markFantasyPlatformDataCurrent(directory);
+  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts', '--dev'], { env: { ...process.env, ...(await testServerEnv(t)), TONARIUM_TEST_HELLO_ID: '1', NODE_ENV:'test',SERVER_PORT: String(port), DATA_DIR: directory, SESSIONS_FILE: sessions, LIVEKIT_URL: '', LIVEKIT_API_KEY: '', LIVEKIT_API_SECRET: '', KOKOAAI_APIKEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = ''; child.stdout.on('data', chunk => { output += String(chunk); }); child.stderr.on('data', chunk => { output += String(chunk); }); const sockets: WebSocket[] = [];
   t.after(async () => { for (const socket of sockets) socket.terminate(); child.kill(); if (child.exitCode === null && !child.signalCode) await new Promise<void>(resolve => { const timer = setTimeout(() => { child.kill('SIGKILL'); resolve(); }, 3000); child.once('exit', () => { clearTimeout(timer); resolve(); }); }); assert.equal(path.dirname(path.resolve(directory)), path.resolve(os.tmpdir())); assert.ok(path.basename(directory).startsWith('fantasy-combat-ws-')); fs.rmSync(directory, { recursive: true, force: true }); });
   async function until<T>(read: () => T | undefined | null | false): Promise<T> { const deadline = Date.now() + 15000; while (Date.now() < deadline) { const value = read(); if (value) return value; if (child.exitCode !== null) throw new Error(output); await new Promise(resolve => setTimeout(resolve, 20)); } throw new Error(`Combat WS timeout: ${output}`); }
@@ -372,7 +400,7 @@ test('real combat WebSockets enforce party consent, session ownership, turn slot
     let ws: WebSocket | undefined; const deadline = Date.now() + 30000;
     while (!ws && Date.now() < deadline) { const attempt = new WebSocket(`ws://127.0.0.1:${port}/ws`); const opened = await new Promise<boolean>(resolve => { attempt.once('open', () => resolve(true)); attempt.once('error', () => resolve(false)); }); if (opened) ws = attempt; else { attempt.terminate(); if (child.exitCode !== null) throw new Error(output); await new Promise(resolve => setTimeout(resolve, 30)); } }
     if (!ws) throw new Error(output); sockets.push(ws); const messages: Record<string, any>[] = []; ws.on('message', data => messages.push(JSON.parse(String(data)))); const send = (message: object) => ws!.send(JSON.stringify(message));
-    send({ t: 'hello', compat: COMPAT_VERSION, id, name: id }); await until(() => messages.find(message => message.t === 'fantasyPartyState')); const joinedAt = messages.length;
+    send({ t: 'hello', compat: COMPAT_VERSION, id, name: id }); await until(() => messages.find(message => message.t === 'snapshot')); const joinedAt = messages.length;
     send({ t: 'join', sid: session }); send({ t: 'fantasyPartyRequest', command: { type: 'sync' } }); await until(() => messages.slice(joinedAt).find(message => message.t === 'fantasyPartyState' && !message.error));
     return { ws, messages, send };
   }
@@ -380,20 +408,26 @@ test('real combat WebSockets enforce party consent, session ownership, turn slot
   a.send({ t: 'fantasyPartyRequest', command: { type: 'create' } }); await until(() => a.messages.find(message => message.t === 'fantasyPartyState' && message.state?.id));
   a.send({ t: 'fantasyPartyRequest', command: { type: 'invite', target: 'bob' } }); const invite = await until(() => b.messages.find(message => message.t === 'fantasyPartyState' && message.state?.invitations?.length)?.state.invitations[0]);
   b.send({ t: 'fantasyPartyRequest', command: { type: 'respond', invite: invite.id, accept: true } }); await until(() => a.messages.find(message => message.t === 'fantasyPartyState' && message.state?.members?.length === 2));
-  a.send({ t: 'fantasyPartyRequest', command: { type: 'readyCombat', source: 'challenge', target: 'human-watch-patrol', confirm: true } }); b.send({ t: 'fantasyPartyRequest', command: { type: 'readyCombat', source: 'challenge', target: 'human-watch-patrol', confirm: true } });
+  a.send({ t: 'fantasyPartyRequest', command: { type: 'readyCombat', source: 'encounter', target: 'encounter-watch' } });
+  const proposal = await until(() => b.messages.find(message => message.t === 'fantasyPartyState' && message.state?.combatProposal)?.state.combatProposal);
+  b.send({ t: 'fantasyPartyRequest', command: { type: 'combatDecision', proposal: proposal.id, revision: proposal.revision, decision: 'accept' } });
   await until(() => a.messages.find(message => message.t === 'fantasyPartyState' && message.state?.canStartCombat)); a.send({ t: 'fantasyPartyRequest', command: { type: 'startCombat' } });
   const battle = await until(() => a.messages.find(message => message.t === 'fantasyCombatState' && message.state?.status === 'active')?.state as FantasyCombatState | undefined); await until(() => b.messages.find(message => message.t === 'fantasyCombatState' && message.state?.id === battle.id));
   assert.ok(!c.messages.some(message => message.t === 'fantasyCombatState' && message.state?.id === battle.id));
   c.send({ t: 'fantasyCombatRequest', command: { type: 'order', combatId: battle.id, revision: battle.revision, order: { type: 'guard' } } }); await until(() => c.messages.find(message => message.t === 'fantasyCombatState' && message.error === 'not-owner'));
   a.send({ t: 'npcChat', requestId: 'busy_combat', npcId: 'rin', locale: 'en', text: 'hello' }); await until(() => a.messages.find(message => message.t === 'npcReply' && message.requestId === 'busy_combat' && message.error === 'busy'));
-  const enemy = battle.fighters.find(fighter => fighter.side === 'enemies')!, approach = approachOrAttack(battle, 'bob'); assert.equal(approach.type, 'moveTo');
-  a.send({ t: 'fantasyCombatRequest', command: { type: 'order', combatId: battle.id, revision: battle.revision, order: { type: 'guard' } } }); b.send({ t: 'fantasyCombatRequest', command: { type: 'order', combatId: battle.id, revision: battle.revision, order: approach } });
-  const moved = await until(() => a.messages.find(message => message.t === 'fantasyCombatState' && message.state?.revision > battle.revision)?.state as FantasyCombatState | undefined);
-  assert.notDeepEqual(moved.fighters.find(fighter => fighter.userId === 'bob')!.tile, battle.fighters.find(fighter => fighter.userId === 'bob')!.tile);
+  const enemy = battle.fighters.find(fighter => fighter.side === 'enemies')!;
+  let moved = battle;
+  for (let round = 0; fantasyCombatOrderError(moved, 'bob', { type: 'attack', target: enemy.id }) && round < 8; round++) {
+    const previous = moved, approach = approachOrAttack(previous, 'bob'); assert.equal(approach.type, 'moveTo');
+    a.send({ t: 'fantasyCombatRequest', command: { type: 'order', combatId: battle.id, revision: previous.revision, order: { type: 'guard' } } }); b.send({ t: 'fantasyCombatRequest', command: { type: 'order', combatId: battle.id, revision: previous.revision, order: approach } });
+    moved = await until(() => a.messages.find(message => message.t === 'fantasyCombatState' && message.state?.revision > previous.revision)?.state as FantasyCombatState | undefined);
+    assert.notDeepEqual(moved.fighters.find(fighter => fighter.userId === 'bob')!.tile, previous.fighters.find(fighter => fighter.userId === 'bob')!.tile);
+  }
   assert.equal(fantasyCombatOrderError(moved, 'bob', { type: 'attack', target: enemy.id }), undefined);
   a.send({ t: 'fantasyCombatRequest', command: { type: 'order', combatId: battle.id, revision: moved.revision, order: { type: 'guard' } } }); b.send({ t: 'fantasyCombatRequest', command: { type: 'order', combatId: battle.id, revision: moved.revision, order: { type: 'attack', target: enemy.id } } });
   const attacked = await until(() => a.messages.find(message => message.t === 'fantasyCombatState' && message.state?.revision > moved.revision)?.state as FantasyCombatState | undefined);
-  assert.equal(attacked.fighters.find(fighter => fighter.userId === 'bob')!.contribution.manualActions, 2);
+  assert.equal(attacked.fighters.find(fighter => fighter.userId === 'bob')!.contribution.manualActions, moved.fighters.find(fighter => fighter.userId === 'bob')!.contribution.manualActions + 1);
   for (const [client, id] of [[a, 'alice'], [b, 'bob'], [c, 'carol']] as const) {
     for (const message of client.messages.filter(message => message.t === 'fantasyProfile')) assert.equal(message.profile?.character?.name, `Secret-${id}`);
     for (const message of client.messages.filter(message => message.t === 'fantasyCombatState' && message.state)) for (const privateKey of ['inventory', 'quests', 'completed', 'voyageDecisions', 'apexWarnings']) assert.ok(!JSON.stringify(message.state).includes(`"${privateKey}"`));

@@ -115,6 +115,22 @@ test('facility templates decline questions they can only partially answer so liv
   for(const [npcId,text]of [['rin','객실 종류를 알려주세요'],['rin','What rooms do you have?'],['rin','部屋の種類を教えて'],['rin','어떤 식사를 주문할 수 있어?'],['rin','이 시설에서 무엇을 할 수 있어?'],['hearth-daren','지금 받을 수 있는 의뢰는 뭐야?'],['hearth-daren','いまどんな依頼がありますか？'],['hearth-mira','どんな職業を学べますか？'],['hearth-alia','회복 약초 가격 알려줘'],['hearth-mira','What is Mana Begins with Breath about?']] as const)assert.equal(npcFacilityQuerySupported(npcId,text,character()),true,text);
 });
 
+test('single-syllable Korean produce names do not consume lesson words', () => {
+  const c = character();
+  for (const text of ['어떤 기술을 배울 수 있어?', '어떤 직업을 배울 수 있어?', '배 얼마야', '배가격', '배는 몇개', '배 가격 알려줘', '배는 얼마야?', '쌀을 얼마에 팔아?']) {
+    assert.equal(npcFacilityQuerySupported('hearth-mira', text, c), true, text);
+  }
+  for (const text of ['배신은 어떤 기술이야?', '쌀쌀한 날씨는 어때?', 'What is saltwater?', '어떤 기술을 배울 수 있어? 그리고 내 친구는 어디야?']) {
+    assert.equal(npcFacilityQuerySupported('hearth-mira', text, c), false, text);
+  }
+  const facts = { hour:c.hour,location:c.location,rumors:[],shops:[{building:'market' as const,lots:[{id:'pear-one',item:'pantry-pear',count:4,unitPrice:13}],sales:[]}] };
+  assert.ok(npcFacilityReply('ko', 'hearth-alia', '어떤 기술을 배울 수 있어?', c, undefined, facts)!.includes(npcFacilityKnowledge('hearth-alia', c).jobs[0].names.ko));
+  for (const text of ['배 얼마야', '배가격', '배는 몇개', '배는 얼마야?']) {
+    const reply = npcFacilityReply('ko', 'hearth-alia', text, c, undefined, facts)!;
+    assert.match(reply, /13G/u, text); assert.match(reply, /4개/u, text);
+  }
+});
+
 test('menus and individual libraries use their own real holdings and never announce foreign collections', () => {
   for (const npc of NPC_PUBLIC.filter(npc => ['inn', 'restaurant', 'library'].includes(npc.building))) for (const locale of locales) {
     const c = character(); c.location = npc.homeLocation;

@@ -1,9 +1,12 @@
+import { FantasyBusinessPanel } from './FantasyBusinessPanel.tsx';
 import { useState } from 'react';
-import type { FantasyProfile } from '../../../shared/fantasy.ts';
+import type { FantasyAction, FantasyProfile } from '../../../shared/fantasy.ts';
 import { FANTASY_ITEMS } from '../../../shared/fantasy-data.ts';
 import { FANTASY_TERMS } from '../../../shared/fantasy-lore.ts';
 import { fantasyPropertyText, fantasyPropertyUseError, type FantasyPropertyCommand, type FantasyPropertyState, type FantasyPropertyView } from '../../../shared/fantasy-property.ts';
 import { FANTASY_PROPERTY_BLUEPRINTS, type FantasyPropertyBlueprint } from '../../../shared/fantasy-property-extensions.ts';
+import { FANTASY_FURNITURE, fantasyFurnitureCanPlace } from '../../../shared/fantasy-furniture.ts';
+import { fantasyBagChangeError } from '../../../shared/fantasy-bags.ts';
 import { useLocale } from '../locale.ts';
 import { ReasonButton } from './FantasyActionButton.tsx';
 import { realDuration } from './FantasyActivity.tsx';
@@ -11,14 +14,14 @@ import './fantasy-property.css';
 
 interface Props {
   profile: FantasyProfile; state: FantasyPropertyState | null; pending: boolean; error: string | null;
-  onCommand: (command: FantasyPropertyCommand) => void;
+  onCommand: (command: FantasyPropertyCommand) => void; onAction?: (action: FantasyAction) => void;
 }
-export function FantasyPropertyPanel({ profile, state, pending, error, onCommand }: Props) {
+export function FantasyPropertyPanel({ profile, state, pending, error, onCommand, onAction }: Props) {
   const [locale] = useLocale(), [confirmation, setConfirmation] = useState<{ plot: string; revision: number; type: 'buy' | 'list' | 'cancel'; price?: number } | null>(null);
   const [prices, setPrices] = useState<Record<string, string>>({});
   const say = (ko: string, en: string, ja: string) => ({ ko, en, ja })[locale];
   const c = profile.character;
-  const busy = pending || !!profile.activity || !!profile.combatId || !!profile.event || !!profile.death || !c;
+  const busy = pending || !!profile.activity || !!profile.combatId || !!profile.event || !!profile.death || !c || c.hp <= 0;
   const busyReason = pending ? say('요청을 확인 중입니다.', 'Waiting for the request.', '依頼を確認しています。')
     : busy ? say('현재 행동이나 사건을 먼저 마쳐 주세요.', 'Finish the current activity or encounter first.', 'いまの行動や出来事を先に終えてください。') : undefined;
   const itemName = (id: string) => FANTASY_ITEMS.find(item => item.id === id)?.names?.[locale] ?? FANTASY_TERMS.find(term => term.category === 'item' && term.id === id)?.names[locale] ?? id;
@@ -58,6 +61,8 @@ export function FantasyPropertyPanel({ profile, state, pending, error, onCommand
             </details>}
           </> : plot.listed ? <ReasonButton className="fr-btn primary" disabled={busy || (c?.gold ?? 0) < plot.price! || ownedCount >= 3} reason={busyReason ?? ((c?.gold ?? 0) < plot.price! ? fantasyPropertyText('insufficient-gold', locale) : ownedCount >= 3 ? fantasyPropertyText('limit', locale) : undefined)} onClick={() => setConfirmation({ plot: plot.id, revision: plot.revision, type: 'buy', price: plot.price! })}>{say(`${plot.price}G에 구매`, `Buy for ${plot.price}G`, `${plot.price}Gで購入`)}</ReasonButton> : <p className="fr-muted">{say('판매 중이 아닙니다.', 'Not for sale.', '売り出していません。')}</p>}
       {!remote && <PropertyManagement profile={profile} plot={plot} busy={busy} busyReason={busyReason} onCommand={send} />}
+      {!remote && state && plot.business && <FantasyBusinessPanel profile={profile} plot={plot} state={state} onAction={onAction} reason={busyReason ?? (plot.management?.canUse ? undefined : useReason)} onCommand={send} />}
+      {plot.kind === 'residence' && (plot.ownedByMe || plot.management?.tenant || !!plot.furniture?.length) && <PropertyFurniture profile={profile} plot={plot} reason={remote ? say('가구를 옮기려면 현지로 가세요.', 'Visit the home to move furniture.', '家具を動かすには現地を訪ねてください。') : useReason} onCommand={send} />}
     </article>;
   };
   return <section className="fr-property"><h2>{say('부동산', 'Property', '不動産')}</h2>
@@ -76,6 +81,32 @@ export function FantasyPropertyPanel({ profile, state, pending, error, onCommand
       <div className="fr-action-grid"><ReasonButton className="fr-btn primary" disabled={busy || confirmPlot.revision !== confirmation.revision} reason={busyReason ?? (confirmPlot.revision !== confirmation.revision ? fantasyPropertyText('stale', locale) : undefined)} onClick={execute}>{say('확인', 'Confirm', '確認')}</ReasonButton><button className="fr-btn" onClick={() => setConfirmation(null)}>{say('닫기', 'Close', '閉じる')}</button></div>
     </div>}
   </section>;
+}
+
+function PropertyFurniture({ profile, plot, reason, onCommand }: { profile: FantasyProfile; plot: FantasyPropertyView; reason?: string; onCommand: (command: FantasyPropertyCommand) => void }) {
+  const [locale] = useLocale(), c = profile.character;
+  if (!c) return null;
+  const say = (ko: string, en: string, ja: string) => ({ ko, en, ja })[locale], installed = plot.furniture ?? [];
+  const available = FANTASY_FURNITURE.filter(furniture => (c.inventory[furniture.item] ?? 0) > 0);
+  const manage = plot.ownedByMe || plot.management?.tenant;
+  return <details className="fr-property-furniture"><summary>{say('집 안의 가구', 'Home furniture', '家の家具')} · {installed.length}/10</summary>
+    <p className="fr-muted">{say('침대 1개 · 작업대·궤·식탁·책상·서랍장 각 1개 · 장식 4점. 침대의 추가 회복은 집에서 8시간 쉬기를 마칠 때 적용됩니다.', 'One bed, one workbench, chest, table, desk and drawers, and four decorations. Extra bed recovery applies after eight hours of home rest.', '寝台1台・作業台と長櫃と食卓と机と箪笥は各1台・装飾4点。寝台の追加回復は自宅で8時間休み終えた時に得られます。')}</p>
+    {!installed.length && <p className="fr-muted">{say('아직 설치한 가구가 없습니다.', 'No furniture installed yet.', 'まだ家具を置いていません。')}</p>}
+    {installed.map((furniture, index) => {
+      const after = { ...profile, character: { ...c, inventory: { ...c.inventory, [furniture.item]: (c.inventory[furniture.item] ?? 0) + 1 } } };
+      const blocked = reason ?? (!furniture.canRemove ? say('집의 소유자나 이 가구를 설치한 임차인만 회수할 수 있습니다.', 'Only a home owner or the tenant who installed this furnishing can recover it.', '家の所有者か、この家具を置いた借主だけが回収できます。') : fantasyBagChangeError(profile, after) ? fantasyPropertyText('bag-full', locale) : undefined);
+      return <div className="fr-property-furniture-row" key={`${furniture.item}-${index}`}><b>{furniture.names[locale]}</b><p className="fr-muted">{furniture.descriptions[locale]}</p>
+        {manage && <ReasonButton className="fr-btn" disabled={!!blocked} reason={blocked} onClick={() => onCommand({ type: 'unfurnish', plot: plot.id, revision: plot.revision, requestId: crypto.randomUUID(), item: furniture.item })}>{say('소지품으로 회수', 'Recover to bag', '鞄に回収する')}</ReasonButton>}
+      </div>;
+    })}
+    {manage && <><h4>{say('소지품에서 설치', 'Install from your bag', '鞄から設置する')}</h4>
+      {!available.length && <p className="fr-muted">{say('목수가 만든 가구를 소지하면 여기에 표시됩니다.', 'Furniture made by a carpenter appears here when carried.', '木工職人が作った家具を持つと、ここに表示されます。')}</p>}
+      {available.map(furniture => {
+        const blocked = reason ?? (!fantasyFurnitureCanPlace(installed, furniture.item) ? fantasyPropertyText('furniture-limit', locale) : undefined);
+        return <div className="fr-property-furniture-row" key={furniture.item}><p className="fr-muted">{furniture.descriptions[locale]}</p><ReasonButton className="fr-btn" disabled={!!blocked} reason={blocked} onClick={() => onCommand({ type: 'furnish', plot: plot.id, revision: plot.revision, requestId: crypto.randomUUID(), item: furniture.item })}>{say(`${furniture.names[locale]} 설치 · 보유 ${c.inventory[furniture.item]}개`, `Install ${furniture.names[locale]} · Owned ${c.inventory[furniture.item]}`, `${furniture.names[locale]}を設置・所持${c.inventory[furniture.item]}個`)}</ReasonButton></div>;
+      })}
+    </>}
+  </details>;
 }
 
 const BLUEPRINT_NAMES: Record<FantasyPropertyBlueprint, [string, string, string]> = {
@@ -143,12 +174,12 @@ function PropertyManagement({ profile, plot, busy, busyReason, onCommand }: { pr
         {button(say(`개축 · ${(m.level + 1) * 40}G · 목재${3 + (m.level + 1) * 2} 철광석${m.level + 1}`, `Build · ${(m.level + 1) * 40}G · Wood${3 + (m.level + 1) * 2} Ore${m.level + 1}`, `改築・${(m.level + 1) * 40}G・木材${3 + (m.level + 1) * 2} 鉱石${m.level + 1}`), { type: 'build', ...base(), blueprint }, `${names(blueprint)} · ${realDuration((m.level + 1) * 4, locale)}`, occupation ?? (m.taxDue ? fantasyPropertyText('tax-due', locale) : undefined))}
       </>}
     </details>}
-    {m.manager && plot.kind !== 'residence' && <details><summary>{say('고용 영업', 'Staffed operation', '雇用営業')}</summary>
+    {m.manager && (plot.kind === 'farmland' || !!m.automation?.stock) && <details><summary>{say('고용 영업', 'Staffed operation', '雇用営業')}</summary>
       <p>{say('재료', 'Supplies', '材料')} {m.automation?.stock ?? 0} · {say('임금', 'Wages', '賃金')} {m.automation?.wages ?? 0}G</p>
       {input(say('맡길 재료 수량', 'Supplies to stock', '預ける材料の数'), stock, setStock, 1, 99)}
-      {button(say('재료·임금 맡기기', 'Stock supplies and wages', '材料と賃金を預ける'), { type: 'autoStock', ...base(), count: Number(stock) }, say(`재료 ${stock}개와 임금 ${Number(stock) * 2}G를 맡깁니다.`, `Stock ${stock} supplies and ${Number(stock) * 2}G in wages.`, `材料${stock}個と賃金${Number(stock) * 2}Gを預けます。`), occupation ?? (!whole(stock, 1, 99) ? invalid : undefined))}
+      {plot.kind === 'farmland' && button(say('재료·임금 맡기기', 'Stock supplies and wages', '材料と賃金を預ける'), { type: 'autoStock', ...base(), count: Number(stock) }, say(`재료 ${stock}개와 임금 ${Number(stock) * 2}G를 맡깁니다.`, `Stock ${stock} supplies and ${Number(stock) * 2}G in wages.`, `材料${stock}個と賃金${Number(stock) * 2}Gを預けます。`), occupation ?? (!whole(stock, 1, 99) ? invalid : undefined))}
       {button(say('남은 재료·임금 돌려받기', 'Withdraw unused supplies and wages', '残りの材料と賃金を回収'), { type: 'autoWithdraw', ...base(), count: Number(stock) }, say(`재료 ${stock}개와 미사용 임금 ${Number(stock) * 2}G를 회수합니다.`, `Recover ${stock} supplies and ${Number(stock) * 2}G unused wages.`, `材料${stock}個と未使用賃金${Number(stock) * 2}Gを回収します。`), m.automation?.enabled ? say('고용 영업을 먼저 중지하세요.', 'Pause staffed work first.', '先に雇用営業を停止してください。') : !whole(stock, 1, 99) || (m.automation?.stock ?? 0) < Number(stock) ? invalid : undefined)}
-      {button(m.automation?.enabled ? say('고용 영업 중지', 'Pause staffed work', '雇用営業を停止') : say('고용 영업 시작', 'Start staffed work', '雇用営業を開始'), { type: 'autoToggle', ...base(), enabled: !m.automation?.enabled }, undefined, occupation ?? (!m.automation?.enabled && !m.automation?.stock ? fantasyPropertyText('missing-material', locale) : undefined))}
+      {plot.kind === 'farmland' && button(m.automation?.enabled ? say('고용 영업 중지', 'Pause staffed work', '雇用営業を停止') : say('고용 영업 시작', 'Start staffed work', '雇用営業を開始'), { type: 'autoToggle', ...base(), enabled: !m.automation?.enabled }, undefined, occupation ?? (!m.automation?.enabled && !m.automation?.stock ? fantasyPropertyText('missing-material', locale) : undefined))}
     </details>}
     {(m.manager || plot.estate || m.auction) && <details><summary>{say('경매', 'Auction', '競売')}</summary>
       {m.auction ? <><p>{m.auction.bidder ?? say('입찰 없음', 'No bids', '入札なし')} · {m.auction.highest}G</p><p>{realDuration(Math.max(0, m.auction.endsAt - c.hour), locale)}</p>

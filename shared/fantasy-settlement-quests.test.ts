@@ -12,6 +12,7 @@ import { fantasyHuntTargets } from './fantasy-gathering.ts';
 import { fantasyGmKnowledge } from './fantasy-gm-knowledge.ts';
 import { npcAllowedFacts, npcCanonicalReply } from '../server/npc.ts';
 import { npcInformationSpeech } from '../server/npc-info-speech.ts';
+import { fantasyQuestInstitution } from './fantasy-institutions.ts';
 
 const fresh = () => {
   const p = applyFantasyAction(newFantasyProfile(), { type: 'create', name: 'Quest traveler', gender: 'female', source: 'human' }, () => .5).profile;
@@ -23,7 +24,7 @@ const legacyMain = FANTASY_MAIN_QUESTS.filter(quest => quest.chapter! <= 12).map
 const settlements = ['inkstone-city', 'pinewatch', 'reedcross', 'canopy-hall', 'mossbrook', 'leafshade', 'sunloom', 'wellrest', 'rockshade'];
 
 test('settlement quests register once, with real local issuers and complete localized speech', () => {
-  assert.equal(FANTASY_QUESTS.length, 167); assert.equal(new Set(FANTASY_QUESTS.map(quest => quest.id)).size, 167);
+  assert.equal(new Set(FANTASY_QUESTS.map(quest => quest.id)).size, FANTASY_QUESTS.length);
   assert.equal(FANTASY_MAIN_QUESTS.length, 18); assert.equal(FANTASY_MAIN_REVEALS.length, 18); assert.equal(FANTASY_SIDE_QUESTS.length, 60);
   assert.equal(additions.length, 36);
   for (const quest of additions) {
@@ -102,14 +103,16 @@ test('new chapter evidence is hidden from GM and NPC knowledge until that chapte
   }
 });
 
-test('all new side contracts participate in seasonal guild postings and preserve individual and group modes', () => {
+test('all new side contracts use their institution’s seasonal postings and preserve individual and group modes', () => {
   const p = fresh();
   for (const quest of FANTASY_SETTLEMENT_SIDE_QUESTS) {
     const place = FANTASY_LOCATIONS.find(value => value.id === quest.giver)!;
-    const board = { noctis: 'inkstone-city', sylvara: 'canopy-hall', kazaran: 'sunloom' }[place.land as 'noctis' | 'sylvara' | 'kazaran'];
+    const regionalGuild = { noctis: 'inkstone-city', sylvara: 'canopy-hall', kazaran: 'sunloom' }[place.land as 'noctis' | 'sylvara' | 'kazaran'];
+    const source = fantasyQuestInstitution(quest), board = source === 'guild' ? regionalGuild : quest.giver;
     assert.ok(board); assert.equal(fantasyPersonalQuest(quest), false);
     const season = quest.seasons?.[0] ?? 'spring';
     assert.ok(fantasyContractCandidates(board, 12, season, 8).some(value => value.id === quest.id), quest.id);
+    if (source !== 'guild' && regionalGuild !== quest.giver) assert.ok(!fantasyContractCandidates(regionalGuild, 12, season, 8).some(value => value.id === quest.id), `${quest.id}: resident requests stay with their issuer`);
     assert.equal(fantasyContractMode(quest), quest.group ? 'raid' : 'exclusive');
     if (quest.seasons) for (const other of ['spring', 'summer', 'autumn', 'winter'].filter(value => !quest.seasons!.includes(value as typeof season))) assert.ok(!fantasyContractCandidates(board, 12, other, 8).some(value => value.id === quest.id));
     if (quest.objective?.type === 'hunt') {
@@ -119,7 +122,7 @@ test('all new side contracts participate in seasonal guild postings and preserve
     }
   }
   assert.equal(FANTASY_SETTLEMENT_SIDE_QUESTS.filter(quest => quest.group).length, 2);
-  assert.equal(FANTASY_QUESTS.filter(quest => quest.group).length, 8);
+  assert.equal(FANTASY_QUESTS.filter(quest => quest.group).length, 11);
   assert.equal(FANTASY_SETTLEMENT_SIDE_QUESTS.filter(quest => quest.objective && !quest.group).length, 2);
   assert.equal(new Set(FANTASY_SETTLEMENT_SIDE_QUESTS.flatMap(quest => quest.seasons ?? [])).size, 4);
 });

@@ -24,7 +24,8 @@ test('profession teachers require the right NPC, region and an actual local buil
 test('guilds teach ordinary work while an explicit GM request can teach crime professions', () => {
   const learner = { location: 'hearth', job: 'unassigned' };
   assert.ok(canAcquireJob(learner, 'cook', 'guild'));
-  assert.ok(!canAcquireJob({ ...learner, location: 'emberhall' }, 'cook', 'guild'));
+  assert.ok(canAcquireJob({ ...learner, location: 'emberhall' }, 'cook', 'guild'));
+  assert.ok(!canAcquireJob({ ...learner, location: 'tidehaven' }, 'cook', 'guild'));
   for (const job of ['thief', 'smuggler', 'assassin', 'bandit', 'spy', 'crimeboss']) {
     assert.ok(!canAcquireJob(learner, job, 'guild'));
     assert.ok(canAcquireJob({ ...learner, location: 'greenwood' }, job, 'gm'));
@@ -36,12 +37,12 @@ test('guilds teach ordinary work while an explicit GM request can teach crime pr
 
 test('each settlement has its explicit specialty, independent of legacy service tags', () => {
   assert.deepEqual(fantasyBuildings({ location: 'hearth' }).map(b => b.id), ['market', 'inn', 'restaurant', 'guild', 'library', 'temple']);
-  assert.deepEqual(fantasyBuildings({ location: 'emberhall' }).map(b => b.id), ['market', 'blacksmith', 'inn']);
-  assert.deepEqual(fantasyBuildings({ location: 'mooncity' }).map(b => b.id), ['library', 'alchemist', 'inn', 'temple', 'archaeology']);
+  assert.deepEqual(fantasyBuildings({ location: 'emberhall' }).map(b => b.id), ['market', 'blacksmith', 'inn', 'guild', 'merchantGuild']);
+  assert.deepEqual(fantasyBuildings({ location: 'mooncity' }).map(b => b.id), ['library', 'alchemist', 'inn', 'temple', 'archaeology', 'tower']);
   assert.deepEqual(fantasyBuildings({ location: 'starspire' }).map(b => b.id), ['tower', 'library']);
   assert.ok(FANTASY_LOCATIONS.find(location => location.id === 'mooncity')!.services.includes('market'));
   assert.ok(!fantasyBuildings({ location: 'mooncity' }).some(b => b.id === 'market'));
-  assert.ok(!fantasyBuildings({ location: 'emberhall' }).some(b => b.id === 'guild'));
+  assert.ok(!fantasyBuildings({ location: 'emberhall' }).some(b => b.id === 'library'));
 });
 
 test('temples are limited to the two dawn sanctuaries and the covenant shrine', () => {
@@ -134,9 +135,9 @@ test('frontier contains only current graph neighbors and never reveals the entir
   assert.deepEqual(fantasyFrontierLocations({ location: 'missing-place' }), []);
 });
 
-test('local maps cover ordinary locations but exclude the story-earned island, and unused maps do not reveal places', () => {
+test('local maps cover settled lands but exclude the uncharted continent and story-earned island', () => {
   const assigned = FANTASY_MAPS.flatMap(map => map.locationIds);
-  assert.deepEqual(new Set(assigned), new Set(FANTASY_LOCATIONS.filter(place => place.id !== FANTASY_FINAL_ISLE_ID).map(place => place.id)));
+  assert.deepEqual(new Set(assigned), new Set(FANTASY_LOCATIONS.filter(place => place.land !== 'frontier' && place.id !== FANTASY_FINAL_ISLE_ID).map(place => place.id)));
   for (const map of FANTASY_MAPS) {
     assert.ok(map.price > 0);
     assert.ok(map.locationIds.every(id => FANTASY_LOCATIONS.some(location => location.id === id)));

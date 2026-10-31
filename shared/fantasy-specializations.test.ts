@@ -1,8 +1,10 @@
+import { learnFantasyMagicBook } from './fantasy-magic-discovery.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { applyFantasyAction, fantasyStats, newFantasyProfile } from './fantasy-engine.ts';
 import { FANTASY_ITEMS } from './fantasy-data.ts';
 import { NPC_PUBLIC } from './npc.ts';
+import { NPC_FRONTIER_PUBLIC } from './npc-frontier.ts';
 import { fantasyGmReply } from './fantasy-gm.ts';
 import { fantasyApprenticeshipError, fantasyNpcMentorSkills } from './fantasy-apprenticeship.ts';
 import { npcAllowedFacts, npcCanonicalReply } from '../server/npc.ts';
@@ -18,6 +20,7 @@ import {
 function player(job = 'leader', location = 'hearth') {
   const profile = applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', name: 'Specialist', gender: 'female' }, () => .999).profile;
   const c = profile.character!; c.job = job; c.jobXp[job] = 0; c.location = location; c.visited = [...new Set(['hearth', location])]; c.gold = 100;
+  if (job === 'mage' || job === 'priest') { for (const book of ['mana-primer', 'advanced-mana-forms', 'stone-and-flame', 'remedies-and-rites']) learnFantasyMagicBook(c, book); }
   return profile;
 }
 function context(profile: ReturnType<typeof player>, success = true): FantasySpecializationContext {
@@ -86,8 +89,8 @@ test('summon support requires actual MP upkeep and consumes it only when support
 test('magic preparation has one initial slot and unlocks a second and third at proficiency 30 and 100', () => {
   let profile = player('mage');
   assert.equal(fantasySpellCapacity(profile.character!), 1);
-  assert.ok(run(profile, { type: 'magicPrepare', slot: 2, element: 'tide', form: 'mend' }).error);
-  profile = run(profile, { type: 'magicPrepare', slot: 1, element: 'tide', form: 'mend' }).profile;
+  assert.ok(run(profile, { type: 'magicPrepare', slot: 2, element: 'flame', form: 'bolt' }).error);
+  profile = run(profile, { type: 'magicPrepare', slot: 1, element: 'flame', form: 'bolt' }).profile;
   profile.character!.jobXp.mage = 30; assert.equal(fantasySpellCapacity(profile.character!), 2);
   profile.character!.jobXp.mage = 100; assert.equal(fantasySpellCapacity(profile.character!), 3);
   profile = run(profile, { type: 'magicPrepare', slot: 3, element: 'stone', form: 'veil' }).profile;
@@ -96,11 +99,12 @@ test('magic preparation has one initial slot and unlocks a second and third at p
 });
 
 test('prepared magic produces bounded actual healing or a nonstacking check/guard effect and consumes MP', () => {
-  let profile = player('mage'); profile.character!.hp -= 30;
+  let profile = player('priest'); profile.character!.hp -= 30;
   profile = run(profile, { type: 'magicPrepare', slot: 1, element: 'tide', form: 'mend' }).profile;
   const before = profile.character!.hp; const mp = profile.character!.mp;
   profile = run(profile, { type: 'magicCast', slot: 1 }).profile;
   assert.equal(profile.character!.hp, before + 22); assert.equal(profile.character!.mp, mp - 10);
+  profile=player('mage');
   profile = run(profile, { type: 'magicPrepare', slot: 1, element: 'gale', form: 'bolt' }).profile;
   profile = run(profile, { type: 'magicCast', slot: 1 }).profile;
   assert.deepEqual(profile.character!.buff, { effect: 'check', power: 4, stat: 'agility', mp: 7 });
@@ -175,7 +179,10 @@ test('job-specific mentor skills require current profession expertise and the re
 });
 
 test('story conclusions only reach NPC context after their own completed chapter and public resident count matches the expanded world', () => {
-  assert.equal(NPC_PUBLIC.length, 137);
+  const frontierIds = new Set(NPC_FRONTIER_PUBLIC.map(npc => npc.id));
+  assert.equal(NPC_PUBLIC.filter(npc => !frontierIds.has(npc.id)).length, 159);
+  assert.deepEqual(NPC_PUBLIC.filter(npc => frontierIds.has(npc.id)).map(npc => npc.id).sort(), [...frontierIds].sort());
+  assert.equal(NPC_PUBLIC.length, 159 + NPC_FRONTIER_PUBLIC.length);
   const conclusion = FANTASY_MAIN_REVEALS.at(-1)!;
   assert.ok(!npcAllowedFacts('rin', 'trusted', { completedQuests: [] }).includes(conclusion.text.en));
   assert.ok(!npcAllowedFacts('rin', 'trusted', { completedQuests: ['main-night-01'] }).includes(conclusion.text.en));

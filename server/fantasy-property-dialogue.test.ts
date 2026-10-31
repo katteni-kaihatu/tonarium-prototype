@@ -27,7 +27,7 @@ function fixture() {
 }
 
 test('property bargaining gives a real local offer before a separate yes purchases it exactly once', () => {
-  const f = fixture(), before = f.profiles().alice.character!.gold, first = f.chat('주거 집값 흥정하고 싶어'); assert.equal(first.handled, true); assert.match(first.text!, /G/); assert.equal(f.calls.length, 1); assert.equal(f.calls[0].type, 'bargain');
+  const f = fixture(), before = f.profiles().alice.character!.gold, first = f.chat('작은 집 집값 흥정하고 싶어'); assert.equal(first.handled, true); assert.match(first.text!, /G/); assert.equal(f.calls.length, 1); assert.equal(f.calls[0].type, 'bargain');
   const offer = f.state().plots.find(plot => plot.id === 'hearth-residence')!.management!.bargain!.price;
   assert.equal(f.profiles().alice.character!.gold, before); assert.equal(f.ledger().plots['hearth-residence'].owner, null);
   const agreed = f.chat('응'); assert.equal(agreed.handled, true); assert.equal(f.calls[1].type, 'acceptBargain'); assert.equal(f.ledger().plots['hearth-residence'].owner?.user, 'alice'); assert.equal(f.profiles().alice.character!.gold, before - offer);
@@ -40,18 +40,55 @@ test('ambiguous property kinds request a named choice without bargaining or buyi
   const chosen = f.chat('농지'); assert.equal(chosen.handled, true); assert.equal(f.calls.length, 1); assert.ok('plot' in f.calls[0]); assert.equal(f.calls[0].plot, 'hearth-farmland'); assert.equal(f.ledger().plots['hearth-farmland'].owner, null);
 });
 
+test('two homes of the same kind offer actual listing names and a named choice buys only that listing in all locales', () => {
+  for (const locale of ['ko', 'en', 'ja'] as const) {
+    for (const plotId of ['hearth-residence', 'hearth-mansion']) {
+      const f = fixture(); f.profiles().alice.character!.gold = 30000;
+      const homes = f.state().plots.filter(plot => plot.kind === 'residence'), chosen = homes.find(plot => plot.id === plotId)!;
+      const ask = f.chat({ ko: '주거 집값 흥정', en: 'bargain house property', ja: '住宅の値引き交渉' }[locale], { locale });
+      assert.equal(ask.handled, true); assert.equal(f.calls.length, 0);
+      for (const home of homes) assert.ok(ask.text!.includes(home.names[locale]));
+      assert.equal(f.chat({ ko: '응', en: 'yes', ja: 'はい' }[locale], { locale }).handled, true); assert.equal(f.calls.length, 0);
+      const quote = f.chat(chosen.names[locale], { locale }); assert.equal(quote.handled, true); assert.match(quote.text!, /\d+G/);
+      assert.equal(f.calls.length, 1); assert.equal(f.calls[0].type, 'bargain'); assert.ok('plot' in f.calls[0]); assert.equal(f.calls[0].plot, plotId);
+      const gold = f.profiles().alice.character!.gold, price = f.state().plots.find(plot => plot.id === plotId)!.management!.bargain!.price;
+      assert.equal(f.chat({ ko: '응', en: 'yes', ja: 'はい' }[locale], { locale }).handled, true);
+      assert.equal(f.ledger().plots[plotId].owner?.user, 'alice'); assert.equal(f.profiles().alice.character!.gold, gold - price);
+      for (const home of homes.filter(home => home.id !== plotId)) assert.equal(f.ledger().plots[home.id].owner, null);
+    }
+  }
+});
+
+test('a named listing selection expires with its original profile and locale and explanations never negotiate', () => {
+  for (const alter of [(f: ReturnType<typeof fixture>) => f.now(120000), (f: ReturnType<typeof fixture>) => { f.profiles().alice.revision++; },
+    (f: ReturnType<typeof fixture>) => { f.profiles().alice.generation = 2; }, (f: ReturnType<typeof fixture>) => { f.profiles().alice.character!.lifeStartedAt = 9; }]) {
+    const f = fixture(); f.chat('주거 집값 흥정'); alter(f);
+    assert.equal(f.chat('작은 집').handled, true); assert.equal(f.calls.length, 0); assert.equal(f.ledger().plots['hearth-residence'].owner, null);
+  }
+  const f = fixture(); f.chat('주거 집값 흥정'); assert.equal(f.chat('Small home', { locale: 'en' }).handled, true); assert.equal(f.calls.length, 0);
+  assert.equal(f.chat('작은 집 흥정이 뭐야').handled, false); assert.equal(f.calls.length, 0);
+});
+
+test('an unavailable named home never redirects bargaining or confirmation to another listed home', () => {
+  const f = fixture(); f.otherBuyer(); const before = f.profiles().alice.character!.gold;
+  assert.equal(f.chat('작은 집 집값 흥정').handled, true); assert.equal(f.calls.length, 0);
+  assert.equal(f.chat('응').handled, false); assert.equal(f.calls.length, 0);
+  assert.equal(f.profiles().alice.character!.gold, before); assert.equal(f.ledger().plots['hearth-residence'].owner?.user, 'bob');
+  assert.equal(f.ledger().plots['hearth-mansion'].owner, null);
+});
+
 test('property explanations do not start negotiations and another buyer can legitimately win the listing', () => {
   const f = fixture(); assert.equal(f.chat('부동산 흥정이 뭐야').handled, false); assert.equal(f.calls.length, 0);
-  f.chat('주거 집값 흥정'); f.otherBuyer(); const before = f.profiles().alice.character!.gold;
+  f.chat('작은 집 집값 흥정'); f.otherBuyer(); const before = f.profiles().alice.character!.gold;
   assert.equal(f.chat('응').handled, true); assert.equal(f.calls.length, 1); assert.equal(f.profiles().alice.character!.gold, before); assert.equal(f.ledger().plots['hearth-residence'].owner?.user, 'bob');
 });
 
 test('cancel consumes the spoken offer and cannot be revived by a later yes', () => {
-  const f = fixture(); f.chat('주거 집값 흥정'); assert.equal(f.chat('취소').handled, true); assert.equal(f.chat('응').handled, false); assert.equal(f.calls.length, 1);
+  const f = fixture(); f.chat('작은 집 집값 흥정'); assert.equal(f.chat('취소').handled, true); assert.equal(f.chat('응').handled, false); assert.equal(f.calls.length, 1);
 });
 
 test('the quote is private to the original player and actual local property speaker', () => {
-  const f = fixture(); f.chat('주거 집값 흥정');
+  const f = fixture(); f.chat('작은 집 집값 흥정');
   assert.equal(f.chat('응', { user: 'bob' }).handled, false); assert.equal(f.chat('응', { npc: 'hearth-galen' }).handled, false); assert.equal(f.chat('응', { npc: 'rin' }).handled, false); assert.equal(f.calls.length, 1);
   assert.equal(f.chat('응').handled, true); assert.equal(f.calls.length, 2);
 });
@@ -59,13 +96,13 @@ test('the quote is private to the original player and actual local property spea
 test('expiry, locale, new life, same-life restart and changed personal state invalidate a quoted purchase', () => {
   for (const alter of [(f: ReturnType<typeof fixture>) => f.now(120000), (f: ReturnType<typeof fixture>) => { f.profiles().alice.generation = 2; },
     (f: ReturnType<typeof fixture>) => { f.profiles().alice.character!.lifeStartedAt = 9; }, (f: ReturnType<typeof fixture>) => { f.profiles().alice.revision++; }]) {
-    const f = fixture(); f.chat('주거 집값 흥정'); alter(f); assert.equal(f.chat('응').handled, true); assert.equal(f.calls.length, 1); assert.equal(f.ledger().plots['hearth-residence'].owner, null);
+    const f = fixture(); f.chat('작은 집 집값 흥정'); alter(f); assert.equal(f.chat('응').handled, true); assert.equal(f.calls.length, 1); assert.equal(f.ledger().plots['hearth-residence'].owner, null);
   }
-  const f = fixture(); f.chat('주거 집값 흥정'); assert.equal(f.chat('yes', { locale: 'en' }).handled, true); assert.equal(f.calls.length, 1);
+  const f = fixture(); f.chat('작은 집 집값 흥정'); assert.equal(f.chat('yes', { locale: 'en' }).handled, true); assert.equal(f.calls.length, 1);
 });
 
 test('plot revision changes invalidate an offer even when its advertised price did not change', () => {
-  const f = fixture(); f.chat('주거 집값 흥정'); f.ledger().plots['hearth-residence'].revision++;
+  const f = fixture(); f.chat('작은 집 집값 흥정'); f.ledger().plots['hearth-residence'].revision++;
   assert.equal(f.chat('응').handled, true); assert.equal(f.calls.length, 1); assert.equal(f.ledger().plots['hearth-residence'].owner, null);
 });
 
@@ -73,13 +110,13 @@ test('a new owner, new price or busy character cannot reuse a previously spoken 
   for (const alter of [(f: ReturnType<typeof fixture>) => { f.ledger().plots['hearth-residence'].extension!.bargain!.price++; },
     (f: ReturnType<typeof fixture>) => { f.profiles().alice.event = 'pending'; }, (f: ReturnType<typeof fixture>) => { f.profiles().alice.combatId = 'battle'; },
     (f: ReturnType<typeof fixture>) => { f.profiles().alice.death = { location: 'hearth', hour: 8, cause: 'test' }; }]) {
-    const f = fixture(); f.chat('주거 집값 흥정'); alter(f); assert.equal(f.chat('응').handled, true); assert.equal(f.calls.length, 1);
+    const f = fixture(); f.chat('작은 집 집값 흥정'); alter(f); assert.equal(f.chat('응').handled, true); assert.equal(f.calls.length, 1);
   }
 });
 
 test('all three languages keep property negotiation in-world and show the concrete quoted amount', () => {
   for (const locale of ['ko', 'en', 'ja'] as const) {
-    const f = fixture(), result = f.chat({ ko: '주거 집값 흥정', en: 'bargain house property', ja: '住宅の値引き交渉' }[locale], { locale });
+    const f = fixture(), result = f.chat({ ko: '작은 집 집값 흥정', en: 'bargain Small home property', ja: '小さな家の値引き交渉' }[locale], { locale });
     assert.equal(result.handled, true); assert.match(result.text!, /\d+G/); assert.doesNotMatch(result.text!, /ゲーム|game|server|npc|게임|서버|판정|requestId|revision/i);
     assert.equal(f.chat({ ko: '응', en: 'yes', ja: 'はい' }[locale], { locale }).handled, true); assert.equal(f.calls.length, 2);
   }
@@ -92,7 +129,7 @@ test('real-store negotiated purchase failures preserve quoted ownership and gold
   const store = new FantasyStore(file, { worldHour: () => 8, onError: () => {}, save: (target, value) => { if (fail) throw new Error('Test disk full'); fs.writeFileSync(target, value); } }); assert.equal(store.loadError, undefined);
   const dialogue = new FantasyPropertyDialogue(), current = () => store.propertyState('alice');
   const chat = (text: string) => dialogue.chat({ user: 'alice', npc: 'hearth-alia', text, locale: 'ko', profile: store.profile('alice'), state: current(), requestId: `property-dialogue-${serial++}` }, command => store.propertyRequest('alice', command), current);
-  assert.equal(chat('주거 집값 흥정').handled, true); const before = store.profile('alice'), state = current(), bytes = fs.readFileSync(file, 'utf8');
+  assert.equal(chat('작은 집 집값 흥정').handled, true); const before = store.profile('alice'), state = current(), bytes = fs.readFileSync(file, 'utf8');
   fail = true; const failed = chat('응'); assert.equal(failed.handled, true); assert.deepEqual(store.profile('alice'), before); assert.deepEqual(current(), state); assert.equal(fs.readFileSync(file, 'utf8'), bytes);
   fail = false; assert.equal(chat('응').handled, false); assert.equal(store.profile('alice').character!.gold, before.character!.gold);
 });

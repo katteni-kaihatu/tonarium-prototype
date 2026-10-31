@@ -8,6 +8,7 @@ import { applyFantasyAction, advanceFantasyWorld, fantasyTransports, newFantasyP
 import { FANTASY_FINAL_ISLE_ID, FANTASY_FINAL_ISLE_LAST_QUEST, FANTASY_FINAL_ISLE_UNLOCK_QUEST, fantasyIsleAccess } from './fantasy-isle-access.ts';
 import { FANTASY_MAPS, FANTASY_SETTLEMENTS, fantasyBuildings, fantasyFrontierLocations, fantasyKnownLocations } from './fantasy-town.ts';
 import { fantasyHasGate } from './fantasy-gates.ts';
+import { FANTASY_RETREATS } from './fantasy-retreats.ts';
 
 const fresh = () => {
   const p=applyFantasyAction(newFantasyProfile(),{type:'create',name:'Dawn voyager',gender:'female',source:'human'},()=>.5).profile;
@@ -18,7 +19,9 @@ const unlock = () => {const p=fresh();p.character!.completed.push(FANTASY_FINAL_
 
 test('the new seed-garden island is an isolated uninhabited region with a single real sea approach',()=>{
   const island=FANTASY_LOCATIONS.find(place=>place.id===FANTASY_FINAL_ISLE_ID)!;
-  assert.equal(FANTASY_LOCATIONS.length,45);assert.equal(FANTASY_LOCATIONS.filter(place=>place.kind==='island').length,7);
+  assert.equal(FANTASY_LOCATIONS.filter(place=>place.land!=='frontier').length,50);assert.equal(FANTASY_LOCATIONS.filter(place=>place.kind==='island').length,8);
+  assert.equal(FANTASY_RETREATS.length, 4);
+  for (const retreat of FANTASY_RETREATS) assert.ok(FANTASY_LOCATIONS.some(place => place.id === retreat.location.id));
   assert.equal(island.kind,'island');assert.equal(island.land,'islands');assert.equal(island.danger,3);
   assert.deepEqual(island.names,{ko:'새벽너머섬',en:'Beyond-Dawn Isle',ja:'暁の向こうの島'});
   assert.equal(FANTASY_SETTLEMENTS[island.id],undefined);assert.deepEqual(fantasyBuildings({location:island.id}),[]);

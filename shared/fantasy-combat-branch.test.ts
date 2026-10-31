@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advanceFantasyCombat, createFantasyCombat, fantasyCombatOrderError, submitFantasyCombatOrder, validFantasyCombatState, type FantasyCombatPlayer, type FantasyCombatOrder, type FantasyCombatState } from './fantasy-combat.ts';
+import { advanceFantasyCombat, createFantasyCombat, fantasyCombatOrderError, fantasyCombatTelegraph, submitFantasyCombatOrder, validFantasyCombatState, type FantasyCombatPlayer, type FantasyCombatOrder, type FantasyCombatState } from './fantasy-combat.ts';
 import { fantasyCombatPlayer } from '../server/fantasy-combat-adapter.ts';
 import { applyFantasyAction, fantasySkills, fantasyStats, newFantasyProfile } from './fantasy-engine.ts';
 import { FANTASY_JOBS } from './fantasy-data.ts';
@@ -30,7 +30,8 @@ test('elemental riders need damaging unguarded hits, cost finite MP and preserve
   const one = choose(state, 'u-0', input), two = choose(JSON.parse(JSON.stringify(state)), 'u-0', input);
   assert.deepEqual(one, two); assert.equal(one.state.fighters[0].mp, 73);
   assert.ok(one.state.fighters[1].effects.some(effect => effect.id === 'burn' && effect.power === 2 && effect.turns === 2));
-  const guarding = battle(1); guarding.round = 2;
+  const guarding = battle(1); guarding.round = 3;
+  assert.equal(fantasyCombatTelegraph(guarding.fighters[1], guarding.round, 'en'), 'It is preparing to guard.');
   const guarded = choose(guarding, 'u-0', input); assert.ok(guarded.state.logs.some(entry => entry.text.en.includes('braces its guard')));
   assert.equal(guarded.state.fighters[1].effects.length, 0);
   let misses = 0;
@@ -95,6 +96,8 @@ test('manual unit commands count as owner participation once even when the owner
 test('basic attack practice receipts require a real roll, including misses but excluding skipped turns after a companion kill', () => {
   const hero = player(); hero.companions = [{ id: 'scout', kind: 'troop', names: names('Scout'), stats: { ...hero.stats, attack: 100, agility: 100, accuracy: 100 }, hp: 400, mp: 0, range: 'ranged', skills: [] }];
   let state = createFantasyCombat({ id: 'skipped-attack', location: 'oldwatch', source: 'hunt:monster-cave-slime', players: [hero], enemies: [{ id: 'enemy', template: 'monster-cave-slime' }], seed: 42, hour: 12 });
+  state.fighters.find(fighter => fighter.side === 'enemies')!.hp = 1;
+  assert.ok(validFantasyCombatState(state));
   state = choose(state, 'u-0', { type: 'unit', unit: state.units![0].id, order: { type: 'attack', target: 'enemy' } }).state;
   const skipped = choose(state, 'u-0', { type: 'attack', target: 'enemy' });
   assert.equal(skipped.state.status, 'victory'); assert.equal(skipped.attemptedAttacks, undefined); assert.equal(skipped.state.fighters[0].contribution.manualActions, 1);
@@ -112,6 +115,7 @@ function specialized(job: string): FantasyProfile {
   c.job = job; c.jobXp[job] = 1000; c.hour = 100; c.gold = 1000; c.level = 12; c.inventory.lantern = 1;
   c.readBooks = FANTASY_READABLE_LIBRARY_BOOKS.map(book => book.id); c.unlockedSkills = data.skills.filter(skill => skill.unlock?.kind === 'mentor').map(skill => skill.id);
   c.skillXp = Object.fromEntries(data.skills.map(skill => [skill.id, 200])); c.practice = { explore: 10, craft: 10, gather: 10, hunt: 10, fish: 10, command: 10 };
+  if (job === 'mage') c.occult = { version: 1, starObservations: [{ hour: 20, location: 'starfall-isle' }], relicClaims: [], relics: [], usedRelics: [] };
   const stats = fantasyStats(c); c.hp = stats.hp; c.mp = stats.mp; return p;
 }
 
@@ -136,7 +140,7 @@ test('every selected combat path exposes its own real art and one nonduplicated 
     }
     c.job = 'unassigned'; assert.ok(!fantasyCombatPlayer(profile, 'traveler').skills.some(skill => skill.id === active.id), path.id);
   }
-  assert.ok(combatPaths >= 70); assert.ok(lifestylePaths >= 60); assert.equal(combatPaths + lifestylePaths, 145);
+  assert.ok(combatPaths >= 70); assert.ok(lifestylePaths >= 60); assert.equal(combatPaths + lifestylePaths, 149);
 });
 
 test('all combat path arts perform their stated attack, healing or ward with their own MP and bounded riders', () => {

@@ -1,5 +1,7 @@
 import type { FantasyAction, FantasyCharacter } from '../../../shared/fantasy.ts';
-import { fantasyEscortOffers, fantasyEscortTransportError } from '../../../shared/fantasy-escort.ts';
+import { fantasyEscortOffers, fantasyEscortPenalty, fantasyEscortTerms, fantasyEscortTransportError } from '../../../shared/fantasy-escort.ts';
+import { fantasyEscortGrade } from '../../../shared/fantasy-quest-grades.ts';
+import { fantasyGuildRankName } from '../../../shared/fantasy-adventurer.ts';
 import { fantasyKnownLocations } from '../../../shared/fantasy-town.ts';
 import { fantasyTermName } from '../../../shared/fantasy-lore.ts';
 import { useLocale } from '../locale.ts';
@@ -18,10 +20,12 @@ export function FantasyEscortPanel({ c, guild = false, blocked, onAction, onSele
   if (!guild && !contract) return null;
   const offers = guild && !contract ? fantasyEscortOffers(c) : [];
   const error = contract ? fantasyEscortTransportError(c, contract.destination) : undefined;
+  const rank = (from: string, destination: string, hours: number, path?: readonly string[]) => <p>{{ ko: '의뢰 전체 권장 등급', en: 'Recommended rank for the whole assignment', ja: '依頼全体の推奨等級' }[locale]}: <strong>{fantasyGuildRankName(fantasyEscortGrade(path ?? fantasyEscortTerms(from, destination)?.path ?? [from, destination], hours), locale)}</strong></p>;
   return <details className="fr-fold fr-escort-quests" open={!!contract}><summary>{t.title}</summary>
-    {contract ? <article className="fr-card"><p>{t.origin}: {name(contract.from)} → {name(contract.destination)}</p><p>{t.pay}: +{contract.reward} G · {contract.hours * 2} {t.minutes}</p><small>{t.cost}</small>
+    {!contract && c.escortPenalty && <p className="fr-muted">{{ko:`지난 호위 위약금 ${c.escortPenalty.amount} G (지불 ${c.escortPenalty.paid} G) · ${name(c.escortPenalty.destination)}`,en:`Last escort penalty ${c.escortPenalty.amount} G (paid ${c.escortPenalty.paid} G) · ${name(c.escortPenalty.destination)}`,ja:`前回の護衛違約金${c.escortPenalty.amount} G（支払い${c.escortPenalty.paid} G）・${name(c.escortPenalty.destination)}`}[locale]}</p>}
+    {contract ? <article className="fr-card"><p>{t.origin}: {name(contract.from)} → {name(contract.destination)}</p>{rank(contract.from, contract.destination, contract.hours)}<p>{t.pay}: +{contract.reward} G · {contract.hours * 2} {t.minutes}</p><small>{t.cost} · {{ko:"포기 시 위약금",en:"Abandonment penalty",ja:"辞退時の違約金"}[locale]} {fantasyEscortPenalty(contract.reward)} G</small>
       {onSelect && known.includes(contract.destination) && <ReasonButton className="fr-text-button" onClick={() => onSelect(contract.destination)}>{name(contract.destination)} ↗</ReasonButton>}
       <div className="fr-action-grid">{contract.defense==='pending'&&<ReasonButton className="fr-btn primary" disabled={blocked} onClick={()=>requestFantasyCombat({type:'start',source:'escort',target:contract.id})}>{{ko:'호위대 지키기',en:'Defend the convoy',ja:'護衛隊を守る'}[locale]}</ReasonButton>}<ReasonButton className="fr-btn" disabled={blocked || !!error} reason={error ? fantasyErrorText(error, locale) : undefined} onClick={() => onAction({ type: 'travel', destination: contract.destination, transport: 'escort' })}>{t.leave}</ReasonButton><ReasonButton className="fr-text-button" disabled={blocked} onClick={() => onAction({ type: 'escortAbandon' })}>{t.abandon}</ReasonButton></div>
-    </article> : offers.length ? offers.map(offer => <article className="fr-card" key={offer.destination}><p>{name(offer.destination)}</p><small>{offer.hours * 2} {t.minutes} · {t.pay} +{offer.reward} G</small><ReasonButton className="fr-btn" disabled={blocked || !offer.available} reason={offer.reason ? fantasyErrorText(offer.reason, locale) : undefined} onClick={() => onAction({ type: 'escortAccept', destination: offer.destination })}>{t.accept}</ReasonButton></article>) : <p>{t.empty}</p>}
+    </article> : offers.length ? offers.map(offer => <article className="fr-card" key={offer.destination}><p>{name(offer.destination)}</p>{rank(offer.from, offer.destination, offer.hours, offer.path)}<small>{offer.hours * 2} {t.minutes} · {t.pay} +{offer.reward} G · {{ko:"포기 시 위약금",en:"Abandonment penalty",ja:"辞退時の違約金"}[locale]} {fantasyEscortPenalty(offer.reward)} G</small><ReasonButton className="fr-btn" disabled={blocked || !offer.available} reason={offer.reason ? fantasyErrorText(offer.reason, locale) : undefined} onClick={() => onAction({ type: 'escortAccept', destination: offer.destination })}>{t.accept}</ReasonButton></article>) : <p>{t.empty}</p>}
   </details>;
 }

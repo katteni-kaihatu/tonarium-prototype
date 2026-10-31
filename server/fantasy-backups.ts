@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
+import { FANTASY_PLATFORM_RESET_MARKER, validFantasyPlatformResetMarker } from './fantasy-platform-reset.ts';
 
 export interface FantasyBackupOptions {
   dataDirectory: string;
@@ -159,12 +160,8 @@ export class FantasyBackups {
     return{manifest:value,payload};
   }
   private restorePayload(id:string):ReturnType<FantasyBackups['load']> {
-    const loaded=this.load(id),accounts=loaded.payload.get('accounts');
-    if(accounts){
-      const ledger=jsonObject(accounts) as Record<string,unknown>;
-      if(ledger.version!==1||!Array.isArray(ledger.accounts)||!Array.isArray(ledger.sessions)||!Array.isArray(ledger.claims))throw new Error('Unsupported account backup schema; administrator migration is required');
-      loaded.payload.set('accounts',Buffer.from(JSON.stringify({...ledger,sessions:[],claims:[]})));
-    }
+    const loaded=this.load(id),marker=loaded.payload.get('platform-reset');
+    if(this.files.has('platform-reset')&&(!marker||!validFantasyPlatformResetMarker(jsonObject(marker))))throw new Error('Snapshot lacks a valid completed platform reset marker');
     return loaded;
   }
   list():FantasyBackupSummary[] {
@@ -241,7 +238,7 @@ export class FantasyBackups {
 }
 
 export function fantasyBackupFiles(dataDirectory:string):Record<string,string> {
-  return Object.fromEntries([['world','fantasy.json'],['clock','fantasy-clock.json'],['community','fantasy-community.json'],['contracts','fantasy-contracts.json'],['accounts','fantasy-accounts.json']].map(([key,name])=>[key,path.join(dataDirectory,name)]));
+  return Object.fromEntries([['world','fantasy.json'],['clock','fantasy-clock.json'],['community','fantasy-community.json'],['contracts','fantasy-contracts.json'],['named-commissions','fantasy-named-commissions.json'],['platform-reset',FANTASY_PLATFORM_RESET_MARKER]].map(([key,name])=>[key,path.join(dataDirectory,name)]));
 }
 
 export function createFantasyBackupSave(backups:FantasyBackups,write?:(file:string,text:string)=>void):(file:string,text:string)=>void {

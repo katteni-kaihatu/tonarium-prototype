@@ -18,11 +18,12 @@ import { npcBreaksFourthWall } from '../server/npc-speech.ts';
 import { NpcChat } from '../server/npc.ts';
 import { FantasyStore } from '../server/fantasy-store.ts';
 import { fantasyEconomyShopQuote, fantasyEconomyState, newFantasyEconomyLedger } from './fantasy-economy.ts';
+import { fantasyEnvironmentPenalty, fantasyLightStrength } from './fantasy-environment.ts';
 
 function player(inventory: Record<string, number> = {}, location = 'greenwood'): FantasyProfile {
   const profile = applyFantasyAction(newFantasyProfile(), { type: 'create', name: 'Camp tester', gender: 'female', source: 'human' }, () => .5).profile;
   Object.assign(profile.character!, { location, birthBonuses: {}, hour: 8, lifeStartedAt: 8, hp: 40, mp: 10, gold: 200,
-    fatigue: 70, hunger: 10, inventory: { ...inventory }, foodLots: [], visited: [...new Set(['hearth', location])] });
+    fatigue: 70, hunger: 10, outfit: 'rain-cape', inventory: { 'rain-cape': 1, ...inventory }, foodLots: [], visited: [...new Set(['hearth', location])] });
   profile.log = [];
   return profile;
 }
@@ -35,9 +36,9 @@ function camp(profile: FantasyProfile, ...rolls: number[]) {
 const fullKit = { 'bedroll': 1, 'fur-bedroll': 1, 'camp-tarp': 1, 'camp-stakes': 1, 'sentinel-bell': 1, 'everglow-lantern': 1, 'pocket-hearth': 1 };
 
 test('travel goods and recipes register once with real ingredients, professions, facilities and complete localizations', () => {
-  assert.equal(FANTASY_TRAVEL_GOODS.length, 24); assert.equal(FANTASY_TRAVEL_RECIPES.length, 10);
+  assert.equal(FANTASY_TRAVEL_GOODS.length, 24); assert.equal(FANTASY_TRAVEL_RECIPES.length, 11);
   assert.equal(new Set(FANTASY_TRAVEL_GOODS.map(item => item.id)).size, 24);
-  assert.equal(new Set(FANTASY_TRAVEL_RECIPES.map(recipe => recipe.id)).size, 10);
+  assert.equal(new Set(FANTASY_TRAVEL_RECIPES.map(recipe => recipe.id)).size, 11);
   assert.equal(FANTASY_TRAVEL_GOODS.filter(item => item.food).length, 12);
   for (const item of FANTASY_TRAVEL_GOODS) {
     assert.equal(FANTASY_ITEMS.filter(value => value.id === item.id).length, 1, item.id);
@@ -73,6 +74,19 @@ test('camping selects the best bedroll, adds one hearth bonus and never stacks d
   assert.equal(normal.character!.hp, 60); assert.equal(protectedCamp.character!.hp, 60);
   assert.equal(normal.character!.mp, 18); assert.equal(protectedCamp.character!.mp, 20);
   assert.equal(protectedCamp.character!.hunger, 26); assert.equal(protectedCamp.character!.hour, 16);
+});
+
+test('rental bedroll and lantern improve basic camping but remain weaker than bought and crafted gear', () => {
+  const bare = player(), rental = player({ 'guild-loan-bedroll': 1, 'guild-loan-lantern': 1 }), bought = player({ bedroll: 1, lantern: 1 }), crafted = player({ 'fur-bedroll': 1, 'everglow-lantern': 1 });
+  const campers = [bare, rental, bought, crafted];
+  assert.deepEqual(campers.map(p => fantasyCampingKit(p.character!).fatigue), [15, 20, 25, 33]);
+  assert.deepEqual(campers.map(p => fantasyLightStrength(p.character!.inventory)), [0, 1, 2, 3]);
+  const risks = campers.map(p => fantasyCampingKit(p.character!).riskMultiplier);
+  assert.deepEqual(risks, [1, .97, .9, .8]);
+  for (const p of campers) p.character!.hour = 20;
+  const penalties = campers.map(p => fantasyEnvironmentPenalty(p.character!));
+  for (let i = 1; i < penalties.length; i++) assert.equal(penalties[i - 1] - penalties[i], 1);
+  assert.deepEqual(campers.map(p => camp(p, .999).character!.fatigue), [55, 50, 45, 37]);
 });
 
 test('camp defenses reduce incident probability without making the camp completely safe', () => {

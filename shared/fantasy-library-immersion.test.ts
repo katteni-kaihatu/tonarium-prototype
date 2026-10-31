@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FANTASY_JOBS } from './fantasy-data.ts';
+import { FANTASY_JOBS, FANTASY_LOCATIONS } from './fantasy-data.ts';
+import { FANTASY_MIRACLES } from './fantasy-miracle-catalog.ts';
 import { advanceFantasyWorld, applyFantasyAction, newFantasyProfile, startFantasyActivity } from './fantasy-engine.ts';
-import { FANTASY_LIBRARY_BOOKS, FANTASY_READABLE_LIBRARY_BOOKS } from './fantasy-library.ts';
+import { FANTASY_LIBRARY_BOOKS, FANTASY_READABLE_LIBRARY_BOOKS, FANTASY_TEMPLE_DOCTRINE_BOOKS } from './fantasy-library.ts';
 import { FANTASY_DINING } from './fantasy-life.ts';
 import { fantasyAvailableJobSkills, fantasySkillUnlocked } from './fantasy-progression.ts';
-import { FANTASY_LIBRARY_HOLDINGS, fantasyLibraryHoldings } from './fantasy-town.ts';
+import { FANTASY_LIBRARY_HOLDINGS, fantasyLibraryHoldings, FANTASY_TEMPLE_READING, fantasyTempleLibraryHoldings } from './fantasy-town.ts';
 
 const locales = ['ko', 'en', 'ja'] as const;
 // Check the rendered, dynamically assembled books as well as authored story passages.
@@ -13,9 +14,9 @@ const outsideWorld = /\b(?:NPCs?|GM|server|players?|buttons?|click|inventory|UI|
 const high = () => .999;
 const player = () => applyFantasyAction(newFantasyProfile(), { type: 'create', source: 'human', name: '도서 검증', gender: 'female' }, high).profile;
 
-test('all 34 shelf books have complete, in-world prose in each supported language', () => {
-  assert.equal(FANTASY_READABLE_LIBRARY_BOOKS.length, 34);
-  assert.equal(new Set(FANTASY_READABLE_LIBRARY_BOOKS.map(book => book.id)).size, 34);
+test('all shelf books have complete, in-world prose in each supported language', () => {
+  assert.equal(FANTASY_READABLE_LIBRARY_BOOKS.length, 52);
+  assert.equal(new Set(FANTASY_READABLE_LIBRARY_BOOKS.map(book => book.id)).size, 52);
   for (const book of FANTASY_READABLE_LIBRARY_BOOKS) {
     for (const locale of locales) {
       assert.ok(book.title[locale].trim(), `${book.id}/${locale}: title`);
@@ -32,7 +33,7 @@ test('all 34 shelf books have complete, in-world prose in each supported languag
   assert.ok(!FANTASY_READABLE_LIBRARY_BOOKS.includes(bible));
 });
 
-test('every readable book remains on a real library shelf while local collections stay distinct', () => {
+test('public books remain on real library shelves while advanced temple doctrine keeps its institutional reading source', () => {
   const readable = new Set(FANTASY_READABLE_LIBRARY_BOOKS.map(book => book.id));
   const shelved = new Set<string>();
   for (const [location, holding] of Object.entries(FANTASY_LIBRARY_HOLDINGS)) {
@@ -43,10 +44,14 @@ test('every readable book remains on a real library shelf while local collection
       shelved.add(id);
     }
   }
-  assert.deepEqual([...shelved].sort(), [...readable].sort());
+  const doctrine = new Set<string>(FANTASY_TEMPLE_DOCTRINE_BOOKS);
+  assert.deepEqual([...shelved].sort(), [...readable].filter(id => !doctrine.has(id)).sort());
+  assert.deepEqual(new Set(FANTASY_TEMPLE_READING), doctrine);
+  for (const id of doctrine) { assert.ok(readable.has(id)); assert.equal(shelved.has(id), false); }
   assert.ok(fantasyLibraryHoldings({ location: 'mooncity' }).includes('archive-records'));
   assert.ok(!fantasyLibraryHoldings({ location: 'hearth' }).includes('archive-records'));
   const profile = player();
+  assert.deepEqual(fantasyTempleLibraryHoldings(profile.character!), []);
   for (const book of ['archive-records', 'world-bible']) {
     const result = applyFantasyAction(profile, { type: 'read', book }, high);
     assert.ok(result.error, book);
@@ -54,9 +59,27 @@ test('every readable book remains on a real library shelf while local collection
   }
 });
 
+test('every miracle testimony has a registered library and can actually be read there', () => {
+  for (const miracle of FANTASY_MIRACLES) {
+    assert.ok(FANTASY_LOCATIONS.some(location => location.id === miracle.library), `${miracle.book}: unknown location`);
+    const profile = player(), c = profile.character!;
+    c.location = miracle.library;
+    const before = structuredClone(profile);
+    assert.ok(fantasyLibraryHoldings(c).includes(miracle.book), `${miracle.book}: inaccessible shelf`);
+    const started = startFantasyActivity(profile, { type: 'read', book: miracle.book }, c.hour, high);
+    assert.equal(started.error, undefined, miracle.book);
+    assert.equal((started.profile.character!.readBooks ?? []).includes(miracle.book), false);
+    const activity = started.profile.activity!;
+    const completed = advanceFantasyWorld(started.profile, activity.endsAt).profile;
+    assert.equal(completed.activity, undefined);
+    assert.deepEqual(completed.character!.readBooks, [miracle.book]);
+    assert.deepEqual(profile, before);
+  }
+});
+
 test('rewritten manuals still unlock every book-taught profession skill only with its required practice', () => {
   for (const job of FANTASY_JOBS) for (const skill of job.skills) {
-    if (skill.unlock?.kind !== 'book') continue;
+    if (skill.retired || skill.unlock?.kind !== 'book') continue;
     const { book, jobXp = 0 } = skill.unlock;
     const location = Object.entries(FANTASY_LIBRARY_HOLDINGS).find(([, ids]) => ids.includes(book))?.[0];
     assert.ok(location, `${skill.id}: missing book ${book}`);
@@ -83,9 +106,11 @@ test('rewritten manuals still unlock every book-taught profession skill only wit
 
 test('a scheduled reading grants knowledge on completion, never while still reading', () => {
   const profile = player(), c = profile.character!;
-  c.job = 'mage'; c.jobXp.mage = 100;
-  const skill = FANTASY_JOBS.find(job => job.id === 'mage')!.skills.find(entry => entry.unlock?.kind === 'book' && entry.unlock.book === 'mana-primer')!;
-  const started = startFantasyActivity(profile, { type: 'read', book: 'mana-primer' }, c.hour, high);
+  const job=FANTASY_JOBS.find(job=>job.skills.some(skill=>!skill.retired&&skill.unlock?.kind==='book'))!;
+  c.job=job.id;c.jobXp[job.id]=100;
+  const skill=job.skills.find(skill=>!skill.retired&&skill.unlock?.kind==='book')!,book=skill.unlock!.kind==='book'?skill.unlock!.book:'';
+  c.location=Object.entries(FANTASY_LIBRARY_HOLDINGS).find(([,ids])=>ids.includes(book))![0];
+  const started = startFantasyActivity(profile, { type: 'read', book }, c.hour, high);
   assert.equal(started.error, undefined);
   const activity = started.profile.activity!;
   assert.equal(activity.endsAt - activity.startedAt, 1);
@@ -94,9 +119,9 @@ test('a scheduled reading grants knowledge on completion, never while still read
   assert.equal(fantasySkillUnlocked(partial.character!, skill), false);
   const completed = advanceFantasyWorld(partial, activity.endsAt).profile;
   assert.equal(fantasySkillUnlocked(completed.character!, skill), true);
-  assert.deepEqual(completed.character!.readBooks, ['mana-primer']);
+  assert.deepEqual(completed.character!.readBooks, [book]);
   assert.equal(completed.activity, undefined);
-  const repeated = applyFantasyAction(completed, { type: 'read', book: 'mana-primer' }, high);
+  const repeated = applyFantasyAction(completed, { type: 'read', book }, high);
   assert.ok(repeated.error);
   assert.deepEqual(repeated.profile, completed);
 });

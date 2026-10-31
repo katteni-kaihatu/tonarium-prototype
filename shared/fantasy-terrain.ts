@@ -1,3 +1,4 @@
+import { fantasyHasJob } from './fantasy-careers.ts';
 import type { FantasyAction, FantasyCharacter, FantasyCheckContext, FantasyLocation, FantasyProfile, FantasyResult, FantasySeason, FantasyStat, FantasyStats } from './fantasy.ts';
 import type { NpcLocale } from './npc.ts';
 import { FANTASY_ITEMS, FANTASY_LOCATIONS, FANTASY_RACES } from './fantasy-data.ts';
@@ -69,7 +70,7 @@ export function fantasyTerrainAllowed(character: FantasyCharacter, value: string
   if (!activity || !place || character.hp <= 0) return false;
   const race = FANTASY_RACES.find(race => race.id === character.race);
   if (!race) return false;
-  return (!activity.jobs || activity.jobs.includes(character.job))
+  return (!activity.jobs || activity.jobs.some(job=>fantasyHasJob(character,job)))
     && (!activity.races || activity.races.includes(character.race))
     && (!activity.families || activity.families.includes(race.family))
     && (!activity.traits || fantasyBodyTraits(character).some(trait => activity.traits!.includes(trait.id)))

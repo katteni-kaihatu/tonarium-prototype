@@ -1,7 +1,10 @@
-import type { FantasyCharacter, FantasyProfile, FantasyResult, FantasyStats } from './fantasy.ts';
+import { advanceFantasyBusinesses } from './fantasy-business.ts';
+import type { FantasyProfile, FantasyResult, FantasyStats } from './fantasy.ts';
 import { FANTASY_ITEMS } from './fantasy-data.ts';
 import { fantasyReputation } from './fantasy-reputation.ts';
-import { FANTASY_PROPERTY_PLOTS, reconcileFantasyProperties, type FantasyPropertyChange, type FantasyPropertyCommand, type FantasyPropertyLedger, type FantasyPropertyRecord, type FantasyPropertyOwner } from './fantasy-property.ts';
+import { fantasyFurnitureFatigueBonus } from './fantasy-furniture.ts';
+import { fantasyHasJob } from './fantasy-careers.ts';
+import { FANTASY_PROPERTY_PLOTS, fantasyPropertyActivityUses, reconcileFantasyProperties, type FantasyPropertyChange, type FantasyPropertyCommand, type FantasyPropertyLedger, type FantasyPropertyRecord, type FantasyPropertyOwner } from './fantasy-property.ts';
 
 type Party = Pick<FantasyPropertyOwner, 'user' | 'generation' | 'name'>;
 export type FantasyPropertyBlueprint = 'irrigation' | 'greenhouse' | 'granary' | 'workshop' | 'shopfront' | 'storehouse' | 'hearth' | 'bedroom' | 'garden';
@@ -46,7 +49,6 @@ const who = (p: FantasyProfile, user: string): Party => ({ user, generation: p.g
 const matches = (party: Party | null | undefined, user: string, p: FantasyProfile | undefined) => !!party && !!p?.character && !p.death && party.user === user && party.generation === (p.generation ?? 1);
 const alive = (p: FantasyProfile | undefined) => !!p?.character && !p.death && p.character.hp > 0;
 const quiet = (p: FantasyProfile | undefined) => alive(p) && !p!.activity && !p!.combatId && !p!.event;
-const deed = (ledger: FantasyPropertyLedger, plot: string) => ledger.plots[plot];
 export const FANTASY_PROPERTY_BLUEPRINTS: Record<'farmland' | 'commercial' | 'residence', FantasyPropertyBlueprint[]> = {
   farmland: ['irrigation', 'greenhouse', 'granary'], commercial: ['workshop', 'shopfront', 'storehouse'], residence: ['hearth', 'bedroom', 'garden'],
 };
@@ -180,7 +182,7 @@ export function fantasyPropertyPurchasePrice(record: FantasyPropertyRecord, acto
 
 export function advanceFantasyProperties(ledger: FantasyPropertyLedger, profiles: Record<string, FantasyProfile>, at: number): FantasyPropertyChange {
   if (!Number.isFinite(at) || at < 0) return { ledger, profiles, changed: false, error: 'invalid' };
-  const next = structuredClone(ledger), people = { ...profiles }; let changed = false;
+  const next = structuredClone(ledger), people = { ...profiles }; let changed = advanceFantasyBusinesses(next, people, at);
   for (const plot of FANTASY_PROPERTY_PLOTS) {
     const record = next.plots[plot.id]; if (!record.owner && !record.extension) continue;
     const before = JSON.stringify(record), ext = extension(record, at);
@@ -194,6 +196,7 @@ export function advanceFantasyProperties(ledger: FantasyPropertyLedger, profiles
     if (ext.construction && ext.construction.endsAt <= at) { ext.level = ext.construction.level; ext.blueprint = ext.construction.blueprint; ext.condition = 100; delete ext.construction; }
     if (ext.bargain && ext.bargain.nextAt <= at) delete ext.bargain;
     const auto = ext.automation;
+    if (auto && plot.kind === 'commercial' && auto.enabled) auto.enabled = false;
     if (auto && at >= auto.lastAt + 4) {
       const steps = Math.min(12, Math.floor((at - auto.lastAt) / 4)); auto.lastAt = at;
       if (auto.enabled && record.owner && !record.owner.estate && !record.listing && !ext.auction && !ext.construction && !ext.lease && !ext.taxDue && ext.condition > 0) {
@@ -235,7 +238,7 @@ export function applyFantasyPropertyExtensionCommand(ledger: FantasyPropertyLedg
   const next = structuredClone(ledger), people = { ...profiles }, p = structuredClone(source), record = next.plots[plot.id], ext = extension(record, at); people[actor] = p;
   const mine = who(p, actor), coowner = ext.shares.some(s => !s.estate && matches(s, actor, p));
   const occupied = !!record.listing || !!ext.auction || !!ext.construction || ext.lease?.state === 'active';
-  const inUse = Object.values(profiles).some(value => value.activity?.action.type === 'propertyUse' && value.activity.action.plot === plot.id);
+  const inUse = Object.values(profiles).some(value => fantasyPropertyActivityUses(value, plot.id));
   const peer = (target: string) => { const values = Object.entries(profiles).filter(([user, v]) => user !== actor && quiet(v) && v.character!.location === c.location && v.character!.name === target); return values.length === 1 ? { user: values[0][0], p: values[0][1] } : null; };
   if (command.type === 'leaseOffer' || command.type === 'shareOffer') {
     if (!manager) return fail('not-owner'); if (occupied || ext.shares.some(s => s.estate)) return fail('occupied');
@@ -305,14 +308,14 @@ export function applyFantasyPropertyExtensionCommand(ledger: FantasyPropertyLedg
   } else if (command.type === 'auctionCancel') {
     if (!manager || !ext.auction || ext.auction.highest) return fail('auction'); delete ext.auction;
   } else if (command.type === 'autoStock') {
-    if (!manager || plot.kind === 'residence') return fail('not-owner'); if (occupied || ext.taxDue) return fail('occupied');
+    if (!manager || plot.kind !== 'farmland') return fail('not-owner'); if (occupied || ext.taxDue) return fail('occupied');
     const auto = ext.automation ??= { enabled: false, stock: 0, wages: 0, lastAt: at }, material = plot.input ?? plot.output!;
     if (auto.stock + command.count > 99 || auto.wages + command.count * 2 > 198) return fail('limit');
     if ((p.character!.inventory[material] ?? 0) < command.count) return fail('missing-material'); if (p.character!.gold < command.count * 2) return fail('insufficient-gold');
     p.character!.inventory[material] -= command.count; if (!p.character!.inventory[material]) delete p.character!.inventory[material]; p.character!.gold -= command.count * 2;
     auto.stock += command.count; auto.wages += command.count * 2;
   } else if (command.type === 'autoToggle') {
-    if (!manager || plot.kind === 'residence') return fail('not-owner'); if (command.enabled && (occupied || ext.taxDue)) return fail('occupied');
+    if (!manager || plot.kind === 'residence' || plot.kind === 'commercial' && command.enabled) return fail('not-owner'); if (command.enabled && (occupied || ext.taxDue)) return fail('occupied');
     const auto = ext.automation ??= { enabled: false, stock: 0, wages: 0, lastAt: at };
     if (command.enabled && (!auto.stock || auto.wages < 2 || !ext.condition)) return fail('missing-material'); auto.enabled = command.enabled; auto.lastAt = at;
   } else if (command.type === 'autoWithdraw') {
@@ -334,7 +337,7 @@ export function applyFantasyPropertyExtensionCommand(ledger: FantasyPropertyLedg
   } else if (command.type === 'bargain') {
     if (record.owner || !record.listing) return fail('not-listed');
     if (old?.bargain && old.bargain.nextAt > at && matches(old.bargain, actor, p)) return fail('cooldown');
-    const score = fantasyReputation(c).score, target = Math.max(10, Math.min(85, 25 + Math.round(score / 2) + (c.job === 'merchant' ? 8 : 0)));
+    const score = fantasyReputation(c).score, target = Math.max(10, Math.min(85, 25 + Math.round(score / 2) + (fantasyHasJob(c, 'merchant') ? 8 : 0)));
     let hash = 2166136261; for (const char of `${actor}:${p.generation ?? 1}:${plot.id}:${Math.floor(at / 4)}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
     const roll = 1 + (hash >>> 0) % 100, discount = roll <= target ? Math.min(.2, .08 + Math.max(0, score) * .0012) : 0;
     ext.bargain = { ...mine, price: Math.max(1, Math.ceil(record.listing.price * (1 - discount))), expiresAt: at + 1, nextAt: at + 4, roll, target };
@@ -345,13 +348,16 @@ export function applyFantasyPropertyExtensionCommand(ledger: FantasyPropertyLedg
 }
 export function applyFantasyPropertyImprovement(profile: FantasyProfile, plotId: string, ledger: FantasyPropertyLedger, maximum?: Pick<FantasyStats, 'hp' | 'mp'>): FantasyResult {
   const plot = FANTASY_PROPERTY_PLOTS.find(p => p.id === plotId), level = ledger.plots[plotId]?.extension?.level ?? 0;
-  if (!profile.character || !plot || !level) return { profile, changed: false };
+  const bed = plot?.kind === 'residence' ? fantasyFurnitureFatigueBonus(ledger.plots[plotId]?.furniture) : 0;
+  if (!profile.character || !plot || !level && !bed) return { profile, changed: false };
   const proof = profile.log.findLast(entry => entry.text.startsWith('property:'));
   if (!proof || !['rest', 'harvest', 'operate'].some(kind => proof.text.startsWith(`property:${kind}:${plotId}:`))
     || profile.log.some(entry => entry.id > proof.id && entry.text.startsWith('行動を完了できなかった。'))) return { profile, changed: false };
   const next = structuredClone(profile), c = next.character!;
   if (plot.kind === 'farmland') c.inventory[plot.output!] = Math.min(1_000_000, (c.inventory[plot.output!] ?? 0) + level);
   else if (plot.kind === 'commercial') c.gold = Math.min(1_000_000, c.gold + level * 2);
-  else { c.fatigue = Math.max(0, c.fatigue - level * 5); if (maximum) { c.hp = Math.min(maximum.hp, c.hp + level * 10); c.mp = Math.min(maximum.mp, c.mp + level * 5); } }
-  journal(next, `property:improved:${plotId}:${level}`); return { profile: next, changed: true };
+  else { c.fatigue = Math.max(0, c.fatigue - level * 5 - bed); if (maximum) { c.hp = Math.min(maximum.hp, c.hp + level * 10); c.mp = Math.min(maximum.mp, c.mp + level * 5); } }
+  if (level) journal(next, `property:improved:${plotId}:${level}`);
+  if (bed) journal(next, `property:bed-rest:${plotId}:${bed}`);
+  return { profile: next, changed: true };
 }
