@@ -5,6 +5,7 @@ import { FANTASY_WORLD_TIME_RATE, type FantasyWorldClock } from '../shared/fanta
 
 interface SavedClock { version: 1; hour: number; wallTime: number }
 interface ClockOptions {
+  load?: boolean;
   now?: () => number;
   initialHour?: number;
   save?: (file: string, text: string) => void;
@@ -40,6 +41,7 @@ export class FantasyClock {
     this.anchor = { version: 1, hour: Math.max(8, options.initialHour ?? 8), wallTime: now };
     this.lastHour = this.anchor.hour;
     this.lastSave = now;
+    if (options.load === false) return;
     try {
       let text: string;
       try { text = fs.readFileSync(file, 'utf8'); }

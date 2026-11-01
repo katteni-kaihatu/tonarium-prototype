@@ -3,10 +3,23 @@ import assert from 'node:assert/strict';
 import { ROOM_HALF, SPAWN } from './protocol.ts';
 import { SURVIVOR_TITLE } from './survivor.ts';
 import { GARDEN, WORLDS, WORLD_KINDS, isWorldKind, pushOut, type Solid } from './worlds.ts';
+import { contentAvailable } from './market.ts';
+import { cleanAttach } from './timeline.ts';
 
 const EPS = 1e-7;
 const BODY_R = 0.35;
 const solids = WORLDS.garden.solids;
+
+test('the withdrawn RPG cannot be listed, selected or attached while other worlds remain available', () => {
+  assert.equal(WORLD_KINDS.includes('fantasy'), false);
+  assert.equal(isWorldKind('fantasy'), false);
+  assert.equal(contentAvailable([], 'worlds', 'fantasy'), false);
+  assert.equal(cleanAttach({ kind: 'world', id: 'fantasy' }), undefined);
+  for (const world of ['room', 'cafe', 'game', 'survivors', 'city', 'garden', 'starlounge', 'antimatter']) {
+    assert.equal(isWorldKind(world), true, world);
+  }
+  assert.ok(WORLDS.fantasy.name, 'old references retain readable metadata');
+});
 
 function clearance(x: number, z: number, solid: Solid) {
   if ('r' in solid) return Math.hypot(x - solid.x, z - solid.z) - solid.r;

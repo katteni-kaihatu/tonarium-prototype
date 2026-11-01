@@ -19,7 +19,7 @@ export interface FantasyContractActor { id: string; session: string | null; worl
 interface Claim { phase: 'pending' | 'accepted'; grant: FantasyContractGrant }
 interface Offer extends FantasyContractOffer { claims: Record<string, Claim> }
 interface Saved { version: 1 | 2; revision: number; generated: Record<string, number>; offers: Offer[]; pressure: Record<string, { value: number; hour: number }>; hunts: string[] }
-interface Options { save?: (file: string, text: string) => void; lookup?: (user: string) => FantasyProfile | undefined; onError?: (error: unknown) => void }
+interface Options { load?: boolean; save?: (file: string, text: string) => void; lookup?: (user: string) => FantasyProfile | undefined; onError?: (error: unknown) => void }
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const hour = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 const count = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) >= 0;
@@ -103,6 +103,7 @@ export class FantasyContracts {
   get error(): string | undefined { return this.loadError ?? this.saveError; }
   constructor(private file: string, options: Options = {}) {
     this.save = options.save ?? saveAtomic; this.lookup = options.lookup; this.onError = options.onError ?? (error => console.error('[fantasy-contracts]', error));
+    if (options.load === false) return;
     try { const saved: unknown = JSON.parse(fs.readFileSync(file, 'utf8')); if (!valid(saved)) throw new Error('Invalid shared quest board save'); this.data = migrate(saved); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') { this.loadError = 'unavailable'; this.onError(error); } }
     if (!this.loadError) this.reconcile();

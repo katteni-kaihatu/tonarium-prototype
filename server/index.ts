@@ -121,7 +121,8 @@ const CLIENT_VERSION = (() => {
   try { return createHash('sha1').update(fs.readFileSync(path.join(DIST, 'index.html'))).digest('hex').slice(0, 12); } catch { return null; }
 })();
 const DATA_DIR = process.env.DATA_DIR ?? path.join(ROOT, 'data');
-resetFantasyPlatformData(DATA_DIR);
+const fantasyEnabled = isWorldKind('fantasy');
+if (fantasyEnabled) resetFantasyPlatformData(DATA_DIR);
 const clientAddress = createClientAddress({
   trustProxy: process.env.FANTASY_TRUST_PROXY === '1',
   trustedProxyAddresses: (process.env.FANTASY_TRUSTED_PROXY_IPS ?? '').split(',').map(value => value.trim()).filter(Boolean),
@@ -166,23 +167,24 @@ try {
     console.error('Content translation registration failed; original text remains available.');
   });
 } catch { console.error('Content translation registration failed; original text remains available.'); }
-const fantasyBackups = new FantasyBackups({ dataDirectory: DATA_DIR, files: fantasyBackupFiles(DATA_DIR) });
-fantasyBackups.acquireRuntime();
-const saveFantasyData = createFantasyBackupSave(fantasyBackups);
+const fantasyBackups = fantasyEnabled ? new FantasyBackups({ dataDirectory: DATA_DIR, files: fantasyBackupFiles(DATA_DIR) }) : undefined;
+fantasyBackups?.acquireRuntime();
+const saveFantasyData = fantasyBackups ? createFantasyBackupSave(fantasyBackups) : () => {};
 let fantasyClock: FantasyClock;
 const fantasyStore = new FantasyStore(path.join(DATA_DIR, 'fantasy.json'), {
+  load: fantasyEnabled,
   save: saveFantasyData,
   combatEnabled: true,
   ambush: true,
   worldHour: () => fantasyClock.snapshot().hour,
   clockError: () => fantasyClock.error,
 });
-fantasyClock = new FantasyClock(path.join(DATA_DIR, 'fantasy-clock.json'), { save: saveFantasyData, initialHour: fantasyStore.maximumHour() });
-const fantasyCommunity = new FantasyCommunity(path.join(DATA_DIR, 'fantasy-community.json'), { save: saveFantasyData });
-const fantasyContracts = new FantasyContracts(path.join(DATA_DIR, 'fantasy-contracts.json'), { save: saveFantasyData, lookup: user => fantasyStore.loadError ? undefined : fantasyStore.profile(user) });
-const fantasyNamedCommissions = new FantasyNamedCommissions(path.join(DATA_DIR, 'fantasy-named-commissions.json'), {save:saveFantasyData});
+fantasyClock = new FantasyClock(path.join(DATA_DIR, 'fantasy-clock.json'), { load: fantasyEnabled, save: saveFantasyData, initialHour: fantasyStore.maximumHour() });
+const fantasyCommunity = new FantasyCommunity(path.join(DATA_DIR, 'fantasy-community.json'), { load: fantasyEnabled, save: saveFantasyData });
+const fantasyContracts = new FantasyContracts(path.join(DATA_DIR, 'fantasy-contracts.json'), { load: fantasyEnabled, save: saveFantasyData, lookup: user => fantasyStore.loadError ? undefined : fantasyStore.profile(user) });
+const fantasyNamedCommissions = new FantasyNamedCommissions(path.join(DATA_DIR, 'fantasy-named-commissions.json'), {load:fantasyEnabled,save:saveFantasyData});
 
-try { if(!fantasyStore.loadError&&!fantasyClock.error)fantasyBackups.checkpoint('startup',true); }
+try { if(fantasyEnabled&&!fantasyStore.loadError&&!fantasyClock.error)fantasyBackups?.checkpoint('startup',true); }
 catch(error){console.error('[fantasy-backup] startup snapshot failed',error);}
 const fantasyParty = new FantasyParty({ lookup: id => {
   const user = users.get(id);
@@ -434,6 +436,8 @@ async function readBody(req: http.IncomingMessage, limit: number) {
 
 const SESSIONS_FILE = process.env.SESSIONS_FILE ?? path.join(ROOT, 'sessions.json');
 const guild = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf-8')) as GuildConfig;
+const retiredSessionIds = new Set(guild.sessions.filter(session => session.world === 'fantasy').map(session => session.id));
+guild.sessions = guild.sessions.filter(session => session.world !== 'fantasy');
 const fixedSessionIds = new Set(guild.sessions.map((d) => d.id));
 const EMPTY_SESSION_TTL_MS = 5 * 60 * 1000;
 const emptySessionTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -451,7 +455,8 @@ for (const g of home.groups) {
 const canEditGroup = (g: Group, id: string) => g.owner === id || !!g.editors?.includes(id);
 const groupImageKey = (g: Group, v: number) => `groups/${g.id}/${v}.jpg`;
 for (const ev of home.events) { ev.maybe ??= []; ev.declined ??= []; }
-guild.sessions.push(...home.sessions);
+for (const session of home.sessions) if (session.world === 'fantasy') retiredSessionIds.add(session.id);
+guild.sessions.push(...home.sessions.filter(session => session.world !== 'fantasy'));
 /** 開始から 30 日以上過ぎたイベントは残さない。当日のものや開始時刻が読めないものは消さない */
 function pruneOldEvents() {
   home.events = pruneEvents(home.events, Date.now());
@@ -580,7 +585,7 @@ for (const w of guild.sessions) {
   scheduleEmptyCheck(w.id);
 }
 // sessions.json から外したセッションなどのアイテムは、次の保存で DB から消す
-for (const sid of Object.keys(savedItems)) if (!sessionIds.has(sid)) markItemsDirty(sid);
+for (const sid of Object.keys(savedItems)) if (!sessionIds.has(sid) && !retiredSessionIds.has(sid)) markItemsDirty(sid);
 // 配信のたびにフレンド全走査と全ユーザー配列化を人数分繰り返さないよう、1 回の配信で使い回す写し
 interface UserSnapshot { all: Participant[]; friendsById: Map<string, string[]> }
 function snapshotUsers(): UserSnapshot {
@@ -759,7 +764,7 @@ function publishFantasyWorld(user: User, periodic = false) {
   sendTo([user.id], { t: 'fantasyContractBoard', board: fantasyContracts.state(contractActor(user), fantasyClock.snapshot().hour), error: fantasyContracts.error ? 'unavailable' : undefined });
 }
 
-setInterval(() => {
+if (fantasyEnabled) setInterval(() => {
   fantasyClock.checkpoint();
   const online = new Set([...users.values()].filter(user => fantasyUserAuthorized(user.id)&&user.session && worldOf.get(user.session) === 'fantasy').map(user => user.id));
   for (const update of fantasyStore.tick(online)) {
@@ -775,7 +780,7 @@ setInterval(() => {
   publishFantasyParties();
   publishFantasyCombats();
 }, 1000);
-setInterval(()=>{try{fantasyBackups.checkpoint('periodic');}catch(error){console.error('[fantasy-backup] periodic snapshot failed',error);}},300_000).unref();
+if (fantasyEnabled) setInterval(()=>{try{fantasyBackups?.checkpoint('periodic');}catch(error){console.error('[fantasy-backup] periodic snapshot failed',error);}},300_000).unref();
 const isOnline = (id: string) => homeUsers().some((u) => u.id === id);
 
 /**
@@ -1357,7 +1362,7 @@ async function homeSessionCurrent(ws:WebSocket,state:HomeConnectionState):Promis
 }
 function fantasySocketAuthorized(ws:WebSocket):boolean {
   const state=homeConnections.get(ws), user=state?.id?users.get(state.id):undefined;
-  return !!state && fantasyPlatformAuthorized(state.account,state.id,user?.session?worldOf.get(user.session):undefined);
+  return fantasyEnabled && !!state && fantasyPlatformAuthorized(state.account,state.id,user?.session?worldOf.get(user.session):undefined);
 }
 function fantasyUserAuthorized(id:string):boolean { return [...sockets.get(id)??[]].some(fantasySocketAuthorized); }
 function publishFantasyInitial(ws:WebSocket,state:HomeConnectionState,user:User):void {
@@ -1416,7 +1421,7 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
     state.id = account.id;
     state.account = account;
     if (!state.testModeSent) {
-      send(ws, { t: 'fantasyTestMode', enabled: fantasyTestToolsAllowed(process.env.FANTASY_TEST_TOOLS, state.remoteAddress) });
+      if (fantasyEnabled) send(ws, { t: 'fantasyTestMode', enabled: fantasyTestToolsAllowed(process.env.FANTASY_TEST_TOOLS, state.remoteAddress) });
       state.testModeSent = true;
     }
     const name = account.name;
@@ -1457,7 +1462,7 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
     send(ws, { t: 'survivorProfile', profile: survivorProfile(account.id) });
     const current = users.get(account.id)!;
     if (current.session && worldOf.get(current.session) === 'fantasy') publishFantasyInitial(ws,state,current);
-    send(ws, { t: 'fantasyClock', clock: fantasyClock.snapshot() });
+    if (fantasyEnabled) send(ws, { t: 'fantasyClock', clock: fantasyClock.snapshot() });
     send(ws, { t: 'marketLikes', ...marketLikes.snapshot(account.id) });
     send(ws, followsMsg(account.id));
     send(ws, { t: 'posts', list: timeline.posts });
@@ -1474,7 +1479,7 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
   }
   const me = state.id ? users.get(state.id) : undefined;
   if (!me) return;
-  const worldRequest=msg.t.startsWith('fantasy')||msg.t==='communityContribute'||msg.t==='npcChat'&&!!me.session&&worldOf.get(me.session)==='fantasy';
+  const worldRequest=msg.t.startsWith('fantasy')||msg.t==='communityContribute'||msg.t==='npcChat';
   if(worldRequest&&!fantasySocketAuthorized(ws))return;
   if (msg.t === 'fantasyRankingRequest') {
     if (Object.keys(msg).length !== 1 || !me.session || worldOf.get(me.session) !== 'fantasy') return;
@@ -2320,7 +2325,8 @@ function destroyUserSession(sessionId: string) {
   if (!def) return;
   cancelEmptyCheck(sessionId);
   home.sessions.splice(home.sessions.indexOf(def), 1);
-  guild.sessions.splice(guild.sessions.indexOf(def), 1);
+  const publishedIndex = guild.sessions.indexOf(def);
+  if (publishedIndex >= 0) guild.sessions.splice(publishedIndex, 1);
   sessionIds.delete(def.id);
   thumbnails.delete(def.id);
   worldOf.delete(def.id);
@@ -2346,6 +2352,10 @@ function destroyUserSession(sessionId: string) {
 function handleHome(me: User, msg: ClientMsg, ws: WebSocket): boolean {
   switch (msg.t) {
     case 'sessionCreate': {
+      if (msg.world === 'fantasy') {
+        if (msg.requestId) send(ws, { t: 'sessionResult', requestId: msg.requestId, error: 'このワールドは公開を終了しました。' });
+        return true;
+      }
       const name = trimTo(msg.name, 40);
       const visibility = Object.hasOwn(VISIBILITY_INFO, msg.visibility) ? msg.visibility : 'public';
       const group = isGroupVisibility(visibility) ? home.groups.find((g) => g.id === msg.group && g.members.includes(me.id))?.id : undefined;
@@ -2997,19 +3007,21 @@ for (const sig of ['SIGINT', 'SIGTERM'] as const) process.on(sig, () => {
   saveTimeline.flush();
   savePeople.flush();
   saveInbox.flush();
-  fantasyClock.checkpoint(true);
-  try{fantasyBackups.checkpoint('shutdown',true);}catch(error){console.error('[fantasy-backup] shutdown snapshot failed',error);}
-  fantasyDiagnostics.record({type:'runtime.stop',status:'ok',droppedCount:fantasyDiagnostics.stats.dropped});
+  if (fantasyEnabled) {
+    fantasyClock.checkpoint(true);
+    try{fantasyBackups?.checkpoint('shutdown',true);}catch(error){console.error('[fantasy-backup] shutdown snapshot failed',error);}
+    fantasyDiagnostics.record({type:'runtime.stop',status:'ok',droppedCount:fantasyDiagnostics.stats.dropped});
+  }
   const closeDiagnostics=Promise.race([fantasyDiagnostics.close(),new Promise<void>(resolve=>{setTimeout(resolve,2000).unref();})]);
   // 積んだ DB への書き込みを流し切ってから閉じる
-  Promise.allSettled([shutdownRooms(), drain().then(closeDb), closeDiagnostics]).finally(()=>{fantasyBackups.releaseRuntime();process.exit(0);});
+  Promise.allSettled([shutdownRooms(), drain().then(closeDb), closeDiagnostics]).finally(()=>{fantasyBackups?.releaseRuntime();process.exit(0);});
 });
-process.on('exit',()=>fantasyBackups.releaseRuntime());
+process.on('exit',()=>fantasyBackups?.releaseRuntime());
 
 await loadDirectory();
 
 server.listen(PORT, () => {
-  fantasyDiagnostics.record({type:'runtime.start',status:'ok',operation:'server'});
+  if (fantasyEnabled) fantasyDiagnostics.record({type:'runtime.start',status:'ok',operation:'server'});
   console.log(`server on http://localhost:${PORT}`);
   console.log(`sessions: ${guild.sessions.map((w) => w.name).join(' ')}`);
   if (!process.env.LIVEKIT_URL) console.warn('LIVEKIT_* が未設定: 音声・画面共有は無効になります');

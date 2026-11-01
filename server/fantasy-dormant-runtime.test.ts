@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { FantasyStore } from './fantasy-store.ts';
+import { FantasyClock } from './fantasy-clock.ts';
+import { FantasyCommunity } from './fantasy-community.ts';
+import { FantasyContracts } from './fantasy-contracts.ts';
+import { FantasyNamedCommissions } from './fantasy-named-commissions.ts';
+
+test('a dormant RPG does not load corrupt saves or initialize persistent files', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'tonarium-dormant-rpg-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const file = path.join(directory, 'existing.json');
+  fs.writeFileSync(file, 'deliberately invalid retired data');
+  const errors: unknown[] = [], writes: string[] = [];
+  const options = { load: false, save: (file: string) => { writes.push(file); }, onError: (error: unknown) => { errors.push(error); } };
+  const store = new FantasyStore(file, options);
+  const clock = new FantasyClock(file, options);
+  new FantasyCommunity(file, options);
+  const contracts = new FantasyContracts(file, options);
+  new FantasyNamedCommissions(file, options);
+  assert.equal(store.loadError, undefined);
+  assert.equal(clock.error, undefined);
+  assert.equal(contracts.loadError, undefined);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(writes, []);
+  assert.deepEqual(fs.readdirSync(directory), ['existing.json']);
+  assert.equal(fs.readFileSync(file, 'utf8'), 'deliberately invalid retired data');
+});
