@@ -5,7 +5,7 @@ import type { FantasyContractVisibleOffer } from '../shared/fantasy-contracts.ts
 
 interface Notice { day: number; offer: string }
 interface Saved { version: 1; notices: [string, Notice][] }
-interface Options { save?: (file: string, text: string) => void; onError?: (error: unknown) => void }
+interface Options { load?: boolean; save?: (file: string, text: string) => void; onError?: (error: unknown) => void }
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 function valid(value: unknown): value is Saved {
   if (!record(value) || value.version !== 1 || !Array.isArray(value.notices)) return false;
@@ -34,6 +34,7 @@ export class FantasyNamedCommissions {
   constructor(private file: string, options: Options = {}) {
     this.save = options.save ?? saveAtomic;
     this.onError = options.onError ?? (error => console.error('[fantasy-named-commissions]', error));
+    if (options.load === false) return;
     try {
       const saved: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
       if (!valid(saved)) throw new Error('Invalid daily commission notice record');

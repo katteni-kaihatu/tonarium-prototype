@@ -66,6 +66,7 @@
     "test:avatar": "tsx --test shared/avatar.test.ts",
     "test:market": "tsx --test shared/market.test.ts server/market.test.ts",
     "test:worlds": "tsx --test shared/worlds.test.ts",
+    "test:fantasy-retirement": "tsx --test shared/worlds.test.ts server/fantasy-dormant-runtime.test.ts server/fantasy-retirement.integration.test.ts",
     "test:items": "tsx --test shared/items.test.ts",
     "test:telephone": "tsx --test server/telephone.test.ts",
     "test:events": "tsx --test server/events.test.ts",

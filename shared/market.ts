@@ -1,4 +1,4 @@
-import type { WorldKind } from './worlds.ts';
+import { isWorldKind, type WorldKind } from './worlds.ts';
 import type { SoundId } from './sounds.ts';
 import type { EmoteId } from './emotes.ts';
 import type { ItemKind } from './items.ts';
@@ -22,6 +22,7 @@ export const MARKET_PRODUCTS: MarketProduct[] = [
 
 export const productFor = (category: MarketCategory, content: string) => MARKET_PRODUCTS.find((p) => p.category === category && p.content === content);
 export const contentAvailable = (owned: readonly string[], category: MarketCategory, content: string) => {
+  if (category === 'worlds' && !isWorldKind(content)) return false;
   const product = productFor(category, content);
   return !product || owned.includes(product.id);
 };

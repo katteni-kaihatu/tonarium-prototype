@@ -45,9 +45,10 @@ export class FantasyCommunity {
   private save: (file: string, text: string) => void;
   private onError: (error: unknown) => void;
   readonly loadError?: string;
-  constructor(private file: string, options: { save?: (file: string, text: string) => void; onError?: (error: unknown) => void } = {}) {
+  constructor(private file: string, options: { load?: boolean; save?: (file: string, text: string) => void; onError?: (error: unknown) => void } = {}) {
     this.save = options.save ?? saveAtomic;
     this.onError = options.onError ?? (error => console.error('[fantasy-community] save/load failed', error));
+    if (options.load === false) return;
     try {
       const value: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
       if (!valid(value)) throw new Error('Invalid shared community save');

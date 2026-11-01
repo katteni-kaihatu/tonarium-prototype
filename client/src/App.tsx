@@ -2,7 +2,7 @@ import { t as tr, useLanguage } from './i18n/index.ts';
 import { LanguageSelect } from './i18n/LanguageSelect.tsx';
 import { UpdateRecoveryNotice } from './UpdateRecoveryNotice.tsx';
 import { useMarketNavigation } from './market/navigation.ts';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from './store.ts';
 import { enter, loginGuest, resume, startMisskeyLogin, type AuthInfo } from './auth.ts';
 import { HammerCursor, Lightbox } from './world/common.tsx';
@@ -13,9 +13,6 @@ import { PeekMascot, type MascotHandle } from './world/Mascot.tsx';
 import { FEEDBACK_URL } from './feedback.ts';
 import { CompatOverlay, MaintenanceOverlay, UpdateBanner } from './world/ServerNotices.tsx';
 import { XRControls } from './xr/XRControls.tsx';
-
-const NpcPrototype = lazy(() => import('./world/NpcChat.tsx').then((m) => ({ default: m.NpcPrototype })));
-const FantasyPlaytest = lazy(() => import('./world/FantasyPlaytest.tsx').then((m) => ({ default: m.FantasyPlaytest })));
 
 function JoinScreen({ misskeyHost }: { misskeyHost: string }) {
   const [name, setName] = useState(() => {
@@ -106,14 +103,10 @@ export function App() {
   useEffect(() => {
     void resume().then(setAuthInfo, () => setAuthInfo({ account: null, misskeyHost: 'misskey.resonite.love', devLogin: false }));
   }, []);
-  const params = new URLSearchParams(location.search);
   return (
     <>
       <UpdateRecoveryNotice />
-      {/* NPC の試作もログインしてから（本人はログインのセッションで決まる） */}
       {!joined ? (authInfo && <JoinScreen misskeyHost={authInfo.misskeyHost} />) : incompatible ? <CompatOverlay />
-        : params.get('npc') === '1' ? <Suspense fallback={null}><NpcPrototype onStart={() => {}} /></Suspense>
-        : params.get('rpg') === '1' ? <Suspense fallback={null}><FantasyPlaytest /></Suspense>
         : session ? <WorldScreen /> : <Home />}
       <SharedSession />
       {!session && <Toast />}

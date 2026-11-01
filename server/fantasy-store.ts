@@ -447,6 +447,7 @@ function saveAtomic(file: string, data: string) {
 }
 
 interface StoreOptions {
+  load?: boolean;
   save?: (file: string, data: string) => void;
   onError?: (error: unknown) => void;
   now?: () => number;
@@ -497,6 +498,7 @@ export class FantasyStore {
     this.clockError = options.clockError ?? (() => undefined);
     this.combatEnabled = options.combatEnabled === true;
     this.ambushEnabled = options.ambush === true;
+    if (options.load === false) return;
     try {
       const saved: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
       if (!object(saved)) throw new Error('Invalid fantasy save');

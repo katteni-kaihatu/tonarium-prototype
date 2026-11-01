@@ -14,6 +14,7 @@ export interface WorldInfo {
   name: string;
   desc: string;
   solids: Solid[];
+  available?: boolean;
   /** 3D の人がいられる範囲がいつもの部屋より広いとき（ゲームの塔など） */
   extent?: { minX: number; maxX: number; minZ: number; maxZ: number };
 }
@@ -80,7 +81,7 @@ export const GARDEN = {
 };
 
 export const WORLDS: Record<WorldKind, WorldInfo> = {
-  fantasy: { name: '悠久の旅路', desc: '平面の世界地図で目的地と移動手段を選び、冒険と暮らしを紡ぐファンタジーRPG', solids: [] },
+  fantasy: { name: '悠久の旅路', desc: '平面の世界地図で目的地と移動手段を選び、冒険と暮らしを紡ぐファンタジーRPG', solids: [], available: false },
   starlounge: { name: '星あかりのラウンジ', desc: '星の灯りに包まれる青いラウンジ', solids: [] },
   room: { name: 'ホール', desc: '何も置いていない広い部屋', solids: [] },
   cafe: {
@@ -130,8 +131,8 @@ export const WORLDS: Record<WorldKind, WorldInfo> = {
 /** 切り替えを決めてから実際に切り替わるまで（全員に予告を出す） */
 export const WORLD_COUNTDOWN_MS = 3000;
 
-export const WORLD_KINDS = Object.keys(WORLDS) as WorldKind[];
-export const isWorldKind = (v: unknown): v is WorldKind => typeof v === 'string' && Object.hasOwn(WORLDS, v);
+export const WORLD_KINDS = (Object.keys(WORLDS) as WorldKind[]).filter(kind => WORLDS[kind].available !== false);
+export const isWorldKind = (v: unknown): v is WorldKind => typeof v === 'string' && WORLD_KINDS.includes(v as WorldKind);
 
 /** 背の高さ。高さのある当たり判定は、足元 y からこの高さまでと重なるときだけ効く */
 const BODY_H = 1.7;
