@@ -47,8 +47,6 @@ import { unlockEmoteAudio } from './sounds.ts';
 import { AdAudio } from '../ad/AdAudio.tsx';
 import { NewArrivals, PopupPauseSettings } from './NewArrivals.tsx';
 
-const FantasyPanel = lazy(() => import('./FantasyPanel.tsx').then((m) => ({ default: m.FantasyPanel })));
-
 /** 名前はだれでも変えられ、全員に反映されてログに出る */
 function SessionRename({ current, onDone }: { current: string; onDone: () => void }) {
   const [name, setName] = useState(current);
@@ -544,7 +542,6 @@ export function WorldScreen() {
   const dragging = useMediaInput();
   const mode = useStore((s) => s.mode);
   const worldKind = useStore((s) => worldKindOf(s));
-  const [fantasySocial, setFantasySocial] = useState(false);
   const locked = useStore((s) => s.locked);
   const folded = useStore((s) => s.folded);
   const root = useRef<HTMLDivElement>(null);
@@ -575,10 +572,8 @@ export function WorldScreen() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [mode]);
   return (
-    <div ref={root} className={`world ${mode} ${worldKind === 'fantasy' ? 'fantasy-world' : ''} ${locked ? 'locked' : ''} ${folded.left ? 'fl' : ''} ${folded.right ? 'fr' : ''} ${phone ? `phone pt-${phoneTab}` : ''}`}>
-      {worldKind === 'fantasy' ? (
-        <Suspense fallback={null}><FantasyPanel socialOpen={fantasySocial} onSocialToggle={() => setFantasySocial((v) => !v)} /></Suspense>
-      ) : mode === '3d' ? (
+    <div ref={root} className={`world ${mode} ${locked ? 'locked' : ''} ${folded.left ? 'fl' : ''} ${folded.right ? 'fr' : ''} ${phone ? `phone pt-${phoneTab}` : ''}`}>
+      {mode === '3d' ? (
         <Suspense fallback={<View3DFallback />}>
           <View3D />
         </Suspense>
@@ -588,10 +583,10 @@ export function WorldScreen() {
       <div className="front">
         {worldKind === 'survivors' && mode === '3d' && <SurvivorPanel overlay />}
         <WorldBadge />
-        {(worldKind !== 'fantasy' || fantasySocial || phone) && <NearList />}
-        {worldKind !== 'fantasy' && <FaceStrip />}
-        {(worldKind !== 'fantasy' || fantasySocial || phone) && <NoticeLog />}
-        {worldKind !== 'fantasy' && mode === '3d' ? <div className="view3d-hud"><KeyHelp /><StatusChips /></div> : <StatusChips />}
+        <NearList />
+        <FaceStrip />
+        <NoticeLog />
+        {mode === '3d' ? <div className="view3d-hud"><KeyHelp /><StatusChips /></div> : <StatusChips />}
         {phone && <PhoneTabs />}
       </div>
       <AdAudio />

@@ -8,7 +8,7 @@ import type { AvatarState, ChatMessage, DirectoryEntry, EventDef, Group, GuildCo
 import { SPAWN } from '../../shared/protocol.ts';
 import type { Item } from '../../shared/items.ts';
 import { WORLDS } from './i18n/static.ts';
-import { type WorldKind } from '../../shared/worlds.ts';
+import { isWorldKind, type WorldKind } from '../../shared/worlds.ts';
 import type { DieSides } from '../../shared/dice.ts';
 import { newGame, type GameState } from '../../shared/game.ts';
 import { NEW_ELEVATOR, type ElevatorState } from '../../shared/city.ts';
@@ -509,7 +509,10 @@ export function heldCamera(s: { items: Record<string, Item>; selfId: string }) {
 
 export const serverNow = () => Date.now() + get().serverOffset;
 export const isBroadcast = (s = get()) => !!(s.session && s.broadcast[s.session]);
-export const worldKindOf = (s = get(), sid = s.session): WorldKind => (sid && s.worldBy[sid]) || 'room';
+export const worldKindOf = (s = get(), sid = s.session): WorldKind => {
+  const kind = sid && s.worldBy[sid];
+  return isWorldKind(kind) ? kind : 'room';
+};
 export const solidsOf = (s = get()) => WORLDS[worldKindOf(s)].solids;
 const NO_GAME = newGame();
 export const gameOfSession = (s = get()) => (s.session && s.games[s.session]) || NO_GAME;
