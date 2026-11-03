@@ -1,4 +1,6 @@
 export default {
+  mapItemAction: '{0}: {1}',
+  mapWatchShare: '{0}의 화면 공유 보기',
   adBgmLabel: '내 AD 연구소 BGM',
   adBgmOn: 'BGM: 켜짐',
   adBgmOff: 'BGM: 꺼짐',

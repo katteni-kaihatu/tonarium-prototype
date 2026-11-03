@@ -44,6 +44,35 @@ test('床面との交点がないときは移動先を返さない', () => {
 const pointer = (button = 0, x = 10, y = 10, id = 1, buttons = button === 0 ? 1 : button === 1 ? 4 : 2) => ({ pointerId: id, button, buttons, clientX: x, clientY: y });
 const release = (...args: Parameters<typeof pointer>) => ({ ...pointer(...args), buttons: 0 });
 
+test('押下時の背景と対象を分離し一度だけ確定する', () => {
+  const tap = new MapTap<string>();
+  tap.start(pointer());
+  assert.deepEqual(tap.finish(release()), { target: null });
+  tap.start(pointer(), 'item:chess');
+  assert.deepEqual(tap.finish(release()), { target: 'item:chess' });
+  assert.equal(tap.finish(release()), null);
+});
+
+test('対象でもドラッグ後の戻り・複数指・wheel・cancel・capture 喪失は発火しない', () => {
+  for (const target of [null, 'hammer', 'share']) {
+    for (const interrupt of [
+      (tap: MapTap<string>) => tap.move(pointer(0, 30, 30)),
+      (tap: MapTap<string>) => tap.start(pointer(0, 10, 10, 2), 'other'),
+      (tap: MapTap<string>) => tap.move(pointer(2, 10, 10, 1, 3)),
+      // DOM の wheel / pointercancel / lostpointercapture は共通の cancel に渡す。
+      (tap: MapTap<string>) => tap.cancel(),
+    ]) {
+      const tap = new MapTap<string>();
+      tap.start(pointer(), target);
+      interrupt(tap);
+      assert.equal(tap.finish(release()), null);
+      assert.equal(tap.finish(release(0, 10, 10, 2)), null);
+      tap.start(pointer(), target);
+      assert.deepEqual(tap.finish(release()), { target });
+    }
+  }
+});
+
 test('追加ボタンが pointermove で届いた操作は全ボタン解放まで取り消す', () => {
   for (const buttons of [3, 5, 7]) {
     const tap = new MapTap();

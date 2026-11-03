@@ -26,6 +26,7 @@ import { PeerVolume } from './VolumeMenus.tsx';
 import { EmoteBadge } from './Emotes.tsx';
 import { SystemItemPanel } from '../systems/SystemItem.tsx';
 import { copySessionUrl } from '../sessionLinks.ts';
+import { canEquipHammer } from './mapActions.ts';
 
 type Menu = { kind: 'user'; id: string; rect: DOMRect } | { kind: 'item'; id: string; rect: DOMRect };
 
@@ -193,7 +194,7 @@ function MenuItem({ icon, label, onClick, disabled }: { icon: Parameters<typeof 
 
 function ActionMenu({ menu, onClose }: { menu: Menu; onClose: () => void }) {
   const s = useStore(useShallow((st) => ({
-    participants: st.participants, selfId: st.selfId, items: st.items, camFeeds: st.camFeeds, mode: st.mode,
+    session: st.session, participants: st.participants, selfId: st.selfId, items: st.items, camFeeds: st.camFeeds, mode: st.mode,
   })));
   const me = s.participants.find((p) => p.id === s.selfId);
   const run = (f: () => void) => () => { f(); onClose(); };
@@ -223,7 +224,7 @@ function ActionMenu({ menu, onClose }: { menu: Menu; onClose: () => void }) {
     {isCameraTimerItem(it) && <MenuItem icon="trash" label={tr("ui618")} onClick={run(() => removeItem(it.id))} />}
   </Popover>;
   const holder = 'holder' in it ? it.holder : null;
-  const iHold = !!heldHammer(s);
+  const canEquip = canEquipHammer(s, it.id);
   return (
     <Popover anchor={menu.rect} onClose={onClose} className="menu">
       <span className="menutitle">{itemLabel(it)}</span>
@@ -231,7 +232,7 @@ function ActionMenu({ menu, onClose }: { menu: Menu; onClose: () => void }) {
       {it.kind === 'camera' && it.variant === 'camera-timer' && s.mode === '3d' && <MenuItem icon="camera"
         label={tr('cameraTimerShoot')} disabled={!!it.timerState?.systems.find(system => system.instanceId === 'camera-shot')?.state.busy}
         onClick={run(() => requestTimedCamera(it.id))} />}
-      {it.kind === 'hammer' && !holder && <MenuItem icon="hand" label={tr("ui614")} disabled={iHold} onClick={run(() => itemAction(it.id, { a: 'pick' }))} />}
+      {it.kind === 'hammer' && !holder && <MenuItem icon="hand" label={tr("ui614")} disabled={!canEquip} onClick={run(() => { if (canEquipHammer(get(), it.id)) itemAction(it.id, { a: 'pick' }); })} />}
       {it.kind === 'hammer' && holder === s.selfId && <MenuItem icon="hand" label={tr("ui615")} onClick={run(dropHammer)} />}
       {key && <MenuItem icon="window" label={it.kind === 'camera' ? tr("ui616") : tr("ui617")} onClick={run(() => openWindow(key))} />}
       {!holder && <MenuItem icon="trash" label={tr("ui618")} onClick={run(() => removeItem(it.id))} />}
