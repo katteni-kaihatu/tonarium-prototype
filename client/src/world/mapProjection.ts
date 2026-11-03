@@ -16,12 +16,12 @@ export function floorAt(camera: THREE.Camera, x: number, y: number, width: numbe
 }
 
 export interface MapPointer { pointerId: number; button: number; buttons: number; clientX: number; clientY: number }
-export class MapTap {
-  private down: (MapPointer & { moved: boolean; cancelled: boolean }) | null = null;
-  start(e: MapPointer) {
+export class MapTap<T = never> {
+  private down: (MapPointer & { moved: boolean; cancelled: boolean; target: T | null }) | null = null;
+  start(e: MapPointer, target: T | null = null) {
     if (this.down) { this.down.cancelled = true; return; }
     this.down = { pointerId: e.pointerId, button: e.button, buttons: e.buttons, clientX: e.clientX, clientY: e.clientY,
-      moved: false, cancelled: e.button !== 0 || e.buttons !== 1 };
+      target, moved: false, cancelled: e.button !== 0 || e.buttons !== 1 };
   }
   move(e: MapPointer) {
     const d = this.down;
@@ -31,10 +31,14 @@ export class MapTap {
     if (Math.hypot(e.clientX - d.clientX, e.clientY - d.clientY) > 6) d.moved = true;
   }
   end(e: MapPointer) {
+    return this.finish(e) !== null;
+  }
+  finish(e: MapPointer): { target: T | null } | null {
     this.move(e);
     const d = this.down;
     this.cancel();
-    return !!d && d.pointerId === e.pointerId && d.button === 0 && e.button === 0 && e.buttons === 0 && !d.moved && !d.cancelled;
+    return d && d.pointerId === e.pointerId && d.button === 0 && e.button === 0 && e.buttons === 0 && !d.moved && !d.cancelled
+      ? { target: d.target } : null;
   }
   cancel() { this.down = null; }
 }

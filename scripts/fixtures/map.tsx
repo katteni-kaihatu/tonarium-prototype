@@ -3,6 +3,7 @@ import { _roots } from '@react-three/fiber';
 import { EMPTY_PRESENCE, ROOM_HALF, type Participant } from '../../shared/protocol.ts';
 import type { AvatarState } from '../../shared/protocol.ts';
 import type { WorldKind } from '../../shared/worlds.ts';
+import { createItem } from '../../shared/items.ts';
 import { Map2D } from '../../client/src/world/Map2D.tsx';
 import { get, set, useStore } from '../../client/src/store.ts';
 import { stopWalk } from '../../client/src/walk.ts';
@@ -41,7 +42,7 @@ Object.assign(window, { mapTest: {
         bodies.push({ id: node.userData.hitTarget, position: node.position.toArray(), ry: node.rotation.y, meshes });
       }
     });
-    return { moves, events, walk: get().walk, bodies, render: state?.gl.info.render };
+    return { moves, events, walk: get().walk, windows: get().windows, bodies, render: state?.gl.info.render };
   },
   floorTarget: (x: number, y: number) => {
     const floor = document.querySelector('.mapfloor')!;
@@ -64,6 +65,14 @@ Object.assign(window, { mapTest: {
     document.querySelector('canvas')!.setPointerCapture(down.id);
   },
   received: (participants: Participant[], avatars: Record<string, AvatarState>) => set({ participants, avatars, avatarIds: Object.keys(avatars) }),
+  actions: () => {
+    const chess = createItem('chess', { id: 'chess', x: -3, z: 0, ry: 0, createdBy: self.id }, () => .5)!;
+    const canvas = createItem('canvas', { id: 'canvas', x: 3, z: 0, ry: 0, createdBy: self.id }, () => .5)!;
+    set({ session: 'fixture', items: { chess, canvas }, windows: [], sharer: self.id,
+      participants: [{ ...self, sharing: true, session: 'fixture' }] });
+  },
+  endShare: () => set({ sharer: null, participants: [{ ...self, session: 'fixture' }] }),
+  clearActions: () => set({ session: null, items: {}, windows: [], sharer: null, participants: [self] }),
   show: async (mode: '2d' | '3d', kind: WorldKind = 'room') => {
     const Component = mode === '2d' ? Map2D : (await import('../../client/src/world/Map3D.tsx')).Map3D;
     root.render(<Component key={`${mode}:${kind}`} kind={kind} />);
