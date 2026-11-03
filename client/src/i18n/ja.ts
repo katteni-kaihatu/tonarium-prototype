@@ -1,4 +1,6 @@
 export default {
+  mapItemAction: '{0}：{1}',
+  mapWatchShare: '{0}の画面共有を見る',
   adBgmLabel: '自分のAD研究所BGM',
   adBgmOn: 'BGM: オン',
   adBgmOff: 'BGM: オフ',

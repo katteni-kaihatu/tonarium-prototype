@@ -42,7 +42,7 @@ export function useSpaceReset(reset: () => void) {
   ref.current = reset;
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
-      if (e.code !== 'Space' || !onMap(e.target)) return;
+      if (e.code !== 'Space' || !onMap(e.target) || (e.target instanceof Element && e.target.closest('button'))) return;
       e.preventDefault();
       ref.current();
     };
