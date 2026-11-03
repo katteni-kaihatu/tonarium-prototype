@@ -1,4 +1,6 @@
 export default {
+  mapItemAction: '{0}: {1}',
+  mapWatchShare: 'Watch {0}’s screen share',
   adBgmLabel: 'AD lab BGM for you',
   adBgmOn: 'BGM: On',
   adBgmOff: 'BGM: Off',

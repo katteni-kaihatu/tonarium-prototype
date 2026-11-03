@@ -1,4 +1,4 @@
-import { Suspense, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
@@ -14,6 +14,15 @@ import { boundsOf, moveSelfTo, useHeatCells, useMapBox, useSpaceReset } from './
 import { CenterInBox, ControlsHome, MapControls, MAP_FOV, mapCameraHome } from './mapCamera.tsx';
 import { floorAt, floorMatrix, MapTap } from './mapProjection.ts';
 import { CityTrain2D, MapBackdrop, MapItemMark } from './mapSymbols.tsx';
+import { t as tr } from '../i18n/index.ts';
+import { itemLabel } from './common.tsx';
+import { itemAction } from '../items/actions.ts';
+import { openWindow } from './windows.ts';
+import { mapItemTarget, mapShareTarget, runMapTarget, type MapTarget } from './mapActions.ts';
+
+const activate = (target: MapTarget) => runMapTarget(get(), target, {
+  pick: id => itemAction(id, { a: 'pick' }), open: openWindow,
+});
 
 function Floor({ kind, plane }: { kind: WorldKind; plane: React.RefObject<SVGSVGElement | null> }) {
   useStore(s => s.avatars);
@@ -51,8 +60,15 @@ function Projection({ plane, marks, cameraRef }: {
     cameraRef.current = camera;
     camera.updateMatrixWorld();
     if (plane.current) plane.current.style.transform = `matrix3d(${floorMatrix(camera, size.width, size.height).join(',')})`;
+    const places = placesOf(get());
     for (const el of marks.current?.children ?? []) {
       const mark = el as HTMLElement;
+      if (mark.dataset.participant) {
+        const place = places.get(mark.dataset.participant);
+        if (!place) { mark.style.visibility = 'hidden'; continue; }
+        mark.dataset.x = String(place.x);
+        mark.dataset.z = String(place.z);
+      }
       point.set(Number(mark.dataset.x), 0, Number(mark.dataset.z)).project(camera);
       mark.style.visibility = point.z >= -1 && point.z <= 1 ? 'visible' : 'hidden';
       mark.style.left = `${(point.x + 1) * size.width / 2}px`;
@@ -63,6 +79,7 @@ function Projection({ plane, marks, cameraRef }: {
 }
 
 export function Map2D({ kind }: { kind: WorldKind }) {
+  const [root, setRoot] = useState<HTMLDivElement | null>(null);
   const box = useMapBox();
   const bounds = boundsOf(kind);
   const cx = (bounds.minX + bounds.maxX) / 2;
@@ -73,21 +90,46 @@ export function Map2D({ kind }: { kind: WorldKind }) {
   const camera = useRef<THREE.Camera>(null);
   const plane = useRef<SVGSVGElement>(null);
   const marks = useRef<HTMLDivElement>(null);
-  const gesture = useRef(new MapTap());
+  const gesture = useRef(new MapTap<MapTarget>());
   const participants = useStore(s => s.participants);
   const selfId = useStore(s => s.selfId);
   const items = useStore(s => s.items);
+  const camFeeds = useStore(s => s.camFeeds);
+  const sharer = useStore(s => s.sharer);
+  const session = useStore(s => s.session);
+  const state = get();
+  const places = placesOf(state);
+  useEffect(() => useStore.subscribe((s, prev) => {
+    if (s.session !== prev.session || s.sharer !== prev.sharer
+      || prev.participants.some(p => p.sharing && !s.participants.some(next => next.id === p.id && next.sharing))) gesture.current.cancel();
+  }), []);
+  const targetAt = (el: EventTarget | null) => {
+    const button = el instanceof Element ? el.closest<HTMLButtonElement>('button[data-map-kind]') : null;
+    if (!button || !session) return null;
+    return { kind: button.dataset.mapKind, id: button.dataset.mapId, session } as MapTarget;
+  };
+  const keyboardClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    // ポインターの click は pointerup で処理済み。キーボードの合成 click だけ受ける。
+    if (e.detail === 0) {
+      const target = targetAt(e.currentTarget);
+      if (target) activate(target);
+    }
+  };
   useSpaceReset(() => { gesture.current.cancel(); controls.current?.reset(); });
   const onUp = (e: React.PointerEvent) => {
-    if (!gesture.current.end(e) || e.buttons !== 0 || !camera.current) return;
+    const tap = gesture.current.finish(e);
+    if (!tap) return;
+    if (tap.target) { activate(tap.target); return; }
+    if (!camera.current) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const p = floorAt(camera.current, e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
     if (p) moveSelfTo(p.x, p.z);
   };
-  return <div className="map2d"
+  return <div className="map2d" ref={setRoot}
     onPointerDownCapture={e => {
       if (!e.isPrimary) { gesture.current.cancel(); return; }
-      gesture.current.start(e);
+      gesture.current.start(e, targetAt(e.target));
       if (touchOnly && e.button === 0) {
         // マウスでは OrbitControls に捕捉を任せ、capture の移し替えを避ける。
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { gesture.current.cancel(); }
@@ -95,6 +137,7 @@ export function Map2D({ kind }: { kind: WorldKind }) {
     }}
     onPointerMoveCapture={e => gesture.current.move(e)} onPointerUpCapture={onUp}
     onPointerCancelCapture={() => gesture.current.cancel()} onLostPointerCaptureCapture={() => gesture.current.cancel()}
+    onWheelCapture={() => gesture.current.cancel()}
     onAuxClick={e => e.preventDefault()} onContextMenu={e => e.preventDefault()}>
     <Floor kind={kind} plane={plane} />
     <Canvas camera={{ fov: MAP_FOV, near: .1, far: Math.max(400, span * 12), position: camera0.toArray() }}>
@@ -104,15 +147,30 @@ export function Map2D({ kind }: { kind: WorldKind }) {
           ? <Standee key={user.id} user={user} overview />
           : <Avatar3D key={user.id} id={user.id} self={user.id === selfId} overview />)}
       </Suspense>
-      <MapControls controls={controls} cx={cx} cz={cz} span={span} flat />
+      <MapControls controls={controls} cx={cx} cz={cz} span={span} flat domElement={root ?? undefined} />
       <ControlsHome controls={controls} camera0={camera0} target={[cx, 0, cz]} />
       <Projection plane={plane} marks={marks} cameraRef={camera} />
     </Canvas>
     <div className="mapmarks" ref={marks}>
-      {Object.values(items).filter(it => !('holder' in it && it.holder)).map(it =>
-        <div key={it.id} data-x={it.x} data-z={it.z} className="mapmark">
-          <MapItemMark left={0} top={0} tint={ITEM_INFO[it.kind].tint} ink={ITEM_INFO[it.kind].ink} name={ITEM_INFO[it.kind].name} mark={ITEM_INFO[it.kind].mark} />
-        </div>)}
+      {Object.values(items).filter(it => !('holder' in it && it.holder)).map(it => {
+        const target = mapItemTarget({ ...state, items, camFeeds }, it.id);
+        const label = itemLabel(it);
+        const actionLabel = tr('mapItemAction', label, target?.kind === 'pick' ? tr('ui614') : tr('ui617'));
+        const mark = <MapItemMark left={0} top={0} tint={ITEM_INFO[it.kind].tint} ink={ITEM_INFO[it.kind].ink} name={target ? actionLabel : label} mark={ITEM_INFO[it.kind].mark} />;
+        return <div key={it.id} data-x={it.x} data-z={it.z} className="mapmark">
+          {target ? <button type="button" className="mapaction" data-map-kind={target.kind} data-map-id={it.id}
+            title={actionLabel} aria-label={actionLabel} onClick={keyboardClick}>{mark}</button> : mark}
+        </div>;
+      })}
+      {participants.filter(p => mapShareTarget({ ...state, sharer }, p.id)).map(p => {
+        const place = places.get(p.id);
+        if (!place) return null;
+        const label = tr('mapWatchShare', p.name);
+        return <div key={`share:${p.id}`} className="mapmark" data-participant={p.id} data-x={place.x} data-z={place.z}>
+          <button type="button" className="mapaction mapshare" data-map-kind="share" data-map-id={p.id}
+            title={label} aria-label={label} onClick={keyboardClick}>{tr('ui588')}</button>
+        </div>;
+      })}
     </div>
   </div>;
 }

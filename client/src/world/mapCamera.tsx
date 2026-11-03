@@ -7,10 +7,10 @@ import type { useMapBox } from './mapShared.ts';
 import { touchOnly } from '../phone.ts';
 export const MAP_FOV = 45;
 
-export function MapControls({ controls, cx, cz, span, flat = false }: {
-  controls: React.RefObject<OrbitControlsImpl | null>; cx: number; cz: number; span: number; flat?: boolean;
+export function MapControls({ controls, cx, cz, span, flat = false, domElement }: {
+  controls: React.RefObject<OrbitControlsImpl | null>; cx: number; cz: number; span: number; flat?: boolean; domElement?: HTMLElement;
 }) {
-  return <OrbitControls ref={controls} target={[cx, 0, cz]} enabled={!touchOnly} screenSpacePanning={false} zoomSpeed={2}
+  return <OrbitControls ref={controls} domElement={domElement} target={[cx, 0, cz]} enabled={!touchOnly} screenSpacePanning={false} zoomSpeed={2}
     minPolarAngle={flat ? .08 : 0} maxPolarAngle={Math.PI / 2 - (flat ? .25 : .08)} minDistance={3} maxDistance={span * 5}
     mouseButtons={{ LEFT: -1 as THREE.MOUSE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE }} />;
 }

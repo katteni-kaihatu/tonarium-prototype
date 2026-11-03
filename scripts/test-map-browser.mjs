@@ -126,6 +126,57 @@ try {
         });
       }, home);
     }
+    await page.evaluate(() => window.mapTest.actions());
+    const chess = page.locator('button[data-map-id="chess"]');
+    const canvas = page.locator('button[data-map-id="canvas"]');
+    const share = page.locator('button[data-map-kind="share"]');
+    await chess.waitFor({ state: 'visible' });
+    await reset();
+    if (mobile) await chess.tap(); else await chess.click();
+    const firstWindow = (await snapshot()).windows[0];
+    assert.equal(firstWindow.key, 'item:chess');
+    if (mobile) await canvas.tap(); else await canvas.click();
+    if (mobile) await chess.tap(); else await chess.click();
+    let actionState = await snapshot();
+    assert.deepEqual(actionState.windows.map(w => w.key), ['item:canvas', 'item:chess']);
+    assert.deepEqual(actionState.windows[1], firstWindow, 'reopening must keep the existing window position');
+    assert.equal(actionState.moves.length, 0, 'marker activation must not walk');
+    await canvas.focus();
+    await page.keyboard.press('Space');
+    assert.equal((await snapshot()).windows.at(-1).key, 'item:canvas', 'Space on a button must activate it');
+    await chess.focus();
+    await page.keyboard.press('Enter');
+    assert.equal((await snapshot()).windows.at(-1).key, 'item:chess');
+    if (mobile) await share.tap(); else await share.click();
+    assert.equal((await snapshot()).windows.at(-1).key, 'share');
+    await page.evaluate(() => window.mapTest.actions());
+    await reset();
+    const markBox = await chess.boundingBox();
+    assert.ok(markBox);
+    const mx = markBox.x + markBox.width / 2, my = markBox.y + markBox.height / 2;
+    if (mobile) {
+      const input = await context.newCDPSession(page);
+      await input.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: mx, y: my, id: 1 }] });
+      await input.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: mx, y: my, id: 1 }, { x: mx + 70, y: my + 70, id: 2 }] });
+      await input.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await input.detach();
+    } else {
+      await page.mouse.move(mx, my);
+      await page.mouse.down();
+      await page.mouse.move(mx + 30, my + 30);
+      await page.mouse.move(mx, my);
+      await page.mouse.up();
+      assert.deepEqual((await snapshot()).windows, [], 'drag returning to a marker must not activate it');
+      await page.mouse.down();
+      await page.mouse.wheel(0, -100);
+      await page.mouse.up();
+    }
+    actionState = await snapshot();
+    assert.deepEqual(actionState.windows, [], 'multi-touch or wheel must cancel the target');
+    assert.equal(actionState.moves.length, 0);
+    await page.evaluate(() => window.mapTest.endShare());
+    await share.waitFor({ state: 'detached' });
+    await page.evaluate(() => window.mapTest.clearActions());
     await page.waitForFunction(() => window.mapTest.snapshot().bodies.some(body => body.meshes > 10));
     await page.screenshot({ path: `.local/verification/map-${mobile ? 'mobile' : 'desktop'}.png` });
     if (!mobile) {

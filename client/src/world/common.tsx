@@ -76,13 +76,7 @@ export function useItemsNear() {
   return useNearbyItems();
 }
 
-/** そのアイテムを開くウィンドウ。無ければ null */
-export function windowKeyOf(item: Item, camFeeds: Record<string, number>) {
-  if (item.mapPlacement?.mode === 'system') return `item:${item.id}`;
-  if (item.kind === 'hammer') return null;
-  if (item.kind === 'camera') return item.live && camFeeds[item.id] ? `cam:${item.id}` : null;
-  return `item:${item.id}`;
-}
+export { windowKeyOf } from './windowKey.ts';
 
 export function itemInfo(item: Item) {
   return localizedVariantInfo(item.kind === 'camera' ? item.variant : undefined) ?? ITEM_INFO[item.kind];
