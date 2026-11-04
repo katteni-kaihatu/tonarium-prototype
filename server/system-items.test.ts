@@ -103,3 +103,28 @@ test('invalid assets, duplicate placement IDs and reserved instance collisions f
   assert.throws(() => reconcileSystemItems(current, absentState, {}, () => 0), /state unavailable/);
   assert.deepEqual([...current], conflicted);
 });
+
+test('coexisting chess identities survive reload and reject reserved-ID conflicts without changing ordinary boards', () => {
+  const definition = view([itemObject('board', 'chess'), itemObject('button', 'chess', 'system')]);
+  const ordinary = createItem('chess', { id: 'ordinary-board', x: 0, z: 0, ry: 0, createdBy: 'alice' }, noRandom)!;
+  const current = reconcileSystemItems(new Map([[ordinary.id, ordinary]]), definition, {}, noRandom).items;
+  const before = structuredClone([...current]);
+  for (let tick = 0; tick < 100; tick++) {
+    const result = reconcileSystemItems(current, definition, { createMissingNative: false }, noRandom);
+    assert.deepEqual(result.changed, []); assert.deepEqual(result.removed, []);
+  }
+  assert.deepEqual([...current], before);
+  const changedMode = structuredClone(definition);
+  changedMode.map.objects[0].itemMode = 'system';
+  const reloaded = reconcileSystemItems(current, changedMode, {}, noRandom);
+  assert.equal(reloaded.items.get(id('board'))!.mapPlacement!.mode, 'system');
+  assert.equal(reloaded.items.get(ordinary.id), ordinary);
+  assert.equal(ordinary.mapPlacement, undefined);
+  for (const placement of [undefined, { ...current.get(id('board'))!.mapPlacement!, mapId: 'other-map' }, { ...current.get(id('board'))!.mapPlacement!, objectId: 'other-object' }]) {
+    const conflicting = new Map(current);
+    conflicting.set(id('board'), { ...ordinary, id: id('board'), mapPlacement: placement });
+    const untouched = structuredClone([...conflicting]);
+    assert.throws(() => reconcileSystemItems(conflicting, definition, {}, noRandom), /identity conflict/);
+    assert.deepEqual([...conflicting], untouched);
+  }
+});

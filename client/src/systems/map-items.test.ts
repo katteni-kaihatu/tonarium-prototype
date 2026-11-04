@@ -11,8 +11,34 @@ import { SystemRuntime } from '../../../server/system-runtime.ts';
 import type { SystemManifest } from '../../../shared/system-types.ts';
 import { controlledItemObject } from './map-item-control.ts';
 import { findInteractable } from '../view3d/interact.ts';
+import { systemDemoMap } from '../../../shared/system-demo.ts';
+import { reconcileSystemItems } from '../../../server/system-items.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
+
+test('same-position ordinary and native chess never resolve to the demo timer control', () => {
+  const catalog = validateSystemSubmission(root).catalog, runtime = new SystemRuntime(() => catalog, () => {});
+  const map = structuredClone(systemDemoMap);
+  map.objects.push({ id: 'native-board', itemId: 'chess', itemMode: 'native', capabilities: [], position: [1.5, 0, 0] });
+  runtime.apply('alice', { kind: 'map', id: 'load', revision: 0, map });
+  const ordinary = createItem('chess', { id: 'ordinary-board', x: 1.5, z: 0, ry: 0, createdBy: 'alice' }, () => 0)!;
+  const items = reconcileSystemItems(new Map([[ordinary.id, ordinary]]), runtime.view()).items;
+  const demo = items.get(systemItemInstanceId(map.id, 'menu-chess-button'))!;
+  const native = items.get(systemItemInstanceId(map.id, 'native-board'))!;
+  const state = { sid: 'room', view: runtime.view() };
+  for (const item of [ordinary, native]) assert.equal(controlledItemObject(item, 'room', state), undefined);
+  assert.equal(controlledItemObject(demo, 'room', state)?.id, 'menu-chess-button');
+  const wrongAsset = structuredClone(demo); wrongAsset.mapPlacement!.itemId = 'note';
+  const wrongObject = structuredClone(demo); wrongObject.mapPlacement!.objectId = 'pause-button';
+  const changedMode = structuredClone(state); changedMode.view.map.objects.find(object => object.id === 'menu-chess-button')!.itemMode = 'native';
+  assert.equal(controlledItemObject(wrongAsset, 'room', state), undefined);
+  assert.equal(controlledItemObject(wrongObject, 'room', state), undefined);
+  assert.equal(controlledItemObject(demo, 'room', changedMode), undefined);
+  assert.equal(controlledItemObject(demo, 'other-room', state), undefined);
+  runtime.apply('alice', { kind: 'interact', objectId: 'menu-chess-button', id: 'start', revision: runtime.view().revision });
+  assert.equal(runtime.view().systems.find(system => system.instanceId === 'countdown')!.state.running, true);
+  assert.deepEqual(items.get(ordinary.id), ordinary); assert.equal(native.mapPlacement!.mode, 'native');
+});
 
 test('system item boundary overrides native child actions once and blocks native fallback without an action', () => {
   const outer = new THREE.Group(), inner = new THREE.Group(), mesh = new THREE.Mesh();

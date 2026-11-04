@@ -3,11 +3,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
-import { testServerEnv } from './test-db.ts';
+import { readHomeData, testServerEnv } from './test-db.ts';
 import { devLogin } from './test-auth.ts';
 import { WebSocket } from 'ws';
 import { KokosyncClient } from '../vendor/kokosync/index.js';
@@ -18,6 +19,7 @@ import type { SystemCommand, SystemValue, SystemView } from '../shared/system-ty
 import { systemDemoMap } from '../shared/system-demo.ts';
 import { SystemCommandQueue } from '../client/src/systems/command-queue.ts';
 import { CameraCountdown } from '../client/src/systems/camera-countdown.ts';
+import { squareIndex } from '../shared/chess.ts';
 
 const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 async function until<T>(read: () => T | undefined, label: string, timeout = 15_000): Promise<T> {
@@ -159,9 +161,24 @@ test('live shared systems: code-map load, late snapshots, native items, occupied
   }
   const a = await peer('systems-a'), other = await peer('systems-other', otherSid);
   assert.equal(a.view.map.id, 'empty'); assert.equal(other.view.map.id, 'empty');
+  await a.send({ t: 'itemCreate', kind: 'chess', x: 1.5, z: 0, ry: 0 });
+  const ordinary = await until(() => [...a.items.values()].find(item => item.kind === 'chess' && item.createdBy === a.id), 'ordinary chess before demo load');
+  assert.equal(ordinary.mapPlacement, undefined); assert.notEqual(ordinary.id, chessId);
+  await a.send({ t: 'itemAction', id: ordinary.id, action: { a: 'chessMove', from: squareIndex('e2'), to: squareIndex('e4'), revision: 0 } });
+  const played = await until(() => { const item = a.items.get(ordinary.id); return item?.kind === 'chess' && item.chess.revision === 1 ? serialized(item) : undefined; }, 'ordinary chess move');
+  const assertChess = (...peers: Peer[]) => {
+    for (const p of peers) {
+      assert.deepEqual(p.items.get(ordinary.id), played);
+      assert.equal(p.items.get(chessId)?.kind, 'chess');
+      assert.deepEqual(p.items.get(chessId)?.mapPlacement, {
+        mapId: 'system-demo', objectId: 'menu-chess-button', itemId: 'chess', mode: 'system', position: [1.5, 0, 0], rotation: 0,
+      });
+    }
+  };
   await a.send({ t: 'systemLoad', mapId: 'system-demo' });
   await until(() => a.view.map.id === 'system-demo' && a.items.has(noteId) && a.items.has(chessId) ? true : undefined, 'registered code-map and native item load');
   assert.deepEqual(a.view.map, systemDemoMap); assert.equal(text(a), '00:10'); assert.equal(a.items.get(chessId)?.kind, 'chess');
+  assertChess(a);
   await command(a, { kind: 'interact', objectId: 'menu-chess-button' }, () => timer(a).state.running === true);
   await until(() => Number(timer(a).state.remaining) < 9.9 ? true : undefined, 'server timer progress');
   await command(a, { kind: 'interact', objectId: 'pause-button' }, () => timer(a).state.running === false);
@@ -169,6 +186,7 @@ test('live shared systems: code-map load, late snapshots, native items, occupied
   await command(a, { kind: 'interact', objectId: 'chair-object' }, () => a.view.seats['chair-object'] === a.id);
   const paused = serialized(a.view), pausedText = text(a);
   const b = await peer('systems-b');
+  assertChess(a, b);
   assert.deepEqual(b.snapshot.systems, paused); assert.deepEqual(b.view, a.view); assert.equal(text(b), pausedText);
   assert.deepEqual(b.items.get(noteId), a.items.get(noteId)); assert.deepEqual(b.items.get(chessId), a.items.get(chessId));
 
@@ -177,6 +195,7 @@ test('live shared systems: code-map load, late snapshots, native items, occupied
   await until(() => Number(timer(a).state.remaining) < resumeFrom - 1 && text(a) !== beforeNote && text(a) === text(b) ? true : undefined, 'timer and actual note changes reach both peers');
   await command(a, { kind: 'interact', objectId: 'pause-button' }, () => timer(a).state.running === false);
   await until(() => JSON.stringify(a.view) === JSON.stringify(b.view) && text(a) === text(b) ? true : undefined, 'paused peer convergence');
+  assertChess(a, b);
   const beforeOccupied = serialized(a.view), aErrorCount = a.frames.filter(frame => frame.value.message?.error).length, occupiedAfter = b.ordinal;
   const occupiedCommand: InputCommand = { kind: 'interact', objectId: 'chair-object', id: `integration-${crypto.randomUUID()}`, revision: b.view.revision };
   await b.send({ t: 'systemCommand', command: occupiedCommand });
@@ -187,6 +206,7 @@ test('live shared systems: code-map load, late snapshots, native items, occupied
 
   b.client.close();
   const b2 = await peer('systems-b', sid, b);
+  assertChess(a, b2);
   assert.notEqual(b2.config.token, b.config.token); assert.equal(b2.id, b.id);
   assert.deepEqual(b2.snapshot.systems, a.view); assert.equal(text(b2), text(a)); assert.equal(b2.view.seats['chair-object'], a.id);
   const reset = await command(b2, { kind: 'interact', objectId: 'reset-button' }, () => timer(b2).state.remaining === 10 && timer(b2).state.running === false);
@@ -233,11 +253,31 @@ test('live shared systems: code-map load, late snapshots, native items, occupied
   await command(b2, { kind: 'interact', objectId: 'chair-object' }, () => b2.view.seats['chair-object'] === b2.id);
   a.home.send(JSON.stringify({ t: 'join', sid }));
   const a2 = await peer('systems-a', sid, a);
+  assertChess(a2, b2);
   assert.equal(a2.view.seats['chair-object'], b2.id); assert.equal(text(a2), '00:10');
   await command(b2, { kind: 'interact', objectId: 'menu-chess-button' }, () => timer(b2).state.running === true);
   await until(() => timer(b2).state.remaining === 0 && timer(b2).state.running === false && timer(a2).state.remaining === 0 && text(b2) === '00:00' && text(a2) === '00:00' ? true : undefined, 'real ten-second timer completion converges', 20_000);
   assert.deepEqual(a2.view, b2.view);
   const c = await peer('systems-c');
+  assertChess(a2, b2, c);
+  const completed = serialized(b2.view);
+  await b2.send({ t: 'itemAction', id: ordinary.id, action: { a: 'chessMove', from: squareIndex('e7'), to: squareIndex('e5'), revision: played.chess.revision } });
+  await until(() => [a2, b2, c].every(p => { const item = p.items.get(ordinary.id); return item?.kind === 'chess' && item.chess.revision === 2 && item.mapPlacement === undefined; }) ? true : undefined, 'ordinary chess still plays after timer completion');
+  assert.deepEqual(b2.view, completed, 'ordinary chess must not operate the timer');
+  const finalBoard = serialized(b2.items.get(ordinary.id)!);
+  for (const p of [a2, c]) assert.deepEqual(p.items.get(ordinary.id), finalBoard);
+  const saveDeadline = Date.now() + 15_000;
+  let saved = false;
+  while (Date.now() < saveDeadline) {
+    const rows = (await readHomeData(dbEnv)).items.filter(row => row.sessionId === sid);
+    const storedBoard = rows.find(row => row.itemId === ordinary.id)?.data;
+    const storedDemo = rows.find(row => row.itemId === chessId)?.data;
+    if (isDeepStrictEqual(storedBoard, finalBoard) && storedDemo) {
+      assert.deepEqual(storedDemo, serialized(b2.items.get(chessId)!)); saved = true; break;
+    }
+    await delay(100);
+  }
+  assert.equal(saved, true, 'ordinary chess and demo must finish saving separately');
   assert.deepEqual(c.snapshot.systems, b2.view); assert.equal(text(c), '00:00'); assert.equal(c.view.seats['chair-object'], b2.id);
 
   const globalBeforeCameras = serialized(b2.view);
