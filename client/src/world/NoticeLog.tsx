@@ -16,6 +16,9 @@ import { openWindow } from './windows.ts';
 import { canItemize, itemizeMessage, uploadMedia } from '../media.ts';
 import { OgpCard, firstUrl } from './Links.tsx';
 import { BotMark } from './BotMark.tsx';
+import { REACTIONS } from '../../../shared/timeline.ts';
+import { reactToChat } from '../actions.ts';
+import { ReactionChips } from './ReactionChips.tsx';
 
 const NO_CHAT: ChatMessage[] = [];
 const time = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -167,6 +170,26 @@ function LogLine({ m, selfId }: { m: ChatMessage; selfId: string }) {
         {firstUrl(m.text) && <OgpCard url={firstUrl(m.text)!} />}
         <ChatImage src={m.image} />
         {m.media?.kind === 'image' && <ChatImage src={m.media.url} />}
+        <div className="chatreactions">
+          <ReactionChips reactions={m.reactions ?? {}} self={selfId} react={(emoji, on) => reactToChat(m.id, emoji, on)} />
+          <details onKeyDown={e => {
+            if (e.key === 'Escape') { e.currentTarget.open = false; e.currentTarget.querySelector('summary')?.focus(); }
+          }}>
+            <summary aria-label={tr('tlReact')}>{tr('tlReact')}</summary>
+            <div className="chatreactionchoices" role="group" aria-label={tr('tlReact')}>
+              {REACTIONS.map(emoji => {
+                const on = !!m.reactions?.[emoji]?.includes(selfId);
+                return <button key={emoji} className={`ib ${on ? 'on' : ''}`} aria-pressed={on}
+                  aria-label={tr(on ? 'reactionRemove' : 'reactionAdd', emoji)}
+                  onClick={e => {
+                    reactToChat(m.id, emoji, !on);
+                    const details = e.currentTarget.closest('details');
+                    if (details) { details.open = false; details.querySelector('summary')?.focus(); }
+                  }}>{emoji}</button>;
+              })}
+            </div>
+          </details>
+        </div>
         {canItemize(m) && (
           <button className="ib itemize" onClick={() => void itemizeMessage(m)} title={tr("ui655")}>
             <Icon name="box" size={12} />{tr("ui656")}</button>

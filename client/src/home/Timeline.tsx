@@ -1,4 +1,5 @@
 import { t as tr } from '../i18n/index.ts';
+import { ReactionChips as SharedReactionChips } from '../world/ReactionChips.tsx';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { get, nameOf, set, useStore } from '../store.ts';
@@ -291,18 +292,7 @@ function Media({ p }: { p: Post }) {
 function ReactionChips({ p }: { p: Post }) {
   const self = useStore((s) => s.selfId);
   const names = (ids: string[]) => ids.map((id) => nameOf(id)).join(', ');
-  return (
-    <>
-      {Object.entries(p.reactions).map(([emoji, ids]) => {
-        const on = ids.includes(self);
-        return (
-          <button key={emoji} className={`tlrx ${on ? 'on' : ''}`} aria-pressed={on} title={names(ids)} onClick={() => reactPost(p.id, emoji, !on)}>
-            <span>{emoji}</span><b>{ids.length}</b>
-          </button>
-        );
-      })}
-    </>
-  );
+  return <SharedReactionChips reactions={p.reactions} self={self} names={names} react={(emoji, on) => reactPost(p.id, emoji, on)} />;
 }
 
 function ReactButton({ p, small }: { p: Post; small?: boolean }) {

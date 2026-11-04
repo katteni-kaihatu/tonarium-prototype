@@ -1,5 +1,6 @@
 import { handleFantasyNpcRankBenefits, clearFantasyNpcRankBenefits } from './npc-rank-benefits.ts';
 import { NpcTransactions } from './npc-transactions.ts';
+import { canReadChat, reactChat } from '../shared/chat-reactions.ts';
 import { FantasyNamedCommissions } from './fantasy-named-commissions.ts';
 import { fantasyRegisteredGuildGrade } from '../shared/fantasy-guild-progression.ts';
 import { FANTASY_MAP_MERCHANT_EVENT, FANTASY_MAP_MERCHANT_NPC, fantasyMapMerchantDaylight } from '../shared/fantasy-map-merchant.ts';
@@ -1147,7 +1148,7 @@ function sendSessionSnapshot(sid: string, id: string) {
     sid,
     sharedAssets: sharedAssets.view(sid, id),
     systems: systems.view(sid),
-    chats: (chats.get(sid) ?? []).filter((m) => !m.to || m.to.includes(id)),
+    chats: (chats.get(sid) ?? []).filter((m) => canReadChat(m, id)),
     avatars: Object.fromEntries(avatars.get(sid) ?? []),
     items: [...(items.get(sid)?.values() ?? [])].map(it => telephoneItemFor(it, id, new Set(inSession(sid).map(u => u.id)))),
     presence: Object.fromEntries(inSession(sid).map((u) => [u.id, presenceOf(u)])),
@@ -1896,6 +1897,11 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
 function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPositions = false, peerEvent?: PeerOperation) {
   const sessItems = items.get(sid)!;
   switch (msg.t) {
+    case 'chatReact': {
+      const m = reactChat(chats.get(sid) ?? [], me.id, msg);
+      if (m) roomSend(sid, { t: 'chatReactions', sid, id: m.id, reactions: m.reactions!, reactionRevision: m.reactionRevision! }, m.to);
+      return;
+    }
     case 'systemResync':
       syncSystemItems(sid);
       roomSend(sid, { t: 'systemState', sid, view: systems.view(sid) }, [me.id]);
