@@ -16,6 +16,7 @@ import { SessionEvents, EVENT_TOPIC, EVENT_BULK_TOPIC, RECOVERY_TOPIC } from '..
 import { applyItemAction, isDeltaAction, type Item } from '../shared/items.ts';
 import { COMPAT_VERSION, type RoomClientMsg } from '../shared/protocol.ts';
 import { EMOTES } from '../shared/emotes.ts';
+import { REACTIONS } from '../shared/timeline.ts';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until<T>(read: () => T | undefined, timeout = 45_000): Promise<T> {
@@ -189,6 +190,55 @@ test('live kokosync: initial canvas, deltas, private delivery, independent media
   assert.ok(b2.snapshot.items[0].strokes.some((s: any) => s.id === 'new-line'));
   const other = await peer('other', 'other-test');
   assert.ok(other.snapshot.items.every((v: any) => v.id !== 'large-canvas'));
+  async function snapshotNow(p: Awaited<ReturnType<typeof peer>>) {
+    const start = p.received.length;
+    await p.send({ t: 'sync' });
+    return (await until(() => p.received.slice(start).find(v => v.kind === 'snapshot'))).snapshot;
+  }
+  const roomChat = b2.snapshot.chats.find((m: any) => m.text === 'room hello');
+  const chatReact = { t: 'chatReact' as const, id: roomChat.id, emoji: REACTIONS[0], on: true };
+  await Promise.all([a.send(chatReact), b2.send(chatReact)]);
+  await until(() => b2.received.find(v => v.message?.t === 'chatReactions' && v.message.id === roomChat.id && v.message.reactionRevision === 2));
+  await a.send(chatReact);
+  await other.send(chatReact);
+  await b.send(chatReact).catch(() => {});
+  await a.send({ ...chatReact, user: b.id, on: false } as unknown as RoomClientMsg);
+  await a.send({ ...chatReact, emoji: '__proto__' });
+  await a.send({ ...chatReact, on: 'yes' } as unknown as RoomClientMsg);
+  const reacted = (await snapshotNow(a)).chats.find((m: any) => m.id === roomChat.id);
+  assert.deepEqual(new Set(reacted.reactions[REACTIONS[0]]), new Set([a.id, b.id]));
+  assert.equal(reacted.reactionRevision, 2);
+  assert.equal(other.received.some(v => v.message?.t === 'chatReactions'), false);
+  await a.send({ ...chatReact, on: false });
+  await until(() => b2.received.find(v => v.message?.t === 'chatReactions' && v.message.id === roomChat.id && v.message.reactionRevision === 3));
+  assert.deepEqual((await snapshotNow(b2)).chats.find((m: any) => m.id === roomChat.id).reactions[REACTIONS[0]], [b.id]);
+  const systemLog = (await snapshotNow(a)).chats.find((m: any) => m.from === null);
+  assert.ok(systemLog);
+  await a.send({ ...chatReact, id: systemLog.id });
+  assert.equal((await snapshotNow(a)).chats.find((m: any) => m.id === systemLog.id).reactions, undefined);
+
+  const outsider = await peer('reaction-outsider');
+  for (const [p, x, z] of [[a, -8, -8], [b2, -7, -8], [outsider, 8, 8]] as const) {
+    await p.send({ t: 'mode', mode: '3d' });
+    await p.send({ t: 'avatar', s: { x, z, ry: 0 } });
+    await snapshotNow(p);
+  }
+  await a.send({ t: 'chat', text: 'saved reaction audience', scope: 'near' });
+  const nearChat = await until(() => b2.received.find(v => v.message?.m?.text === 'saved reaction audience'));
+  const nearReact = { ...chatReact, id: nearChat.message.m.id };
+  await b2.send({ t: 'avatar', s: { x: 8, z: 8, ry: 0 } });
+  await snapshotNow(b2);
+  await outsider.send({ t: 'avatar', s: { x: -7, z: -8, ry: 0 } });
+  await snapshotNow(outsider);
+  await b2.send(nearReact);
+  await until(() => a.received.find(v => v.message?.t === 'chatReactions' && v.message.id === nearReact.id));
+  await outsider.send(nearReact);
+  await outsider.send({ ...nearReact, user: b.id } as unknown as RoomClientMsg);
+  const hidden = await snapshotNow(outsider);
+  assert.equal(hidden.chats.some((m: any) => m.id === nearReact.id), false);
+  assert.equal(outsider.received.some(v => v.message?.id === nearReact.id || v.message?.m?.id === nearReact.id), false);
+  const visible = (await snapshotNow(a)).chats.find((m: any) => m.id === nearReact.id);
+  assert.deepEqual(visible.reactions[REACTIONS[0]], [b.id]);
   await a.send({ t: 'emote', id: 'wave' });
   const reaction = await until(() => b2.received.find((v) => v.message?.t === 'emote'));
   assert.equal(reaction.message.from, a.id);
@@ -216,6 +266,11 @@ test('live kokosync: initial canvas, deltas, private delivery, independent media
   const beforeCrouch = b2.received.length;
   await a.send({ t: 'avatar', s: { x: 2, z: 3, ry: 0, crouching: true } });
   await until(() => b2.received.slice(beforeCrouch).find((v) => v.t === 'avatar' && v.id === a.id && v.s.crouching === true));
+  const restored = await peer('sync-b', 'sync-test', b2);
+  assert.deepEqual(restored.snapshot.chats.find((m: any) => m.id === nearReact.id).reactions, visible.reactions);
+  await sendPacket(b2.client, b2.cfg.server, await seal(b2.key, b2.cfg.token, 'client', 101, { ...nearReact, on: false })).catch(() => {});
+  assert.equal((await fetch(`${base}/sync/offer`, { method: 'POST', headers: { Origin: base, 'X-Tonarium-Sync': b2.cfg.token }, body: '{}' })).status, 403);
+  assert.deepEqual((await snapshotNow(a)).chats.find((m: any) => m.id === nearReact.id).reactions, visible.reactions);
   const c = await peer('modern-a', 'sync-test', undefined, true);
   assert.equal(c.snapshot.avatars[a.id].crouching, true);
   await a.send({ t: 'avatar', s: { x: 2, z: 3, ry: 0, crouching: false } });
@@ -274,9 +329,25 @@ test('live kokosync: initial canvas, deltas, private delivery, independent media
   assert.deepEqual(publisher.received.find((v) => v.message?.m?.dice?.id === secretRoll!.id).message.m.dice.results, secretRoll!.roll!.results);
   await until(() => receiver.received.find((v) => v.message?.m?.dice?.id === secretRoll!.id));
   assert.equal(receiver.received.find((v) => v.message?.m?.dice?.id === secretRoll!.id).message.m.dice.results, null);
+  const secretChat = publisher.received.find(v => v.message?.m?.dice?.id === secretRoll!.id).message.m;
+  const hiddenDiceChat = receiver.received.find(v => v.message?.m?.dice?.id === secretRoll!.id).message.m;
+  await receiver.send({ t: 'chatReact', id: secretChat.id, emoji: REACTIONS[0], on: true });
+  await publisher.send({ t: 'chatReact', id: secretChat.id, emoji: REACTIONS[0], on: true });
+  const secretSnapshot = await snapshotNow(publisher);
+  assert.deepEqual(secretSnapshot.chats.find((m: any) => m.id === secretChat.id).reactions[REACTIONS[0]], [publisher.id]);
+  assert.equal((await snapshotNow(receiver)).chats.some((m: any) => m.id === secretChat.id), false);
+  assert.equal(receiver.received.some(v => v.message?.t === 'chatReactions' && v.message.id === secretChat.id), false);
+  await receiver.send({ t: 'chatReact', id: hiddenDiceChat.id, emoji: REACTIONS[0], on: true });
+  assert.deepEqual((await snapshotNow(receiver)).chats.find((m: any) => m.id === hiddenDiceChat.id).reactions[REACTIONS[0]], [receiver.id]);
   publisher.events!.update([]);
   const recovery = await publisher.send({ t: 'chat', text: 'recover missing peer data', scope: 'all' });
+  const recoveryReact = { t: 'chatReact' as const, id: recovery!.id, emoji: REACTIONS[1], on: true };
+  await publisher.send(recoveryReact);
   await until(() => receiver.received.find((v) => v.message?.m?.id === recovery!.id));
+  await until(() => receiver.received.find(v => v.message?.t === 'chatReactions' && v.message.id === recovery!.id));
+  await publisher.send({ t: 'peerOperation', event: recovery! });
+  assert.deepEqual((await snapshotNow(receiver)).chats.find((m: any) => m.id === recovery!.id).reactions[REACTIONS[1]], [publisher.id]);
+  assert.equal(receiver.received.filter(v => v.message?.m?.id === recovery!.id).length, 1);
   assert.ok(receiver.raw.some((f) => f.topic === RECOVERY_TOPIC), 'missing P2P body recovers from server');
   const newcomer = await peer('newcomer', 'peer-five', undefined, true);
   assert.ok(newcomer.snapshot.chats.some((m: any) => m.id === publicEvent!.id));

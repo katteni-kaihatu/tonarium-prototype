@@ -1,4 +1,6 @@
 export default {
+  reactionAdd: 'Add {0} reaction',
+  reactionRemove: 'Remove {0} reaction',
   mapItemAction: '{0}: {1}',
   mapWatchShare: 'Watch {0}’s screen share',
   adBgmLabel: 'AD lab BGM for you',

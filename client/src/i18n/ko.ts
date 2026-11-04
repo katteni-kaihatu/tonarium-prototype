@@ -1,4 +1,6 @@
 export default {
+  reactionAdd: '{0} 반응 추가',
+  reactionRemove: '{0} 반응 취소',
   mapItemAction: '{0}: {1}',
   mapWatchShare: '{0}의 화면 공유 보기',
   adBgmLabel: '내 AD 연구소 BGM',
