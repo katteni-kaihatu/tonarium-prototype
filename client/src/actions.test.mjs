@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import { beforeEach, mock, test } from 'node:test';
 
-let state, serverSession, calls, errors, request, voiceConnect, voiceLeave;
+let state, serverSession, calls, errors, request, voiceConnect, voiceLeave, sentOperations;
 const set = (patch) => { state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) }; };
 const stub = (path, namedExports) => mock.module(new URL(path, import.meta.url).href, { namedExports });
 stub('./store.ts', {
   get: () => state, set, recompute() {}, spawnPoint: () => ({ x: 0, z: 0, ry: 0 }), save() {}, nameOf: () => '',
   showToast: (error) => errors.push(error), dropSession: (sid) => calls.push(`drop:${sid}`),
 });
-stub('./net/ws.ts', { send: (msg) => calls.push(msg.t), requestSession: (msg) => request(msg) });
+stub('./net/ws.ts', { send: (msg) => { calls.push(msg.t); sentOperations.push(msg); }, requestSession: (msg) => request(msg) });
 stub('./net/livekit.ts', { connectVoice: (sid) => voiceConnect(sid), leaveVoice: () => voiceLeave() });
 stub('./net/session.ts', { startSessionSync: () => calls.push('sync:start'), stopSessionSync: () => calls.push('sync:stop') });
 stub('./items/actions.ts', { clampRoomPos: (pos) => pos });
@@ -16,10 +16,22 @@ stub('./spatial.ts', { placesOf: () => new Map(), resumeAudio() {} });
 stub('./phone.ts', { touchOnly: true });
 stub('./walk.ts', { stopWalk() {} });
 stub('../../shared/places.ts', { approach() {} });
-const { createSession, joinSession, leaveSession, pushNotice, markNoticesRead, removeNotice } = await import('./actions.ts');
+const { createSession, joinSession, leaveSession, pushNotice, markNoticesRead, removeNotice, reactToChat } = await import('./actions.ts');
+
+test('chat reactions send the same authenticated operation in 2D and 3D', () => {
+  reactToChat('message', '👍', true);
+  assert.deepEqual(sentOperations, []);
+  state.session = 'room';
+  for (const mode of ['2d', '3d']) {
+    state.mode = mode;
+    reactToChat('message', '👍', true);
+    reactToChat('message', '👍', false);
+  }
+  assert.deepEqual(sentOperations, [true, false, true, false].map(on => ({ t: 'chatReact', id: 'message', emoji: '👍', on })));
+});
 
 beforeEach(() => {
-  calls = []; errors = []; serverSession = null;
+  calls = []; errors = []; serverSession = null; sentOperations = [];
   state = { session: null, voice: 'off', mode: '2d', hubOpen: true, homePage: 'worlds',
     popupPausedUntil: 0, arrivals: {},
     selfAvatar: { x: 4, z: 2, ry: 1 }, windows: ['old-window'], maxWin: 'old-window', notices: [], selectedNote: null };

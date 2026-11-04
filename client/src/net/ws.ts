@@ -1,4 +1,5 @@
 import { arrivalPatch, KnownChatMessages, shouldPlayChatArrival } from '../newArrival.ts';
+import { PendingChatReactions } from './chat-reactions.ts';
 import { sourceText as uiSource } from '../i18n/core.ts';
 import { receiveShared } from '../shared-assets/state.ts';
 import { useSharedAssets } from '../shared-assets/state.ts';
@@ -27,6 +28,7 @@ import { startSessionSync, stopSessionSync, roomSend, configureSessionSync, sync
 
 // 表示行の削除・履歴置換・再入場でも既知IDを失わないよう、ページの寿命まで保持する。
 const knownChats = new KnownChatMessages();
+const chatReactions = new PendingChatReactions();
 const chatScope = (kind: 'session' | 'conversation', id: string) => JSON.stringify([kind, id]);
 
 function receiveChatArrival(scope: string, message: { id: string }, history: readonly { id: string }[], eligible: boolean, conversation?: string) {
@@ -153,7 +155,7 @@ export function applySessionSnapshot(snap: SessionSnapshot) {
   const nextSelf = snap.survivor?.players[get().selfId];
   if (nextSelf?.alive && nextSelf.choiceQueue.length > 0 && !(previousSelf?.choiceQueue.length ?? 0)) playSurvivorSound('choice');
   set((s) => ({
-    chats: { ...s.chats, [sid]: snap.chats },
+    chats: { ...s.chats, [sid]: snap.chats.map(m => chatReactions.body(sid, m, s.chats[sid]?.find(old => old.id === m.id))) },
     avatarsBy: { ...s.avatarsBy, [sid]: snap.avatars },
     itemsBy: { ...s.itemsBy, [sid]: Object.fromEntries(snap.items.map((n) => [n.id, n])) },
     presence: snap.presence,
@@ -229,6 +231,11 @@ export function onMessage(msg: ServerMsg) {
       if (msg.sid !== get().session) return;
       set({ presence: msg.all });
       break;
+    case 'chatReactions': {
+      if (msg.sid !== get().session) return;
+      set(s => ({ chats: { ...s.chats, [msg.sid]: chatReactions.receive(msg, s.chats[msg.sid] ?? []) } }));
+      return;
+    }
     case 'chat': {
       const s = get();
       const arrival = receiveChatArrival(chatScope('session', msg.sid), msg.m, s.chats[msg.sid] ?? [],
@@ -236,8 +243,8 @@ export function onMessage(msg: ServerMsg) {
       set((s) => ({
         ...arrival,
         chats: { ...s.chats, [msg.sid]: (s.chats[msg.sid] ?? []).some((m) => m.id === msg.m.id)
-          ? s.chats[msg.sid].map((m) => m.id === msg.m.id ? msg.m : m)
-          : [...(s.chats[msg.sid] ?? []), msg.m].slice(-500) },
+          ? s.chats[msg.sid].map((m) => m.id === msg.m.id ? chatReactions.body(msg.sid, msg.m, m) : m)
+          : [...(s.chats[msg.sid] ?? []), chatReactions.body(msg.sid, msg.m)].slice(-500) },
       }));
       return;
     }

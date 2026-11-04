@@ -55,6 +55,12 @@
 .tlqtext { font-size: 12px; color: var(--ink2); white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 .tlacts { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-left: -5px; }
+.chatreactions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; }
+.chatreactions details { font-size: 12px; color: var(--ink2); }
+.chatreactions summary { cursor: pointer; padding: 3px; }
+.chatreactionchoices { display: grid; grid-template-columns: repeat(6, 32px); gap: 2px; padding: 4px 0; }
+.chatreactionchoices button { width: 32px; height: 32px; justify-content: center; padding: 0; }
+.chatreactionchoices button.on { background: #E8EEFB; }
 .tlrx { height: 24px; padding: 0 7px; gap: 4px; border: 0; border-radius: 999px; background: rgba(38, 38, 46, .06); font-size: 13px; }
 .tlrx b { font-size: 11px; color: var(--ink2); }
 .tlrx.on { background: #E8EEFB; box-shadow: inset 0 0 0 1.5px var(--accent); }

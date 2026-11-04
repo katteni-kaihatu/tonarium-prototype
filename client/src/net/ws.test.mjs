@@ -41,6 +41,30 @@ beforeEach(() => {
 
 const systemView = revision => ({ revision, map: { schema: 1, id: 'test-map', objects: [], systems: [], connections: [] }, systems: [], objects: {}, seats: {}, diagnostics: [], traces: [] });
 
+test('reaction updates survive peer body retries and history restoration without arrivals', () => {
+  const r = chatReceiver('session', 'reactions');
+  const m = r.message('first');
+  const update = { t: 'chatReactions', sid: state.session, id: m.id, reactions: { '👍': ['self'] }, reactionRevision: 1 };
+  onMessage(update);
+  assert.deepEqual(state.chats[state.session], []);
+  assert.equal(chatSounds, 0);
+  assert.deepEqual(state.arrivals, {});
+  r.receive(m);
+  assert.deepEqual(state.chats[state.session][0].reactions, update.reactions);
+  const arrivals = structuredClone(state.arrivals), sounds = chatSounds;
+  state.mode = '2d';
+  onMessage({ ...update, reactions: {}, reactionRevision: 2 });
+  state.mode = '3d';
+  r.receive(m);
+  r.history([m]);
+  assert.deepEqual(state.chats[state.session][0].reactions, {});
+  assert.equal(state.chats[state.session][0].reactionRevision, 2);
+  assert.equal(state.chats[state.session].length, 1);
+  assert.equal(chatSounds, sounds);
+  assert.deepEqual(state.arrivals, arrivals);
+  assert.deepEqual(notices, []);
+});
+
 function chatReceiver(kind, prefix) {
   const conv = `${kind}:${prefix}`;
   return {
