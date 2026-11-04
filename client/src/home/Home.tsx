@@ -7,7 +7,7 @@ import { MarketPage } from '../market/Market.tsx';
 import { ReactionLibrary } from '../market/Library.tsx';
 import { contentAvailable, productFor } from '../../../shared/market.ts';
 import { useOwnedContent } from '../market/store.ts';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { get, save, set, showToast, unreadOf, useStore, type HomePage, type Notice, type SideWidget } from '../store.ts';
 import { WORLDS } from '../i18n/static.ts';
@@ -35,6 +35,7 @@ import { useChangelog } from './changelog.ts';
 import { XRLaunch } from '../xr/XRControls.tsx';
 import { ModeButton } from './ModeButton.tsx';
 import { homePageOf } from '../homePage.ts';
+import { attachHorizontalWheel } from './horizontalWheel.ts';
 import { TimelinePage, TimelinePhoneSheet, TimelineSide, TimelineTabs } from './Timeline.tsx';
 
 const NAV: { page: HomePage; name: string; icon: IconName }[] = localized([
@@ -362,13 +363,16 @@ function SideArea() {
 }
 
 /** ホームの 1 段だけのセクション。続きはタイトルの横の「もっと見る」から各ページへ */
-function RowSection({ title, sub, onMore, empty, children }: { title: string; sub?: string; onMore: () => void; empty?: string; children: React.ReactNode[] }) {
+function RowSection({ title, sub, onMore, empty, children, horizontalWheel = false }: { title: string; sub?: string; onMore: () => void; empty?: string; children: React.ReactNode[]; horizontalWheel?: boolean }) {
+  const rowRef = useCallback((node: HTMLDivElement | null) => {
+    if (node && horizontalWheel) return attachHorizontalWheel(node);
+  }, [horizontalWheel]);
   // empty が無いセクションは、出すものが無ければセクションごと出さない
   if (children.length === 0 && !empty) return null;
   return (
     <section className="hsec">
       <h2>{title} {sub && <span className="sub">{sub}</span>}<button className="ib hlink" onClick={onMore}>{tr("ui203")}</button></h2>
-      {children.length === 0 ? <Empty>{empty}</Empty> : <div className="hrow">{children}</div>}
+      {children.length === 0 ? <Empty>{empty}</Empty> : <div className="hrow" ref={rowRef}>{children}</div>}
     </section>
   );
 }
@@ -469,7 +473,7 @@ function HomePageView({ q }: { q: string }) {
       <RowSection title={tr("ui219")} sub={tr("ui220")} onMore={() => goHome('sessions')} empty={tr("ui221")}>
         {others.map((d) => <SessionCard key={d.id} s={d} />)}
       </RowSection>
-      <RowSection title={tr("ui222")} onMore={() => goHome('worlds')} empty={tr("ui223")}>
+      <RowSection title={tr("ui222")} onMore={() => goHome('worlds')} empty={tr("ui223")} horizontalWheel>
         {worlds.map((k) => <WorldTile key={k} k={k} />)}
       </RowSection>
     </>
