@@ -9,9 +9,71 @@ import { SystemService } from './system-service.ts';
 import { prepareSystemBundle, validateSystemSubmission } from './system-catalog.ts';
 import { systemDemoMap } from '../shared/system-demo.ts';
 import type { SystemCommand, SystemManifest } from '../shared/system-types.ts';
+import { applyItemAction, createItem, type Item } from '../shared/items.ts';
+import { squareIndex } from '../shared/chess.ts';
+import { systemItemInstanceId } from '../shared/system-items.ts';
+import { reconcileSystemItems } from './system-items.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const serialized = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+
+test('ordinary and native chess coexist with the demo across ticks and separately saved system/item state', t => {
+  let now = 1_700_000_000_000;
+  t.mock.method(Date, 'now', () => now);
+  const directory = temporary(t), sid = 'chess-coexistence', participants = ['alice', 'bob'];
+  let service = new SystemService(directory, root);
+  t.after(() => service.dispose());
+  const map = structuredClone(systemDemoMap);
+  map.objects.push({ id: 'native-board', itemId: 'chess', itemMode: 'native', capabilities: [], position: [1.5, 0, 0] });
+  service.load(sid, 'alice', map, participants);
+  const ordinary = createItem('chess', { id: 'ordinary-chess', x: 1.5, z: 0, ry: 0, createdBy: 'alice' }, () => 0)!;
+  let items = reconcileSystemItems(new Map([[ordinary.id, ordinary]]), service.view(sid)).items;
+  const nativeId = systemItemInstanceId(map.id, 'native-board'), demoId = systemItemInstanceId(map.id, 'menu-chess-button');
+  for (const id of [ordinary.id, nativeId]) {
+    const item = items.get(id)!;
+    assert.ok(applyItemAction(item, { a: 'chessMove', from: squareIndex('e2'), to: squareIndex('e4'), revision: 0 }, 'alice', () => 0));
+  }
+  const boards = serialized([items.get(ordinary.id), items.get(nativeId), items.get(demoId)]);
+  const reconcile = () => {
+    items = reconcileSystemItems(items, service.view(sid), { createMissingNative: false }).items;
+    assert.deepEqual(serialized([items.get(ordinary.id), items.get(nativeId), items.get(demoId)]), boards);
+    assert.equal(items.get(ordinary.id)!.mapPlacement, undefined);
+    assert.equal(items.get(nativeId)!.mapPlacement!.mode, 'native');
+    assert.equal(items.get(demoId)!.mapPlacement!.mode, 'system');
+  };
+  const interact = (objectId: string, id: string) => service.apply(sid, 'alice', { kind: 'interact', objectId, id, revision: service.view(sid).revision }, participants);
+  const timer = () => service.view(sid).systems.find(system => system.instanceId === 'countdown')!.state;
+  const itemFile = path.join(directory, 'test-items.json');
+  const saveBoards = () => fs.writeFileSync(itemFile, JSON.stringify([...items.values()]));
+  const restore = () => {
+    service.dispose(); service = new SystemService(directory, root);
+    items = new Map((JSON.parse(fs.readFileSync(itemFile, 'utf8')) as Item[]).map(item => [item.id, item]));
+    reconcile();
+  };
+  reconcile(); saveBoards();
+  interact('menu-chess-button', 'start'); assert.equal(timer().running, true);
+  for (let tick = 0; tick < 20; tick++) { now += 100; service.tick(sid, participants); reconcile(); }
+  interact('pause-button', 'pause'); assert.equal(timer().running, false); assert.equal(timer().remaining, 8);
+  reconcile();
+  // アイテムの保存後に進んだ共有状態を、先に保存した盤面と組み合わせる。
+  restore(); assert.equal(timer().running, false); assert.equal(timer().remaining, 8);
+  interact('menu-chess-button', 'resume');
+  saveBoards(); now += 3000; restore(); assert.equal(timer().running, true);
+  service.tick(sid, participants); reconcile(); assert.equal(timer().remaining, 5);
+  for (let tick = 0; tick < 50; tick++) { now += 100; service.tick(sid, participants); reconcile(); }
+  assert.equal(timer().running, false); assert.equal(timer().remaining, 0);
+  saveBoards(); restore();
+  service.leave(sid, 'alice'); service.leave(sid, 'bob'); service.release(sid);
+  reconcile(); assert.equal(timer().remaining, 0);
+  now += 1000; service.load(sid, 'alice', map, participants); reconcile();
+  for (const id of [ordinary.id, nativeId]) {
+    const item = items.get(id)!;
+    assert.equal(item.kind, 'chess');
+    if (item.kind !== 'chess') assert.fail('chess expected');
+    assert.ok(applyItemAction(item, { a: 'chessMove', from: squareIndex('e7'), to: squareIndex('e5'), revision: item.chess.revision }, 'bob', () => 0));
+    assert.equal(timer().remaining, 0); assert.equal(timer().running, false);
+  }
+});
 function temporary(t: { after(fn: () => void): void }) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'tonarium-system-service-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true })); return directory;
