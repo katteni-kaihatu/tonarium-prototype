@@ -35,7 +35,7 @@ export type Mode = '2d' | '3d';
  * 約束事を壊す変更（メッセージの追加・意味の変更など）を入れたら +1 する。
  * hello で申告が無い・一致しないクライアントはサーバーが接続を断ち、画面は全面で更新を促す（docs/sync.md）
  */
-export const COMPAT_VERSION = 18;
+export const COMPAT_VERSION = 19;
 
 /** セッションを見られる人。省略時は public */
 export type Visibility = 'public' | 'friends' | 'groupPlus' | 'group' | 'invite';
@@ -231,6 +231,8 @@ export interface SessionInfo {
 export type ChatScope = 'near' | 'all' | 'announce';
 
 export interface ChatMessage {
+  reactions?: Record<string, string[]>;
+  reactionRevision?: number;
   clientRequestId?: string;
   id: string;
   /** null はシステムメッセージ（ログのイベント） */
@@ -245,7 +247,7 @@ export interface ChatMessage {
   media?: ChatMedia;
   at: number;
   scope: ChatScope;
-  /** near の宛先 */
+  /** 送信時に確定した宛先（近距離発言・宛先付きサイコロなど） */
   to?: string[];
   /** イベントで強調する相手（つんつんされた人など） */
   about?: string;
@@ -381,6 +383,7 @@ export type HomeClientMsg =
 
 /** kokosync でサーバーへ送るもの（セッションの中だけ）。 */
 export type RoomClientMsg =
+  | { t: 'chatReact'; id: string; emoji: string; on: boolean }
   | { t: 'systemLoad'; mapId: string }
   | { t: 'systemCommand'; command: Exclude<SystemCommand, { kind: 'map' }> }
   | { t: 'systemResync' }
@@ -436,6 +439,7 @@ export type ClientMsg = HomeClientMsg | RoomClientMsg;
 
 /** 部屋へ送る種類の一覧（送り先の振り分けに使う。型と同じ並び） */
 const ROOM_CLIENT_TYPES: Record<RoomClientMsg['t'], true> = {
+  chatReact: true,
   systemLoad: true, systemCommand: true, systemResync: true,
   sharedCommand: true, sharedResync: true,
   peerOperation: true,
@@ -505,6 +509,7 @@ export type HomeServerMsg =
 
 /** kokosync でサーバーから届くもの。 */
 export type RoomServerMsg =
+  | { t: 'chatReactions'; sid: string; id: string; reactions: Record<string, string[]>; reactionRevision: number }
   | { t: 'systemState'; sid: string; view: SystemView; error?: string; commandResult?: SystemCommandResult }
   | { t: 'sharedDelta'; sid: string; delta: AssetDelta; commandId?: string }
   | { t: 'sharedState'; sid: string; view: AssetView; commandId?: string; error?: string }

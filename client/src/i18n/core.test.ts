@@ -21,6 +21,21 @@ Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
 } });
 const { setLanguage, getLanguage, subscribeLanguage, t, msg, systemText, localized, formatDate, sourceText } = await import('./core.ts');
 
+test('reaction add and remove labels follow all three languages', () => {
+  const previous = getLanguage();
+  try {
+    for (const [language, add, remove] of [
+      ['ja', '👍 のリアクションを追加', '👍 のリアクションを取り消す'],
+      ['en', 'Add 👍 reaction', 'Remove 👍 reaction'],
+      ['ko', '👍 반응 추가', '👍 반응 취소'],
+    ] as const) {
+      setLanguage(language);
+      assert.equal(t('reactionAdd', '👍'), add);
+      assert.equal(t('reactionRemove', '👍'), remove);
+    }
+  } finally { setLanguage(previous); }
+});
+
 test('hammer hit counts are displayed in each supported language', () => {
   const previous = getLanguage();
   try {

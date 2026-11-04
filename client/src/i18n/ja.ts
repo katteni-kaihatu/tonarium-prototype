@@ -1,4 +1,6 @@
 export default {
+  reactionAdd: '{0} のリアクションを追加',
+  reactionRemove: '{0} のリアクションを取り消す',
   mapItemAction: '{0}：{1}',
   mapWatchShare: '{0}の画面共有を見る',
   adBgmLabel: '自分のAD研究所BGM',

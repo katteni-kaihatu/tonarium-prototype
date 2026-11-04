@@ -268,6 +268,10 @@ export function sendChat(text: string, scope: ChatScope, image?: string, media?:
   send({ t: 'chat', text, scope, image, media });
 }
 
+export function reactToChat(id: string, emoji: string, on: boolean) {
+  if (get().session) send({ t: 'chatReact', id, emoji, on });
+}
+
 export const playSound = (id: string) => send({ t: 'sound', id });
 
 export function markNoticesRead() {
