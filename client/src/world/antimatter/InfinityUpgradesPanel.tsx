@@ -33,13 +33,13 @@ function UpgradeCard({ ad, item }: { ad: AntimatterSlice; item: InfinityUpgradeD
   const locked = !item.owned && !item.available;
   const state = item.owned ? ' is-owned' : locked ? ' is-locked' : item.canBuy ? ' is-affordable' : '';
   return (
-    <div className={`ad-card ad-iu-card${state}`} data-iu={item.id}>
-      <div className="ad-card-head"><b>{t(NAME_KEYS[item.id])}</b></div>
-      <div className="ad-card-body"><span className="ad-number ad-card-value">{effectText(item.effect)}</span></div>
+    <div className={`adlab-card adlab-iu-card${state}`} data-iu={item.id}>
+      <div className="adlab-card-head"><b>{t(NAME_KEYS[item.id])}</b></div>
+      <div className="adlab-card-body"><span className="adlab-number adlab-card-value">{effectText(item.effect)}</span></div>
       {item.owned
-        ? <div className="ad-iu-owned"><Icon name="check" size={16} /> {t('adIuOwned')}</div>
+        ? <div className="adlab-iu-owned"><Icon name="check" size={16} /> {t('adIuOwned')}</div>
         : locked
-          ? <div className="ad-iu-lock" role="img" aria-label={t('adLocked')}><Icon name="lock" size={18} /></div>
+          ? <div className="adlab-iu-lock" role="img" aria-label={t('adLocked')}><Icon name="lock" size={18} /></div>
           : <button type="button" style={s.btn} disabled={!item.canBuy} onClick={() => ad.buyInfinityUpgrade(item.id)}>{t('adLabText62', item.cost)}</button>}
     </div>
   );
@@ -49,9 +49,9 @@ export function InfinityUpgradesPanel({ ad }: { ad: AntimatterSlice }) {
   useLanguage();
   const columns = [1, 2, 3, 4].map(column => ad.derived.infinityUpgrades.filter(item => item.column === column));
   return (
-    <div className="ad-iu-grid">
+    <div className="adlab-iu-grid">
       {columns.map((items, i) => (
-        <div key={i} className="ad-iu-col">
+        <div key={i} className="adlab-iu-col">
           {items.map(item => <UpgradeCard key={item.id} ad={ad} item={item} />)}
         </div>
       ))}
