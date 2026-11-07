@@ -105,13 +105,16 @@ test('separated statistics and achievements preserve every value and save in thr
     setLanguage(language);
     const ad = adaptAdSlice(slice)!;
     const stats = renderToStaticMarkup(<StatsPanel ad={ad} />);
-    const values = [
-      t('adLabText44', formatNumber(game.totalAntimatter)), t('adLabText45', formatDuration(90061)),
-      t('adLabText46', 17), t('adLabText47', 3), t('adLabText48', 2),
-      `IP: ${formatNumber(game.infinityPoints)}`, t('adLabText49', 23), t('adLabText50', formatNumber(game.sacrificeBoost)),
+    const tiles: [string, string][] = [
+      [t('adUiStatTotal'), formatNumber(game.totalAntimatter)], [t('adUiStatPlay'), formatDuration(90061)],
+      ['Dimension Boost', t('adUiTimes', 17)], [t('adUiStatGalaxy'), t('adUiGalaxyCount', 3)], ['Infinity', t('adUiTimes', 2)],
+      ['Infinity Point', formatNumber(game.infinityPoints)], [t('adUiStatTick'), t('adUiTimes', 23)], [t('adUiStatSacrifice'), `×${formatNumber(game.sacrificeBoost)}`],
     ];
-    for (const value of values) assert.ok(stats.includes(value), `${language}: ${value}`);
-    assert.equal([...stats.matchAll(/<span\b/g)].length, 8);
+    for (const [label, value] of tiles) {
+      const tile = `<span class="adlab-stat-label">${label}</span><b class="adlab-number">${value}</b>`;
+      assert.ok(stats.includes(tile), `${language}: ${label} ${value}`);
+    }
+    assert.equal([...stats.matchAll(/class="adlab-stat"/g)].length, 8);
     assert.ok(!stats.includes('adlab-ranking'));
     assert.ok(!stats.includes(t('adLabText133')));
     const achievements = renderToStaticMarkup(<AchievementsPanel ad={ad} />);
@@ -343,7 +346,7 @@ for (const language of ['ja', 'en', 'ko'] as const) {
 
 }
 
-test('first Infinity unlocks the Layers tab, and the Crunch card appears only once reachable or reached, in all languages', () => {
+test('first Infinity unlocks the Layers and Infinity tabs, and the Crunch card is enabled only once reachable, in all languages', () => {
   const previous = getLanguage();
   try {
     for (const language of ['ja', 'en', 'ko'] as const) {
@@ -354,7 +357,8 @@ test('first Infinity unlocks the Layers tab, and the Crunch card appears only on
       const before = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
       for (const key of ['adLabText4', 'adLabText6', 'ui819', 'adLabText52', 'adSaveTab']) assert.ok(tabButton(before, key));
       assert.ok(!tabButton(before, 'adLabText7'));
-      assert.ok(!before.includes(t('adLabText31')));
+      assert.match(before, new RegExp(`<button[^>]*class="adlab-tab is-locked"[^>]*disabled=""[^>]*>[\\s\\S]*?${t('adInfinityTab')}<svg`));
+      assert.equal(disabled(before, t('adLabText31')), true);
       assert.ok(before.includes(t('adLabText26')) && before.includes(t('adLabText28')) && before.includes(t('adLabText30')));
       game.antimatter = bigFromNumber(1.79e308);
       const reachable = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
@@ -367,7 +371,7 @@ test('first Infinity unlocks the Layers tab, and the Crunch card appears only on
       slice.adGame = createNewGame(0);
       const restored = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
       assert.ok(!tabButton(restored, 'adLabText7'));
-      assert.ok(!restored.includes(t('adLabText31')));
+      assert.equal(disabled(restored, t('adLabText31')), true);
     }
   } finally { setLanguage(previous); }
 });

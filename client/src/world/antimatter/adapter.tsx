@@ -6,13 +6,43 @@ import {
   getAntimatterPerSecond, getDimensionalBoostRequirement, getDimensionCost,
   getDimensionMultiplierBig, getDimensionProductionPerSecond, getEffectiveTickspeedBig, getSacrificeCandidate, getGalaxyRequirement,
   getInfinityGain, getMaxUnlockedTier, getTickspeedCost, getTickspeedPerPurchase,
+  INFINITY_THRESHOLD_LOG10, SACRIFICE_MIN_GAIN, bigMulNumber,
   type GameState,
 } from '../../ad/engine.mjs';
 import { parseImportBundle, type StorageLike } from '../../ad/user.mjs';
 import type { AdSlice } from '../../ad/slice.ts';
-import type { AntimatterSlice, DerivedSnapshot, OfflineNotice } from './types.ts';
+import type { AntimatterSlice, DerivedSnapshot, OfflineNotice, PreviewDerived } from './types.ts';
 import { AntimatterPanel } from './AntimatterPanel.tsx';
 import { emitAdFeedback } from '../../ad/feedback.ts';
+
+// 状態を書き換えずに、浅いコピーへエンジンの式を当てて比較値を出す。
+function previewFrom(game: GameState, maxUnlockedTier: number): PreviewDerived {
+  const multiplier = (state: GameState, tier: number) => {
+    const mult = getDimensionMultiplierBig(state, tier);
+    return tier === 8 ? bigDiv(mult, state.sacrificeBoost) : mult;
+  };
+  const boostPart = (boosts: number, tier: number) =>
+    bigDiv(multiplier({ ...game, dimensionalBoosts: boosts }, tier), multiplier({ ...game, dimensionalBoosts: 0 }, tier));
+  const withoutBought = (tier: number): GameState => ({
+    ...game,
+    dimensions: game.dimensions.map((dim, i) => (i === tier - 1 ? { ...dim, bought: 0 } : dim)),
+  });
+  return {
+    tickspeedNext: getEffectiveTickspeedBig({ ...game, tickspeedBought: game.tickspeedBought + 1 }),
+    boostFirst: boostPart(game.dimensionalBoosts, 1),
+    boostFirstNext: boostPart(game.dimensionalBoosts + 1, 1),
+    galaxyPerPurchaseNext: getTickspeedPerPurchase({ ...game, galaxies: game.galaxies + 1 }),
+    sacrificeNeeded: bigMulNumber(game.sacrificeBoost, SACRIFICE_MIN_GAIN),
+    infinityThresholdLog10: INFINITY_THRESHOLD_LOG10,
+    breakdown: game.dimensions.map((_, i) => {
+      const tier = i + 1;
+      const total = multiplier(game, tier);
+      const buy10 = bigDiv(total, multiplier(withoutBought(tier), tier));
+      const boost = boostPart(game.dimensionalBoosts, tier);
+      return { tier, locked: tier > maxUnlockedTier, buy10, boost, other: bigDiv(bigDiv(total, buy10), boost), total };
+    }),
+  };
+}
 
 function derivedFrom(game: GameState): DerivedSnapshot {
   const maxUnlockedTier = getMaxUnlockedTier(game);
@@ -71,6 +101,7 @@ function derivedFrom(game: GameState): DerivedSnapshot {
       canBuy: canBuyInfinityUpgrade(game, id),
       effect: getInfinityUpgradeEffect(game, id),
     })),
+    preview: previewFrom(game, maxUnlockedTier),
   };
 }
 
