@@ -1,7 +1,7 @@
 import { t, useLanguage, type UiMessage } from '../../i18n/index.ts';
 import { Icon } from '../Icon.tsx';
 import { memo } from 'react';
-import { bigMulNumber } from '../../ad/engine.mjs';
+import { bigGte, bigMulNumber } from '../../ad/engine.mjs';
 import type { AntimatterSlice, DimensionDerived } from './types.ts';
 import { formatNumber } from './format.ts';
 import { TIER_EN } from './styles.ts';
@@ -20,8 +20,9 @@ function DimensionName({ d }: { d: DimensionDerived }) {
   );
 }
 
-function DimensionRow({ d, sacrificeBoost, buyDimension, buyUntilNextTen }: {
+function DimensionRow({ d, antimatter, sacrificeBoost, buyDimension, buyUntilNextTen }: {
   d: DimensionDerived;
+  antimatter: AntimatterSlice['game']['antimatter'];
   sacrificeBoost: AntimatterSlice['game']['sacrificeBoost'];
   buyDimension: AntimatterSlice['buyDimension'];
   buyUntilNextTen: AntimatterSlice['buyUntilNextTen'];
@@ -38,6 +39,8 @@ function DimensionRow({ d, sacrificeBoost, buyDimension, buyUntilNextTen }: {
   // 1 ブロック（10 個）の中は単価が同じなので、次の ×2 までの費用は単価 × 残り個数になる。
   const blockCost = bigMulNumber(d.cost, d.nextMilestoneRemaining);
   const done = 10 - d.nextMilestoneRemaining;
+  // 押せる条件は 1 個買えるかのまま（足りない分は買える数だけ買う）。強調は全部買えるときだけにする。
+  const blockAffordable = d.affordable && bigGte(antimatter, blockCost);
   return (
     <div className={`adlab-dim-row${d.affordable ? ' is-affordable' : ''}`} data-tier={d.tier}>
       <DimensionName d={d} />
@@ -55,7 +58,7 @@ function DimensionRow({ d, sacrificeBoost, buyDimension, buyUntilNextTen }: {
         <button type="button" aria-label={t('adLabText23', d.tier)} disabled={!d.affordable} onClick={() => buyDimension(d.tier)}>
           <b>+1</b><small className="adlab-number">{formatNumber(d.cost)}</small>
         </button>
-        <button type="button" aria-label={t('adLabText24', d.tier)} disabled={!d.affordable} onClick={() => buyUntilNextTen(d.tier)}>
+        <button type="button" className={blockAffordable ? undefined : 'is-partial'} aria-label={t('adLabText24', d.tier)} disabled={!d.affordable} onClick={() => buyUntilNextTen(d.tier)}>
           <b>+{d.nextMilestoneRemaining}</b><small className="adlab-number">{formatNumber(blockCost)}</small>
         </button>
       </div>
@@ -82,7 +85,7 @@ export function DimensionList({ ad, notice = () => {} }: { ad: AntimatterSlice; 
         </div>
         {derived.dimensions.map((d) => (
           <MemoRow
-            key={d.tier} d={d} sacrificeBoost={game.sacrificeBoost}
+            key={d.tier} d={d} antimatter={game.antimatter} sacrificeBoost={game.sacrificeBoost}
             buyDimension={ad.buyDimension} buyUntilNextTen={ad.buyUntilNextTen}
           />
         ))}
