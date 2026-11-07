@@ -72,8 +72,8 @@
 .adlab-header-tools { flex: none; margin-left: auto; }
 .adlab-number { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .adlab-shell { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
-.adlab-tabs { flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(min-content, 1fr); border-bottom: 1px solid rgba(255,255,255,.16); }
-.adlab-lab-panel .adlab-tab { min-height: 44px; padding: 4px 2px; overflow-wrap: normal; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: transparent; color: rgba(242,238,245,.75); font-size: var(--ad-text, 13px); font-weight: 600; cursor: pointer; }
+.adlab-tabs { flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(min-content, 1fr); overflow-x: auto; border-bottom: 1px solid rgba(255,255,255,.16); }
+.adlab-lab-panel .adlab-tab { min-width: 44px; min-height: 44px; padding: 4px 8px; white-space: nowrap; overflow-wrap: normal; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: transparent; color: rgba(242,238,245,.75); font-size: var(--ad-text, 13px); font-weight: 600; cursor: pointer; }
 .adlab-lab-panel .adlab-tab.is-active { border-bottom-color: #7fffe3; background: rgba(127,255,227,.1); color: #b5fff2; }
 .adlab-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-gutter: stable; display: flex; flex-direction: column; gap: 10px; }
 .adlab-body > * { flex-shrink: 0; min-width: 0; }
