@@ -12,15 +12,19 @@ import {
   getDimensionalBoostRequirement,
   getDimensionCost,
   getDimensionProductionPerSecond,
-  getEffectiveTickspeed,
+  getEffectiveTickspeedBig,
+  getSacrificeCandidate,
   getGalaxyRequirement,
   getMaxUnlockedTier,
   getTickspeedCost,
+  INFINITY_UPGRADES,
+  type AutobuyerId,
   type GameState,
 } from './engine.mjs';
 import type { AdPanelTarget, AdLabSnapshot } from '../../../shared/antimatterLayout.ts';
 import type { AdActions } from '../view3d/antimatterPanels.tsx';
 import type { AdSlice } from './slice.ts';
+import { confirmAd } from '../world/antimatter/confirmAd.tsx';
 
 const log10Of = (v: Parameters<typeof bigLog10>[0]): number => {
   const v2 = bigLog10(v);
@@ -34,6 +38,8 @@ const EXHIBIT_KEYS: Record<string, string> = {
   'exhibit-celestials': 'adExhibitCelestials',
 };
 export const adExhibitTitle = (id: string): string => t(EXHIBIT_KEYS[id] ?? 'adLabText125');
+
+const autoActive = (game: GameState, id: AutobuyerId): boolean => game.autobuyers[id].unlocked && game.autobuyers[id].enabled;
 
 export function buildAdLabSnapshot(game: GameState): AdLabSnapshot {
   const maxUnlockedTier = getMaxUnlockedTier(game);
@@ -58,7 +64,7 @@ export function buildAdLabSnapshot(game: GameState): AdLabSnapshot {
         locked: tier > maxUnlockedTier,
       };
     }),
-    tickspeedText: formatNumber(getEffectiveTickspeed(game)),
+    tickspeedText: formatNumber(getEffectiveTickspeedBig(game)),
     tickspeedBought: game.tickspeedBought,
     boosts: game.dimensionalBoosts,
     boostRequirementText: t('adLabText130', boostReq.tier, boostReq.amount),
@@ -69,18 +75,25 @@ export function buildAdLabSnapshot(game: GameState): AdLabSnapshot {
     galaxyCurrentAmountText: formatNumber(game.dimensions[galaxyReq.tier - 1].amount),
     canGalaxy: canAntimatterGalaxy(game),
     sacrificeText: formatNumber(game.sacrificeBoost),
+    sacrificeNextText: formatNumber(getSacrificeCandidate(game)),
     sacrificeUnlocked: game.dimensionalBoosts >= 5,
     canSacrifice: canSacrifice(game),
     infinityPointsText: formatNumber(game.infinityPoints),
     infinities: game.infinities,
     canCrunch: canInfinity(game),
+    infinityUpgradesOwned: game.infinityUpgrades.length,
+    infinityUpgradesTotal: INFINITY_UPGRADES.length,
+    autoTickspeed: autoActive(game, 'tickspeed'),
+    autoBoost: autoActive(game, 'boost'),
+    autoGalaxy: autoActive(game, 'galaxy'),
+    autoCrunch: autoActive(game, 'crunch'),
   };
 }
 
 // 購入ロジックは engine 呼び出し 1 か所に集約する。3D 側はこの口だけを使う。
 // buyDimensionMax / buyMaxTickspeed はスライスに無いため、ここで直接 engine を呼ぶことはせず
 // スライス側の追加アクション（adBuyDimensionMax / adBuyMaxTickspeed）に委ねる。
-export function buildAdActions(slice: AdSlice): AdActions {
+export function buildAdActions(slice: AdSlice, confirm: (message: string) => Promise<boolean> = confirmAd): AdActions {
   return {
     buyDimension: (tier) => { void slice.adBuyDimension(tier); },
     buyDimensionUpTo: (tier, count) => {
@@ -95,9 +108,9 @@ export function buildAdActions(slice: AdSlice): AdActions {
     dimensionalBoost: () => { void slice.adBoost(); },
     antimatterGalaxy: () => { void slice.adGalaxy(); },
     sacrifice: () => { void slice.adSacrifice(); },
-    prestigeInfinity: () => {
+    prestigeInfinity: async () => {
       // Big Crunch は取り消せないため、呼び出し前に確認する（3D パネル側では出さない約束）
-      if (!window.confirm(t('adLabText132'))) return;
+      if (!await confirm(t('adLabText132'))) return;
       void slice.adPrestige();
     },
   };

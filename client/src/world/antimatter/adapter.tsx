@@ -1,8 +1,10 @@
 import { msg, getLanguage, useLanguage } from '../../i18n/index.ts';
 import {
-  bigGte, canAntimatterGalaxy, canDimensionalBoost, canInfinity, canSacrifice,
+  AUTOBUYER_IDS, AUTOBUYER_UNLOCK_COST, getAutobuyerInterval, getAutobuyerUpgradeCost,
+  INFINITY_UPGRADES, bigDiv, bigFromNumber, bigGte, canBuyInfinityUpgrade, getInfinityUpgradeEffect,
+  hasInfinityUpgrade, isInfinityUpgradeAvailable, canAntimatterGalaxy, canDimensionalBoost, canInfinity, canSacrifice,
   getAntimatterPerSecond, getDimensionalBoostRequirement, getDimensionCost,
-  getDimensionProductionPerSecond, getEffectiveTickspeed, getGalaxyRequirement,
+  getDimensionMultiplierBig, getDimensionProductionPerSecond, getEffectiveTickspeedBig, getSacrificeCandidate, getGalaxyRequirement,
   getInfinityGain, getMaxUnlockedTier, getTickspeedCost, getTickspeedPerPurchase,
   type GameState,
 } from '../../ad/engine.mjs';
@@ -16,7 +18,7 @@ function derivedFrom(game: GameState): DerivedSnapshot {
   const maxUnlockedTier = getMaxUnlockedTier(game);
   return {
     antimatterPerSecond: getAntimatterPerSecond(game),
-    tickspeedValue: getEffectiveTickspeed(game),
+    tickspeedValue: getEffectiveTickspeedBig(game),
     tickspeedBought: game.tickspeedBought,
     tickspeedCost: getTickspeedCost(game),
     tickspeedAffordable: bigGte(game.antimatter, getTickspeedCost(game)),
@@ -32,6 +34,7 @@ function derivedFrom(game: GameState): DerivedSnapshot {
         bought: dim.bought,
         cost,
         productionPerSecond: getDimensionProductionPerSecond(game, tier),
+        multiplier: tier === 8 ? bigDiv(getDimensionMultiplierBig(game, tier), game.sacrificeBoost) : getDimensionMultiplierBig(game, tier),
         affordable: !locked && bigGte(game.antimatter, cost),
         locked,
         nextMilestoneRemaining: dim.bought % 10 === 0 ? 10 : 10 - (dim.bought % 10),
@@ -45,8 +48,29 @@ function derivedFrom(game: GameState): DerivedSnapshot {
       const req = getGalaxyRequirement(game);
       return { tier: req.tier, amount: req.amount, currentAmount: game.dimensions[7].amount, can: canAntimatterGalaxy(game) };
     })(),
-    sacrifice: { unlocked: game.dimensionalBoosts >= 5, can: canSacrifice(game), boost: game.sacrificeBoost, boosts: game.dimensionalBoosts },
+    sacrifice: { unlocked: game.dimensionalBoosts >= 5, can: canSacrifice(game), boost: game.sacrificeBoost, next: getSacrificeCandidate(game), boosts: game.dimensionalBoosts },
     infinity: { can: canInfinity(game), gain: getInfinityGain(game) },
+    autobuyers: AUTOBUYER_IDS.map((id) => {
+      const ab = game.autobuyers[id];
+      const upgradeCost = getAutobuyerUpgradeCost(game, id);
+      return {
+        id,
+        unlocked: ab.unlocked,
+        enabled: ab.enabled,
+        intervalMs: getAutobuyerInterval(ab.level),
+        unlockCost: AUTOBUYER_UNLOCK_COST[id],
+        canUnlock: bigGte(game.infinityPoints, bigFromNumber(AUTOBUYER_UNLOCK_COST[id])),
+        upgradeCost,
+        canUpgrade: upgradeCost !== null && bigGte(game.infinityPoints, bigFromNumber(upgradeCost)),
+      };
+    }),
+    infinityUpgrades: INFINITY_UPGRADES.map(({ id, column, row, cost }) => ({
+      id, column, row, cost,
+      owned: hasInfinityUpgrade(game, id),
+      available: isInfinityUpgradeAvailable(game, id),
+      canBuy: canBuyInfinityUpgrade(game, id),
+      effect: getInfinityUpgradeEffect(game, id),
+    })),
   };
 }
 
@@ -77,6 +101,7 @@ export function adaptAdSlice(slice: AdSlice, options: AdaptOptions = {}): Antima
     exportProgress: key => { const bundle = slice.adExportProgress(key); return bundle ? JSON.stringify(bundle, null, 2) : ''; },
     activeProfile: slice.adProfile,
     offlineNotice: offline,
+    rescueCount: slice.adRescues,
     leaderboard: slice.adLeaderboard,
     serverStatus,
     syncState: slice.adSync,
@@ -103,6 +128,10 @@ export function adaptAdSlice(slice: AdSlice, options: AdaptOptions = {}): Antima
       const gain = getInfinityGain(game);
       return slice.adPrestige() ? gain : 0;
     },
+    unlockAutobuyer: (id) => { slice.adUnlockAutobuyer(id); },
+    setAutobuyer: (id, enabled) => { slice.adSetAutobuyer(id, enabled); },
+    upgradeAutobuyer: (id) => { slice.adUpgradeAutobuyer(id); },
+    buyInfinityUpgrade: (id) => { slice.adBuyInfinityUpgrade(id); },
     resetGame: slice.adResetGame,
     recoveryRecords: slice.adListRecovery(),
     exportRecoveryBundle: (source, key) => { const bundle = slice.adExportRecovery(source, key); return bundle ? JSON.stringify(bundle, null, 2) : ''; },

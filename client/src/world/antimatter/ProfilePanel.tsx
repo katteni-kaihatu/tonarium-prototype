@@ -5,6 +5,7 @@ import { emitAdFeedback } from '../../ad/feedback.ts';
 import { parseImportBundle } from '../../ad/user.mjs';
 import { t, useLanguage, msg, getLanguage, type UiMessage } from '../../i18n/index.ts';
 import { ProgressPicker } from './ProgressPicker.tsx';
+import { confirmAd } from './confirmAd.tsx';
 
 export function ProfilePanel({ ad, notice }: { ad: AntimatterSlice; notice: (message: UiMessage) => void }) {
   useLanguage();
@@ -28,11 +29,11 @@ export function ProfilePanel({ ad, notice }: { ad: AntimatterSlice; notice: (mes
       notice(msg('adExportDone'));
     } catch { notice(msg('adExportFailed')); }
   };
-  const onImport = () => {
+  const onImport = async () => {
     try {
       const bundle = parseImportBundle(exportText);
       const legacy = bundle.version === 2;
-      if (legacy && !window.confirm(t('adLegacyConfirm'))) return;
+      if (legacy && !await confirmAd(t('adLegacyConfirm'))) return;
       notice(ad.importBundle(exportText, legacy).message);
     } catch { emitAdFeedback({ kind: 'error' }); notice(msg('adImportFailed')); }
   };
@@ -68,8 +69,8 @@ export function ProfilePanel({ ad, notice }: { ad: AntimatterSlice; notice: (mes
         setExportText(text); download(text, 'antimatter-recovery-v3.json');
       }} />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-        <button style={s.btnDanger} disabled={waiting} onClick={() => {
-          if (!window.confirm(t('adResetConfirm')) || !window.confirm(t('adResetFinal'))) return;
+        <button style={s.btnDanger} disabled={waiting} onClick={async () => {
+          if (!await confirmAd(t('adResetConfirm')) || !await confirmAd(t('adResetFinal'))) return;
           try { ad.resetGame(); setExportText(''); } catch { notice(msg('adProfileFailed')); }
         }}>{t('adReset')}</button>
       </div>

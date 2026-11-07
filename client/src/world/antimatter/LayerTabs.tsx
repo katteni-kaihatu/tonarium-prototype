@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { AntimatterSlice } from './types.ts';
 import {
   CELESTIALS_OVERVIEW, CHALLENGES, ETERNITY_UPGRADES, getLayerTabs, GLYPH_TYPES,
-  INFINITY_DIMENSIONS, INFINITY_UPGRADES, REALITY_UPGRADES, TIME_DIMENSIONS, TIME_STUDIES,
+  INFINITY_DIMENSIONS, REALITY_UPGRADES, TIME_DIMENSIONS, TIME_STUDIES,
 } from './layersData.ts';
 import { s } from './styles.ts';
 import { LabBanner, type LabArtKind } from './LabArt.tsx';
@@ -32,11 +32,6 @@ function LayerBody({ layerId, ad }: { layerId: string; ad: AntimatterSlice }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <p style={s.muted}>{t('adLabText61')}</p>
-        <MockList title={t('adLabText71')}>
-          {INFINITY_UPGRADES.map((u) => (
-            <div key={u.id} style={s.row}><span><b>{u.name}</b> <span style={s.badgeMock}>{t('ui1154')}</span></span><span style={s.muted}>{t('adEffect', u.description, u.effect)}</span><span style={{ flex: 1 }} /><MockButton>{t('adLabText62', u.costIP)}</MockButton></div>
-          ))}
-        </MockList>
         <MockList title={t('adLabText72')}>
           {INFINITY_DIMENSIONS.map((d) => (
             <div key={d.tier} style={s.row}><span><b>{d.name}</b> <span style={s.badgeMock}>{t('ui1154')}</span></span><span style={s.muted}>{t('adBaseCost', d.produces, d.baseCostIP, 'IP')}</span><span style={{ flex: 1 }} /><MockButton>{t('adLabText63')}</MockButton></div>
@@ -104,9 +99,9 @@ export function LayerTabs({ ad }: { ad: AntimatterSlice }) {
   const layerArt: Record<string, LabArtKind> = { dimensions: 'reactor', infinity: 'singularity', eternity: 'galaxy', reality: 'explorer', celestials: 'galaxy' };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={s.tabs}>
+      <div className="ad-segments" role="group">
         {tabs.map((entry) => (
-          <button key={entry.id} style={entry.id === layerId ? s.tabActive : s.tab} onClick={() => { if (entry.id !== layerId) { setLayerId(entry.id); emitAdFeedback({ kind: 'navigate' }); } }}>
+          <button key={entry.id} type="button" className={`ad-segment${entry.id === layerId ? ' is-active' : ''}`} aria-pressed={entry.id === layerId} onClick={() => { if (entry.id !== layerId) { setLayerId(entry.id); emitAdFeedback({ kind: 'navigate' }); } }}>
             {entry.nameJa}<span style={entry.status === 'mock' ? s.badgeMock : s.badge}>{entry.badge}</span>{!entry.unlocked && entry.id !== 'dimensions' ? <span style={s.muted}><Icon name="lock" size={14} /> {t('adLocked')}</span> : null}
           </button>
         ))}

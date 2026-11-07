@@ -16,6 +16,11 @@ import { DimensionList } from './DimensionList.tsx';
 import { LayerTabs } from './LayerTabs.tsx';
 import { serialize } from '../../ad/engine.mjs';
 import { AntimatterPanel } from './AntimatterPanel.tsx';
+import { AutomationPanel } from './AutomationPanel.tsx';
+import { InfinityPanel } from './InfinityPanel.tsx';
+import { InfinityUpgradesPanel } from './InfinityUpgradesPanel.tsx';
+import { confirmAd } from './confirmAd.tsx';
+import { shouldFillWindow, simpleWindowSize } from '../windowSize.ts';
 
 test('personal BGM toggle is accessible in 2D and every 3D target regardless of ownership', () => {
   const previous = getLanguage();
@@ -239,10 +244,10 @@ for (const language of ['ja', 'en', 'ko'] as const) {
             assert.equal(disabled(flat, target === 'boost' ? t('adLabText26') : t('adLabText28')), expected);
             assert.equal(disabled(space, target === 'boost' ? t('adLabText115') : t('adLabText119')), expected);
             assert.equal(target === 'boost' ? ad.derived.boost.can : ad.derived.galaxy.can, !expected);
-            assert.ok(flat.includes(t('adRequired') + ': ' + t('adLabText13', req.tier)));
-            assert.match(flat, new RegExp('class="ad-number">' + req.amount + '</span>'));
-            assert.match(flat, new RegExp('class="ad-number">' + (req.amount + offset) + '</span>'));
-            assert.ok(flat.includes(t(target === 'boost' ? 'adLabText46' : 'adLabText47', target === 'boost' ? game.dimensionalBoosts : game.galaxies)));
+            assert.ok(flat.includes(t('adLabText13', req.tier)));
+            assert.ok(flat.includes(`${req.amount + offset} / ${req.amount}`));
+            const header = renderToStaticMarkup(<AntimatterPanel ad={ad} />);
+            assert.ok(header.includes(target === 'boost' ? t('adChipBoost', game.dimensionalBoosts) : t('adChipGalaxy', game.galaxies)));
             assert.ok(space.includes(t('adRequirementCurrentAmount', String(req.amount + offset))));
             assert.equal(disabled(panels(slice, target, false).space, target === 'boost' ? t('adLabText115') : t('adLabText119')), true);
           }
@@ -263,6 +268,7 @@ for (const language of ['ja', 'en', 'ko'] as const) {
         const game = createNewGame(0);
         game.dimensionalBoosts = boosts;
         game.dimensions[0].amount = bigFromLog10(100);
+        game.dimensions[7].amount = bigFromNumber(1);
         if (!improved) game.sacrificeBoost = getSacrificeCandidate(game);
         const slice = harness(game);
         const { flat, space } = panels(slice, 'sacrifice');
@@ -274,6 +280,7 @@ for (const language of ['ja', 'en', 'ko'] as const) {
     for (const amount of [1.78e308, 1.79e308, 1.795e308]) {
       const game = createNewGame(0);
       game.antimatter = bigFromNumber(amount);
+      game.infinities = 1;
       const slice = harness(game);
       const { flat, space } = panels(slice, 'crunch');
       assert.equal(disabled(flat, t('adLabText31')), amount < 1.79e308);
@@ -284,28 +291,125 @@ for (const language of ['ja', 'en', 'ko'] as const) {
 
 }
 
-test('first Infinity unlocks upper layers and Research keeps the initial Crunch available in all languages', () => {
+test('first Infinity unlocks the Layers tab, and the Crunch card appears only once reachable or reached, in all languages', () => {
   const previous = getLanguage();
   try {
-    for (const [language, research] of [['ja', '研究開発'], ['en', 'Research'], ['ko', '연구개발']] as const) {
+    for (const language of ['ja', 'en', 'ko'] as const) {
       setLanguage(language);
-      assert.equal(t('adLabText5'), research);
       const game = createNewGame(0);
-      game.antimatter = bigFromNumber(1.79e308);
       const slice = harness(game);
+      const tabButton = (html: string, key: string) => html.includes('>' + t(key).replace(/&/g, '&amp;') + '</button>');
       const before = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
-      assert.ok(before.includes('>' + research + '</button>'));
-      assert.ok(!before.includes('>' + t('adLabText7') + '</button>'));
-      assert.equal(disabled(renderToStaticMarkup(<ActionBar ad={adaptAdSlice(slice)!} notice={() => {}} />), t('adLabText31')), false);
+      for (const key of ['adLabText4', 'adLabText6', 'adSaveTab']) assert.ok(tabButton(before, key));
+      assert.ok(!tabButton(before, 'adLabText7'));
+      assert.ok(!before.includes(t('adLabText31')));
+      assert.ok(before.includes(t('adLabText26')) && before.includes(t('adLabText28')) && before.includes(t('adLabText30')));
+      game.antimatter = bigFromNumber(1.79e308);
+      const reachable = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
+      assert.equal(disabled(reachable, t('adLabText31')), false);
       assert.equal(slice.adPrestige(), true);
       assert.equal(slice.adGame!.infinities, 1);
       const after = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
-      assert.ok(after.includes('>' + t('adLabText7') + '</button>'));
+      assert.ok(tabButton(after, 'adLabText7'));
+      assert.equal(disabled(after, t('adLabText31')), true);
       slice.adGame = createNewGame(0);
       const restored = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
-      assert.ok(!restored.includes('>' + t('adLabText7') + '</button>'));
+      assert.ok(!tabButton(restored, 'adLabText7'));
+      assert.ok(!restored.includes(t('adLabText31')));
     }
   } finally { setLanguage(previous); }
+});
+
+test('自動化タブは Infinity 後に出て、解放・切り替え・短縮が IP を使い、3D には自動の印が出る', () => {
+  const previous = getLanguage();
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      const game = createNewGame(0);
+      const slice = harness(game);
+      const tabButton = (html: string) => html.includes('>' + t('adInfinityTab') + '</button>');
+      assert.ok(!tabButton(renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />)));
+      game.infinities = 1;
+      game.infinityPoints = bigFromNumber(2);
+      assert.ok(tabButton(renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />)));
+      const html = () => renderToStaticMarkup(<AutomationPanel ad={adaptAdSlice(slice)!} />);
+      assert.ok(html().includes(t('adAutoUnlock', 1)) && html().includes(t('adAutoUnlock', 3)));
+      assert.equal(disabled(html(), t('adAutoUnlock', 3)), true);
+      assert.equal(slice.adUnlockAutobuyer('crunch'), false);
+      assert.equal(slice.adUnlockAutobuyer('tickspeed'), true);
+      assert.equal(buildAdLabSnapshot(game).autoTickspeed, true);
+      assert.ok(panels(slice, 'tickspeed').space.includes(t('adAutoBadge')));
+      assert.ok(!panels(slice, 'boost').space.includes(t('adAutoBadge')));
+      assert.ok(html().includes(t('adAutoInterval', 5)) && html().includes(t('adAutoShorten', 1)));
+      assert.equal(slice.adSetAutobuyer('tickspeed', false), true);
+      assert.ok(html().includes(t('adAutoOff')));
+      assert.ok(!panels(slice, 'tickspeed').space.includes(t('adAutoBadge')));
+      assert.equal(slice.adUpgradeAutobuyer('tickspeed'), true);
+      assert.ok(html().includes(t('adAutoInterval', 3)));
+    }
+  } finally { setLanguage(previous); }
+});
+
+test('Infinity 強化は列の順に買え、IP が足りないと変わらず、2D・3D の表示に反映される', () => {
+  const previous = getLanguage();
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      const game = createNewGame(0);
+      game.infinities = 1;
+      game.infinityPoints = bigFromNumber(2);
+      const slice = harness(game);
+      const html = () => renderToStaticMarkup(<InfinityUpgradesPanel ad={adaptAdSlice(slice)!} />);
+      const card = (id: string) => html().split('<div class="ad-card ad-iu-card').find(part => part.includes(`data-iu="${id}"`)) ?? '';
+      assert.equal(html().match(/data-iu="/g)?.length, 16);
+      assert.ok(card('dims18').includes(t('adLocked')) && card('dims18').includes('is-locked'));
+      assert.equal(slice.adBuyInfinityUpgrade('dims18'), false);
+      assert.equal(disabled(card('startBoost1').replace(/^[^<]*/, ''), t('adLabText62', 6)), true);
+      assert.equal(slice.adBuyInfinityUpgrade('startBoost1'), false);
+      assert.equal(game.infinityPoints.mantissa, 2);
+      assert.equal(slice.adBuyInfinityUpgrade('totalTime'), true);
+      assert.ok(card('totalTime').includes('is-owned') && card('totalTime').includes(t('adIuOwned')));
+      assert.ok(!card('dims18').includes('is-locked'));
+      assert.equal(slice.adBuyInfinityUpgrade('dims18'), true);
+      assert.equal(game.infinityPoints.mantissa, 0);
+      assert.equal(slice.adBuyInfinityUpgrade('dims36'), false);
+      assert.ok(card('buy10').includes('×2.2'));
+      assert.ok(card('resetReq').includes('−9'));
+      assert.ok(card('startGalaxy').includes(t('adChipBoost', 4)));
+      const infinityTab = renderToStaticMarkup(<InfinityPanel ad={adaptAdSlice(slice)!} />);
+      assert.ok(infinityTab.includes(t('adIuSegUpgrades')) && infinityTab.includes(t('adAutoTab')));
+      assert.ok(panels(slice, 'exhibit-infinity').space.includes(t('adIuCount', 2, 16)));
+      assert.ok(!panels(slice, 'exhibit-eternity').space.includes(t('adIuCount', 2, 16)));
+    }
+  } finally { setLanguage(previous); }
+});
+
+test('次元の倍率表示は Infinity 強化と Boost の効果を含むエンジンの値と一致する', () => {
+  const game = createNewGame(0);
+  game.dimensions[0].bought = 20;
+  game.dimensionalBoosts = 2;
+  const slice = harness(game);
+  const before = renderToStaticMarkup(<DimensionList ad={adaptAdSlice(slice)!} />);
+  assert.ok(before.includes('×16'));
+  game.infinityUpgrades = ['buy10', 'boostMult'];
+  const after = renderToStaticMarkup(<DimensionList ad={adaptAdSlice(slice)!} />);
+  assert.ok(after.includes(`×${formatNumber(bigFromLog10(2 * Math.log10(2.2) + 2 * Math.log10(2.5)))}`));
+});
+
+test('phone window size fills the region only for AD windows in the phone layout', () => {
+  const region = { w: 374, h: 560 };
+  const opts = { region, bar: 44, aspect: 1.2 };
+  assert.deepEqual(simpleWindowSize({ ...opts, fill: true }), { width: 374, height: 560 });
+  assert.deepEqual(simpleWindowSize({ ...opts, fill: false }), { width: 374, height: 374 / 1.2 + 44 });
+  assert.deepEqual(simpleWindowSize({ ...opts, aspect: undefined, fill: false }), { width: 374, height: undefined });
+  assert.equal(shouldFillWindow({ phone: true, compact: false, isAd: true }), true);
+  assert.equal(shouldFillWindow({ phone: true, compact: true, isAd: true }), false);
+  assert.equal(shouldFillWindow({ phone: false, compact: false, isAd: true }), false);
+  assert.equal(shouldFillWindow({ phone: true, compact: false, isAd: false }), false);
+});
+
+test('in-app confirm resolves false without a document and never calls window.confirm', async () => {
+  assert.equal(await confirmAd('?'), false);
 });
 
 test('number fixtures straddle actual suffix and exponent formatting boundaries', () => {

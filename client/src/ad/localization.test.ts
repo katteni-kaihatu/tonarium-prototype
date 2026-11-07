@@ -8,7 +8,7 @@ import { getLanguage, msg, setLanguage, systemText, t } from '../i18n/core.ts';
 import { resources } from '../i18n/resources.ts';
 import { formatDuration } from '../world/antimatter/format.ts';
 import { ACHIEVEMENT_DEFS } from '../world/antimatter/styles.ts';
-import { LAYERS, INFINITY_UPGRADES, INFINITY_DIMENSIONS, CHALLENGES, TIME_DIMENSIONS, TIME_STUDIES, ETERNITY_UPGRADES, GLYPH_TYPES, REALITY_UPGRADES, CELESTIALS_OVERVIEW } from '../world/antimatter/layersData.ts';
+import { LAYERS, INFINITY_DIMENSIONS, CHALLENGES, TIME_DIMENSIONS, TIME_STUDIES, ETERNITY_UPGRADES, GLYPH_TYPES, REALITY_UPGRADES, CELESTIALS_OVERVIEW } from '../world/antimatter/layersData.ts';
 import { ANTIMATTER_EXHIBITS } from '../../../shared/antimatterLayout.ts';
 import { adReadoutLines, drawAdBoard, drawAdReadings } from '../view3d/antimatterText.ts';
 
@@ -19,7 +19,7 @@ test('ja → en → ko → ja preserves progress, saved data, IDs and user names
   game.achievements.push('first-dimension');
   const profile = { id: 'same-id', name: '次元 {0} Player 플레이어' };
   const saved = JSON.stringify({ save: serialize(game), profile });
-  const definitions = [ACHIEVEMENT_DEFS, LAYERS, INFINITY_UPGRADES, INFINITY_DIMENSIONS, CHALLENGES, TIME_DIMENSIONS, TIME_STUDIES, ETERNITY_UPGRADES, GLYPH_TYPES, REALITY_UPGRADES, CELESTIALS_OVERVIEW];
+  const definitions = [ACHIEVEMENT_DEFS, LAYERS, INFINITY_DIMENSIONS, CHALLENGES, TIME_DIMENSIONS, TIME_STUDIES, ETERNITY_UPGRADES, GLYPH_TYPES, REALITY_UPGRADES, CELESTIALS_OVERVIEW];
   const identifiers = definitions.map(items => items.map(item => 'id' in item ? item.id : item.tier));
   const views: Record<string, ReturnType<typeof buildAdLabSnapshot>> = {};
   const labels: Record<string, string> = {};
