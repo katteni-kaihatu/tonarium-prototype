@@ -151,10 +151,18 @@
 .adlab-dim-next > .adlab-bar { flex: 1 1 auto; }
 .adlab-dim-next > span { flex: none; width: 36px; color: var(--ad-muted); font-size: 11px; text-align: right; }
 .adlab-dim-buy { grid-area: buy; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.adlab-lab-panel .adlab-dim-buy button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-height: 36px; padding: 2px 6px; border: 1px solid #3a3266; border-radius: 7px; background: transparent; color: var(--ad-muted); line-height: 1.15; cursor: pointer; }
+/* 背景の塗りは「今の反物質 ÷ 費用」。押せないボタンも塗りが読めるよう、半透明にせず文字色だけ落とす。 */
+.adlab-lab-panel .adlab-dim-buy button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-height: 36px; padding: 2px 6px; border: 1px solid #3a3266; border-radius: 7px; background: linear-gradient(90deg, rgba(139,127,214,.38) var(--ad-fill, 0%), transparent var(--ad-fill, 0%)); color: #ece9f6; line-height: 1.15; cursor: pointer; }
+.adlab-lab-panel .adlab-dim-buy button:disabled { opacity: 1; color: var(--ad-muted); }
+.adlab-lab-panel .adlab-dim-buy button.is-partial:not(:disabled) { background: linear-gradient(90deg, rgba(94,234,212,.3) var(--ad-fill, 0%), transparent var(--ad-fill, 0%)); }
 .adlab-lab-panel .adlab-dim-row.is-affordable .adlab-dim-buy button:not(:disabled):not(.is-partial) { border-color: #5eead4; background: #1d3a3a; color: #c9f7ee; opacity: 1; }
+.adlab-lab-panel .adlab-dim-row.is-affordable .adlab-dim-buy button.is-double:not(:disabled) { border-color: #f0b866; background: #3a2e2a; color: #f6cf92; }
+.adlab-dim-eta { color: var(--ad-muted); white-space: nowrap; }
+.adlab-dim-row.is-affordable .adlab-dim-buy button:not(:disabled):not(.is-partial) .adlab-dim-eta { color: inherit; }
+.adlab-dim-prod { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+.adlab-dim-prod > small { color: var(--ad-muted); font-size: 10px; white-space: nowrap; }
 .adlab-dim-buy b { font-size: 12px; }
-.adlab-dim-buy small { font-size: 10px; }
+.adlab-dim-buy small { font-size: 10px; line-height: 1.15; }
 .adlab-dim-row.is-locked { grid-template-areas: "name locked"; opacity: .7; }
 .adlab-dim-locked { grid-area: locked; display: flex; align-items: center; gap: 4px; color: var(--ad-muted); font-size: var(--ad-small, 12px); }
 
@@ -293,11 +301,11 @@
 @container (min-width: 760px) {
   .adlab-stat-columns { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; }
   .adlab-infinity-columns { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
-  .adlab-dim-row { grid-template-columns: 132px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(64px, 1fr) 176px; grid-template-areas: "name owned mult prod next buy"; padding: 3px 10px; min-height: 42px; }
+  .adlab-dim-row { grid-template-columns: 132px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(64px, 1fr) 188px; grid-template-areas: "name owned mult prod next buy"; padding: 3px 10px; min-height: 46px; }
   .adlab-dim-header { display: grid; min-height: 28px; color: var(--ad-muted); font-size: 11px; }
   .adlab-dim-mult { text-align: right; }
-  .adlab-dim-buy { grid-template-columns: repeat(2, 84px); justify-content: end; }
-  .adlab-lab-panel .adlab-dim-buy button { min-height: 34px; }
+  .adlab-dim-buy { grid-template-columns: repeat(2, 90px); justify-content: end; }
+  .adlab-lab-panel .adlab-dim-buy button { min-height: 40px; }
   .adlab-dim-row.is-locked { grid-template-areas: "name locked locked locked locked locked"; }
 }
 @container (min-width: 820px) {

@@ -480,3 +480,38 @@ test('number fixtures straddle actual suffix and exponent formatting boundaries'
   assert.equal(formatNumber(bigFromLog10(99999)), '1.00e99999');
   assert.equal(formatNumber(bigFromLog10(100000)), '1.00e100000');
 });
+
+test('次元の購入ボタンは貯まった割合・残り時間を出し、×2 に届く購入を払えるときだけ黄色にする', () => {
+  const previous = getLanguage();
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      const game = createNewGame(0);
+      game.dimensions[0].bought = 5;
+      const slice = harness(game);
+      const cost = adaptAdSlice(slice)!.derived.dimensions[0].cost;
+      const buttons = () => {
+        const html = renderToStaticMarkup(<DimensionList ad={adaptAdSlice(slice)!} />);
+        const find = (label: string) => [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(m => m[0]).find(b => b.includes(`aria-label="${label}"`)) ?? '';
+        return { html, single: find(t('adLabText23', 1)), block: find(t('adLabText24', 1)) };
+      };
+      game.antimatter = bigMulNumber(cost, 0.5);
+      let view = buttons();
+      assert.ok(view.single.includes('--ad-fill:50%'));
+      assert.ok(view.block.includes('--ad-fill:10%'));
+      assert.ok(view.single.includes(t('adUiEtaFar')));
+      assert.ok(view.html.includes(t('adUiMakes', t('adUiResAntimatter'))) && view.html.includes(t('adUiMakes', t('adLabText13', 1))));
+      game.antimatter = bigMulNumber(cost, 2);
+      view = buttons();
+      assert.ok(view.single.includes(t('adUiEtaNow')) && !view.single.includes('is-double'));
+      assert.ok(view.block.includes('is-partial') && !view.block.includes('is-double'));
+      assert.equal(/\bdisabled=/.test(view.block), false);
+      game.antimatter = bigMulNumber(cost, 5);
+      view = buttons();
+      assert.ok(view.block.includes('is-double') && view.block.includes(t('adUiEtaNow')));
+      game.dimensions[0].bought = 9;
+      game.antimatter = adaptAdSlice(slice)!.derived.dimensions[0].cost;
+      assert.ok(buttons().single.includes('is-double'));
+    }
+  } finally { setLanguage(previous); }
+});
