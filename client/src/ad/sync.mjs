@@ -1,4 +1,4 @@
-import { bigCompare, deserialize } from './engine.mjs';
+import { AUTOBUYER_IDS, AUTOBUYER_MAX_LEVEL, bigCompare, deserialize } from './engine.mjs';
 
 export function saveIdentity(save) {
   const value = typeof save === 'string' ? JSON.parse(save) : save;
@@ -14,6 +14,23 @@ export function compareProgress(local, remote) {
   return Math.sign(a.infinities - b.infinities) || bigCompare(a.totalAntimatter, b.totalAntimatter);
 }
 
+function validAutobuyers(v) {
+  return !!v && typeof v === 'object' && !Array.isArray(v) && AUTOBUYER_IDS.every(id => {
+    const a = v[id];
+    return a && typeof a === 'object' && typeof a.unlocked === 'boolean' && typeof a.enabled === 'boolean'
+      && Number.isSafeInteger(a.level) && a.level >= 0 && a.level <= AUTOBUYER_MAX_LEVEL
+      && Number.isFinite(a.elapsedMs) && a.elapsedMs >= 0;
+  });
+}
+
+function validInfinityFields(save) {
+  const time = v => v === undefined || Number.isFinite(v);
+  return (save.infinityUpgrades === undefined || (Array.isArray(save.infinityUpgrades) && save.infinityUpgrades.every(v => typeof v === 'string')))
+    && time(save.runStartedAt)
+    && (save.bestInfinityMs === undefined || save.bestInfinityMs === null || (Number.isFinite(save.bestInfinityMs) && save.bestInfinityMs >= 0))
+    && (save.ipGenElapsedMs === undefined || (Number.isFinite(save.ipGenElapsedMs) && save.ipGenElapsedMs >= 0));
+}
+
 export function validateSave(save) {
   const big = v => v && typeof v === 'object' && Number.isFinite(v.mantissa) && v.mantissa >= 0 && Number.isSafeInteger(v.exponent);
   const count = v => Number.isSafeInteger(v) && v >= 0;
@@ -24,6 +41,8 @@ export function validateSave(save) {
     || !Array.isArray(save.dimensions) || save.dimensions.length !== 8
     || !save.dimensions.every((d, i) => d && d.tier === i + 1 && big(d.amount) && count(d.bought))
     || !['infinities', 'tickspeedBought', 'dimensionalBoosts', 'galaxies'].every(k => count(save[k]))
+    || (save.autobuyers !== undefined && !validAutobuyers(save.autobuyers))
+    || !validInfinityFields(save)
     || !Number.isFinite(save.lastTick) || !Number.isFinite(save.createdAt)
     || !Array.isArray(save.achievements) || !save.achievements.every(v => typeof v === 'string')) {
     throw new Error('Invalid AD save');

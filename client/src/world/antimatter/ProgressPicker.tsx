@@ -3,6 +3,7 @@ import type { AntimatterSlice } from './types.ts';
 import { t, useLanguage, msg, getLanguage, type UiMessage } from '../../i18n/index.ts';
 import { formatNumber } from './format.ts';
 import { s } from './styles.ts';
+import { confirmAd } from './confirmAd.tsx';
 
 export function ProgressSummary({ save }: { save: Record<string, unknown> }) {
   useLanguage();
@@ -25,11 +26,11 @@ export function ProgressPicker({ ad, migration = false, notice, onExport }: { ad
     </select>
     {source && <ProgressSummary save={source.save} />}
     <div style={s.row}>
-      <button style={s.btn} disabled={!source || !migration && ['loading', 'choice'].includes(ad.syncState)} onClick={() => {
+      <button style={s.btn} disabled={!source || !migration && ['loading', 'choice'].includes(ad.syncState)} onClick={async () => {
         if (!source) return;
         try {
           if (migration) ad.selectProgress(source.key);
-          else if (window.confirm(t('adRestoreConfirm'))) ad.restoreProgress(source.key);
+          else if (await confirmAd(t('adRestoreConfirm'))) ad.restoreProgress(source.key);
         } catch { notice(msg('adProfileFailed')); }
       }}>{t(migration ? 'adUseProgress' : 'adRestoreProgress')}</button>
       {!migration && <button style={s.btn} disabled={!source} onClick={() => {

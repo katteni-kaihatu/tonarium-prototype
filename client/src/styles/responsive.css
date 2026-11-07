@@ -34,6 +34,8 @@
   .world.phone .facestrip { left: 8px; right: 8px; top: 64px; bottom: auto; }
   .world.phone .facegrid { left: 8px; right: 8px; top: 64px; bottom: 130px; }
   .world.phone .winregion { left: 8px; right: 8px; top: 172px; bottom: 130px; }
+  .world.phone.ad-front.pt-screen .facestrip { display: none; }
+  .world.phone.ad-front .winregion { top: 64px; }
   .world.phone .session-surface:not(.hub-open) .dock { bottom: calc(68px + env(safe-area-inset-bottom)); padding: 6px; gap: 6px; border-radius: 18px; max-width: calc(100% - 16px); overflow-x: auto; }
   .world.phone .dk { width: 44px; height: 44px; border-radius: 13px; }
   .world.phone .dseg, .world.phone .dsep { display: none; }
@@ -66,6 +68,7 @@
   .world.phone .faces { flex-wrap: wrap; flex-shrink: 0; }
   .world.phone .facefold { flex-shrink: 0; }
   .world.phone .winregion { left: calc(176px + var(--phone-left)); right: calc(88px + var(--phone-right)); top: 62px; bottom: calc(64px + var(--phone-bottom)); }
+  .world.phone.ad-front .winregion { left: var(--phone-left); top: 62px; }
   .world.phone .winstrip { height: 60px; }
   .world.phone .winstrip .win.compact { height: 56px !important; width: 120px !important; }
   .world.phone .front > .statuschips { left: var(--phone-left); bottom: calc(64px + var(--phone-bottom)); width: 160px; max-height: 50px; overflow-y: auto; transform: none; pointer-events: auto !important; }
