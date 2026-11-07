@@ -10,6 +10,9 @@ import { ActionBar } from './ActionBar.tsx';
 import type { AdPanelTarget } from '../../../../shared/antimatterLayout.ts';
 import { ProfilePanel } from './ProfilePanel.tsx';
 import { ProgressPicker } from './ProgressPicker.tsx';
+import { AchievementsPanel } from './AchievementsPanel.tsx';
+import { RankingPanel } from './RankingPanel.tsx';
+import { ACHIEVEMENT_DEFS } from './styles.ts';
 import { StatsPanel } from './StatsPanel.tsx';
 import { getLanguage, setLanguage, systemText, t } from '../../i18n/core.ts';
 import { DimensionList } from './DimensionList.tsx';
@@ -62,11 +65,11 @@ test('2D tabs and 3D exhibits render in three languages without changing saves o
       assert.ok(layers.includes(t('adLabText147')));
       assert.ok(layers.includes(t('adLocked')));
       for (const html of [dimensions, layers]) assert.doesNotMatch(html, /[🔥🏆🔒]/u);
-      const stats = renderToStaticMarkup(<StatsPanel ad={ad} notice={() => {}} />);
+      const stats = renderToStaticMarkup(<AchievementsPanel ad={ad} />);
       assert.ok(stats.includes(t('adLabText133')));
       assert.ok(stats.includes(t('adNotAchieved')));
       assert.doesNotMatch(stats, /[🔥🏆🔒]/u);
-      assert.ok(stats.includes('名前 {0} 플레이어'));
+      assert.ok(renderToStaticMarkup(<RankingPanel ad={ad} notice={() => {}} />).includes('名前 {0} 플레이어'));
       for (const target of ['core', 'tickspeed', 'boost', 'galaxy', 'sacrifice', 'crunch', 'dimension-1', 'dimension-8', 'exhibit-infinity', 'exhibit-eternity', 'exhibit-reality', 'exhibit-celestials'] as const) {
         const space = panels(slice, target).space;
         if (language !== 'ja') assert.doesNotMatch(space, /[ぁ-んァ-ヶ一-龠]/);
@@ -85,6 +88,47 @@ function harness(game: GameState) {
   return slice;
 }
 
+test('separated statistics and achievements preserve every value and save in three languages', (context) => {
+  const previous = getLanguage();
+  context.after(() => setLanguage(previous));
+  const now = 1_800_000_000_000;
+  context.mock.method(Date, 'now', () => now);
+  const game = createNewGame(now - 90061_000);
+  Object.assign(game, {
+    totalAntimatter: bigFromLog10(105), dimensionalBoosts: 17, galaxies: 3,
+    infinities: 2, infinityPoints: bigFromNumber(1234), tickspeedBought: 23,
+    sacrificeBoost: bigFromNumber(8), achievements: ['first-dimension', 'unknown-{0}-실적'],
+  });
+  const slice = harness(game);
+  const before = serialize(game);
+  for (const language of ['ja', 'en', 'ko'] as const) {
+    setLanguage(language);
+    const ad = adaptAdSlice(slice)!;
+    const stats = renderToStaticMarkup(<StatsPanel ad={ad} />);
+    const values = [
+      t('adLabText44', formatNumber(game.totalAntimatter)), t('adLabText45', formatDuration(90061)),
+      t('adLabText46', 17), t('adLabText47', 3), t('adLabText48', 2),
+      `IP: ${formatNumber(game.infinityPoints)}`, t('adLabText49', 23), t('adLabText50', formatNumber(game.sacrificeBoost)),
+    ];
+    for (const value of values) assert.ok(stats.includes(value), `${language}: ${value}`);
+    assert.equal([...stats.matchAll(/<span\b/g)].length, 8);
+    assert.ok(!stats.includes('ad-ranking'));
+    assert.ok(!stats.includes(t('adLabText133')));
+    const achievements = renderToStaticMarkup(<AchievementsPanel ad={ad} />);
+    assert.ok(achievements.includes(t('adLabText51', 2, ACHIEVEMENT_DEFS.length + 1)));
+    assert.ok(achievements.includes(t('adLabText59', 2)));
+    for (const def of ACHIEVEMENT_DEFS) {
+      assert.ok(achievements.includes(def.name));
+      assert.ok(achievements.includes(def.desc));
+    }
+    assert.ok(achievements.includes('<b>unknown-{0}-실적</b>'));
+    assert.ok(achievements.includes(t('adLabText57')));
+    assert.equal(achievements.split('>' + t('adAchieved') + '</span>').length - 1, 2);
+    assert.equal(achievements.split('>' + t('adNotAchieved') + '</span>').length - 1, ACHIEVEMENT_DEFS.length - 1);
+    assert.equal(serialize(game), before);
+  }
+});
+
 test('ranking labels and collapsed self inclusion are shown in all three languages', () => {
   const previous = getLanguage();
   const slice = harness(createNewGame());
@@ -99,7 +143,7 @@ test('ranking labels and collapsed self inclusion are shown in all three languag
   try {
     for (const language of ['ja', 'en', 'ko'] as const) {
       setLanguage(language);
-      const html = renderToStaticMarkup(<StatsPanel ad={adaptAdSlice(slice)!} notice={() => {}} />);
+      const html = renderToStaticMarkup(<RankingPanel ad={adaptAdSlice(slice)!} notice={() => {}} />);
       const [representatives, children] = html.split('<tbody id=');
       for (const key of ['adLabText52', 'adRankingRank', 'adLabText54', 'adLabText55', 'adRankingInfinity', 'adLabText56', 'adRankingContainsSelf', 'adRankingExpand']) assert.ok(representatives.includes(t(key)));
       assert.ok(representatives.includes(t('adRankingRecordCount', 4)));
@@ -121,11 +165,19 @@ test('ranking labels and collapsed self inclusion are shown in all three languag
       assert.equal(buttons.length, 1);
       assert.ok(html.includes(`id="${buttons[0][2]}" hidden="" aria-labelledby="${buttons[0][1]}"`));
       const ad = adaptAdSlice(slice)!;
-      const own = renderToStaticMarkup(<StatsPanel ad={{ ...ad, leaderboard: [{ ...ad.leaderboard[0], self: true }] }} notice={() => {}} />);
+      const own = renderToStaticMarkup(<RankingPanel ad={{ ...ad, leaderboard: [{ ...ad.leaderboard[0], self: true }] }} notice={() => {}} />);
       assert.ok(own.includes(t('adRankingSelf') + '</span>'));
       assert.ok(!own.includes(t('adRankingContainsSelf')));
-      const unrelated = renderToStaticMarkup(<StatsPanel ad={{ ...ad, leaderboard: [ad.leaderboard[1]] }} notice={() => {}} />);
+      const unrelated = renderToStaticMarkup(<RankingPanel ad={{ ...ad, leaderboard: [ad.leaderboard[1]] }} notice={() => {}} />);
       assert.ok(!unrelated.includes('ad-ranking-badge'));
+      const empty = renderToStaticMarkup(<RankingPanel ad={{ ...ad, leaderboard: [] }} notice={() => {}} />);
+      assert.ok(empty.includes(t('adLabText53')));
+      assert.ok(empty.includes(t('adRankingAuto', slice.adProfile.name)));
+      assert.ok(empty.includes(t('adRankingRefresh')));
+      assert.ok(!empty.includes('<table'));
+      const pair = renderToStaticMarkup(<><RankingPanel ad={ad} notice={() => {}} /><RankingPanel ad={ad} notice={() => {}} /></>);
+      const ids = [...pair.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
+      assert.equal(new Set(ids).size, ids.length);
     }
   } finally { setLanguage(previous); }
 });
@@ -143,7 +195,7 @@ test('共通プロフィール・ランキングの同期案内とv3形式は三
         slice.adSync = status;
         const ad = adaptAdSlice(slice)!;
         const profile = renderToStaticMarkup(<ProfilePanel ad={ad} notice={() => {}} />);
-        const stats = renderToStaticMarkup(<StatsPanel ad={ad} notice={() => {}} />);
+        const stats = renderToStaticMarkup(<RankingPanel ad={ad} notice={() => {}} />);
         assert.ok(profile.includes(t('adIssueCode')));
         assert.ok(profile.includes(t('adPreviousProgress')));
         assert.ok(profile.includes(t('adTransfer')));
@@ -300,7 +352,7 @@ test('first Infinity unlocks the Layers tab, and the Crunch card appears only on
       const slice = harness(game);
       const tabButton = (html: string, key: string) => html.includes('>' + t(key).replace(/&/g, '&amp;') + '</button>');
       const before = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
-      for (const key of ['adLabText4', 'adLabText6', 'adSaveTab']) assert.ok(tabButton(before, key));
+      for (const key of ['adLabText4', 'adLabText6', 'ui819', 'adLabText52', 'adSaveTab']) assert.ok(tabButton(before, key));
       assert.ok(!tabButton(before, 'adLabText7'));
       assert.ok(!before.includes(t('adLabText31')));
       assert.ok(before.includes(t('adLabText26')) && before.includes(t('adLabText28')) && before.includes(t('adLabText30')));

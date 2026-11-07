@@ -1,11 +1,12 @@
 import { createServer } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// 実データや接続先を使わず、実際の StatsPanel と親パネルのスタイルを確認する。
+// 実データや接続先を使わず、ランキングと研究所パネルを確認する。
 const server = await createServer({
   configFile: false,
   root: '.',
   envDir: false,
+  cacheDir: '.local/ranking-vite-cache',
   plugins: [react()],
   optimizeDeps: { entries: ['scripts/fixtures/ranking.html'] },
   server: { host: '127.0.0.1', port: 5193, strictPort: true, fs: { deny: ['**/.env', '**/.env.*', '**/.git/**'] } },
