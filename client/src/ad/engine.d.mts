@@ -26,6 +26,7 @@ export interface OfflineResult {
 }
 export const VERSION: number;
 export const OFFLINE_CAP_MS: number;
+export const SACRIFICE_MIN_GAIN: number;
 export function bigNormalize(mantissa: number, exponent?: number): BigNum;
 export function toBig(value: unknown): BigNum;
 export function bigFromNumber(n: number): BigNum;
@@ -54,6 +55,8 @@ export function getDimensionCostForBulk(state: GameState, tier: number, count: n
 export function getTickspeedCost(state: GameState): BigNum;
 export function getTickspeedPerPurchase(state: GameState): number;
 export function getEffectiveTickspeed(state: GameState): number;
+export function getEffectiveTickspeedBig(state: GameState): BigNum;
+export function getEffectiveTickspeedLog10(state: GameState): number;
 export function getMaxUnlockedTier(state: GameState): number;
 export function getDimensionMultiplier(state: GameState, tier: number): number;
 export function getDimensionMultiplierBig(state: GameState, tier: number): BigNum;
@@ -66,6 +69,7 @@ export function canAntimatterGalaxy(state: GameState): boolean;
 export function getInfinityGain(state: GameState): number;
 export function canInfinity(state: GameState): boolean;
 export function canSacrifice(state: GameState): boolean;
+export function rescueIfStuck(state: GameState): boolean;
 export function getSacrificeCandidate(state: GameState): BigNum;
 export function checkAchievements(state: GameState): string[];
 export function tick(state: GameState, dtMs: number): GameState;

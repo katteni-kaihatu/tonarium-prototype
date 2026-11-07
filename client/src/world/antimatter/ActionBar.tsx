@@ -56,7 +56,8 @@ export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (messag
         <div className="ad-upgrade-description">
           <div className="ad-upgrade-heading"><LabArt kind="reactor" size={40} /><b>Dimensional Sacrifice</b></div>
           <div className="ad-upgrade-status" style={s.muted}>
-            <span>{t('adMultiplier')} · {t('adLabText13', 8)}</span><span className="ad-number">×{formatNumber(sacrifice.boost)}</span>
+            <span>{t('adMultiplier')} · {t('adLabText13', 8)}</span>
+            <span className="ad-number" style={{ fontSize: 20 }}>{sacrifice.unlocked ? t('adLabText331', formatNumber(sacrifice.boost), formatNumber(sacrifice.next)) : `×${formatNumber(sacrifice.boost)}`}</span>
             <span className="ad-upgrade-summary">{sacrifice.unlocked ? t('adLabText39') : t('adLabText40', sacrifice.boosts)}</span>
           </div>
         </div>

@@ -12,6 +12,7 @@ import {
   dimensionalBoost,
   offlineProgress,
   prestigeInfinity,
+  rescueIfStuck,
   sacrifice,
   serialize,
   tick,
@@ -59,6 +60,7 @@ export interface AdSlice {
   adGame: GameState | null;
   adVersion: number;
   adOffline: OfflineResult | null;
+  adRescues: number;
   adServer: 'local' | 'connected' | 'error';
   adSync: 'disconnected' | 'loading' | 'choice' | 'ready' | 'error';
   adRecoveryKey: string | null;
@@ -376,6 +378,7 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
     adGame: null,
     adVersion: 0,
     adOffline: null,
+    adRescues: 0,
     adServer: 'local',
     adSync: 'disconnected',
     adRecoveryKey: null,
@@ -402,9 +405,10 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
           const game = get().adGame;
           if (!game || frozen()) return;
           tick(game, 100);
+          const rescued = rescueIfStuck(game);
           acknowledgeClock(JSON.parse(serialize(game)));
           // エンジンはインプレース更新のため、参照は変わらない。購読を起こす版カウンタで知らせる
-          set({ adVersion: get().adVersion + 1 });
+          set(rescued ? { adVersion: get().adVersion + 1, adRescues: get().adRescues + 1 } : { adVersion: get().adVersion + 1 });
         }, 100),
         window.setInterval(() => { saveLocalNow(); }, 1000),
         // サーバー保存は常に有効（既定は同一オリジンの Tonarium サーバー）。localStorage はフォールバックとして残る

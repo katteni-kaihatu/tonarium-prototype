@@ -32,6 +32,13 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
   const [notice, setNotice] = useState<UiMessage | null>(null);
   const showNotice = (message: UiMessage) => setNotice(message);
 
+  const rescueSeen = useRef(ad.rescueCount);
+  useEffect(() => {
+    if (ad.rescueCount === rescueSeen.current) return;
+    rescueSeen.current = ad.rescueCount;
+    setNotice(msg('adLabText330'));
+  }, [ad.rescueCount]);
+
   useEffect(() => {
     if (!notice) return;
     const id = setTimeout(() => setNotice(null), 5000);

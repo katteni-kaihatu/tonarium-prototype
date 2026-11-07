@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   createNewGame, bigFromNumber, bigFromLog10, bigNormalize, bigCompare, bigAdd, bigSub, bigMulNumber,
-  serialize, deserialize, sacrifice,
+  serialize, deserialize, sacrifice, canSacrifice, rescueIfStuck, tick, getSacrificeCandidate, bigZero, bigLog10,
+  getDimensionProductionPerSecond,
   buyDimension, buyMaxDimension, buyMax, getDimensionCost, formatNumber,
   getDimensionalBoostRequirement, getGalaxyRequirement,
   canDimensionalBoost, canAntimatterGalaxy, dimensionalBoost, antimatterGalaxy,
@@ -156,4 +157,88 @@ test('Sacrificeで失った第1〜7次元を購入回数から復元しない', 
     assert.equal(game.dimensions[tier - 1].bought, 21);
     assert.equal(bigCompare(game.dimensions[tier - 1].amount, 1), 0);
   }
+});
+
+function sacrificeReady() {
+  const game = createNewGame(0);
+  game.dimensionalBoosts = 5;
+  game.dimensions[7].amount = bigFromNumber(1);
+  game.dimensions[0].amount = bigFromLog10(100);
+  return game;
+}
+
+test('第8次元が0のSacrificeは押せない', () => {
+  const game = sacrificeReady();
+  assert.equal(canSacrifice(game), true);
+  game.dimensions[7].amount = bigZero();
+  const before = structuredClone(game);
+  assert.equal(canSacrifice(game), false);
+  assert.equal(sacrifice(game), false);
+  assert.deepEqual(game, before);
+});
+
+test('Sacrificeは倍率が2倍以上に伸びるときだけ押せる', () => {
+  const game = sacrificeReady();
+  const candidate = getSacrificeCandidate(game);
+  game.sacrificeBoost = bigMulNumber(candidate, 1 / 2.01);
+  assert.equal(canSacrifice(game), true);
+  game.sacrificeBoost = bigMulNumber(candidate, 1 / 1.9);
+  assert.equal(canSacrifice(game), false);
+});
+
+test('Boost5回・第8次元なしでMax All後にSacrificeしても詰まない', () => {
+  const game = createNewGame(0);
+  game.dimensionalBoosts = 5;
+  game.antimatter = bigFromLog10(20);
+  buyMax(game);
+  game.dimensions[7].amount = bigZero();
+  game.dimensions[0].amount = bigFromLog10(100);
+  assert.equal(sacrifice(game), false);
+  assert.ok(bigCompare(game.dimensions[0].amount, 1) > 0);
+});
+
+function stuckGame() {
+  const game = createNewGame(0);
+  game.dimensionalBoosts = 5;
+  game.dimensions[7].bought = 3;
+  game.antimatter = bigFromNumber(5);
+  return game;
+}
+
+test('詰んだ状態では第8次元が1つ渡され生産が戻る', () => {
+  const game = stuckGame();
+  tick(game, 1000);
+  assert.equal(bigCompare(game.antimatter, 5), 0);
+  assert.equal(rescueIfStuck(game), true);
+  assert.equal(bigCompare(game.dimensions[7].amount, 1), 0);
+  assert.equal(game.dimensions[7].bought, 3);
+  assert.equal(rescueIfStuck(game), false);
+  tick(game, 1000);
+  assert.ok(bigCompare(game.dimensions[6].amount, 0) > 0);
+});
+
+test('次元が残っている、または買えるときは救済しない', () => {
+  const remaining = stuckGame();
+  remaining.dimensions[2].amount = bigFromNumber(1);
+  const affordable = stuckGame();
+  affordable.antimatter = bigFromNumber(10);
+  for (const game of [remaining, affordable]) {
+    const before = structuredClone(game);
+    assert.equal(rescueIfStuck(game), false);
+    assert.deepEqual(game, before);
+  }
+});
+
+test('Galaxy30・Tickspeed3000回でもtickは例外なく反物質が有限で増える', () => {
+  const game = createNewGame(0);
+  game.galaxies = 30;
+  game.tickspeedBought = 3000;
+  game.dimensions[0].amount = bigFromNumber(10);
+  const before = bigLog10(game.antimatter);
+  assert.doesNotThrow(() => tick(game, 100));
+  assert.ok(Number.isFinite(game.antimatter.exponent) && Number.isFinite(game.antimatter.mantissa));
+  assert.ok(Number.isFinite(game.tickspeed));
+  assert.ok(bigLog10(game.antimatter) > before);
+  assert.ok(Number.isFinite(bigLog10(getDimensionProductionPerSecond(game, 1))));
+  assert.doesNotThrow(() => JSON.parse(serialize(game)));
 });

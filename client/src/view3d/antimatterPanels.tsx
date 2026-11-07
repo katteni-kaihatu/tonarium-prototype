@@ -159,7 +159,7 @@ function AntimatterSpaceContent({ target, snapshot, actions, isOwn, onClose }: {
     return (
       <div style={panelStyle}>
         <h3>Dimensional Sacrifice</h3>
-        <p>{snapshot.sacrificeUnlocked ? t('adLabText116', snapshot.sacrificeText) : t('adLabText117')}</p>
+        <p>{snapshot.sacrificeUnlocked ? t('adLabText331', snapshot.sacrificeText, snapshot.sacrificeNextText) : t('adLabText117')}</p>
         <Btn label={t('adLabText118')} onClick={actions.sacrifice} disabled={!own || !snapshot.canSacrifice} />
         <Foot onClose={onClose} />
       </div>

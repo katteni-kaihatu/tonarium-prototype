@@ -50,6 +50,7 @@ export interface SacrificeDerived {
   unlocked: boolean;
   can: boolean;
   boost: BigNum;
+  next: BigNum;
   boosts: number;
 }
 
@@ -60,7 +61,7 @@ export interface InfinityDerived {
 
 export interface DerivedSnapshot {
   antimatterPerSecond: BigNum;
-  tickspeedValue: number;
+  tickspeedValue: BigNum;
   tickspeedBought: number;
   tickspeedCost: BigNum;
   tickspeedAffordable: boolean;
@@ -118,6 +119,7 @@ export interface AntimatterSlice {
   exportProgress: (key: string) => string;
   activeProfile: AdProfile | null;
   offlineNotice: OfflineNotice | null;
+  rescueCount: number;
   leaderboard: LeaderboardEntry[];
   serverStatus: UiMessage | null;
   syncState: 'disconnected' | 'loading' | 'choice' | 'ready' | 'error';

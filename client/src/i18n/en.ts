@@ -348,6 +348,8 @@ export default {
   adLabText327: "Endgame. The toughest trial, involving dark matter and singularities (mock overview)",
   adLabText328: "Playable",
   adLabText329: "Partly implemented",
+  adLabText330: "The lab supplied one 8th dimension.",
+  adLabText331: "×{0} → ×{1}",
   adPerSecond: "{0} /s",
   adOfflineGained: "While away for {0}, you gained {1} antimatter! (Current: {2})",
   adInfinityStatus: "{0} · Current IP: {1} · Infinities: {2}",

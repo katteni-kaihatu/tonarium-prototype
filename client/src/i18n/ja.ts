@@ -348,6 +348,8 @@ export default {
   adLabText327: "最終盤。暗黒物質と特異点が絡む最難関（モック概要）",
   adLabText328: "プレイ可能",
   adLabText329: "一部実装",
+  adLabText330: "研究所が第8次元を1つ支給しました",
+  adLabText331: "×{0} → ×{1}",
   adPerSecond: "{0} /秒",
   adOfflineGained: "{0} の離席中に、反物質が {1} 増えました！（現在 {2}）",
   adInfinityStatus: "{0} · 現在の IP: {1} · Infinity 回数: {2} 回",

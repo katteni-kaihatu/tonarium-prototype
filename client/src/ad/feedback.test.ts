@@ -85,6 +85,7 @@ test('リセット系の成功はそれぞれの操作イベントを一度だ�
     assert.ok(slice.adGalaxy());
     slice.adGame!.dimensionalBoosts = 5;
     slice.adGame!.dimensions[0].amount = bigFromLog10(20);
+    slice.adGame!.dimensions[7].amount = bigFromNumber(1);
     assert.ok(slice.adSacrifice());
     slice.adGame!.antimatter = bigFromLog10(309);
     assert.ok(slice.adPrestige());

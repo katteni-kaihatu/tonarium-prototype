@@ -2,7 +2,7 @@ import { msg, getLanguage, useLanguage } from '../../i18n/index.ts';
 import {
   bigGte, canAntimatterGalaxy, canDimensionalBoost, canInfinity, canSacrifice,
   getAntimatterPerSecond, getDimensionalBoostRequirement, getDimensionCost,
-  getDimensionProductionPerSecond, getEffectiveTickspeed, getGalaxyRequirement,
+  getDimensionProductionPerSecond, getEffectiveTickspeedBig, getSacrificeCandidate, getGalaxyRequirement,
   getInfinityGain, getMaxUnlockedTier, getTickspeedCost, getTickspeedPerPurchase,
   type GameState,
 } from '../../ad/engine.mjs';
@@ -16,7 +16,7 @@ function derivedFrom(game: GameState): DerivedSnapshot {
   const maxUnlockedTier = getMaxUnlockedTier(game);
   return {
     antimatterPerSecond: getAntimatterPerSecond(game),
-    tickspeedValue: getEffectiveTickspeed(game),
+    tickspeedValue: getEffectiveTickspeedBig(game),
     tickspeedBought: game.tickspeedBought,
     tickspeedCost: getTickspeedCost(game),
     tickspeedAffordable: bigGte(game.antimatter, getTickspeedCost(game)),
@@ -45,7 +45,7 @@ function derivedFrom(game: GameState): DerivedSnapshot {
       const req = getGalaxyRequirement(game);
       return { tier: req.tier, amount: req.amount, currentAmount: game.dimensions[7].amount, can: canAntimatterGalaxy(game) };
     })(),
-    sacrifice: { unlocked: game.dimensionalBoosts >= 5, can: canSacrifice(game), boost: game.sacrificeBoost, boosts: game.dimensionalBoosts },
+    sacrifice: { unlocked: game.dimensionalBoosts >= 5, can: canSacrifice(game), boost: game.sacrificeBoost, next: getSacrificeCandidate(game), boosts: game.dimensionalBoosts },
     infinity: { can: canInfinity(game), gain: getInfinityGain(game) },
   };
 }
@@ -77,6 +77,7 @@ export function adaptAdSlice(slice: AdSlice, options: AdaptOptions = {}): Antima
     exportProgress: key => { const bundle = slice.adExportProgress(key); return bundle ? JSON.stringify(bundle, null, 2) : ''; },
     activeProfile: slice.adProfile,
     offlineNotice: offline,
+    rescueCount: slice.adRescues,
     leaderboard: slice.adLeaderboard,
     serverStatus,
     syncState: slice.adSync,

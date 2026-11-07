@@ -50,6 +50,10 @@ function DimensionRow({ d, boosts, sacrificeBoost, buyDimension, buyUntilNextTen
 
 const MemoRow = memo(DimensionRow);
 
+function tickspeedText(value: AntimatterSlice['derived']['tickspeedValue']): string {
+  return value.exponent >= 4 ? formatNumber(value) : (value.mantissa * 10 ** value.exponent).toFixed(2);
+}
+
 export function DimensionList({ ad }: { ad: AntimatterSlice }) {
   useLanguage();
   const { derived, game } = ad;
@@ -57,7 +61,7 @@ export function DimensionList({ ad }: { ad: AntimatterSlice }) {
     <div className="ad-dimensions">
       <div className="ad-tickspeed">
         <div className="ad-tickspeed-numbers">
-          <span className="ad-number"><Icon name="sparkle" size={16} /> Tickspeed: ×{derived.tickspeedValue >= 10000 ? formatNumber(derived.tickspeedValue) : derived.tickspeedValue.toFixed(2)}</span>
+          <span className="ad-number"><Icon name="sparkle" size={16} /> Tickspeed: ×{tickspeedText(derived.tickspeedValue)}</span>
           <span style={s.muted}>{t('adLabText20', derived.tickspeedBought, derived.tickspeedPerPurchase.toFixed(4))}</span>
           <span className="ad-number" style={s.muted}>{t('adLabText18', formatNumber(derived.tickspeedCost))}</span>
         </div>

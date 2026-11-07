@@ -45,6 +45,7 @@ export interface AdLabSnapshot {
   galaxyCurrentAmountText: string;
   canGalaxy: boolean;
   sacrificeText: string;
+  sacrificeNextText: string;
   sacrificeUnlocked: boolean;
   canSacrifice: boolean;
   infinityPointsText: string;

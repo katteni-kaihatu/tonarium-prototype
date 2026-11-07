@@ -348,6 +348,8 @@ export default {
   adLabText327: "최종 단계. 암흑 물질과 특이점이 얽힌 최고 난도 (개요 모형)",
   adLabText328: "플레이 가능",
   adLabText329: "일부 구현",
+  adLabText330: "연구소가 제8차원을 1개 지급했습니다.",
+  adLabText331: "×{0} → ×{1}",
   adPerSecond: "{0} /초",
   adOfflineGained: "{0} 동안 자리를 비운 사이 반물질이 {1} 늘었습니다! (현재 {2})",
   adInfinityStatus: "{0} · 현재 IP: {1} · Infinity: {2}회",

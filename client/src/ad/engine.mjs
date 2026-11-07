@@ -64,6 +64,9 @@ export const TICKSPEED_GALAXY_BONUS = 0.02;
 /** Legacy alias: the base per-purchase multiplier at 0 galaxies. */
 export const TICKSPEED_MULTIPLIER_PER_PURCHASE = TICKSPEED_BASE_PER_PURCHASE;
 
+/** Sacrifice は倍率が現在の何倍以上に伸びるときだけ押せる。 */
+export const SACRIFICE_MIN_GAIN = 2;
+
 export const INFINITY_THRESHOLD_LOG10 = Math.log10(1.79e308); // ≈ 308.2529
 export const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000; // 8 hours
 
@@ -351,9 +354,20 @@ export function getEffectiveTickspeed(state) {
   return getTickspeedPerPurchase(state) ** (state.tickspeedBought || 0);
 }
 
+/** log10 of the effective tickspeed; stays finite where the plain number overflows. */
+export function getEffectiveTickspeedLog10(state) {
+  return Math.log10(getTickspeedPerPurchase(state)) * (state.tickspeedBought || 0);
+}
+
+/** Effective tickspeed as a BigNum. Use this for any calculation. */
+export function getEffectiveTickspeedBig(state) {
+  return bigFromLog10(getEffectiveTickspeedLog10(state));
+}
+
 /** Re-sync the legacy `state.tickspeed` cache with the derived value. */
 function syncTickspeed(state) {
-  state.tickspeed = getEffectiveTickspeed(state);
+  // Infinity は JSON で null になりセーブが壊れるため、キャッシュは有限値に丸める
+  state.tickspeed = Math.min(getEffectiveTickspeed(state), Number.MAX_VALUE);
   return state.tickspeed;
 }
 
@@ -394,8 +408,8 @@ export function getDimensionProductionPerSecond(state, tier) {
   checkTier(tier);
   const dim = state.dimensions[tier - 1];
   const mult = getDimensionMultiplierBig(state, tier);
-  const perSecond = getEffectiveTickspeed(state) * DIMENSION_BASE_RATES[tier - 1];
-  return bigMulNumber(bigMul(dim.amount, mult), perSecond);
+  const base = bigMul(bigMul(dim.amount, mult), getEffectiveTickspeedBig(state));
+  return bigMulNumber(base, DIMENSION_BASE_RATES[tier - 1]);
 }
 
 export function getAntimatterPerSecond(state) {
@@ -472,13 +486,13 @@ export function tick(state, dtMs) {
   if (!(dtMs > 0)) return state;
   syncTickspeed(state);
   const dtSec = dtMs / 1000;
-  const tickspeedMult = getEffectiveTickspeed(state);
+  const tickspeedMult = getEffectiveTickspeedBig(state);
   const snapshot = state.dimensions.map((d) => bigClone(d.amount));
 
   const produced = snapshot.map((amount, i) => {
     const mult = getDimensionMultiplierBig(state, i + 1);
-    const scalar = tickspeedMult * DIMENSION_BASE_RATES[i] * dtSec;
-    return bigMulNumber(bigMul(amount, mult), scalar);
+    const scalar = DIMENSION_BASE_RATES[i] * dtSec;
+    return bigMulNumber(bigMul(bigMul(amount, mult), tickspeedMult), scalar);
   });
 
   for (let i = 7; i >= 1; i--) {
@@ -622,12 +636,31 @@ export function getSacrificeCandidate(state) {
 
 /**
  * canSacrifice(state) -> boolean
- * Sacrifice unlocks after 5 total dimensional boosts (spec §6.1) and only
- * makes sense when sacrificing now would strictly improve sacrificeBoost.
+ * Sacrifice unlocks after 5 total dimensional boosts (spec §6.1). It also
+ * needs an 8th dimension (otherwise production never restarts) and a
+ * candidate at least SACRIFICE_MIN_GAIN times the current sacrificeBoost.
  */
 export function canSacrifice(state) {
   if ((state.dimensionalBoosts || 0) < 5) return false;
-  return bigGt(getSacrificeCandidate(state), state.sacrificeBoost);
+  if (!bigGt(state.dimensions[7].amount, bigZero())) return false;
+  const needed = bigMulNumber(state.sacrificeBoost, SACRIFICE_MIN_GAIN);
+  return bigGte(getSacrificeCandidate(state), needed);
+}
+
+/**
+ * rescueIfStuck(state) -> boolean
+ * 全次元が 0 で、解放済みのどの次元も買えない詰み状態のとき、第8次元を
+ * 1つ（amount のみ。bought は値段と倍率のため据え置き）渡す。
+ */
+export function rescueIfStuck(state) {
+  if (state.dimensions.some((d) => bigGt(d.amount, bigZero()))) return false;
+  const maxTier = getMaxUnlockedTier(state);
+  for (let tier = 1; tier <= maxTier; tier++) {
+    if (bigGte(state.antimatter, getDimensionCost(state, tier))) return false;
+  }
+  const dim = state.dimensions[7];
+  dim.amount = bigAdd(dim.amount, 1);
+  return true;
 }
 
 /**
@@ -755,7 +788,8 @@ export default {
   buyTickspeed, buyMaxTickspeed, dimensionalBoost, antimatterGalaxy,
   sacrifice, prestigeInfinity, offlineProgress, serialize, deserialize,
   formatNumber, getDimensionCost, getDimensionCostForBulk, getTickspeedCost,
-  getEffectiveTickspeed, getTickspeedPerPurchase, getMaxUnlockedTier,
+  getEffectiveTickspeed, getEffectiveTickspeedBig, getEffectiveTickspeedLog10, getTickspeedPerPurchase,
+  rescueIfStuck, getMaxUnlockedTier,
   getDimensionMultiplier, getDimensionMultiplierBig,
   getDimensionProductionPerSecond, getAntimatterPerSecond,
   getDimensionalBoostRequirement, getGalaxyRequirement,

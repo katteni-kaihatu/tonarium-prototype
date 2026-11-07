@@ -263,6 +263,7 @@ for (const language of ['ja', 'en', 'ko'] as const) {
         const game = createNewGame(0);
         game.dimensionalBoosts = boosts;
         game.dimensions[0].amount = bigFromLog10(100);
+        game.dimensions[7].amount = bigFromNumber(1);
         if (!improved) game.sacrificeBoost = getSacrificeCandidate(game);
         const slice = harness(game);
         const { flat, space } = panels(slice, 'sacrifice');
