@@ -163,7 +163,7 @@ DOM表示面は`PanelSurfaces.refresh`が次の全入口から登録する。共
 | WindowLayerの`data-xr-surface` | 画面共有、視点配信、カメラ配信、参加者の顔、画像、YouTube、付箋、サイコロ、お絵描き伝言、バイク、反物質、共有システム操作、チェス、AIチェス、2048、Canvas、サバイバー、図鑑、AD研究所、AD空間設定 | 共通の生成位置は`[(表示枚数%3-1)*.7,0,-1.25]`をロール除去済みの視点姿勢で回したオフセット |
 | SOURCES | nearlist、noticelog、worldbadge、dock、hoverlay、survivor-panel.overlay | 近くの一覧、チャット・通知、通話設定、マイク・音・エモート、ホーム、サバイバーHUD。ホーム以外は一覧から表示 |
 | 自動ダイアログ検出 | modalbg、popover、lightbox、survivor-choice-overlay | プロフィール編集・参加者プロフィール、ワールド変更、セッション作成・編集、ステータス、アイテム追加、確認・外部リンク確認、画像拡大、設定・音量・音・エモート、サバイバー選択。既に登録済みの面の内側は二重登録しない |
-| 個別の追加面 | View3D.NoteEditorのnote-editor、AntimatterPanelのad-offline | 付箋編集、ADオフライン報酬。共通の配置・B/Y規則 |
+| 個別の追加面 | View3D.NoteEditorのnote-editor、AntimatterPanelのad-offline、confirmAdのad-confirm | 付箋編集、ADオフライン報酬、ADの確認ダイアログ。共通の配置・B/Y規則 |
 | XRControlsのutility 6種類 | wrist、tools、help、keyboard、commands、options | 初期視点オフセットは順に`[-.55,-.2,-.8]`、`[.8,.15,-1.25]`、`[-.8,.05,-1.25]`、`[0,-.7,-1.1]`、`[.8,-.55,-1.25]`、`[0,.25,-1.05]`。wristのみ左gripの`[.02,.12,-.05]`へ毎フレーム追従し、X軸-90°回転。左gripがなければ最後の配置を維持。wristはグラブ不可。残りは世界固定・グラブ可。B/Yでも残る |
 
 ## 今回の検証結果と残る確認

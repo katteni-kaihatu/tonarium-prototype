@@ -22,6 +22,7 @@ import {
 import type { AdPanelTarget, AdLabSnapshot } from '../../../shared/antimatterLayout.ts';
 import type { AdActions } from '../view3d/antimatterPanels.tsx';
 import type { AdSlice } from './slice.ts';
+import { confirmAd } from '../world/antimatter/confirmAd.tsx';
 
 const log10Of = (v: Parameters<typeof bigLog10>[0]): number => {
   const v2 = bigLog10(v);
@@ -82,7 +83,7 @@ export function buildAdLabSnapshot(game: GameState): AdLabSnapshot {
 // 購入ロジックは engine 呼び出し 1 か所に集約する。3D 側はこの口だけを使う。
 // buyDimensionMax / buyMaxTickspeed はスライスに無いため、ここで直接 engine を呼ぶことはせず
 // スライス側の追加アクション（adBuyDimensionMax / adBuyMaxTickspeed）に委ねる。
-export function buildAdActions(slice: AdSlice): AdActions {
+export function buildAdActions(slice: AdSlice, confirm: (message: string) => Promise<boolean> = confirmAd): AdActions {
   return {
     buyDimension: (tier) => { void slice.adBuyDimension(tier); },
     buyDimensionUpTo: (tier, count) => {
@@ -97,9 +98,9 @@ export function buildAdActions(slice: AdSlice): AdActions {
     dimensionalBoost: () => { void slice.adBoost(); },
     antimatterGalaxy: () => { void slice.adGalaxy(); },
     sacrifice: () => { void slice.adSacrifice(); },
-    prestigeInfinity: () => {
+    prestigeInfinity: async () => {
       // Big Crunch は取り消せないため、呼び出し前に確認する（3D パネル側では出さない約束）
-      if (!window.confirm(t('adLabText132'))) return;
+      if (!await confirm(t('adLabText132'))) return;
       void slice.adPrestige();
     },
   };

@@ -20,7 +20,6 @@ function check(value: unknown, message: string): asserts value {
 const pause = (ms = 0) => new Promise(resolve => originalTimeout(resolve, ms));
 const originalTimeout = window.setTimeout.bind(window);
 const originalClearTimeout = window.clearTimeout.bind(window);
-const originalConfirm = window.confirm;
 const originalFillText = CanvasRenderingContext2D.prototype.fillText;
 const draws = new WeakMap<HTMLCanvasElement, string[]>();
 const clipped = new WeakSet<HTMLCanvasElement>();
@@ -41,9 +40,9 @@ async function verifyNumberLayouts(root: ReturnType<typeof createRoot>, host: HT
   ];
   const measure = () => {
     const panel = host.querySelector<HTMLElement>('.ad-lab-panel')!;
-    panel.scrollTop = 0;
+    host.querySelector<HTMLElement>('.ad-body')!.scrollTop = 0;
     const panelRect = panel.getBoundingClientRect();
-    const nodes = [...host.querySelectorAll<HTMLElement>('.ad-header, .ad-tickspeed, .ad-dimension-card, .ad-upgrade, button, .ad-dimension-numbers dd, .ad-resource > span')];
+    const nodes = [...host.querySelectorAll<HTMLElement>('.ad-header, .ad-chip, .ad-tabs, .ad-tickspeed, .ad-dimension-card, .ad-card, button, .ad-dimension-numbers dd, .ad-resource > span')];
     return nodes.map(node => {
       const rect = node.getBoundingClientRect();
       check(node.scrollWidth <= node.clientWidth + 1, 'No clipped content: ' + node.textContent);
@@ -58,7 +57,7 @@ async function verifyNumberLayouts(root: ReturnType<typeof createRoot>, host: HT
         flushSync(() => setLanguage(language));
         for (const infinities of [0, 1]) {
           for (const [before, after] of pairs) {
-            for (const view of ['dimensions', 'actions'] as const) {
+            for (const view of ['dimensions'] as const) {
               let previous: ReturnType<typeof measure> | undefined;
               // 往復更新で、一度だけの切替と繰り返し発生する跳ねを区別する。
               for (const [index, exponent] of [before, after, before, after].entries()) {
@@ -82,10 +81,6 @@ async function verifyNumberLayouts(root: ReturnType<typeof createRoot>, host: HT
                 ad.derived.tickspeedCost = value;
                 ad.derived.dimensions = ad.derived.dimensions.map(d => ({ ...d, cost: value, productionPerSecond: value }));
                 flushSync(() => root.render(<AntimatterPanel key={view} ad={ad} />));
-                if (view === 'actions') {
-                  const button = [...host.querySelectorAll('button')].find(button => button.textContent === t('adLabText5'))!;
-                  flushSync(() => button.click());
-                }
                 await pause();
                 check(host.querySelector('.ad-resource-value')?.textContent === formatNumber(value), 'Real format boundary shown');
                 const next = measure();
@@ -222,18 +217,31 @@ async function run() {
     check(tab()?.textContent === t('adLabText4'), 'Reunlock does not restore hidden tab selection');
     await click(t('adLabText7'));
     check(!host.textContent?.includes(t('adLabText71')), 'Nested layer selection reset');
-    await click(t('adLabText5'));
-    await cycle(() => check(tab()?.textContent === t('adLabText5'), 'Actions tab retained'));
-    const confirmations: string[] = [];
-    window.confirm = text => { confirmations.push(text ?? ''); return false; };
-    await cycle(() => {
+    await click(t('adLabText4'));
+    await cycle(() => check(tab()?.textContent === t('adLabText4'), 'Dimensions tab retained'));
+    const dialog = () => document.querySelector<HTMLElement>('[data-xr-surface="ad-confirm"]');
+    const pressEscape = async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await pause();
+    };
+    for (const language of ['ja', 'en', 'ko', 'ja'] as const) {
+      flushSync(() => setLanguage(language));
+      await pause(50);
       const button = [...host.querySelectorAll('button')].find(node => node.textContent === t('adLabText31'))!;
-      button.click();
-      check(confirmations.at(-1) === t('adLabText34', ad.derived.infinity.gain), 'Crunch confirmation follows language');
+      check(button && !button.disabled, 'Crunch card is in the Dimensions tab');
+      flushSync(() => button.click());
+      await pause();
+      check(dialog()?.textContent?.includes(t('adLabText34', ad.derived.infinity.gain)), 'Crunch confirmation follows language');
+      check(dialog()?.getAttribute('data-xr-layout') === 'dialog', 'Dialog carries XR attributes');
+      check(dialog()!.contains(document.activeElement), 'Focus moves into the dialog');
+      await pressEscape();
+      check(!dialog(), 'Escape closes the dialog');
       check(crunches === 0 && scheduled === 0, 'Cancellation does not dispatch or notify');
-    });
-    window.confirm = () => true;
+    }
+    setLanguage('ja');
     await click(t('adLabText31'));
+    await click(t('adConfirmOk'), document.body);
+    check(crunches === 1 && !dialog(), 'Confirming dispatches once');
     check(scheduled === 1, 'Notice scheduled once');
     await click(t('adSaveTab'));
     const input = host.querySelector('input')!;
@@ -317,14 +325,13 @@ async function run() {
       await cycle(() => check([...host.querySelectorAll('button')].every(button => button.disabled === !available), `${target}: owner eligibility retained`));
     }
     await verifyNumberLayouts(root, host);
-    document.getElementById('result')!.textContent = 'PASS: mounted ja → en → ko → ja; tabs, inputs, notices, unchanged-number Canvas, disposal, ownership; number layout at 320/375/390/540/1000px in ja/en/ko before and after Infinity.\nVisual clipping and confirmation/cancellation in the full application still require manual inspection.';
+    document.getElementById('result')!.textContent = 'PASS: mounted ja → en → ko → ja; tabs, inputs, notices, unchanged-number Canvas, disposal, ownership; number layout at 320/375/390/540/1000px in ja/en/ko before and after Infinity.\nVisual clipping in the full application still requires manual inspection.';
   } finally {
     flushSync(() => root.unmount());
     // 途中で失敗したときも Three の購読とタイマーを残さない。
     if (document.getElementById('space')?.childElementCount) space.unmount();
     window.setTimeout = originalTimeout;
     window.clearTimeout = originalClearTimeout;
-    window.confirm = originalConfirm;
     CanvasRenderingContext2D.prototype.fillText = originalFillText;
     setLanguage(previous);
   }

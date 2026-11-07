@@ -1,23 +1,40 @@
 import { t, useLanguage, msg, type UiMessage } from '../../i18n/index.ts';
-import type { AntimatterSlice } from './types.ts';
+import type { AntimatterSlice, BigNum } from './types.ts';
 import { formatNumber } from './format.ts';
 import { s } from './styles.ts';
-import { LabArt } from './LabArt.tsx';
+import { LabArt, type LabArtKind } from './LabArt.tsx';
+import { confirmAd } from './confirmAd.tsx';
+
+function Card({ art, title, children, label, can, onClick }: {
+  art: LabArtKind; title: string; children: React.ReactNode; label: string; can: boolean; onClick: () => void;
+}) {
+  return (
+    <div className="ad-card">
+      <div className="ad-card-head"><LabArt kind={art} size={28} /><b>{title}</b></div>
+      <div className="ad-card-body">{children}</div>
+      <button type="button" style={s.btn} disabled={!can} onClick={onClick}>{label}</button>
+    </div>
+  );
+}
+
+function Requirement({ tier, amount, current }: { tier: number; amount: number; current: BigNum }) {
+  return <>
+    <span style={s.muted}>{t('adLabText13', tier)}</span>
+    <span className="ad-number ad-card-value">{`${formatNumber(current)} / ${amount}`}</span>
+  </>;
+}
 
 export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (message: UiMessage) => void }) {
   useLanguage();
   const { derived, game } = ad;
-  const boost = derived.boost;
-  const galaxy = derived.galaxy;
-  const sacrifice = derived.sacrifice;
-  const infinity = derived.infinity;
+  const { boost, galaxy, sacrifice, infinity } = derived;
 
-  const onGalaxy = () => {
-    if (!window.confirm(t('adLabText32'))) return;
+  const onGalaxy = async () => {
+    if (!await confirmAd(t('adLabText32'))) return;
     if (ad.antimatterGalaxy()) notice(msg('adLabText33'));
   };
-  const onBigCrunch = () => {
-    if (!window.confirm(t('adLabText34', infinity.gain))) return;
+  const onBigCrunch = async () => {
+    if (!await confirmAd(t('adLabText34', infinity.gain))) return;
     const gained = ad.prestigeInfinity();
     if (gained) notice(msg('adLabText35', gained));
   };
@@ -27,53 +44,25 @@ export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (messag
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div className="ad-upgrade" style={{ background: 'linear-gradient(105deg, #202d49, #241e3a)', border: '1px solid #8572e64d', borderRadius: 14, padding: 10 }}>
-        <div className="ad-upgrade-description">
-          <div className="ad-upgrade-heading"><LabArt kind="boost" size={40} /><b>Dimension Boost / Shift</b></div>
-          <div className="ad-upgrade-status" style={s.muted}>
-            <span>{t('adRequired')}: {t('adLabText13', boost.tier)}</span>
-            <span className="ad-number">{formatNumber(boost.amount)}</span>
-            <span>{t('adCurrent')}</span><span className="ad-number">{formatNumber(boost.currentAmount)}</span>
-            <span className="ad-upgrade-summary">{t('adLabText46', game.dimensionalBoosts)}</span>
-          </div>
-        </div>
-        <button style={s.btn} disabled={!boost.can} onClick={() => { if (ad.dimensionalBoost()) notice(msg('adLabText38')); }}>{t('adLabText26')}</button>
-      </div>
-      <div className="ad-upgrade" style={{ background: 'linear-gradient(105deg, #202d49, #241e3a)', border: '1px solid #8572e64d', borderRadius: 14, padding: 10 }}>
-        <div className="ad-upgrade-description">
-          <div className="ad-upgrade-heading"><LabArt kind="galaxy" size={40} /><b>Antimatter Galaxy</b></div>
-          <div className="ad-upgrade-status" style={s.muted}>
-            <span>{t('adRequired')}: {t('adLabText13', galaxy.tier)}</span>
-            <span className="ad-number">{formatNumber(galaxy.amount)}</span>
-            <span>{t('adCurrent')}</span><span className="ad-number">{formatNumber(galaxy.currentAmount)}</span>
-            <span className="ad-upgrade-summary">{t('adLabText47', game.galaxies)}</span>
-          </div>
-        </div>
-        <button style={s.btn} disabled={!galaxy.can} onClick={onGalaxy}>{t('adLabText28')}</button>
-      </div>
-      <div className="ad-upgrade" style={{ background: 'linear-gradient(105deg, #202d49, #241e3a)', border: '1px solid #8572e64d', borderRadius: 14, padding: 10 }}>
-        <div className="ad-upgrade-description">
-          <div className="ad-upgrade-heading"><LabArt kind="reactor" size={40} /><b>Dimensional Sacrifice</b></div>
-          <div className="ad-upgrade-status" style={s.muted}>
-            <span>{t('adMultiplier')} · {t('adLabText13', 8)}</span>
-            <span className="ad-number" style={{ fontSize: 20 }}>{sacrifice.unlocked ? t('adLabText331', formatNumber(sacrifice.boost), formatNumber(sacrifice.next)) : `×${formatNumber(sacrifice.boost)}`}</span>
-            <span className="ad-upgrade-summary">{sacrifice.unlocked ? t('adLabText39') : t('adLabText40', sacrifice.boosts)}</span>
-          </div>
-        </div>
-        <button style={s.btn} disabled={!(sacrifice.unlocked && sacrifice.can)} onClick={onSacrifice}>{t('adLabText30')}</button>
-      </div>
-      <div className="ad-upgrade" style={{ background: 'linear-gradient(105deg, #202d49, #241e3a)', border: '1px solid #8572e64d', borderRadius: 14, padding: 10 }}>
-        <div className="ad-upgrade-description">
-          <div className="ad-upgrade-heading"><LabArt kind="singularity" size={40} /><b>Big Crunch（Infinity）</b></div>
-          <div className="ad-upgrade-status" style={s.muted}>
-            <span className="ad-upgrade-summary">{infinity.can ? t('adLabText41', infinity.gain) : t('adLabText42')}</span>
-            <span>IP</span><span className="ad-number">{formatNumber(game.infinityPoints)}</span>
-            <span className="ad-upgrade-summary">{t('adLabText48', game.infinities)}</span>
-          </div>
-        </div>
-        <button style={s.btn} disabled={!infinity.can} onClick={onBigCrunch}>{t('adLabText31')}</button>
-      </div>
+    <div className="ad-cards">
+      <Card art="boost" title="Dimension Boost" label={t('adLabText26')} can={boost.can} onClick={() => { if (ad.dimensionalBoost()) notice(msg('adLabText38')); }}>
+        <Requirement tier={boost.tier} amount={boost.amount} current={boost.currentAmount} />
+      </Card>
+      <Card art="galaxy" title="Antimatter Galaxy" label={t('adLabText28')} can={galaxy.can} onClick={onGalaxy}>
+        <Requirement tier={galaxy.tier} amount={galaxy.amount} current={galaxy.currentAmount} />
+      </Card>
+      <Card art="reactor" title="Sacrifice" label={t('adLabText30')} can={sacrifice.unlocked && sacrifice.can} onClick={onSacrifice}>
+        {sacrifice.unlocked
+          ? <span className="ad-number ad-card-value">{t('adLabText331', formatNumber(sacrifice.boost), formatNumber(sacrifice.next))}</span>
+          : <><span className="ad-number ad-card-value">×{formatNumber(sacrifice.boost)}</span><span style={s.muted}>{t('adLabText40', sacrifice.boosts)}</span></>}
+      </Card>
+      {(game.infinities > 0 || infinity.can) && (
+        <Card art="singularity" title="Big Crunch" label={t('adLabText31')} can={infinity.can} onClick={onBigCrunch}>
+          <span style={s.muted}>IP</span>
+          <span className="ad-number ad-card-value">{formatNumber(game.infinityPoints)}</span>
+          {infinity.can ? <span style={s.muted}>{t('adLabText41', infinity.gain)}</span> : <span style={s.muted}>{t('adLabText42')}</span>}
+        </Card>
+      )}
     </div>
   );
 }

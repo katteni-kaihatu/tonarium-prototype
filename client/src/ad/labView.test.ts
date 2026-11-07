@@ -10,9 +10,8 @@ import { buildAdActions, buildAdLabSnapshot } from './labView.ts';
 import { createAdSlice, type AdSlice } from './slice.ts';
 import { getLanguage, setLanguage, t } from '../i18n/core.ts';
 
-test('3D Crunch confirmation follows language, and cancellation preserves progress', () => {
+test('3D Crunch confirmation follows language, and cancellation preserves progress', async () => {
   const previous = getLanguage();
-  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
   try {
     for (const language of ['ja', 'en', 'ko'] as const) {
       setLanguage(language);
@@ -21,18 +20,28 @@ test('3D Crunch confirmation follows language, and cancellation preserves progre
         game.antimatter = bigFromNumber(1.79e308);
         const slice = harness(game);
         const before = structuredClone(game);
-        let confirmations = 0;
-        Object.defineProperty(globalThis, 'window', { configurable: true, value: {
-          confirm(text: string) { confirmations++; assert.equal(text, t('adLabText132')); return accepted; },
-        } });
-        buildAdActions(slice).prestigeInfinity();
-        assert.equal(confirmations, 1);
+        const asked: string[] = [];
+        await buildAdActions(slice, async (text) => { asked.push(text); return accepted; }).prestigeInfinity();
+        assert.deepEqual(asked, [t('adLabText132')]);
         if (accepted) assert.equal(slice.adGame!.infinities, before.infinities + 1);
         else assert.deepEqual(slice.adGame, before);
       }
     }
   } finally {
     setLanguage(previous);
+  }
+});
+
+test('3D Crunch does not touch window.confirm', async () => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  try {
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { confirm() { throw new Error('window.confirm is not used'); } } });
+    const game = createNewGame(0);
+    game.antimatter = bigFromNumber(1.79e308);
+    const slice = harness(game);
+    await buildAdActions(slice).prestigeInfinity();
+    assert.equal(slice.adGame!.infinities, 0);
+  } finally {
     if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
     else Reflect.deleteProperty(globalThis, 'window');
   }

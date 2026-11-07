@@ -3,13 +3,10 @@ import type { CSSProperties } from 'react';
 import { formatNumber as formatNumberLocal } from './format.ts';
 // 共通部品はインライン、反応・アニメーションは名前空間付き CSS で定義する。
 export const s: Record<string, CSSProperties> = {
-  root: { display: 'flex', flexDirection: 'column', gap: 10, width: '100%', height: '100%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', scrollbarGutter: 'stable', boxSizing: 'border-box', padding: 10, borderRadius: 10, background: '#10122c', color: '#f2eef5', fontSize: 13, lineHeight: 1.5, fontVariantNumeric: 'tabular-nums', textAlign: 'left' },
-  header: { display: 'grid', gap: 10, alignItems: 'start', padding: '8px 10px', borderRadius: 10, background: 'linear-gradient(120deg, rgba(91,45,174,.6), rgba(11,91,122,.4))', border: '1px solid rgba(128,208,255,.4)' },
+  root: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%', height: '100%', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box', padding: 8, borderRadius: 10, background: '#10122c', color: '#f2eef5', fontSize: 'var(--ad-text, 13px)', lineHeight: 1.5, fontVariantNumeric: 'tabular-nums', textAlign: 'left' },
+  header: { display: 'flex', gap: 8, alignItems: 'center', padding: '6px 10px', borderRadius: 10, background: 'linear-gradient(120deg, rgba(91,45,174,.6), rgba(11,91,122,.4))', border: '1px solid rgba(128,208,255,.4)' },
   big: { fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums' },
-  muted: { color: 'rgba(242,238,245,0.65)', fontSize: 12 },
-  tabs: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  tab: { border: '1px solid rgba(255,255,255,0.18)', borderRadius: 999, background: 'transparent', color: '#f2eef5', padding: '4px 12px', cursor: 'pointer' },
-  tabActive: { border: '1px solid #7fffe3', borderRadius: 999, background: 'rgba(84,244,221,0.18)', color: '#b5fff2', padding: '4px 12px', cursor: 'pointer' },
+  muted: { color: 'rgba(242,238,245,0.65)', fontSize: 'var(--ad-small, 12px)' },
   row: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' },
   dimRow: { display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' },
   dimRowLocked: { display: 'grid', gridTemplateColumns: '1fr', gap: 4, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', opacity: 0.6 },

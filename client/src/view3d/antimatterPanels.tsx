@@ -26,7 +26,7 @@ export interface AdActions {
   dimensionalBoost: () => void;
   antimatterGalaxy: () => void;
   sacrifice: () => void;
-  prestigeInfinity: () => void;
+  prestigeInfinity: () => void | Promise<void>;
 }
 
 // ---- 3D 空間内のボード（CanvasTexture 板） ----

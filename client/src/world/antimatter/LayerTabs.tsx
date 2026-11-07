@@ -104,9 +104,9 @@ export function LayerTabs({ ad }: { ad: AntimatterSlice }) {
   const layerArt: Record<string, LabArtKind> = { dimensions: 'reactor', infinity: 'singularity', eternity: 'galaxy', reality: 'explorer', celestials: 'galaxy' };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={s.tabs}>
+      <div className="ad-segments" role="group">
         {tabs.map((entry) => (
-          <button key={entry.id} style={entry.id === layerId ? s.tabActive : s.tab} onClick={() => { if (entry.id !== layerId) { setLayerId(entry.id); emitAdFeedback({ kind: 'navigate' }); } }}>
+          <button key={entry.id} type="button" className={`ad-segment${entry.id === layerId ? ' is-active' : ''}`} aria-pressed={entry.id === layerId} onClick={() => { if (entry.id !== layerId) { setLayerId(entry.id); emitAdFeedback({ kind: 'navigate' }); } }}>
             {entry.nameJa}<span style={entry.status === 'mock' ? s.badgeMock : s.badge}>{entry.badge}</span>{!entry.unlocked && entry.id !== 'dimensions' ? <span style={s.muted}><Icon name="lock" size={14} /> {t('adLocked')}</span> : null}
           </button>
         ))}

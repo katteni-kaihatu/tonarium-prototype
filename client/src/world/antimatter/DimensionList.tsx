@@ -1,10 +1,11 @@
-import { t, useLanguage } from '../../i18n/index.ts';
+import { t, useLanguage, type UiMessage } from '../../i18n/index.ts';
 import { Icon } from '../Icon.tsx';
 import { memo } from 'react';
 import type { AntimatterSlice, DimensionDerived } from './types.ts';
 import { formatNumber } from './format.ts';
 import { dimensionMultiplierText, s, TIER_EN } from './styles.ts';
 import { DimensionReactor } from './DimensionReactor.tsx';
+import { ActionBar } from './ActionBar.tsx';
 
 function DimensionRow({ d, boosts, sacrificeBoost, buyDimension, buyUntilNextTen }: {
   d: DimensionDerived;
@@ -54,7 +55,7 @@ function tickspeedText(value: AntimatterSlice['derived']['tickspeedValue']): str
   return value.exponent >= 4 ? formatNumber(value) : (value.mantissa * 10 ** value.exponent).toFixed(2);
 }
 
-export function DimensionList({ ad }: { ad: AntimatterSlice }) {
+export function DimensionList({ ad, notice = () => {} }: { ad: AntimatterSlice; notice?: (message: UiMessage) => void }) {
   useLanguage();
   const { derived, game } = ad;
   return (
@@ -70,6 +71,7 @@ export function DimensionList({ ad }: { ad: AntimatterSlice }) {
           <button style={s.btn} onClick={() => ad.buyMax()}>{t('adLabText22')}</button>
         </div>
       </div>
+      <ActionBar ad={ad} notice={notice} />
       {derived.dimensions.map((d) => (
         <MemoRow
           key={d.tier} d={d} boosts={game.dimensionalBoosts} sacrificeBoost={game.sacrificeBoost}

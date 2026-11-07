@@ -16,6 +16,8 @@ import { DimensionList } from './DimensionList.tsx';
 import { LayerTabs } from './LayerTabs.tsx';
 import { serialize } from '../../ad/engine.mjs';
 import { AntimatterPanel } from './AntimatterPanel.tsx';
+import { confirmAd } from './confirmAd.tsx';
+import { shouldFillWindow, simpleWindowSize } from '../windowSize.ts';
 
 test('personal BGM toggle is accessible in 2D and every 3D target regardless of ownership', () => {
   const previous = getLanguage();
@@ -239,10 +241,10 @@ for (const language of ['ja', 'en', 'ko'] as const) {
             assert.equal(disabled(flat, target === 'boost' ? t('adLabText26') : t('adLabText28')), expected);
             assert.equal(disabled(space, target === 'boost' ? t('adLabText115') : t('adLabText119')), expected);
             assert.equal(target === 'boost' ? ad.derived.boost.can : ad.derived.galaxy.can, !expected);
-            assert.ok(flat.includes(t('adRequired') + ': ' + t('adLabText13', req.tier)));
-            assert.match(flat, new RegExp('class="ad-number">' + req.amount + '</span>'));
-            assert.match(flat, new RegExp('class="ad-number">' + (req.amount + offset) + '</span>'));
-            assert.ok(flat.includes(t(target === 'boost' ? 'adLabText46' : 'adLabText47', target === 'boost' ? game.dimensionalBoosts : game.galaxies)));
+            assert.ok(flat.includes(t('adLabText13', req.tier)));
+            assert.ok(flat.includes(`${req.amount + offset} / ${req.amount}`));
+            const header = renderToStaticMarkup(<AntimatterPanel ad={ad} />);
+            assert.ok(header.includes(target === 'boost' ? t('adChipBoost', game.dimensionalBoosts) : t('adChipGalaxy', game.galaxies)));
             assert.ok(space.includes(t('adRequirementCurrentAmount', String(req.amount + offset))));
             assert.equal(disabled(panels(slice, target, false).space, target === 'boost' ? t('adLabText115') : t('adLabText119')), true);
           }
@@ -275,6 +277,7 @@ for (const language of ['ja', 'en', 'ko'] as const) {
     for (const amount of [1.78e308, 1.79e308, 1.795e308]) {
       const game = createNewGame(0);
       game.antimatter = bigFromNumber(amount);
+      game.infinities = 1;
       const slice = harness(game);
       const { flat, space } = panels(slice, 'crunch');
       assert.equal(disabled(flat, t('adLabText31')), amount < 1.79e308);
@@ -285,28 +288,49 @@ for (const language of ['ja', 'en', 'ko'] as const) {
 
 }
 
-test('first Infinity unlocks upper layers and Research keeps the initial Crunch available in all languages', () => {
+test('first Infinity unlocks the Layers tab, and the Crunch card appears only once reachable or reached, in all languages', () => {
   const previous = getLanguage();
   try {
-    for (const [language, research] of [['ja', '研究開発'], ['en', 'Research'], ['ko', '연구개발']] as const) {
+    for (const language of ['ja', 'en', 'ko'] as const) {
       setLanguage(language);
-      assert.equal(t('adLabText5'), research);
       const game = createNewGame(0);
-      game.antimatter = bigFromNumber(1.79e308);
       const slice = harness(game);
+      const tabButton = (html: string, key: string) => html.includes('>' + t(key).replace(/&/g, '&amp;') + '</button>');
       const before = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
-      assert.ok(before.includes('>' + research + '</button>'));
-      assert.ok(!before.includes('>' + t('adLabText7') + '</button>'));
-      assert.equal(disabled(renderToStaticMarkup(<ActionBar ad={adaptAdSlice(slice)!} notice={() => {}} />), t('adLabText31')), false);
+      for (const key of ['adLabText4', 'adLabText6', 'adSaveTab']) assert.ok(tabButton(before, key));
+      assert.ok(!tabButton(before, 'adLabText7'));
+      assert.ok(!before.includes(t('adLabText31')));
+      assert.ok(before.includes(t('adLabText26')) && before.includes(t('adLabText28')) && before.includes(t('adLabText30')));
+      game.antimatter = bigFromNumber(1.79e308);
+      const reachable = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
+      assert.equal(disabled(reachable, t('adLabText31')), false);
       assert.equal(slice.adPrestige(), true);
       assert.equal(slice.adGame!.infinities, 1);
       const after = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
-      assert.ok(after.includes('>' + t('adLabText7') + '</button>'));
+      assert.ok(tabButton(after, 'adLabText7'));
+      assert.equal(disabled(after, t('adLabText31')), true);
       slice.adGame = createNewGame(0);
       const restored = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
-      assert.ok(!restored.includes('>' + t('adLabText7') + '</button>'));
+      assert.ok(!tabButton(restored, 'adLabText7'));
+      assert.ok(!restored.includes(t('adLabText31')));
     }
   } finally { setLanguage(previous); }
+});
+
+test('phone window size fills the region only for AD windows in the phone layout', () => {
+  const region = { w: 374, h: 560 };
+  const opts = { region, bar: 44, aspect: 1.2 };
+  assert.deepEqual(simpleWindowSize({ ...opts, fill: true }), { width: 374, height: 560 });
+  assert.deepEqual(simpleWindowSize({ ...opts, fill: false }), { width: 374, height: 374 / 1.2 + 44 });
+  assert.deepEqual(simpleWindowSize({ ...opts, aspect: undefined, fill: false }), { width: 374, height: undefined });
+  assert.equal(shouldFillWindow({ phone: true, compact: false, isAd: true }), true);
+  assert.equal(shouldFillWindow({ phone: true, compact: true, isAd: true }), false);
+  assert.equal(shouldFillWindow({ phone: false, compact: false, isAd: true }), false);
+  assert.equal(shouldFillWindow({ phone: true, compact: false, isAd: false }), false);
+});
+
+test('in-app confirm resolves false without a document and never calls window.confirm', async () => {
+  assert.equal(await confirmAd('?'), false);
 });
 
 test('number fixtures straddle actual suffix and exponent formatting boundaries', () => {
