@@ -1,12 +1,41 @@
 import { t, useLanguage, type UiMessage } from '../../i18n/index.ts';
 import { Icon } from '../Icon.tsx';
-import { memo } from 'react';
-import { bigGte, bigMulNumber } from '../../ad/engine.mjs';
-import type { AntimatterSlice, DimensionDerived } from './types.ts';
+import { memo, type CSSProperties } from 'react';
+import { bigGte, bigLog10, bigMulNumber, bigSub } from '../../ad/engine.mjs';
+import type { AntimatterSlice, BigNum, DimensionDerived } from './types.ts';
 import { formatNumber } from './format.ts';
 import { TIER_EN } from './styles.ts';
 import { DimensionReactor } from './DimensionReactor.tsx';
+import { percent, ratio } from './progress.ts';
 import { ActionBar } from './ActionBar.tsx';
+
+// 毎 tick 数字が動くとうるさいので、いちばん大きい単位だけを切り上げて出す（秒が動くのは 1 分を切ってから）。
+function etaText(antimatter: BigNum, cost: BigNum, perSecond: BigNum): string {
+  if (bigGte(antimatter, cost)) return t('adUiEtaNow');
+  const seconds = Math.ceil(10 ** (bigLog10(bigSub(cost, antimatter)) - bigLog10(perSecond)));
+  if (!Number.isFinite(seconds)) return t('adUiEtaFar');
+  if (seconds < 60) return t('adUiEtaSec', seconds);
+  if (seconds < 3600) return t('adUiEtaMin', Math.ceil(seconds / 60));
+  if (seconds < 86400) return t('adUiEtaHour', Math.ceil(seconds / 3600));
+  const days = Math.ceil(seconds / 86400);
+  return days > 9999 ? t('adUiEtaFar') : t('adUiEtaDay', days);
+}
+
+function BuyButton({ label, count, cost, antimatter, perSecond, reachesDouble, partial, disabled, onClick }: {
+  label: string; count: number; cost: BigNum; antimatter: BigNum; perSecond: BigNum;
+  reachesDouble: boolean; partial: boolean; disabled: boolean; onClick: () => void;
+}) {
+  const fill = percent(ratio(antimatter, cost));
+  const full = bigGte(antimatter, cost);
+  const state = full && reachesDouble ? 'is-double' : partial ? 'is-partial' : undefined;
+  return (
+    <button type="button" className={state} aria-label={label} title={t('adUiFundProgress', fill)} style={{ '--ad-fill': fill } as CSSProperties} disabled={disabled} onClick={onClick}>
+      <b>+{count}</b>
+      <small className="adlab-number">{formatNumber(cost)}</small>
+      <small className="adlab-dim-eta">{etaText(antimatter, cost, perSecond)}</small>
+    </button>
+  );
+}
 
 function DimensionName({ d }: { d: DimensionDerived }) {
   return (
@@ -20,9 +49,10 @@ function DimensionName({ d }: { d: DimensionDerived }) {
   );
 }
 
-function DimensionRow({ d, antimatter, sacrificeBoost, buyDimension, buyUntilNextTen }: {
+function DimensionRow({ d, antimatter, perSecond, sacrificeBoost, buyDimension, buyUntilNextTen }: {
   d: DimensionDerived;
   antimatter: AntimatterSlice['game']['antimatter'];
+  perSecond: BigNum;
   sacrificeBoost: AntimatterSlice['game']['sacrificeBoost'];
   buyDimension: AntimatterSlice['buyDimension'];
   buyUntilNextTen: AntimatterSlice['buyUntilNextTen'];
@@ -49,18 +79,19 @@ function DimensionRow({ d, antimatter, sacrificeBoost, buyDimension, buyUntilNex
         ×{formatNumber(d.multiplier)}
         {d.tier === 8 && <small>Sacrifice ×{formatNumber(sacrificeBoost)}</small>}
       </span>
-      <span className="adlab-dim-cell adlab-dim-prod adlab-number" data-label={t('adProduction')}>{t('adPerSecond', formatNumber(d.productionPerSecond))}</span>
+      <span className="adlab-dim-cell adlab-dim-prod" data-label={t('adProduction')}>
+        <span className="adlab-number">{t('adPerSecond', formatNumber(d.productionPerSecond))}</span>
+        <small>{t('adUiMakes', d.tier === 1 ? t('adUiResAntimatter') : t('adLabText13', d.tier - 1))}</small>
+      </span>
       <div className="adlab-dim-next" title={t('adLabText16', d.nextMilestoneRemaining)}>
         <div className="adlab-bar" aria-hidden="true"><span style={{ width: `${done * 10}%` }} /></div>
         <span className="adlab-number">{done}/10</span>
       </div>
       <div className="adlab-dim-buy">
-        <button type="button" aria-label={t('adLabText23', d.tier)} disabled={!d.affordable} onClick={() => buyDimension(d.tier)}>
-          <b>+1</b><small className="adlab-number">{formatNumber(d.cost)}</small>
-        </button>
-        <button type="button" className={blockAffordable ? undefined : 'is-partial'} aria-label={t('adLabText24', d.tier)} disabled={!d.affordable} onClick={() => buyUntilNextTen(d.tier)}>
-          <b>+{d.nextMilestoneRemaining}</b><small className="adlab-number">{formatNumber(blockCost)}</small>
-        </button>
+        <BuyButton label={t('adLabText23', d.tier)} count={1} cost={d.cost} antimatter={antimatter} perSecond={perSecond}
+          reachesDouble={d.nextMilestoneRemaining === 1} partial={false} disabled={!d.affordable} onClick={() => buyDimension(d.tier)} />
+        <BuyButton label={t('adLabText24', d.tier)} count={d.nextMilestoneRemaining} cost={blockCost} antimatter={antimatter} perSecond={perSecond}
+          reachesDouble partial={!blockAffordable} disabled={!d.affordable} onClick={() => buyUntilNextTen(d.tier)} />
       </div>
     </div>
   );
@@ -85,7 +116,7 @@ export function DimensionList({ ad, notice = () => {} }: { ad: AntimatterSlice; 
         </div>
         {derived.dimensions.map((d) => (
           <MemoRow
-            key={d.tier} d={d} antimatter={game.antimatter} sacrificeBoost={game.sacrificeBoost}
+            key={d.tier} d={d} antimatter={game.antimatter} perSecond={derived.antimatterPerSecond} sacrificeBoost={game.sacrificeBoost}
             buyDimension={ad.buyDimension} buyUntilNextTen={ad.buyUntilNextTen}
           />
         ))}
