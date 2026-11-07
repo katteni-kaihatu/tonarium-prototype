@@ -5,6 +5,7 @@ import {
   buyDimension,
   buyMax,
   buyMaxDimension,
+  buyInfinityUpgrade,
   buyMaxTickspeed,
   buyTickspeed,
   createNewGame,
@@ -12,10 +13,17 @@ import {
   dimensionalBoost,
   offlineProgress,
   prestigeInfinity,
+  rescueIfStuck,
+  runAutobuyers,
   sacrifice,
   serialize,
+  setAutobuyerEnabled,
   tick,
+  unlockAutobuyer,
+  upgradeAutobuyerInterval,
+  type AutobuyerId,
   type GameState,
+  type InfinityUpgradeId,
   type OfflineResult,
 } from './engine.mjs';
 import {
@@ -59,6 +67,7 @@ export interface AdSlice {
   adGame: GameState | null;
   adVersion: number;
   adOffline: OfflineResult | null;
+  adRescues: number;
   adServer: 'local' | 'connected' | 'error';
   adSync: 'disconnected' | 'loading' | 'choice' | 'ready' | 'error';
   adRecoveryKey: string | null;
@@ -81,6 +90,10 @@ export interface AdSlice {
   adGalaxy: () => boolean;
   adSacrifice: () => boolean;
   adPrestige: () => boolean;
+  adUnlockAutobuyer: (id: AutobuyerId) => boolean;
+  adSetAutobuyer: (id: AutobuyerId, enabled: boolean) => boolean;
+  adUpgradeAutobuyer: (id: AutobuyerId) => boolean;
+  adBuyInfinityUpgrade: (id: InfinityUpgradeId) => boolean;
   adCreateProfile: (name: string) => AdProfile;
   adSwitchProfile: (userId: string) => void;
   adSaveLocal: () => boolean;
@@ -376,6 +389,7 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
     adGame: null,
     adVersion: 0,
     adOffline: null,
+    adRescues: 0,
     adServer: 'local',
     adSync: 'disconnected',
     adRecoveryKey: null,
@@ -402,9 +416,11 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
           const game = get().adGame;
           if (!game || frozen()) return;
           tick(game, 100);
+          runAutobuyers(game, 100);
+          const rescued = rescueIfStuck(game);
           acknowledgeClock(JSON.parse(serialize(game)));
           // エンジンはインプレース更新のため、参照は変わらない。購読を起こす版カウンタで知らせる
-          set({ adVersion: get().adVersion + 1 });
+          set(rescued ? { adVersion: get().adVersion + 1, adRescues: get().adRescues + 1 } : { adVersion: get().adVersion + 1 });
         }, 100),
         window.setInterval(() => { saveLocalNow(); }, 1000),
         // サーバー保存は常に有効（既定は同一オリジンの Tonarium サーバー）。localStorage はフォールバックとして残る
@@ -553,6 +569,41 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
       if (ok) {
         set({ adVersion: get().adVersion + 1 });
         emitAdFeedback({ kind: 'crunch' });
+      }
+      return ok;
+    },
+
+    adUnlockAutobuyer(id) {
+      const game = get().adGame;
+      if (!game || frozen()) return false;
+      const ok = unlockAutobuyer(game, id);
+      if (ok) set({ adVersion: get().adVersion + 1 });
+      return ok;
+    },
+
+    adSetAutobuyer(id, enabled) {
+      const game = get().adGame;
+      if (!game || frozen()) return false;
+      const ok = setAutobuyerEnabled(game, id, enabled);
+      if (ok) set({ adVersion: get().adVersion + 1 });
+      return ok;
+    },
+
+    adUpgradeAutobuyer(id) {
+      const game = get().adGame;
+      if (!game || frozen()) return false;
+      const ok = upgradeAutobuyerInterval(game, id);
+      if (ok) set({ adVersion: get().adVersion + 1 });
+      return ok;
+    },
+
+    adBuyInfinityUpgrade(id) {
+      const game = get().adGame;
+      if (!game || frozen()) return false;
+      const ok = buyInfinityUpgrade(game, id);
+      if (ok) {
+        set({ adVersion: get().adVersion + 1 });
+        emitAdFeedback({ kind: 'purchase', tier: 1, count: 1 });
       }
       return ok;
     },

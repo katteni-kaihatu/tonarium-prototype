@@ -38,7 +38,7 @@ import { PortraitCanvas } from './Portraits.tsx';
 import { MapLayer } from './MapLayer.tsx';
 import { ConfirmOpen } from './Links.tsx';
 import { shareFiles, shareYouTube, youTubeId } from '../media.ts';
-import { closeWindow, openWindow, setWinMode } from './windows.ts';
+import { closeWindow, isAdWindow, openWindow, setWinMode } from './windows.ts';
 import { touchOnly, usePhone } from '../phone.ts';
 import { MasterVolume } from './VolumeMenus.tsx';
 import { SurvivorPanel } from './SurvivorPanel.tsx';
@@ -535,6 +535,11 @@ export function WorldScreen() {
   const phone = usePhone();
   useEffect(() => { set({ phoneLayout: phone }); }, [phone]);
   const phoneTab = useStore((s) => s.phoneTab);
+  // AD が前面のあいだは顔の列を隠して画面を広く使う（CSS 側で phone のときだけ効く）
+  const adFront = useStore((s) => {
+    const front = (s.mode === '3d' ? s.windows.filter((w) => w.key !== 'survivors') : s.windows).at(-1);
+    return !!front && isAdWindow(front.key, front.key.startsWith('item:') ? s.items[front.key.slice(5)] : undefined);
+  });
   // スマホでは左右のパネルはたたまず、ウィンドウはカンタン表示だけ（保存はしない）
   useEffect(() => {
     if (phone) set((s) => ({ folded: { ...s.folded, left: false, right: false }, winMode: 'simple' }));
@@ -572,7 +577,7 @@ export function WorldScreen() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [mode]);
   return (
-    <div ref={root} className={`world ${mode} ${locked ? 'locked' : ''} ${folded.left ? 'fl' : ''} ${folded.right ? 'fr' : ''} ${phone ? `phone pt-${phoneTab}` : ''}`}>
+    <div ref={root} className={`world ${mode} ${locked ? 'locked' : ''} ${folded.left ? 'fl' : ''} ${folded.right ? 'fr' : ''} ${phone ? `phone pt-${phoneTab}${adFront ? ' ad-front' : ''}` : ''}`}>
       {mode === '3d' ? (
         <Suspense fallback={<View3DFallback />}>
           <View3D />

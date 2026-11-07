@@ -39,25 +39,6 @@ export function getLayerTabs(infinities: number): LayerTab[] {
     }));
 }
 
-export const INFINITY_UPGRADES = [
-  { id: 'iu-dim-mult-1', get name() { return t('adLabText159'); }, costIP: 1, get description() { return t('adLabText160'); }, get effect() { return t('adLabText161'); } },
-  { id: 'iu-start-am', get name() { return t('adLabText162'); }, costIP: 1, get description() { return t('adLabText163'); }, get effect() { return t('adLabText164'); } },
-  { id: 'iu-tick-1', get name() { return t('adLabText165'); }, costIP: 2, get description() { return t('adLabText166'); }, get effect() { return t('adLabText167'); } },
-  { id: 'iu-dim-mult-2', get name() { return t('adLabText168'); }, costIP: 2, get description() { return t('adLabText169'); }, get effect() { return t('adLabText170'); } },
-  { id: 'iu-keep-boost', get name() { return t('adLabText171'); }, costIP: 3, get description() { return t('adLabText172'); }, get effect() { return t('adLabText173'); } },
-  { id: 'iu-galaxy-1', get name() { return t('adLabText174'); }, costIP: 4, get description() { return t('adLabText175'); }, get effect() { return t('adLabText176'); } },
-  { id: 'iu-dim-mult-3', get name() { return t('adLabText177'); }, costIP: 5, get description() { return t('adLabText178'); }, get effect() { return t('adLabText179'); } },
-  { id: 'iu-offline', get name() { return t('adLabText180'); }, costIP: 10, get description() { return t('adLabText181'); }, get effect() { return t('adLabText182'); } },
-  { id: 'iu-tick-2', get name() { return t('adLabText183'); }, costIP: 20, get description() { return t('adLabText184'); }, get effect() { return t('adLabText185'); } },
-  { id: 'iu-ip-passive', get name() { return t('adLabText186'); }, costIP: 40, get description() { return t('adLabText187'); }, get effect() { return t('adLabText188'); } },
-  { id: 'iu-dim-mult-4', get name() { return t('adLabText189'); }, costIP: 60, get description() { return t('adLabText190'); }, get effect() { return t('adLabText191'); } },
-  { id: 'iu-galaxy-2', get name() { return t('adLabText192'); }, costIP: 100, get description() { return t('adLabText193'); }, get effect() { return t('adLabText194'); } },
-  { id: 'iu-break-prep', get name() { return t('adLabText195'); }, costIP: 200, get description() { return t('adLabText196'); }, get effect() { return t('adLabText197'); } },
-  { id: 'iu-replicanti-seed', get name() { return t('adLabText198'); }, costIP: 300, get description() { return t('adLabText199'); }, get effect() { return t('adLabText197'); } },
-  { id: 'iu-dim-mult-5', get name() { return t('adLabText200'); }, costIP: 1000, get description() { return t('adLabText201'); }, get effect() { return t('adLabText202'); } },
-  { id: 'iu-eternity-seed', get name() { return t('adLabText203'); }, costIP: 5000, get description() { return t('adLabText204'); }, get effect() { return t('adLabText205'); } },
-];
-
 export const INFINITY_DIMENSIONS = [
   { tier: 1, get name() { return t('adLabText206'); }, baseCostIP: 10, costMultLog10: 3, get produces() { return t('adLabText207'); } },
   { tier: 2, get name() { return t('adLabText208'); }, baseCostIP: 20, costMultLog10: 4, get produces() { return t('adLabText206'); } },

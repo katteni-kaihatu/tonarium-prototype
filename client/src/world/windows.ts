@@ -1,4 +1,5 @@
 import { useStore, get, set, save, type Win, type WinMode } from '../store.ts';
+import type { Item } from '../../../shared/items.ts';
 import { send } from '../net/ws.ts';
 
 const SPOTS = [{ x: 380, y: 150 }, { x: 860, y: 140 }, { x: 420, y: 440 }, { x: 840, y: 420 }, { x: 620, y: 260 }];
@@ -67,3 +68,6 @@ export function resendViewing() {
   lastSent = '';
   send({ t: 'viewing', keys: get().windows.map((w) => w.key) });
 }
+
+/** AD 研究所のウィンドウ（ワールド用のものと、AD ポータルのアイテムから開いたもの） */
+export const isAdWindow = (key: string, item?: Pick<Item, 'kind'>) => key === 'antimatter' || item?.kind === 'antimatter';

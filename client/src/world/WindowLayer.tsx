@@ -15,7 +15,7 @@ import { ShareVideoHost } from '../ShareVideo.tsx';
 import { follow, selectNote } from '../actions.ts';
 import { Icon } from './Icon.tsx';
 import { ItemMark, Viewers, itemLabel } from './common.tsx';
-import { closeWindow, moveWindow, raiseWindow, toggleMax } from './windows.ts';
+import { closeWindow, isAdWindow, moveWindow, raiseWindow, toggleMax } from './windows.ts';
 import { AvatarView } from './Portraits.tsx';
 import { PortraitEmote } from './Emotes.tsx';
 import { MediaControls, mediaVolume } from '../mediaSync.tsx';
@@ -24,6 +24,7 @@ import { send } from '../net/ws.ts';
 import { DiceBody } from './DiceBody.tsx';
 import { TelephoneBody } from '../items/TelephoneBody.tsx';
 import { SurvivorLibrary, SurvivorPanel } from './SurvivorPanel.tsx';
+import { shouldFillWindow, simpleWindowSize } from './windowSize.ts';
 import { AntimatterSpaceWindowBody, AntimatterWindowBody } from './antimatter/windowBodies.tsx';
 import { SystemItemPanel } from '../systems/SystemItem.tsx';
 import { useXR } from '../xr/runtime.ts';
@@ -168,6 +169,7 @@ function WindowFrame({ win, region, simple, z, compact = false }: {
   const r = useResolved(win.key, compact);
   const immersive = useXR().active;
   const maxWin = useStore((s) => s.maxWin);
+  const phoneLayout = useStore((s) => s.phoneLayout);
   const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
   const gone = !r;
   useEffect(() => { if (gone) closeWindow(win.key); }, [gone, win.key]);
@@ -181,14 +183,11 @@ function WindowFrame({ win, region, simple, z, compact = false }: {
   if (compact) { width = 180; height = 112; }
   else if (max) { width = window.innerWidth; height = window.innerHeight; }
   else if (simple) {
-    if (r.aspect) {
-      width = Math.min(region.w, (region.h - BAR) * r.aspect);
-      height = width / r.aspect + BAR;
-    } else width = Math.min(region.w, 420);
+    ({ width, height } = simpleWindowSize({ region, bar: BAR, aspect: r.aspect, fill: shouldFillWindow({ phone: phoneLayout, compact, isAd: isAdWindow(win.key, r.item) }) }));
   } else if (r.aspect && r.kind !== 'panel') height = width / r.aspect + BAR;
 
   // AD は長い操作パネルなので、フリー配置でも画面内に収めて本文をスクロールできるようにする。
-  const boundedAD = !simple && !max && (win.key === 'antimatter' || r.item?.kind === 'antimatter');
+  const boundedAD = !simple && !max && isAdWindow(win.key, r.item);
   let left = win.x;
   let top = win.y;
   if (boundedAD) {

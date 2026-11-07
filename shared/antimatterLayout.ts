@@ -45,11 +45,19 @@ export interface AdLabSnapshot {
   galaxyCurrentAmountText: string;
   canGalaxy: boolean;
   sacrificeText: string;
+  sacrificeNextText: string;
   sacrificeUnlocked: boolean;
   canSacrifice: boolean;
   infinityPointsText: string;
   infinities: number;
   canCrunch: boolean;
+  infinityUpgradesOwned: number;
+  infinityUpgradesTotal: number;
+  /** 自動購入が解放済みかつオンのもの。3D パネルの「自動」の印に使う。 */
+  autoTickspeed: boolean;
+  autoBoost: boolean;
+  autoGalaxy: boolean;
+  autoCrunch: boolean;
 }
 
 /** 他人の研究所はこの粒度だけ見せる。セーブ本体・正確な数値は共有しない */
