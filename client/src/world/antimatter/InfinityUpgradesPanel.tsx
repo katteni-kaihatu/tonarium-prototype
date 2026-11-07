@@ -35,7 +35,10 @@ function UpgradeCard({ ad, item }: { ad: AntimatterSlice; item: InfinityUpgradeD
   return (
     <div className={`adlab-card adlab-iu-card${state}`} data-iu={item.id}>
       <div className="adlab-card-head"><b>{t(NAME_KEYS[item.id])}</b></div>
-      <div className="adlab-card-body"><span className="adlab-number adlab-card-value">{effectText(item.effect)}</span></div>
+      <div className="adlab-card-body">
+        <span className="adlab-iu-desc">{t(NAME_KEYS[item.id] + 'Desc')}</span>
+        <span className="adlab-number adlab-card-value">{effectText(item.effect)}</span>
+      </div>
       {item.owned
         ? <div className="adlab-iu-owned"><Icon name="check" size={16} /> {t('adIuOwned')}</div>
         : locked
