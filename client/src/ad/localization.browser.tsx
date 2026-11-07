@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { Canvas, useThree } from '@react-three/fiber';
 import type { Scene, Mesh, MeshBasicMaterial } from 'three';
-import { createNewGame, bigFromLog10, serialize } from './engine.mjs';
+import { createNewGame, bigFromLog10, bigFromNumber, serialize } from './engine.mjs';
 import { createAdSlice, type AdSlice } from './slice.ts';
 import { buildAdActions, buildAdLabSnapshot } from './labView.ts';
 import { adaptAdSlice } from '../world/antimatter/adapter.tsx';
@@ -26,6 +26,62 @@ const clipped = new WeakSet<HTMLCanvasElement>();
 let scene: Scene;
 function Probe() { scene = useThree(state => state.scene); return null; }
 
+export const blockerRules = '.ad-body, .ad-card, .ad-header, .ad-small, .ad-tabs { display: none !important; }';
+
+function verifyVisiblePanel(host: HTMLElement) {
+  for (const [selector, count] of [
+    ['.adlab-header', 1], ['.adlab-resource-value', 1], ['.adlab-tabs', 1],
+    ['.adlab-tab', 3], ['.adlab-body', 1], ['.adlab-card', 3], ['.adlab-dimension-card', 8],
+  ] as const) {
+    const nodes = host.querySelectorAll(selector);
+    check(nodes.length >= count, `Required elements: ${selector} (${nodes.length})`);
+    for (const node of nodes) {
+      const rect = node.getBoundingClientRect();
+      check(rect.width > 0 && rect.height > 0, `Visible area: ${selector}`);
+    }
+  }
+}
+
+function mountInteractiveFixture() {
+  const previous = getLanguage();
+  document.body.style.margin = '0';
+  document.getElementById('result')!.style.whiteSpace = 'pre-wrap';
+  const host = document.getElementById('panel')!;
+  const root = createRoot(host);
+  let fixture: AdSlice;
+  const render = () => root.render(<AntimatterPanel ad={adaptAdSlice(fixture)!} />);
+  const reset = (language: 'ja' | 'en' | 'ko', width: number, crunch = false) => {
+    flushSync(() => root.render(null));
+    fixture = createAdSlice(partial => { Object.assign(fixture, partial); render(); }, () => fixture);
+    fixture.adGame = createNewGame(0);
+    fixture.adGame.antimatter = crunch ? bigFromLog10(309) : bigFromNumber(1000000);
+    fixture.adGame.dimensionalBoosts = 6;
+    fixture.adGame.infinities = 1;
+    fixture.adLeaderboard = [
+      { name: 'Fixture', antimatterLog10: 6, infinities: 1, playTimeSec: 60, self: true },
+      { name: 'Fixture', antimatterLog10: 5, infinities: 0, playTimeSec: 30, self: true },
+    ];
+    host.style.width = width + 'px';
+    flushSync(() => { setLanguage(language); render(); });
+  };
+  const api = {
+    reset,
+    snapshot: () => ({
+      bought: fixture.adGame!.dimensions[0].bought,
+      antimatter: { ...fixture.adGame!.antimatter },
+      infinities: fixture.adGame!.infinities,
+    }),
+    labels: () => ({
+      buy: t('adLabText23', 1), crunch: t('adLabText31'), cancel: t('ui338'), ok: t('adConfirmOk'),
+      automation: t('adAutoTab'),
+    }),
+    dispose: () => { flushSync(() => root.unmount()); setLanguage(previous); },
+  };
+  Object.assign(window, { adBrowserTest: api });
+  reset('ja', 720);
+  document.getElementById('result')!.textContent = 'READY: isolated real-action fixture';
+}
+
 async function verifyNumberLayouts(root: ReturnType<typeof createRoot>, host: HTMLElement) {
   const originalWidth = host.style.width;
   const language = getLanguage();
@@ -39,15 +95,17 @@ async function verifyNumberLayouts(root: ReturnType<typeof createRoot>, host: HT
     [999999, 1000000],
   ];
   const measure = () => {
-    const panel = host.querySelector<HTMLElement>('.ad-lab-panel')!;
-    host.querySelector<HTMLElement>('.ad-body')!.scrollTop = 0;
+    verifyVisiblePanel(host);
+    const panel = host.querySelector<HTMLElement>('.adlab-lab-panel')!;
+    host.querySelector<HTMLElement>('.adlab-body')!.scrollTop = 0;
     const panelRect = panel.getBoundingClientRect();
-    const nodes = [...host.querySelectorAll<HTMLElement>('.ad-header, .ad-chip, .ad-tabs, .ad-tickspeed, .ad-dimension-card, .ad-card, button, .ad-dimension-numbers dd, .ad-resource > span')];
+    const nodes = [...host.querySelectorAll<HTMLElement>('.adlab-header, .adlab-chip, .adlab-tabs, .adlab-tickspeed, .adlab-dimension-card, .adlab-card, button, .adlab-dimension-numbers dd, .adlab-resource > span')]
+      .filter(node => { const rect = node.getBoundingClientRect(); return rect.width > 0 && rect.height > 0; });
     return nodes.map(node => {
       const rect = node.getBoundingClientRect();
       check(node.scrollWidth <= node.clientWidth + 1, 'No clipped content: ' + node.textContent);
       check(rect.left >= panelRect.left && rect.right <= panelRect.right + 1, 'Content inside panel: ' + node.textContent);
-      return { top: rect.top - panelRect.top, left: rect.left - panelRect.left, height: rect.height, width: rect.width };
+      return { element: `${node.tagName}.${node.className}`, top: rect.top - panelRect.top, left: rect.left - panelRect.left, height: rect.height, width: rect.width };
     });
   };
   try {
@@ -82,14 +140,14 @@ async function verifyNumberLayouts(root: ReturnType<typeof createRoot>, host: HT
                 ad.derived.dimensions = ad.derived.dimensions.map(d => ({ ...d, cost: value, productionPerSecond: value }));
                 flushSync(() => root.render(<AntimatterPanel key={view} ad={ad} />));
                 await pause();
-                check(host.querySelector('.ad-resource-value')?.textContent === formatNumber(value), 'Real format boundary shown');
+                check(host.querySelector('.adlab-resource-value')?.textContent === formatNumber(value), 'Real format boundary shown');
                 const next = measure();
                 if (previous) {
                   check(next.length === previous.length, 'Same layout elements');
                   next.forEach((rect, i) => {
                     for (const key of ['top', 'left', 'height', 'width'] as const) {
                       check(Math.abs(rect[key] - previous![i][key]) < .6,
-                        [width, language, infinities, view, before, after, i, key].join(': '));
+                        [width, language, infinities, view, before, after, i, rect.element, key, previous![i][key], rect[key]].join(': '));
                     }
                   });
                 }
@@ -311,10 +369,13 @@ async function run() {
       useLanguage();
       return <AntimatterSpacePanel target={target} snapshot={buildAdLabSnapshot(slice.adGame!)} actions={controls} isOwn={own} />;
     }
+    // BGMは所有者に関係なく使える個人設定なので、ゲーム操作とは分ける。
+    const gameButtons = () => [...host.querySelectorAll<HTMLButtonElement>('button')]
+      .filter(button => button.getAttribute('aria-label') !== t('adBgmLabel'));
     for (const target of ['dimension-1', 'boost', 'galaxy', 'sacrifice', 'crunch'] as const) {
       flushSync(() => root.render(<Controls target={target} own={false} />));
       await cycle(() => {
-        const buttons = host.querySelectorAll('button');
+        const buttons = gameButtons();
         check(buttons.length > 0 && [...buttons].every(button => button.disabled), `${target}: nonowner cannot operate`);
         buttons.forEach(button => button.click());
         check(actions === 0, 'Nonowner action not dispatched');
@@ -322,7 +383,7 @@ async function run() {
       flushSync(() => root.render(<Controls target={target} own />));
       const snapshot = buildAdLabSnapshot(slice.adGame!);
       const available = target === 'dimension-1' || (target === 'boost' ? snapshot.canBoost : target === 'galaxy' ? snapshot.canGalaxy : target === 'sacrifice' ? snapshot.canSacrifice : snapshot.canCrunch);
-      await cycle(() => check([...host.querySelectorAll('button')].every(button => button.disabled === !available), `${target}: owner eligibility retained`));
+      await cycle(() => check(gameButtons().length > 0 && gameButtons().every(button => button.disabled === !available), `${target}: owner eligibility retained`));
     }
     await verifyNumberLayouts(root, host);
     document.getElementById('result')!.textContent = 'PASS: mounted ja → en → ko → ja; tabs, inputs, notices, unchanged-number Canvas, disposal, ownership; number layout at 320/375/390/540/1000px in ja/en/ko before and after Infinity.\nVisual clipping in the full application still requires manual inspection.';
@@ -336,4 +397,14 @@ async function run() {
     setLanguage(previous);
   }
 }
-void run().catch(error => { document.getElementById('result')!.textContent = `FAIL: ${String(error)}`; console.error(error); });
+if (new URLSearchParams(location.search).has('interactive')) {
+  mountInteractiveFixture();
+} else {
+  const blocker = document.createElement('style');
+  if (new URLSearchParams(location.search).has('blocker')) {
+    blocker.textContent = blockerRules;
+    document.head.appendChild(blocker);
+  }
+  void run().catch(error => { document.getElementById('result')!.textContent = `FAIL: ${String(error)}`; console.error(error); })
+    .finally(() => blocker.remove());
+}

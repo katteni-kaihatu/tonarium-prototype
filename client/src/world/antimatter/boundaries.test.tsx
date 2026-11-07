@@ -108,12 +108,12 @@ test('ranking labels and collapsed self inclusion are shown in all three languag
       assert.match(representatives, /<td[^>]*>17<\/td>/);
       const childRows = [...children.split('</tbody>')[0].matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/g)];
       assert.deepEqual(childRows.map(row => [...row[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)][2][1]), ['0', '8', t('adRankingUnavailable')]);
-      assert.match(html, /class="ad-ranking-scroll"[^>]*tabindex="0"/);
+      assert.match(html, /class="adlab-ranking-scroll"[^>]*tabindex="0"/);
       assert.ok(!representatives.includes(t('adRankingSelf') + '</span>'));
       assert.ok(children.includes(t('adRankingSelf')));
       assert.match(html, /aria-expanded="false"/);
       assert.match(children, /hidden=""/);
-      assert.equal([...html.matchAll(/ad-ranking-rank/g)].length, 2);
+      assert.equal([...html.matchAll(/adlab-ranking-rank/g)].length, 2);
       assert.ok(html.includes(formatDuration(90061)));
       assert.equal(formatDuration(90061), language === 'ja' ? '1日 1時間 1分 1秒' : language === 'en' ? '1d 1h 1m 1s' : '1일 1시간 1분 1초');
       assert.equal(formatDuration(-10), language === 'ja' ? '0秒' : language === 'en' ? '0s' : '0초');
@@ -125,7 +125,7 @@ test('ranking labels and collapsed self inclusion are shown in all three languag
       assert.ok(own.includes(t('adRankingSelf') + '</span>'));
       assert.ok(!own.includes(t('adRankingContainsSelf')));
       const unrelated = renderToStaticMarkup(<StatsPanel ad={{ ...ad, leaderboard: [ad.leaderboard[1]] }} notice={() => {}} />);
-      assert.ok(!unrelated.includes('ad-ranking-badge'));
+      assert.ok(!unrelated.includes('adlab-ranking-badge'));
     }
   } finally { setLanguage(previous); }
 });
@@ -360,7 +360,7 @@ test('Infinity 強化は列の順に買え、IP が足りないと変わらず�
       game.infinityPoints = bigFromNumber(2);
       const slice = harness(game);
       const html = () => renderToStaticMarkup(<InfinityUpgradesPanel ad={adaptAdSlice(slice)!} />);
-      const card = (id: string) => html().split('<div class="ad-card ad-iu-card').find(part => part.includes(`data-iu="${id}"`)) ?? '';
+      const card = (id: string) => html().split('<div class="adlab-card adlab-iu-card').find(part => part.includes(`data-iu="${id}"`)) ?? '';
       assert.equal(html().match(/data-iu="/g)?.length, 16);
       assert.ok(card('dims18').includes(t('adLocked')) && card('dims18').includes('is-locked'));
       assert.equal(slice.adBuyInfinityUpgrade('dims18'), false);

@@ -1,0 +1,320 @@
+{
+    "date":  "2026-11-07",
+    "node":  "v24.22.1",
+    "dependencyLockSha256":  "DB2508A4664D01194C5E7B3D11FC72C19415B907527F8082E3F9FDCD0EF553B1",
+    "before":  {
+                   "browser":  "Chromium 153.0.8010.36",
+                   "reproduction":  "CSS injection only; no ad blocker installed",
+                   "checks":  [
+                                  {
+                                      "before":  {
+                                                     "resource":  {
+                                                                      "count":  1,
+                                                                      "width":  81.921875,
+                                                                      "height":  26.390625
+                                                                  },
+                                                     "tabs":  {
+                                                                  "count":  1,
+                                                                  "width":  179,
+                                                                  "height":  563.609375
+                                                              },
+                                                     "body":  {
+                                                                  "count":  1,
+                                                                  "width":  515,
+                                                                  "height":  563.609375
+                                                              },
+                                                     "card":  {
+                                                                  "count":  4,
+                                                                  "width":  246,
+                                                                  "height":  135.125
+                                                              }
+                                                 },
+                                      "after":  {
+                                                    "resource":  {
+                                                                     "count":  1,
+                                                                     "width":  0,
+                                                                     "height":  0
+                                                                 },
+                                                    "tabs":  {
+                                                                 "count":  1,
+                                                                 "width":  0,
+                                                                 "height":  0
+                                                             },
+                                                    "body":  {
+                                                                 "count":  1,
+                                                                 "width":  0,
+                                                                 "height":  0
+                                                             },
+                                                    "card":  {
+                                                                 "count":  4,
+                                                                 "width":  0,
+                                                                 "height":  0
+                                                             }
+                                                },
+                                      "injectedRules":  1,
+                                      "panelCssLoaded":  true
+                                  }
+                              ],
+                   "status":  "PASS"
+               },
+    "after":  {
+                  "browser":  "Chromium 153.0.8010.36",
+                  "reproduction":  "CSS injection only; no ad blocker installed",
+                  "checks":  [
+                                 {
+                                     "blocked":  false,
+                                     "existingRegression":  "FAIL: Error: 320: ja: 0: dimensions: 2.9995654882259823: 3: 1: SPAN.adlab-resource-value adlab-number: width: 40.609375: 62.421875"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "hiddenCardGuard":  ".adlab-iu-card",
+                                     "result":  "PASS: hidden cards rejected"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "hiddenCardGuard":  ".adlab-auto-card",
+                                     "result":  "PASS: hidden cards rejected"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  320,
+                                     "language":  "ja",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  320,
+                                     "language":  "en",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  320,
+                                     "language":  "ko",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  375,
+                                     "language":  "ja",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  375,
+                                     "language":  "en",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  375,
+                                     "language":  "ko",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  390,
+                                     "language":  "ja",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  390,
+                                     "language":  "en",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  390,
+                                     "language":  "ko",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  540,
+                                     "language":  "ja",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  540,
+                                     "language":  "en",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  540,
+                                     "language":  "ko",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  1000,
+                                     "language":  "ja",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  1000,
+                                     "language":  "en",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  false,
+                                     "width":  1000,
+                                     "language":  "ko",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "existingRegression":  "FAIL: Error: 320: ja: 0: dimensions: 2.9995654882259823: 3: 1: SPAN.adlab-resource-value adlab-number: width: 40.609375: 62.421875"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "hiddenCardGuard":  ".adlab-iu-card",
+                                     "result":  "PASS: hidden cards rejected"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "hiddenCardGuard":  ".adlab-auto-card",
+                                     "result":  "PASS: hidden cards rejected"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  320,
+                                     "language":  "ja",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  320,
+                                     "language":  "en",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  320,
+                                     "language":  "ko",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  375,
+                                     "language":  "ja",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  375,
+                                     "language":  "en",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  375,
+                                     "language":  "ko",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  390,
+                                     "language":  "ja",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  390,
+                                     "language":  "en",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  390,
+                                     "language":  "ko",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  540,
+                                     "language":  "ja",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  540,
+                                     "language":  "en",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  540,
+                                     "language":  "ko",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  1000,
+                                     "language":  "ja",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  1000,
+                                     "language":  "en",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 },
+                                 {
+                                     "blocked":  true,
+                                     "width":  1000,
+                                     "language":  "ko",
+                                     "result":  "PASS: layout, tabs, real purchase, particle origin, dialog and focus"
+                                 }
+                             ],
+                  "status":  "FAIL",
+                  "error":  "AssertionError [ERR_ASSERTION]: existing browser regression checks (see recorded results)"
+              },
+    "unchangedProductionRegression":  {
+                                          "browser":  "153.0.8010.36",
+                                          "source":  "HEAD 4b3fe3ac9edf5c93f33102abb35d9ab5bea8019f production files; current browser fixture with selectors changed back to ad-",
+                                          "result":  "FAIL: Error: 320: ja: 0: dimensions: 2.9995654882259823: 3: 1: SPAN.ad-resource-value ad-number: width: 40.609375: 62.421875"
+                                      },
+    "commands":  [
+                     {
+                         "classification":  "environment: Volta cannot create user directory",
+                         "exitCode":  7,
+                         "command":  "npm run test:ad"
+                     },
+                     {
+                         "classification":  "environment: Volta cannot create user directory",
+                         "exitCode":  7,
+                         "command":  "npm run typecheck"
+                     },
+                     {
+                         "classification":  "environment: Volta cannot create user directory",
+                         "exitCode":  7,
+                         "command":  "npm run build"
+                     },
+                     {
+                         "classification":  "environment: Volta cannot create user directory",
+                         "exitCode":  7,
+                         "command":  "npm run check:completion"
+                     },
+                     {
+                         "exitCode":  0,
+                         "command":  "test:ad script body executed directly with Node",
+                         "passed":  212
+                     },
+                     {
+                         "command":  "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+                         "exitCode":  0
+                     },
+                     {
+                         "command":  "node node_modules/vite/bin/vite.js build",
+                         "exitCode":  0
+                     },
+                     {
+                         "command":  "node scripts/check-changelog.mjs --base HEAD",
+                         "exitCode":  0
+                     }
+                 ]
+}

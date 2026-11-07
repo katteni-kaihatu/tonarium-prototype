@@ -10,12 +10,12 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
   await page.goto('http://127.0.0.1:5193/scripts/fixtures/ranking.html');
-  const ranking = page.locator('.ad-ranking');
+  const ranking = page.locator('.adlab-ranking');
   await ranking.waitFor();
-  const ranks = () => ranking.locator('.ad-ranking-rank').allTextContents();
+  const ranks = () => ranking.locator('.adlab-ranking-rank').allTextContents();
   const alpha = ranking.getByRole('button', { name: '「Alpha」の残りの記録を展開', exact: true });
-  const alphaButton = ranking.locator('.ad-ranking-controls button').first();
-  const children = ranking.locator('.ad-ranking-child:visible');
+  const alphaButton = ranking.locator('.adlab-ranking-controls button').first();
+  const children = ranking.locator('.adlab-ranking-child:visible');
   assert.deepEqual(await ranks(), ['1', '2', '3']);
   assert.equal(await children.count(), 0);
   assert.ok(await ranking.getByText('自分の記録を含む', { exact: true }).count());
@@ -26,7 +26,7 @@ try {
   // 実キー入力でスクロール領域、次いで最初の展開ボタンへ移動する。
   await page.getByRole('button', { name: 'ko', exact: true }).focus();
   await page.keyboard.press('Tab');
-  assert.equal(await ranking.locator('.ad-ranking-scroll').evaluate(el => el === document.activeElement), true);
+  assert.equal(await ranking.locator('.adlab-ranking-scroll').evaluate(el => el === document.activeElement), true);
   await page.keyboard.press('Tab');
   assert.equal(await alpha.evaluate(el => el === document.activeElement), true);
   assert.equal(await alpha.evaluate(el => getComputedStyle(el).outlineStyle), 'solid');
@@ -39,14 +39,14 @@ try {
   assert.equal(await ranking.locator('tbody').first().locator('td').nth(2).textContent(), '17');
   assert.deepEqual(await children.locator('td:nth-child(5)').allTextContents(), ['7', '5']);
   assert.deepEqual(await children.locator('td:nth-child(1)').allTextContents(), ['', '']);
-  assert.equal(await children.locator('.ad-ranking-badge').count(), 1);
+  assert.equal(await children.locator('.adlab-ranking-badge').count(), 1);
   assert.equal(await alphaButton.evaluate(el => el === document.activeElement), true);
   await page.keyboard.press('Space');
   assert.equal(await alphaButton.getAttribute('aria-expanded'), 'false');
   assert.equal(await children.count(), 0);
   await page.keyboard.press('Enter');
   await page.getByRole('button', { name: '並び更新 (初期)', exact: true }).click();
-  const buttons = ranking.locator('.ad-ranking-controls button');
+  const buttons = ranking.locator('.adlab-ranking-controls button');
   assert.deepEqual(await buttons.evaluateAll(elements => elements.map(el => el.getAttribute('aria-expanded'))), ['false', 'false', 'true']);
   assert.match(await buttons.nth(2).getAttribute('aria-label'), /Alpha/);
   assert.deepEqual(await ranks(), ['1', '2', '3']);
@@ -63,7 +63,7 @@ try {
   await mkdir('.local/ranking-verification', { recursive: true });
   await page.screenshot({ path: '.local/ranking-verification/wide.png', fullPage: true });
   await page.getByRole('button', { name: '幅 (900px)', exact: true }).click();
-  const scroll = ranking.locator('.ad-ranking-scroll');
+  const scroll = ranking.locator('.adlab-ranking-scroll');
   const dimensions = await scroll.evaluate(el => ({ client: el.clientWidth, content: el.scrollWidth, parent: el.parentElement.clientWidth }));
   assert.ok(dimensions.client <= 300 && dimensions.content > dimensions.client);
   assert.ok(dimensions.client <= dimensions.parent);

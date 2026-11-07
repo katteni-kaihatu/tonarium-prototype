@@ -28,7 +28,7 @@ function Fixture() {
       <button onClick={() => setNarrow(!narrow)}>幅 ({narrow ? '320' : '900'}px)</button>
       {(['ja', 'en', 'ko'] as const).map(language => <button key={language} onClick={() => { setLanguage(language); setRevision(revision + 1); }}>{language}</button>)}
     </nav>
-    <style>{'.ranking-fixture-panel > div > :not(.ad-ranking) { display: none !important; }'}</style>
+    <style>{'.ranking-fixture-panel > div > :not(.adlab-ranking) { display: none !important; }'}</style>
     <div className="ranking-fixture-panel" style={{ ...s.root, width: narrow ? 320 : 900, maxWidth: '100%', height: 660, marginTop: 12 }}>
       <StatsPanel ad={{ ...ad, leaderboard: updated ? [initial[1], initial[2], initial[0], ...initial.slice(3)] : initial, refreshLeaderboard: async () => setUpdated(value => !value) }} notice={() => {}} />
     </div>

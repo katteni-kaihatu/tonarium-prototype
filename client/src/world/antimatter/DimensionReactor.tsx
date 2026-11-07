@@ -13,15 +13,15 @@ export function DimensionReactor({ dimension: d }: { dimension: DimensionDerived
     '--ad-orbit-duration': `${duration}s`,
   } as CSSProperties;
   return (
-    <svg className={`ad-dimension-reactor${d.locked ? ' is-locked' : ''}${producing ? ' is-producing' : ''}`}
+    <svg className={`adlab-dimension-reactor${d.locked ? ' is-locked' : ''}${producing ? ' is-producing' : ''}`}
       style={style} viewBox="0 0 100 100" aria-hidden="true">
-      <circle className="ad-reactor-halo" cx="50" cy="50" r="43" />
-      <g className="ad-reactor-orbit">
+      <circle className="adlab-reactor-halo" cx="50" cy="50" r="43" />
+      <g className="adlab-reactor-orbit">
         <circle cx="50" cy="50" r="39" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="55 10 7 10" />
         <circle cx="50" cy="11" r="4" fill="currentColor" />
         <circle cx="50" cy="89" r="2" fill="white" />
       </g>
-      <g className="ad-reactor-orbit ad-reactor-inner">
+      <g className="adlab-reactor-orbit adlab-reactor-inner">
         <ellipse cx="50" cy="50" rx="29" ry="17" fill="none" stroke="currentColor" strokeWidth="1.5" />
         <ellipse cx="50" cy="50" rx="17" ry="29" fill="none" stroke="currentColor" strokeWidth="1.5" />
         {Array.from({ length: d.tier }, (_, i) => {
