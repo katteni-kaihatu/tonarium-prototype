@@ -40,10 +40,10 @@ function Dialog({ message, done }: { message: string; done: (ok: boolean) => voi
     };
   }, [done]);
   return (
-    <div className="ad-confirm" style={s.modal} data-xr-surface="ad-confirm" data-xr-layout="dialog" data-xr-min-width="512" data-xr-title={t('mergeAdLab')} onClick={() => done(false)}>
-      <div ref={box} className="ad-confirm-box" style={s.modalBox} role="alertdialog" aria-modal="true" aria-label={message} onClick={(e) => e.stopPropagation()}>
-        <p className="ad-confirm-message">{message}</p>
-        <div className="ad-confirm-actions">
+    <div className="adlab-confirm" style={s.modal} data-xr-surface="ad-confirm" data-xr-layout="dialog" data-xr-min-width="512" data-xr-title={t('mergeAdLab')} onClick={() => done(false)}>
+      <div ref={box} className="adlab-confirm-box" style={s.modalBox} role="alertdialog" aria-modal="true" aria-label={message} onClick={(e) => e.stopPropagation()}>
+        <p className="adlab-confirm-message">{message}</p>
+        <div className="adlab-confirm-actions">
           <button ref={cancel} type="button" style={s.btn} onClick={() => done(false)}>{t('ui338')}</button>
           <button type="button" style={s.btnDanger} onClick={() => done(true)}>{t('adConfirmOk')}</button>
         </div>

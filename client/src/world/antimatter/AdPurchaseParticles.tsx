@@ -27,7 +27,7 @@ export function AdPurchaseParticles({ root }: { root: RefObject<HTMLDivElement |
     const unsubscribe = subscribeAdFeedback((event) => {
       if (!SUCCESS_KINDS.has(event.kind) || !root.current) return;
       const reactor = event.kind === 'purchase' && Number.isInteger(event.tier)
-        ? panel.querySelector(`[data-tier="${event.tier}"] .ad-dimension-reactor`)
+        ? panel.querySelector(`[data-tier="${event.tier}"] .adlab-dimension-reactor`)
         : null;
       const bounds = panel.getBoundingClientRect();
       const candidates = [reactor, panel.querySelector('[data-ad-core] svg'), interactedButton];
@@ -64,7 +64,7 @@ export function AdPurchaseParticles({ root }: { root: RefObject<HTMLDivElement |
   }, [root, reduced]);
   if (reduced) return null;
   return bursts.map((burst) => (
-    <span key={burst.id} className="ad-feedback-burst" aria-hidden="true" style={{ left: burst.x, top: burst.y, color: burst.color }}>
+    <span key={burst.id} className="adlab-feedback-burst" aria-hidden="true" style={{ left: burst.x, top: burst.y, color: burst.color }}>
       {Array.from({ length: 12 }, (_, i) => {
         const angle = i * Math.PI / 6;
         const radius = i % 2 === 0 ? 40 : 28;
