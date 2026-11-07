@@ -1,6 +1,5 @@
 import { t, useLanguage } from '../../i18n/index.ts';
 import type { AutobuyerDerived, AutobuyerId, AntimatterSlice } from './types.ts';
-import { formatNumber } from './format.ts';
 import { s } from './styles.ts';
 
 const NAMES: Record<AutobuyerId, string> = {
@@ -52,11 +51,8 @@ function AutobuyerCard({ ad, item }: { ad: AntimatterSlice; item: AutobuyerDeriv
 export function AutomationPanel({ ad }: { ad: AntimatterSlice }) {
   useLanguage();
   return (
-    <>
-      <div className="ad-auto-ip"><span className="ad-auto-ip-label">IP</span><span className="ad-number ad-card-value">{formatNumber(ad.game.infinityPoints)}</span></div>
-      <div className="ad-cards">
-        {ad.derived.autobuyers.map(item => <AutobuyerCard key={item.id} ad={ad} item={item} />)}
-      </div>
-    </>
+    <div className="ad-cards">
+      {ad.derived.autobuyers.map(item => <AutobuyerCard key={item.id} ad={ad} item={item} />)}
+    </div>
   );
 }

@@ -1,6 +1,5 @@
 import { t } from '../../i18n/core.ts';
 import type { CSSProperties } from 'react';
-import { formatNumber as formatNumberLocal } from './format.ts';
 // 共通部品はインライン、反応・アニメーションは名前空間付き CSS で定義する。
 export const s: Record<string, CSSProperties> = {
   root: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%', height: '100%', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box', padding: 8, borderRadius: 10, background: '#10122c', color: '#f2eef5', fontSize: 'var(--ad-text, 13px)', lineHeight: 1.5, fontVariantNumeric: 'tabular-nums', textAlign: 'left' },
@@ -35,17 +34,3 @@ export const ACHIEVEMENT_DEFS = [
   { id: 'first-sacrifice', get name() { return t('adLabText143'); }, get desc() { return t('adLabText144'); } },
   { id: 'first-infinity', get name() { return t('adLabText145'); }, get desc() { return t('adLabText146'); } },
 ] as const;
-
-// app.js の dimensionMultiplierText と同じ表示規則。生産計算には使わない。
-export function dimensionMultiplierText(tier: number, bought: number, boosts: number, sacrificeBoost: import('./types.ts').BigNum, includeSacrifice = true): string {
-  const logMult = (Math.floor(bought / 10) + Math.max(boosts - (tier - 1), 0)) * Math.log10(2);
-  let text: string;
-  if (logMult < 15) {
-    text = `×${formatNumberLocal(10 ** logMult)}`;
-  } else {
-    const exponent = Math.floor(logMult);
-    text = `×${(10 ** (logMult - exponent)).toFixed(2)}e${exponent}`;
-  }
-  if (tier === 8 && includeSacrifice) text += ` × Sacrifice ${formatNumberLocal(sacrificeBoost)}`;
-  return text;
-}

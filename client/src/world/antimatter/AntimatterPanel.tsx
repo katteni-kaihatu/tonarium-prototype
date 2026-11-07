@@ -7,7 +7,7 @@ import { DimensionList } from './DimensionList.tsx';
 import { StatsPanel } from './StatsPanel.tsx';
 import { ProfilePanel } from './ProfilePanel.tsx';
 import { ProgressPicker, ProgressSummary } from './ProgressPicker.tsx';
-import { AutomationPanel } from './AutomationPanel.tsx';
+import { InfinityPanel } from './InfinityPanel.tsx';
 import { LayerTabs } from './LayerTabs.tsx';
 import './antimatter-panel.css';
 import { emitAdFeedback } from '../../ad/feedback.ts';
@@ -15,11 +15,11 @@ import { AdPurchaseParticles } from './AdPurchaseParticles.tsx';
 import { AdBgmToggle } from '../../ad/AdBgmToggle.tsx';
 import { t, useLanguage, msg, systemText, type UiMessage } from '../../i18n/index.ts';
 
-type TabId = 'dimensions' | 'automation' | 'stats' | 'profiles' | 'layers';
+type TabId = 'dimensions' | 'infinity' | 'stats' | 'profiles' | 'layers';
 
 const TABS: { id: TabId; label: string; visible?: (game: AntimatterPanelProps['ad']['game']) => boolean }[] = [
   { id: 'dimensions', label: 'adLabText4' },
-  { id: 'automation', label: 'adAutoTab', visible: game => game.infinities > 0 },
+  { id: 'infinity', label: 'adInfinityTab', visible: game => game.infinities > 0 },
   { id: 'stats', label: 'adLabText6' },
   { id: 'profiles', label: 'adSaveTab' },
   { id: 'layers', label: 'adLabText7', visible: game => game.infinities > 0 },
@@ -94,7 +94,7 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
             </div>)}
           </div>}
           {activeTab === 'dimensions' && <DimensionList ad={ad} notice={showNotice} />}
-          {activeTab === 'automation' && <AutomationPanel ad={ad} />}
+          {activeTab === 'infinity' && <InfinityPanel ad={ad} />}
           {activeTab === 'stats' && <StatsPanel ad={ad} notice={showNotice} />}
           {activeTab === 'profiles' && <ProfilePanel ad={ad} notice={showNotice} />}
           {activeTab === 'layers' && <LayerTabs ad={ad} />}

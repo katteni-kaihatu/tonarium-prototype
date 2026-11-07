@@ -5,6 +5,7 @@ import {
   buyDimension,
   buyMax,
   buyMaxDimension,
+  buyInfinityUpgrade,
   buyMaxTickspeed,
   buyTickspeed,
   createNewGame,
@@ -22,6 +23,7 @@ import {
   upgradeAutobuyerInterval,
   type AutobuyerId,
   type GameState,
+  type InfinityUpgradeId,
   type OfflineResult,
 } from './engine.mjs';
 import {
@@ -91,6 +93,7 @@ export interface AdSlice {
   adUnlockAutobuyer: (id: AutobuyerId) => boolean;
   adSetAutobuyer: (id: AutobuyerId, enabled: boolean) => boolean;
   adUpgradeAutobuyer: (id: AutobuyerId) => boolean;
+  adBuyInfinityUpgrade: (id: InfinityUpgradeId) => boolean;
   adCreateProfile: (name: string) => AdProfile;
   adSwitchProfile: (userId: string) => void;
   adSaveLocal: () => boolean;
@@ -591,6 +594,17 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
       if (!game || frozen()) return false;
       const ok = upgradeAutobuyerInterval(game, id);
       if (ok) set({ adVersion: get().adVersion + 1 });
+      return ok;
+    },
+
+    adBuyInfinityUpgrade(id) {
+      const game = get().adGame;
+      if (!game || frozen()) return false;
+      const ok = buyInfinityUpgrade(game, id);
+      if (ok) {
+        set({ adVersion: get().adVersion + 1 });
+        emitAdFeedback({ kind: 'purchase', tier: 1, count: 1 });
+      }
       return ok;
     },
 

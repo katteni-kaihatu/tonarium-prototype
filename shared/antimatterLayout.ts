@@ -51,6 +51,8 @@ export interface AdLabSnapshot {
   infinityPointsText: string;
   infinities: number;
   canCrunch: boolean;
+  infinityUpgradesOwned: number;
+  infinityUpgradesTotal: number;
   /** 自動購入が解放済みかつオンのもの。3D パネルの「自動」の印に使う。 */
   autoTickspeed: boolean;
   autoBoost: boolean;

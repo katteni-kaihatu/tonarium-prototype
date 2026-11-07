@@ -1,9 +1,10 @@
 import { msg, getLanguage, useLanguage } from '../../i18n/index.ts';
 import {
   AUTOBUYER_IDS, AUTOBUYER_UNLOCK_COST, getAutobuyerInterval, getAutobuyerUpgradeCost,
-  bigFromNumber, bigGte, canAntimatterGalaxy, canDimensionalBoost, canInfinity, canSacrifice,
+  INFINITY_UPGRADES, bigDiv, bigFromNumber, bigGte, canBuyInfinityUpgrade, getInfinityUpgradeEffect,
+  hasInfinityUpgrade, isInfinityUpgradeAvailable, canAntimatterGalaxy, canDimensionalBoost, canInfinity, canSacrifice,
   getAntimatterPerSecond, getDimensionalBoostRequirement, getDimensionCost,
-  getDimensionProductionPerSecond, getEffectiveTickspeedBig, getSacrificeCandidate, getGalaxyRequirement,
+  getDimensionMultiplierBig, getDimensionProductionPerSecond, getEffectiveTickspeedBig, getSacrificeCandidate, getGalaxyRequirement,
   getInfinityGain, getMaxUnlockedTier, getTickspeedCost, getTickspeedPerPurchase,
   type GameState,
 } from '../../ad/engine.mjs';
@@ -33,6 +34,7 @@ function derivedFrom(game: GameState): DerivedSnapshot {
         bought: dim.bought,
         cost,
         productionPerSecond: getDimensionProductionPerSecond(game, tier),
+        multiplier: tier === 8 ? bigDiv(getDimensionMultiplierBig(game, tier), game.sacrificeBoost) : getDimensionMultiplierBig(game, tier),
         affordable: !locked && bigGte(game.antimatter, cost),
         locked,
         nextMilestoneRemaining: dim.bought % 10 === 0 ? 10 : 10 - (dim.bought % 10),
@@ -62,6 +64,13 @@ function derivedFrom(game: GameState): DerivedSnapshot {
         canUpgrade: upgradeCost !== null && bigGte(game.infinityPoints, bigFromNumber(upgradeCost)),
       };
     }),
+    infinityUpgrades: INFINITY_UPGRADES.map(({ id, column, row, cost }) => ({
+      id, column, row, cost,
+      owned: hasInfinityUpgrade(game, id),
+      available: isInfinityUpgradeAvailable(game, id),
+      canBuy: canBuyInfinityUpgrade(game, id),
+      effect: getInfinityUpgradeEffect(game, id),
+    })),
   };
 }
 
@@ -122,6 +131,7 @@ export function adaptAdSlice(slice: AdSlice, options: AdaptOptions = {}): Antima
     unlockAutobuyer: (id) => { slice.adUnlockAutobuyer(id); },
     setAutobuyer: (id, enabled) => { slice.adSetAutobuyer(id, enabled); },
     upgradeAutobuyer: (id) => { slice.adUpgradeAutobuyer(id); },
+    buyInfinityUpgrade: (id) => { slice.adBuyInfinityUpgrade(id); },
     resetGame: slice.adResetGame,
     recoveryRecords: slice.adListRecovery(),
     exportRecoveryBundle: (source, key) => { const bundle = slice.adExportRecovery(source, key); return bundle ? JSON.stringify(bundle, null, 2) : ''; },

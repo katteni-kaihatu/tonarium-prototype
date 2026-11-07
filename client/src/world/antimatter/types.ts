@@ -6,6 +6,21 @@ export interface BigNum {
 
 export type AutobuyerId = 'lowDims' | 'highDims' | 'tickspeed' | 'boost' | 'galaxy' | 'crunch';
 
+export type InfinityUpgradeId = import('../../ad/engine.mjs').InfinityUpgradeId;
+export type InfinityUpgradeEffect = import('../../ad/engine.mjs').InfinityUpgradeEffect;
+
+export interface InfinityUpgradeDerived {
+  id: InfinityUpgradeId;
+  column: number;
+  row: number;
+  cost: number;
+  owned: boolean;
+  /** 列の上の段まで買ってある（買えるかどうかは IP 次第）。 */
+  available: boolean;
+  canBuy: boolean;
+  effect: InfinityUpgradeEffect;
+}
+
 export interface AutobuyerState {
   unlocked: boolean;
   enabled: boolean;
@@ -44,6 +59,10 @@ export interface GameState {
   infinityPoints: BigNum;
   infinities: number;
   autobuyers: Record<AutobuyerId, AutobuyerState>;
+  infinityUpgrades: InfinityUpgradeId[];
+  runStartedAt: number;
+  bestInfinityMs: number | null;
+  ipGenElapsedMs: number;
   totalAntimatter: BigNum;
   lastTick: number;
   createdAt: number;
@@ -55,6 +74,8 @@ export interface DimensionDerived {
   bought: number;
   cost: BigNum;
   productionPerSecond: BigNum;
+  /** Sacrifice を除く、強化込みの倍率（第8次元の Sacrifice は別に出す）。 */
+  multiplier: BigNum;
   affordable: boolean;
   locked: boolean;
   nextMilestoneRemaining: number;
@@ -94,6 +115,7 @@ export interface DerivedSnapshot {
   sacrifice: SacrificeDerived;
   infinity: InfinityDerived;
   autobuyers: AutobuyerDerived[];
+  infinityUpgrades: InfinityUpgradeDerived[];
 }
 
 export interface AdProfile {
@@ -160,6 +182,7 @@ export interface AntimatterSlice {
   unlockAutobuyer: (id: AutobuyerId) => void;
   setAutobuyer: (id: AutobuyerId, enabled: boolean) => void;
   upgradeAutobuyer: (id: AutobuyerId) => void;
+  buyInfinityUpgrade: (id: InfinityUpgradeId) => void;
   resetGame: () => void;
   exportBundle: () => string;
   recoveryRecords: { key: string; createdAt: string | null }[];

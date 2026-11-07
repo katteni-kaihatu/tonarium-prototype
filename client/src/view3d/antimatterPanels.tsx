@@ -220,6 +220,7 @@ function AntimatterSpaceContent({ target, snapshot, actions, isOwn, onClose }: {
     <div style={panelStyle}>
       <h3>{exhibit ? adExhibitTitle(exhibit.id) : t('adLabText125')}<span style={mockBadge}>{t('ui1154')}</span></h3>
       <p>{t('adLabText111')}</p>
+      {target === 'exhibit-infinity' && <p>{t('adIuCount', snapshot.infinityUpgradesOwned, snapshot.infinityUpgradesTotal)}</p>}
       <Btn label={t('adLabText126')} onClick={() => undefined} disabled />
       <Foot onClose={onClose} />
     </div>

@@ -3,13 +3,12 @@ import { Icon } from '../Icon.tsx';
 import { memo } from 'react';
 import type { AntimatterSlice, DimensionDerived } from './types.ts';
 import { formatNumber } from './format.ts';
-import { dimensionMultiplierText, s, TIER_EN } from './styles.ts';
+import { s, TIER_EN } from './styles.ts';
 import { DimensionReactor } from './DimensionReactor.tsx';
 import { ActionBar } from './ActionBar.tsx';
 
-function DimensionRow({ d, boosts, sacrificeBoost, buyDimension, buyUntilNextTen }: {
+function DimensionRow({ d, sacrificeBoost, buyDimension, buyUntilNextTen }: {
   d: DimensionDerived;
-  boosts: number;
   sacrificeBoost: AntimatterSlice['game']['sacrificeBoost'];
   buyDimension: AntimatterSlice['buyDimension'];
   buyUntilNextTen: AntimatterSlice['buyUntilNextTen'];
@@ -33,7 +32,7 @@ function DimensionRow({ d, boosts, sacrificeBoost, buyDimension, buyUntilNextTen
           <div><dt>{t('adOwned')}</dt><dd style={s.big}>{formatNumber(d.amount)}</dd></div>
           <div><dt>{t('adBought')}</dt><dd>{d.bought}</dd></div>
           <div><dt>{t('adProduction')}</dt><dd>{t('adPerSecond', formatNumber(d.productionPerSecond))}</dd></div>
-          <div><dt>{t('adMultiplier')}</dt><dd>{dimensionMultiplierText(d.tier, d.bought, boosts, sacrificeBoost, false)}</dd></div>
+          <div><dt>{t('adMultiplier')}</dt><dd>×{formatNumber(d.multiplier)}</dd></div>
           {d.tier === 8 && <div><dt>Sacrifice</dt><dd>×{formatNumber(sacrificeBoost)}</dd></div>}
           <div><dt>{t('adCost')}</dt><dd>{formatNumber(d.cost)}</dd></div>
         </dl>
@@ -74,7 +73,7 @@ export function DimensionList({ ad, notice = () => {} }: { ad: AntimatterSlice; 
       <ActionBar ad={ad} notice={notice} />
       {derived.dimensions.map((d) => (
         <MemoRow
-          key={d.tier} d={d} boosts={game.dimensionalBoosts} sacrificeBoost={game.sacrificeBoost}
+          key={d.tier} d={d} sacrificeBoost={game.sacrificeBoost}
           buyDimension={ad.buyDimension} buyUntilNextTen={ad.buyUntilNextTen}
         />
       ))}

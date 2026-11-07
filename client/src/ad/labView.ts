@@ -17,6 +17,7 @@ import {
   getGalaxyRequirement,
   getMaxUnlockedTier,
   getTickspeedCost,
+  INFINITY_UPGRADES,
   type AutobuyerId,
   type GameState,
 } from './engine.mjs';
@@ -80,6 +81,8 @@ export function buildAdLabSnapshot(game: GameState): AdLabSnapshot {
     infinityPointsText: formatNumber(game.infinityPoints),
     infinities: game.infinities,
     canCrunch: canInfinity(game),
+    infinityUpgradesOwned: game.infinityUpgrades.length,
+    infinityUpgradesTotal: INFINITY_UPGRADES.length,
     autoTickspeed: autoActive(game, 'tickspeed'),
     autoBoost: autoActive(game, 'boost'),
     autoGalaxy: autoActive(game, 'galaxy'),

@@ -82,6 +82,44 @@ export const AUTOBUYER_MIN_INTERVAL_MS = 500;
 export const AUTOBUYER_MAX_LEVEL = 5;
 export const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000; // 8 hours
 
+/**
+ * Infinity 強化の定数表。列は上から順にしか買えず、列どうしは独立。
+ * 費用・効果の数値はここだけで調整する。
+ */
+export const INFINITY_UPGRADES = [
+  { id: 'totalTime', column: 1, row: 1, cost: 1 },
+  { id: 'dims18', column: 1, row: 2, cost: 1 },
+  { id: 'dims36', column: 1, row: 3, cost: 1 },
+  { id: 'resetReq', column: 1, row: 4, cost: 1 },
+  { id: 'buy10', column: 2, row: 1, cost: 1 },
+  { id: 'dims27', column: 2, row: 2, cost: 1 },
+  { id: 'dims45', column: 2, row: 3, cost: 1 },
+  { id: 'galaxyBoost', column: 2, row: 4, cost: 2 },
+  { id: 'runTime', column: 3, row: 1, cost: 2 },
+  { id: 'unspentIp', column: 3, row: 2, cost: 3 },
+  { id: 'boostMult', column: 3, row: 3, cost: 4 },
+  { id: 'ipGen', column: 3, row: 4, cost: 5 },
+  { id: 'startBoost1', column: 4, row: 1, cost: 6 },
+  { id: 'startBoost2', column: 4, row: 2, cost: 8 },
+  { id: 'startBoost3', column: 4, row: 3, cost: 10 },
+  { id: 'startGalaxy', column: 4, row: 4, cost: 20 },
+];
+export const INFINITY_UPGRADE_IDS = INFINITY_UPGRADES.map((u) => u.id);
+export const INFINITY_UPGRADE_PARAMS = {
+  totalTimeDivMin: 2, totalTimeExp: 0.15,
+  runTimeDivMin: 4, runTimeExp: 0.25,
+  infinityPerCount: 0.5,
+  unspentIpDiv: 2, unspentIpExp: 1.5,
+  buy10Mult: 2.2, boostMult: 2.5,
+  baseBuy10Mult: 2, baseBoostMult: 2,
+  galaxyBoostFactor: 2,
+  resetReduction: 9,
+  ipGenFactor: 10, ipGenMinIntervalMs: 10 * 60 * 1000,
+  startBoosts: { startBoost1: 1, startBoost2: 2, startBoost3: 3, startGalaxy: 4 },
+  startGalaxies: 1,
+};
+const INFINITY_UPGRADE_PAIRS = { dims18: [1, 8], dims27: [2, 7], dims36: [3, 6], dims45: [4, 5] };
+
 // ---------------------------------------------------------------------------
 // BigNum helpers
 // ---------------------------------------------------------------------------
@@ -311,6 +349,10 @@ export function createNewGame(now = Date.now()) {
     infinityPoints: bigZero(),
     infinities: 0,
     autobuyers: createAutobuyers(),
+    infinityUpgrades: [],
+    runStartedAt: now,
+    bestInfinityMs: null, // 最速の周回時間（Big Crunch したことがなければ null）
+    ipGenElapsedMs: 0,
     totalAntimatter: bigZero(), // lifetime, never reset by boosts/galaxies
     lastTick: now,
     createdAt: now,
@@ -352,9 +394,14 @@ export function getTickspeedCost(state) {
   return bigFromLog10(TICKSPEED_INITIAL_COST_LOG10 + TICKSPEED_COST_LOG_INCREMENT * state.tickspeedBought);
 }
 
+export function hasInfinityUpgrade(state, id) {
+  return Array.isArray(state.infinityUpgrades) && state.infinityUpgrades.includes(id);
+}
+
 /** Per-purchase tickspeed effect: 1.1245 + 0.02 per galaxy (spec §3). */
 export function getTickspeedPerPurchase(state) {
-  return TICKSPEED_BASE_PER_PURCHASE + TICKSPEED_GALAXY_BONUS * (state.galaxies || 0);
+  const factor = hasInfinityUpgrade(state, 'galaxyBoost') ? INFINITY_UPGRADE_PARAMS.galaxyBoostFactor : 1;
+  return TICKSPEED_BASE_PER_PURCHASE + TICKSPEED_GALAXY_BONUS * factor * (state.galaxies || 0);
 }
 
 /**
@@ -394,24 +441,52 @@ export function getMaxUnlockedTier(state) {
   return Math.min(8, 4 + Math.min(boosts, 4));
 }
 
-/**
- * Scalar part of a dimension's production multiplier (spec §2.2/§4.1):
- * - every 10 bought: x2            -> 2^floor(bought/10)
- * - dimensional boosts fall off by tier:
- *     2^max(dimensionalBoosts - (tier-1), 0)
- * (8th dimension additionally multiplies by sacrificeBoost — see Big variant.)
- */
-export function getDimensionMultiplier(state, tier) {
-  checkTier(tier);
-  const dim = state.dimensions[tier - 1];
-  return 2 ** Math.floor(dim.bought / 10) * 2 ** Math.max(state.dimensionalBoosts - (tier - 1), 0);
+function log10Min(ms, divMin, exp) {
+  const minutes = Math.max(0, ms) / 60000;
+  return minutes > divMin ? exp * Math.log10(minutes / divMin) : 0;
 }
 
+/** Infinity 強化の倍率（log10）。tier を渡すと、その次元にだけ効くものも含める。 */
+function getUpgradeMultiplierLog10(state, tier) {
+  const p = INFINITY_UPGRADE_PARAMS;
+  let log = 0;
+  if (hasInfinityUpgrade(state, 'totalTime')) {
+    log += log10Min(state.lastTick - state.createdAt, p.totalTimeDivMin, p.totalTimeExp);
+  }
+  if (hasInfinityUpgrade(state, 'runTime')) {
+    log += log10Min(state.lastTick - (state.runStartedAt ?? state.createdAt), p.runTimeDivMin, p.runTimeExp);
+  }
+  for (const [id, tiers] of Object.entries(INFINITY_UPGRADE_PAIRS)) {
+    if (tiers.includes(tier) && hasInfinityUpgrade(state, id)) log += getInfinityCountMultiplierLog10(state);
+  }
+  if (tier === 1 && hasInfinityUpgrade(state, 'unspentIp')) log += getUnspentIpMultiplierLog10(state);
+  return log;
+}
+
+function getInfinityCountMultiplierLog10(state) {
+  return Math.log10(1 + INFINITY_UPGRADE_PARAMS.infinityPerCount * (state.infinities || 0));
+}
+
+function getUnspentIpMultiplierLog10(state) {
+  const p = INFINITY_UPGRADE_PARAMS;
+  return p.unspentIpExp * bigLog10(bigAdd(bigMulNumber(state.infinityPoints, 1 / p.unspentIpDiv), 1));
+}
+
+/**
+ * A dimension's production multiplier (spec §2.2/§4.1) as a BigNum:
+ * - every 10 bought: x2 (x2.2 with buy10)
+ * - dimensional boosts fall off by tier:
+ *     2^max(dimensionalBoosts - (tier-1), 0) (x2.5 per boost with boostMult)
+ * - Infinity upgrades, and the 8th dimension's sacrificeBoost.
+ */
 export function getDimensionMultiplierBig(state, tier) {
   checkTier(tier);
+  const p = INFINITY_UPGRADE_PARAMS;
   const dim = state.dimensions[tier - 1];
-  const exponent = Math.floor(dim.bought / 10) + Math.max(state.dimensionalBoosts - (tier - 1), 0);
-  const mult = bigFromLog10(exponent * Math.log10(2));
+  const log = Math.floor(dim.bought / 10) * Math.log10(hasInfinityUpgrade(state, 'buy10') ? p.buy10Mult : p.baseBuy10Mult)
+    + Math.max(state.dimensionalBoosts - (tier - 1), 0) * Math.log10(hasInfinityUpgrade(state, 'boostMult') ? p.boostMult : p.baseBoostMult)
+    + getUpgradeMultiplierLog10(state, tier);
+  const mult = bigFromLog10(log);
   if (tier === 8) return bigMul(mult, state.sacrificeBoost);
   return mult;
 }
@@ -435,14 +510,19 @@ export function getAntimatterPerSecond(state) {
  * - boosts >= 4 (Dimension Boost): 20 + 15 * (boosts - 3) of tier 8
  *   (boosts=4 -> 35, 5 -> 50, ..., 9 -> 110, ...)
  */
+function reduceRequirement(state, amount) {
+  const reduction = hasInfinityUpgrade(state, 'resetReq') ? INFINITY_UPGRADE_PARAMS.resetReduction : 0;
+  return Math.max(1, amount - reduction);
+}
+
 export function getDimensionalBoostRequirement(state) {
   const boosts = Math.max(0, Math.trunc(state.dimensionalBoosts || 0));
-  if (boosts < 4) return { tier: boosts + 4, amount: 20 };
-  return { tier: 8, amount: 20 + 15 * (boosts - 3) };
+  if (boosts < 4) return { tier: boosts + 4, amount: reduceRequirement(state, 20) };
+  return { tier: 8, amount: reduceRequirement(state, 20 + 15 * (boosts - 3)) };
 }
 
 export function getGalaxyRequirement(state) {
-  return { tier: 8, amount: 80 + state.galaxies * 60 };
+  return { tier: 8, amount: reduceRequirement(state, 80 + state.galaxies * 60) };
 }
 
 export function canDimensionalBoost(state) {
@@ -514,8 +594,25 @@ export function tick(state, dtMs) {
   state.antimatter = bigAdd(state.antimatter, produced[0]);
   state.totalAntimatter = bigAdd(state.totalAntimatter, produced[0]);
   state.lastTick += dtMs;
+  runIpGeneration(state, dtMs);
   checkAchievements(state);
   return state;
+}
+
+export function getIpGenerationInterval(state) {
+  const p = INFINITY_UPGRADE_PARAMS;
+  if (!Number.isFinite(state.bestInfinityMs)) return null;
+  return Math.max(p.ipGenMinIntervalMs, state.bestInfinityMs * p.ipGenFactor);
+}
+
+function runIpGeneration(state, dtMs) {
+  const interval = hasInfinityUpgrade(state, 'ipGen') ? getIpGenerationInterval(state) : null;
+  if (interval === null) return;
+  state.ipGenElapsedMs += dtMs;
+  const count = Math.floor(state.ipGenElapsedMs / interval);
+  if (count < 1) return;
+  state.ipGenElapsedMs -= count * interval;
+  state.infinityPoints = bigAdd(state.infinityPoints, count);
 }
 
 // ---------------------------------------------------------------------------
@@ -588,6 +685,14 @@ export function buyMaxTickspeed(state, maxIterations = 100_000) {
 // Resets / prestige layers
 // ---------------------------------------------------------------------------
 
+/** 持っている中で一番上の「開始時の Boost・Galaxy」だけが効く。 */
+export function getStartingState(state) {
+  const p = INFINITY_UPGRADE_PARAMS;
+  let boosts = 0;
+  for (const [id, n] of Object.entries(p.startBoosts)) if (hasInfinityUpgrade(state, id)) boosts = Math.max(boosts, n);
+  return { boosts, galaxies: hasInfinityUpgrade(state, 'startGalaxy') ? p.startGalaxies : 0 };
+}
+
 function softReset(state, { keepBoosts = true, keepGalaxies = true, keepSacrifice = false } = {}) {
   state.antimatter = bigFromNumber(10);
   state.dimensions = Array.from({ length: 8 }, (_, i) => emptyDimension(i + 1));
@@ -596,8 +701,9 @@ function softReset(state, { keepBoosts = true, keepGalaxies = true, keepSacrific
     state.sacrificeBoost = bigOne();
     state.sacrificeTotalFirst = bigZero();
   }
-  if (!keepBoosts) state.dimensionalBoosts = 0;
-  if (!keepGalaxies) state.galaxies = 0;
+  const start = getStartingState(state);
+  if (!keepBoosts) state.dimensionalBoosts = start.boosts;
+  if (!keepGalaxies) state.galaxies = start.galaxies;
   syncTickspeed(state);
 }
 
@@ -705,9 +811,70 @@ export function prestigeInfinity(state) {
   if (gain === 0) return 0;
   state.infinityPoints = bigAdd(state.infinityPoints, gain);
   state.infinities += 1;
+  const runMs = Math.max(0, state.lastTick - (state.runStartedAt ?? state.createdAt));
+  state.bestInfinityMs = Number.isFinite(state.bestInfinityMs) ? Math.min(state.bestInfinityMs, runMs) : runMs;
+  state.runStartedAt = state.lastTick;
   softReset(state, { keepBoosts: false, keepGalaxies: false, keepSacrifice: false });
   checkAchievements(state);
   return gain;
+}
+
+// ---------------------------------------------------------------------------
+// Infinity upgrades
+// ---------------------------------------------------------------------------
+
+function spendIp(state, cost) {
+  if (bigLt(state.infinityPoints, cost)) return false;
+  state.infinityPoints = bigSub(state.infinityPoints, cost);
+  return true;
+}
+
+/** 列の1つ上の段を持っている（または1段目）なら買える段。 */
+export function isInfinityUpgradeAvailable(state, id) {
+  const def = INFINITY_UPGRADES.find((u) => u.id === id);
+  if (!def) return false;
+  if (def.row === 1) return true;
+  const above = INFINITY_UPGRADES.find((u) => u.column === def.column && u.row === def.row - 1);
+  return hasInfinityUpgrade(state, above.id);
+}
+
+export function canBuyInfinityUpgrade(state, id) {
+  const def = INFINITY_UPGRADES.find((u) => u.id === id);
+  return !!def && !hasInfinityUpgrade(state, id) && isInfinityUpgradeAvailable(state, id)
+    && bigGte(state.infinityPoints, def.cost);
+}
+
+export function buyInfinityUpgrade(state, id) {
+  if (!canBuyInfinityUpgrade(state, id)) return false;
+  spendIp(state, INFINITY_UPGRADES.find((u) => u.id === id).cost);
+  state.infinityUpgrades.push(id);
+  return true;
+}
+
+/**
+ * 強化の効果の値（買う前でも、買ったときの値を返す）。
+ * kind: mult は BigNum の倍率、reduce は必要数の減少、ms は間隔、
+ * start は開始時の Boost と Galaxy。
+ */
+export function getInfinityUpgradeEffect(state, id) {
+  const p = INFINITY_UPGRADE_PARAMS;
+  switch (id) {
+    case 'totalTime':
+      return { kind: 'mult', value: bigFromLog10(log10Min(state.lastTick - state.createdAt, p.totalTimeDivMin, p.totalTimeExp)) };
+    case 'runTime':
+      return { kind: 'mult', value: bigFromLog10(log10Min(state.lastTick - (state.runStartedAt ?? state.createdAt), p.runTimeDivMin, p.runTimeExp)) };
+    case 'dims18': case 'dims27': case 'dims36': case 'dims45':
+      return { kind: 'mult', value: bigFromLog10(getInfinityCountMultiplierLog10(state)) };
+    case 'unspentIp':
+      return { kind: 'mult', value: bigFromLog10(getUnspentIpMultiplierLog10(state)) };
+    case 'buy10': return { kind: 'mult', value: bigFromNumber(p.buy10Mult) };
+    case 'boostMult': return { kind: 'mult', value: bigFromNumber(p.boostMult) };
+    case 'galaxyBoost': return { kind: 'mult', value: bigFromNumber(p.galaxyBoostFactor) };
+    case 'resetReq': return { kind: 'reduce', value: p.resetReduction };
+    case 'ipGen': return { kind: 'ms', value: getIpGenerationInterval(state) ?? p.ipGenMinIntervalMs };
+    case 'startGalaxy': return { kind: 'start', boosts: p.startBoosts[id], galaxies: p.startGalaxies };
+    default: return { kind: 'start', boosts: p.startBoosts[id] ?? 0, galaxies: 0 };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -731,12 +898,6 @@ export function getAutobuyerInterval(level) {
 export function getAutobuyerUpgradeCost(state, id) {
   const level = state.autobuyers[id].level;
   return level >= AUTOBUYER_MAX_LEVEL ? null : level + 1;
-}
-
-function spendIp(state, cost) {
-  if (bigLt(state.infinityPoints, cost)) return false;
-  state.infinityPoints = bigSub(state.infinityPoints, cost);
-  return true;
 }
 
 export function unlockAutobuyer(state, id) {
@@ -856,6 +1017,18 @@ function sanitizeAutobuyers(raw) {
   return result;
 }
 
+function sanitizeInfinityUpgrades(raw) {
+  const owned = Array.isArray(raw) ? new Set(raw.filter((id) => typeof id === 'string')) : new Set();
+  const result = [];
+  for (let column = 1; column <= 4; column++) {
+    for (const def of INFINITY_UPGRADES.filter((u) => u.column === column).sort((a, b) => a.row - b.row)) {
+      if (!owned.has(def.id)) break;
+      result.push(def.id);
+    }
+  }
+  return result;
+}
+
 /**
  * deserialize(jsonOrObject) -> GameState
  * Accepts a JSON string or an already-parsed object. Missing / invalid
@@ -897,6 +1070,13 @@ export function deserialize(input, now = Date.now()) {
   state.totalAntimatter = sanitizeBig(raw.totalAntimatter, bigZero());
   state.lastTick = Number.isFinite(Number(raw.lastTick)) ? Number(raw.lastTick) : now;
   state.createdAt = Number.isFinite(Number(raw.createdAt)) ? Number(raw.createdAt) : now;
+  state.infinityUpgrades = sanitizeInfinityUpgrades(raw.infinityUpgrades);
+  const runStartedAt = raw.runStartedAt === null || raw.runStartedAt === undefined ? NaN : Number(raw.runStartedAt);
+  state.runStartedAt = Number.isFinite(runStartedAt) && runStartedAt <= state.lastTick ? runStartedAt : state.createdAt;
+  const best = raw.bestInfinityMs === null || raw.bestInfinityMs === undefined ? NaN : Number(raw.bestInfinityMs);
+  state.bestInfinityMs = Number.isFinite(best) && best >= 0 ? best : null;
+  const genElapsed = Number(raw.ipGenElapsedMs);
+  state.ipGenElapsedMs = Number.isFinite(genElapsed) && genElapsed > 0 ? genElapsed : 0;
   return state;
 }
 
@@ -909,7 +1089,8 @@ export default {
   rescueIfStuck, getMaxUnlockedTier,
   runAutobuyers, createAutobuyers, unlockAutobuyer, setAutobuyerEnabled,
   upgradeAutobuyerInterval, getAutobuyerInterval, getAutobuyerUpgradeCost,
-  getDimensionMultiplier, getDimensionMultiplierBig,
+  getDimensionMultiplierBig, hasInfinityUpgrade, isInfinityUpgradeAvailable, canBuyInfinityUpgrade,
+  buyInfinityUpgrade, getInfinityUpgradeEffect, getStartingState, getIpGenerationInterval,
   getDimensionProductionPerSecond, getAntimatterPerSecond,
   getDimensionalBoostRequirement, getGalaxyRequirement,
   canDimensionalBoost, canAntimatterGalaxy, canInfinity, canSacrifice,

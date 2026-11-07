@@ -23,6 +23,14 @@ function validAutobuyers(v) {
   });
 }
 
+function validInfinityFields(save) {
+  const time = v => v === undefined || Number.isFinite(v);
+  return (save.infinityUpgrades === undefined || (Array.isArray(save.infinityUpgrades) && save.infinityUpgrades.every(v => typeof v === 'string')))
+    && time(save.runStartedAt)
+    && (save.bestInfinityMs === undefined || save.bestInfinityMs === null || (Number.isFinite(save.bestInfinityMs) && save.bestInfinityMs >= 0))
+    && (save.ipGenElapsedMs === undefined || (Number.isFinite(save.ipGenElapsedMs) && save.ipGenElapsedMs >= 0));
+}
+
 export function validateSave(save) {
   const big = v => v && typeof v === 'object' && Number.isFinite(v.mantissa) && v.mantissa >= 0 && Number.isSafeInteger(v.exponent);
   const count = v => Number.isSafeInteger(v) && v >= 0;
@@ -34,6 +42,7 @@ export function validateSave(save) {
     || !save.dimensions.every((d, i) => d && d.tier === i + 1 && big(d.amount) && count(d.bought))
     || !['infinities', 'tickspeedBought', 'dimensionalBoosts', 'galaxies'].every(k => count(save[k]))
     || (save.autobuyers !== undefined && !validAutobuyers(save.autobuyers))
+    || !validInfinityFields(save)
     || !Number.isFinite(save.lastTick) || !Number.isFinite(save.createdAt)
     || !Array.isArray(save.achievements) || !save.achievements.every(v => typeof v === 'string')) {
     throw new Error('Invalid AD save');

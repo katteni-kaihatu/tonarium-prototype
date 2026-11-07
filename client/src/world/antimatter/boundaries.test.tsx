@@ -17,6 +17,8 @@ import { LayerTabs } from './LayerTabs.tsx';
 import { serialize } from '../../ad/engine.mjs';
 import { AntimatterPanel } from './AntimatterPanel.tsx';
 import { AutomationPanel } from './AutomationPanel.tsx';
+import { InfinityPanel } from './InfinityPanel.tsx';
+import { InfinityUpgradesPanel } from './InfinityUpgradesPanel.tsx';
 import { confirmAd } from './confirmAd.tsx';
 import { shouldFillWindow, simpleWindowSize } from '../windowSize.ts';
 
@@ -325,7 +327,7 @@ test('自動化タブは Infinity 後に出て、解放・切り替え・短縮�
       setLanguage(language);
       const game = createNewGame(0);
       const slice = harness(game);
-      const tabButton = (html: string) => html.includes('>' + t('adAutoTab') + '</button>');
+      const tabButton = (html: string) => html.includes('>' + t('adInfinityTab') + '</button>');
       assert.ok(!tabButton(renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />)));
       game.infinities = 1;
       game.infinityPoints = bigFromNumber(2);
@@ -346,6 +348,52 @@ test('自動化タブは Infinity 後に出て、解放・切り替え・短縮�
       assert.ok(html().includes(t('adAutoInterval', 3)));
     }
   } finally { setLanguage(previous); }
+});
+
+test('Infinity 強化は列の順に買え、IP が足りないと変わらず、2D・3D の表示に反映される', () => {
+  const previous = getLanguage();
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      const game = createNewGame(0);
+      game.infinities = 1;
+      game.infinityPoints = bigFromNumber(2);
+      const slice = harness(game);
+      const html = () => renderToStaticMarkup(<InfinityUpgradesPanel ad={adaptAdSlice(slice)!} />);
+      const card = (id: string) => html().split('<div class="ad-card ad-iu-card').find(part => part.includes(`data-iu="${id}"`)) ?? '';
+      assert.equal(html().match(/data-iu="/g)?.length, 16);
+      assert.ok(card('dims18').includes(t('adLocked')) && card('dims18').includes('is-locked'));
+      assert.equal(slice.adBuyInfinityUpgrade('dims18'), false);
+      assert.equal(disabled(card('startBoost1').replace(/^[^<]*/, ''), t('adLabText62', 6)), true);
+      assert.equal(slice.adBuyInfinityUpgrade('startBoost1'), false);
+      assert.equal(game.infinityPoints.mantissa, 2);
+      assert.equal(slice.adBuyInfinityUpgrade('totalTime'), true);
+      assert.ok(card('totalTime').includes('is-owned') && card('totalTime').includes(t('adIuOwned')));
+      assert.ok(!card('dims18').includes('is-locked'));
+      assert.equal(slice.adBuyInfinityUpgrade('dims18'), true);
+      assert.equal(game.infinityPoints.mantissa, 0);
+      assert.equal(slice.adBuyInfinityUpgrade('dims36'), false);
+      assert.ok(card('buy10').includes('×2.2'));
+      assert.ok(card('resetReq').includes('−9'));
+      assert.ok(card('startGalaxy').includes(t('adChipBoost', 4)));
+      const infinityTab = renderToStaticMarkup(<InfinityPanel ad={adaptAdSlice(slice)!} />);
+      assert.ok(infinityTab.includes(t('adIuSegUpgrades')) && infinityTab.includes(t('adAutoTab')));
+      assert.ok(panels(slice, 'exhibit-infinity').space.includes(t('adIuCount', 2, 16)));
+      assert.ok(!panels(slice, 'exhibit-eternity').space.includes(t('adIuCount', 2, 16)));
+    }
+  } finally { setLanguage(previous); }
+});
+
+test('次元の倍率表示は Infinity 強化と Boost の効果を含むエンジンの値と一致する', () => {
+  const game = createNewGame(0);
+  game.dimensions[0].bought = 20;
+  game.dimensionalBoosts = 2;
+  const slice = harness(game);
+  const before = renderToStaticMarkup(<DimensionList ad={adaptAdSlice(slice)!} />);
+  assert.ok(before.includes('×16'));
+  game.infinityUpgrades = ['buy10', 'boostMult'];
+  const after = renderToStaticMarkup(<DimensionList ad={adaptAdSlice(slice)!} />);
+  assert.ok(after.includes(`×${formatNumber(bigFromLog10(2 * Math.log10(2.2) + 2 * Math.log10(2.5)))}`));
 });
 
 test('phone window size fills the region only for AD windows in the phone layout', () => {
