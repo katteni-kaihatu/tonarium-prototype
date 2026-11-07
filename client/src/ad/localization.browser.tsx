@@ -31,7 +31,7 @@ export const blockerRules = '.ad-body, .ad-card, .ad-header, .ad-small, .ad-tabs
 function verifyVisiblePanel(host: HTMLElement) {
   for (const [selector, count] of [
     ['.adlab-header', 1], ['.adlab-resource-value', 1], ['.adlab-tabs', 1],
-    ['.adlab-tab', 3], ['.adlab-body', 1], ['.adlab-card', 3], ['.adlab-dimension-card', 8],
+    ['.adlab-tab', 3], ['.adlab-body', 1], ['.adlab-action', 5], ['.adlab-dim-row:not(.adlab-dim-header)', 8],
   ] as const) {
     const nodes = host.querySelectorAll(selector);
     check(nodes.length >= count, `Required elements: ${selector} (${nodes.length})`);
@@ -99,12 +99,14 @@ async function verifyNumberLayouts(root: ReturnType<typeof createRoot>, host: HT
     const panel = host.querySelector<HTMLElement>('.adlab-lab-panel')!;
     host.querySelector<HTMLElement>('.adlab-body')!.scrollTop = 0;
     const panelRect = panel.getBoundingClientRect();
-    const nodes = [...host.querySelectorAll<HTMLElement>('.adlab-header, .adlab-chip, .adlab-tabs, .adlab-tickspeed, .adlab-dimension-card, .adlab-card, button, .adlab-dimension-numbers dd, .adlab-resource > span')]
+    const nodes = [...host.querySelectorAll<HTMLElement>('.adlab-header, .adlab-chip, .adlab-tabs, .adlab-action, .adlab-dim-row, button, .adlab-dim-cell, .adlab-resource > span')]
       .filter(node => { const rect = node.getBoundingClientRect(); return rect.width > 0 && rect.height > 0; });
     return nodes.map(node => {
       const rect = node.getBoundingClientRect();
-      check(node.scrollWidth <= node.clientWidth + 1, 'No clipped content: ' + node.textContent);
-      check(rect.left >= panelRect.left && rect.right <= panelRect.right + 1, 'Content inside panel: ' + node.textContent);
+      // タブ列は狭い幅で横スクロールさせる仕様なので、列のはみ出しと列の外にあるタブは欠けとして扱わない。
+      const scroller = node.closest('.adlab-tabs');
+      if (scroller !== node) check(node.scrollWidth <= node.clientWidth + 1, 'No clipped content: ' + node.textContent);
+      if (!scroller) check(rect.left >= panelRect.left && rect.right <= panelRect.right + 1, 'Content inside panel: ' + node.textContent);
       return { element: `${node.tagName}.${node.className}`, top: rect.top - panelRect.top, left: rect.left - panelRect.left, height: rect.height, width: rect.width };
     });
   };
@@ -256,7 +258,7 @@ async function run() {
       check(host.querySelector('[data-tier="1"] button')?.getAttribute('aria-label') === t('adLabText23', 1), 'Memoized dimension row updates');
     });
     await click(t('adLabText6'));
-    await cycle(() => check(tab()?.textContent === t('adLabText6') && host.textContent?.includes(t('adLabText133')), 'Statistics update in place'));
+    await cycle(() => check(tab()?.textContent === t('adLabText6') && host.textContent?.includes(t('adUiStatTotal')), 'Statistics update in place'));
     await click(t('adLabText7'));
     const layerButtons = host.querySelectorAll('button');
     const infinityTab = [...layerButtons].find(button => button.textContent?.startsWith(t('adLabText150')));

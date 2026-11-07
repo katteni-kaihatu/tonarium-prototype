@@ -101,6 +101,26 @@ export interface InfinityDerived {
   gain: number;
 }
 
+export interface MultiplierBreakdown {
+  tier: number;
+  locked: boolean;
+  buy10: BigNum;
+  boost: BigNum;
+  other: BigNum;
+  total: BigNum;
+}
+
+/** 説明とツールチップ用に、エンジンの式で「実行したらどうなるか」を先に求めた値。 */
+export interface PreviewDerived {
+  tickspeedNext: BigNum;
+  boostFirst: BigNum;
+  boostFirstNext: BigNum;
+  galaxyPerPurchaseNext: number;
+  sacrificeNeeded: BigNum;
+  infinityThresholdLog10: number;
+  breakdown: MultiplierBreakdown[];
+}
+
 export interface DerivedSnapshot {
   antimatterPerSecond: BigNum;
   tickspeedValue: BigNum;
@@ -116,6 +136,7 @@ export interface DerivedSnapshot {
   infinity: InfinityDerived;
   autobuyers: AutobuyerDerived[];
   infinityUpgrades: InfinityUpgradeDerived[];
+  preview: PreviewDerived;
 }
 
 export interface AdProfile {

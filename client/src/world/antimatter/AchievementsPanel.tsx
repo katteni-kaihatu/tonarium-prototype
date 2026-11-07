@@ -1,7 +1,29 @@
 import { Icon } from '../Icon.tsx';
 import { t, useLanguage } from '../../i18n/index.ts';
+import { bigLog10 } from '../../ad/engine.mjs';
 import type { AntimatterSlice } from './types.ts';
-import { ACHIEVEMENT_DEFS, s } from './styles.ts';
+import { ACHIEVEMENT_DEFS } from './styles.ts';
+import { formatNumber } from './format.ts';
+import { digitRatio, percent, ratio } from './progress.ts';
+
+interface Hint { progress: number; text: string }
+
+// 判定はエンジン側。ここは未達成の実績に「あとどれくらいか」を添えるだけ。
+function hintFor(id: string, ad: AntimatterSlice): Hint | null {
+  const { game, derived } = ad;
+  const digits = Math.max(0, bigLog10(game.antimatter));
+  switch (id) {
+    case 'antimatter-1e100': return { progress: digitRatio(digits, 100), text: `e${Math.floor(digits)} / e100` };
+    case 'first-infinity': return { progress: digitRatio(digits, derived.preview.infinityThresholdLog10), text: `e${Math.floor(digits)} / e${Math.floor(derived.preview.infinityThresholdLog10)}` };
+    case 'first-boost': return { progress: ratio(derived.boost.currentAmount, derived.boost.amount), text: `${t('adLabText13', derived.boost.tier)} ${formatNumber(derived.boost.currentAmount)} / ${derived.boost.amount}` };
+    case 'first-galaxy': return { progress: ratio(derived.galaxy.currentAmount, derived.galaxy.amount), text: `${t('adLabText13', 8)} ${formatNumber(derived.galaxy.currentAmount)} / ${derived.galaxy.amount}` };
+    case 'eighth-dimension': return { progress: derived.maxUnlockedTier / 8, text: `${t('adLabText13', derived.maxUnlockedTier)} / ${t('adLabText13', 8)}` };
+    case 'first-sacrifice': return derived.sacrifice.unlocked
+      ? { progress: ratio(derived.sacrifice.next, derived.preview.sacrificeNeeded), text: `×${formatNumber(derived.sacrifice.next)} / ×${formatNumber(derived.preview.sacrificeNeeded)}` }
+      : { progress: Math.min(1, derived.sacrifice.boosts / 5), text: `Boost ${derived.sacrifice.boosts} / 5` };
+    default: return null;
+  }
+}
 
 export function AchievementsPanel({ ad }: { ad: AntimatterSlice }) {
   useLanguage();
@@ -11,20 +33,33 @@ export function AchievementsPanel({ ad }: { ad: AntimatterSlice }) {
   for (const id of game.achievements) {
     if (!defs.some((d) => d.id === id)) defs.push({ id, name: id, desc: t('adLabText57') });
   }
+  const rows = defs.map(d => ({ ...d, done: owned.has(d.id), hint: owned.has(d.id) ? null : hintFor(d.id, ad) }));
+  const nearest = rows.filter(row => row.hint).sort((a, b) => b.hint!.progress - a.hint!.progress)[0];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <h2 style={s.sectionTitle}>{t('adLabText58')} <span style={s.muted}>{t('adLabText59', owned.size)}</span></h2>
-      <div>
-        <h3 style={s.sectionTitle}>{t('ui819')}<span style={s.muted}>{t('adLabText51', owned.size, defs.length)}</span></h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {defs.map((d) => (
-            <div key={d.id} style={{ ...s.row, opacity: owned.has(d.id) ? 1 : 0.65, borderRadius: 10, padding: '10px 12px', background: owned.has(d.id) ? 'linear-gradient(110deg, #234143, #302744)' : '#182238', border: `1px solid ${owned.has(d.id) ? '#78edd95c' : '#66729333'}` }}>
-              <span><Icon name={owned.has(d.id) ? 'check' : 'lock'} size={16} /> <span style={s.muted}>{t(owned.has(d.id) ? 'adAchieved' : 'adNotAchieved')}</span> <b>{d.name}</b></span>
-              <span style={s.muted}>{d.desc}</span>
+    <div className="adlab-achievements">
+      <div className="adlab-ach-summary">
+        <b className="adlab-number">{owned.size}<span> / {defs.length}</span></b>
+        <div className="adlab-bar" aria-hidden="true"><span style={{ width: percent(defs.length ? owned.size / defs.length : 0) }} /></div>
+        <span className="adlab-ach-count">{t('adLabText51', owned.size, defs.length)}</span>
+      </div>
+      <p className="adlab-ach-lead">{t('adLabText59', owned.size)}{nearest ? ` ${t('adUiNearest', nearest.name, percent(nearest.hint!.progress))}` : ''}</p>
+      <div className="adlab-ach-grid">
+        {rows.map((d) => (
+          <div key={d.id} className={`adlab-ach${d.done ? ' is-done' : ''}`}>
+            <span className="adlab-ach-icon"><Icon name={d.done ? 'trophy' : 'lock'} size={20} /></span>
+            <div className="adlab-ach-body">
+              <div className="adlab-ach-head"><b>{d.name}</b><span className="adlab-ach-state">{t(d.done ? 'adAchieved' : 'adNotAchieved')}</span></div>
+              <span className="adlab-ach-desc">{d.desc}</span>
+              {d.hint && (
+                <div className="adlab-ach-progress">
+                  <div className="adlab-bar" aria-hidden="true"><span style={{ width: percent(d.hint.progress) }} /></div>
+                  <span className="adlab-number">{d.hint.text}</span>
+                </div>
+              )}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
     </div>
   );
