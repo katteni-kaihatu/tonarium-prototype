@@ -10,12 +10,12 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
   await page.goto('http://127.0.0.1:5193/scripts/fixtures/ranking.html');
-  const ranking = page.locator('.ad-ranking');
+  const ranking = page.locator('.adlab-ranking');
   await ranking.waitFor();
-  const ranks = () => ranking.locator('.ad-ranking-rank').allTextContents();
+  const ranks = () => ranking.locator('.adlab-ranking-rank').allTextContents();
   const alpha = ranking.getByRole('button', { name: '「Alpha」の残りの記録を展開', exact: true });
-  const alphaButton = ranking.locator('.ad-ranking-controls button').first();
-  const children = ranking.locator('.ad-ranking-child:visible');
+  const alphaButton = ranking.locator('.adlab-ranking-controls button').first();
+  const children = ranking.locator('.adlab-ranking-child:visible');
   assert.deepEqual(await ranks(), ['1', '2', '3']);
   assert.equal(await children.count(), 0);
   assert.ok(await ranking.getByText('自分の記録を含む', { exact: true }).count());
@@ -26,7 +26,7 @@ try {
   // 実キー入力でスクロール領域、次いで最初の展開ボタンへ移動する。
   await page.getByRole('button', { name: 'ko', exact: true }).focus();
   await page.keyboard.press('Tab');
-  assert.equal(await ranking.locator('.ad-ranking-scroll').evaluate(el => el === document.activeElement), true);
+  assert.equal(await ranking.locator('.adlab-ranking-scroll').evaluate(el => el === document.activeElement), true);
   await page.keyboard.press('Tab');
   assert.equal(await alpha.evaluate(el => el === document.activeElement), true);
   assert.equal(await alpha.evaluate(el => getComputedStyle(el).outlineStyle), 'solid');
@@ -39,14 +39,14 @@ try {
   assert.equal(await ranking.locator('tbody').first().locator('td').nth(2).textContent(), '17');
   assert.deepEqual(await children.locator('td:nth-child(5)').allTextContents(), ['7', '5']);
   assert.deepEqual(await children.locator('td:nth-child(1)').allTextContents(), ['', '']);
-  assert.equal(await children.locator('.ad-ranking-badge').count(), 1);
+  assert.equal(await children.locator('.adlab-ranking-badge').count(), 1);
   assert.equal(await alphaButton.evaluate(el => el === document.activeElement), true);
   await page.keyboard.press('Space');
   assert.equal(await alphaButton.getAttribute('aria-expanded'), 'false');
   assert.equal(await children.count(), 0);
   await page.keyboard.press('Enter');
   await page.getByRole('button', { name: '並び更新 (初期)', exact: true }).click();
-  const buttons = ranking.locator('.ad-ranking-controls button');
+  const buttons = ranking.locator('.adlab-ranking-controls button');
   assert.deepEqual(await buttons.evaluateAll(elements => elements.map(el => el.getAttribute('aria-expanded'))), ['false', 'false', 'true']);
   assert.match(await buttons.nth(2).getAttribute('aria-label'), /Alpha/);
   assert.deepEqual(await ranks(), ['1', '2', '3']);
@@ -63,7 +63,7 @@ try {
   await mkdir('.local/ranking-verification', { recursive: true });
   await page.screenshot({ path: '.local/ranking-verification/wide.png', fullPage: true });
   await page.getByRole('button', { name: '幅 (900px)', exact: true }).click();
-  const scroll = ranking.locator('.ad-ranking-scroll');
+  const scroll = ranking.locator('.adlab-ranking-scroll');
   const dimensions = await scroll.evaluate(el => ({ client: el.clientWidth, content: el.scrollWidth, parent: el.parentElement.clientWidth }));
   assert.ok(dimensions.client <= 304 && dimensions.content > dimensions.client);
   assert.ok(dimensions.client <= dimensions.parent);
@@ -107,9 +107,9 @@ try {
     };
   }
   await page.goto('http://127.0.0.1:5193/scripts/fixtures/ranking.html?panel');
-  const panel = page.locator('.ad-lab-panel');
+  const panel = page.locator('.adlab-lab-panel');
   await panel.waitFor();
-  const body = panel.locator('.ad-body');
+  const body = panel.locator('.adlab-body');
   const tabKeys = ['adLabText4', 'adInfinityTab', 'adLabText6', 'ui819', 'adLabText52', 'adSaveTab', 'adLabText7'];
   for (const language of ['ja', 'en', 'ko']) {
     await page.getByRole('button', { name: language, exact: true }).click();
@@ -123,26 +123,26 @@ try {
         await page.setViewportSize({ width: Math.max(360, width + 32), height: 950 });
         await page.locator('.ranking-fixture-panel').evaluate((el, value) => { el.style.width = `${value}px`; }, width);
         const keys = tabKeys.filter(key => infinity || !['adInfinityTab', 'adLabText7'].includes(key));
-        const tabs = panel.locator('.ad-tabs button');
+        const tabs = panel.locator('.adlab-tabs button');
         assert.deepEqual(await tabs.allTextContents(), keys.map(label));
         assert.equal(await tabs.first().evaluate(el => getComputedStyle(el).whiteSpace), 'nowrap');
-        if (width === 320 && infinity) assert.equal(await panel.locator('.ad-tabs').evaluate(el => el.scrollWidth > el.clientWidth), true);
+        if (width === 320 && infinity) assert.equal(await panel.locator('.adlab-tabs').evaluate(el => el.scrollWidth > el.clientWidth), true);
         for (let index = 0; index < keys.length; index++) {
           const tab = tabs.nth(index);
           await tab.scrollIntoViewIfNeeded();
           if (width === 320) await tab.tap(); else await tab.click();
           assert.equal(await tab.getAttribute('aria-pressed'), 'true');
-          assert.equal(await panel.locator('.ad-tabs [aria-pressed="true"]').count(), 1);
+          assert.equal(await panel.locator('.adlab-tabs [aria-pressed="true"]').count(), 1);
           for (const [key, selector] of [
-            ['adLabText4', '.ad-dimensions'], ['adInfinityTab', '.ad-infinity-head'],
-            ['adLabText52', '.ad-ranking'],
+            ['adLabText4', '.adlab-dimensions'], ['adInfinityTab', '.adlab-infinity-head'],
+            ['adLabText52', '.adlab-ranking'],
           ]) assert.equal(await body.locator(selector).count(), keys[index] === key ? 1 : 0);
           for (const [key, heading] of [['adLabText6', 'adLabText43'], ['ui819', 'ui819']]) {
             assert.equal(await body.locator('h3').filter({ hasText: label(heading) }).count(), keys[index] === key ? 1 : 0);
           }
           if (keys[index] === 'adSaveTab') assert.ok(await body.getByText(label('adIssueCode'), { exact: true }).count());
           if (keys[index] === 'adLabText7') assert.ok(await body.getByText(label('adLabText60'), { exact: true }).count());
-          const box = await tab.boundingBox(), tabsBox = await panel.locator('.ad-tabs').boundingBox();
+          const box = await tab.boundingBox(), tabsBox = await panel.locator('.adlab-tabs').boundingBox();
           assert.ok(box.x >= tabsBox.x - 1 && box.x + box.width <= tabsBox.x + tabsBox.width + 1);
           assert.ok(box.height >= 40);
         }
@@ -161,16 +161,16 @@ try {
       if (infinity) {
         // 非表示になるタブを開いたまま進行を戻し、次元へ復帰する。
         for (const key of ['adInfinityTab', 'adLabText7']) {
-          await panel.locator('.ad-tabs').getByRole('button', { name: label(key), exact: true }).click();
+          await panel.locator('.adlab-tabs').getByRole('button', { name: label(key), exact: true }).click();
           await page.getByRole('button', { name: 'Infinity: true', exact: true }).click();
-          assert.equal(await panel.locator('.ad-tabs button').first().getAttribute('aria-pressed'), 'true');
-          assert.equal(await body.locator('.ad-dimensions').count(), 1);
+          assert.equal(await panel.locator('.adlab-tabs button').first().getAttribute('aria-pressed'), 'true');
+          assert.equal(await body.locator('.adlab-dimensions').count(), 1);
           await page.getByRole('button', { name: 'Infinity: false', exact: true }).click();
-          assert.equal(await panel.locator('.ad-tabs button').first().getAttribute('aria-pressed'), 'true');
+          assert.equal(await panel.locator('.adlab-tabs button').first().getAttribute('aria-pressed'), 'true');
         }
       }
     }
-    await panel.locator('.ad-tabs').getByRole('button', { name: label('adLabText52'), exact: true }).click();
+    await panel.locator('.adlab-tabs').getByRole('button', { name: label('adLabText52'), exact: true }).click();
     const refresh = body.getByRole('button', { name: label('adRankingRefresh'), exact: true });
     const beforeCalls = Number(await page.locator('[data-refresh-calls]').textContent());
     await refresh.click();
@@ -182,10 +182,10 @@ try {
     await page.getByRole('button', { name: 'Reject: true', exact: true }).click();
   }
   for (const [key, heading] of [['adLabText6', 'adLabText43'], ['ui819', 'ui819'], ['adLabText52', 'adLabText52']]) {
-    await panel.locator('.ad-tabs').getByRole('button', { name: labels.ko(key), exact: true }).click();
+    await panel.locator('.adlab-tabs').getByRole('button', { name: labels.ko(key), exact: true }).click();
     for (const language of ['en', 'ja', 'ko']) {
       await page.getByRole('button', { name: language, exact: true }).click();
-      assert.equal(await panel.locator('.ad-tabs [aria-pressed="true"]').textContent(), labels[language](key));
+      assert.equal(await panel.locator('.adlab-tabs [aria-pressed="true"]').textContent(), labels[language](key));
       assert.equal(await body.locator('h3').filter({ hasText: labels[language](heading) }).count(), 1);
     }
   }

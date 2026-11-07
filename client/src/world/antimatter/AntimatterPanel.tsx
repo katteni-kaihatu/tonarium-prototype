@@ -57,34 +57,34 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
   const offlineGained = offline && (offline.antimatterGained.mantissa ?? 0) !== 0 && offline.elapsedMs >= 5000;
 
   return (
-    <div ref={root} className="ad-lab-panel" style={s.root} role="region" aria-label={t('mergeAdLab')} tabIndex={0}>
-      <div className="ad-header" style={s.header}>
-        <div className="ad-resource" data-ad-core>
-          <span className="ad-resource-label">{t('adLabText1')}</span>
-          <span className="ad-resource-value ad-number" style={s.big}>{formatNumber(game.antimatter)}</span>
-          <span className="ad-number ad-resource-rate" style={s.muted}>{t('adPerSecond', formatNumber(derived.antimatterPerSecond))}</span>
+    <div ref={root} className="adlab-lab-panel" style={s.root} role="region" aria-label={t('mergeAdLab')} tabIndex={0}>
+      <div className="adlab-header" style={s.header}>
+        <div className="adlab-resource" data-ad-core>
+          <span className="adlab-resource-label">{t('adLabText1')}</span>
+          <span className="adlab-resource-value adlab-number" style={s.big}>{formatNumber(game.antimatter)}</span>
+          <span className="adlab-number adlab-resource-rate" style={s.muted}>{t('adPerSecond', formatNumber(derived.antimatterPerSecond))}</span>
         </div>
-        <div className="ad-chips">
-          <span className="ad-chip ad-number">IP {formatNumber(game.infinityPoints)}</span>
-          <span className="ad-chip">{t('adChipBoost', game.dimensionalBoosts)}</span>
-          <span className="ad-chip">{t('adChipGalaxy', game.galaxies)}</span>
+        <div className="adlab-chips">
+          <span className="adlab-chip adlab-number">IP {formatNumber(game.infinityPoints)}</span>
+          <span className="adlab-chip">{t('adChipBoost', game.dimensionalBoosts)}</span>
+          <span className="adlab-chip">{t('adChipGalaxy', game.galaxies)}</span>
         </div>
-        <div className="ad-header-tools">
+        <div className="adlab-header-tools">
           <AdBgmToggle />
         </div>
       </div>
-      <div className="ad-shell">
-        <div className="ad-tabs" role="group" aria-label={t('adLabText10')}>
+      <div className="adlab-shell">
+        <div className="adlab-tabs" role="group" aria-label={t('adLabText10')}>
           {tabs.map((item) => (
-            <button key={item.id} type="button" className={`ad-tab${item.id === activeTab ? ' is-active' : ''}`} aria-pressed={item.id === activeTab} onClick={() => {
+            <button key={item.id} type="button" className={`adlab-tab${item.id === activeTab ? ' is-active' : ''}`} aria-pressed={item.id === activeTab} onClick={() => {
               if (item.id === activeTab) return;
               setTab(item.id);
               emitAdFeedback({ kind: 'navigate' });
             }}>{t(item.label)}</button>
           ))}
         </div>
-        <div className="ad-body">
-          {(notice || ad.serverStatus) && <div className="ad-notices">
+        <div className="adlab-body">
+          {(notice || ad.serverStatus) && <div className="adlab-notices">
             {notice && <div style={s.notice}>{systemText(notice)}</div>}
             {ad.serverStatus && <div role="status" style={s.notice}>{systemText(ad.serverStatus)}</div>}
           </div>}

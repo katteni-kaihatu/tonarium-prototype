@@ -17,11 +17,11 @@ export function InfinityPanel({ ad }: { ad: AntimatterSlice }) {
   const [view, setView] = useState<View>('upgrades');
   return (
     <>
-      <div className="ad-infinity-head">
-        <div className="ad-auto-ip"><span className="ad-auto-ip-label">IP</span><span className="ad-number ad-card-value">{formatNumber(ad.game.infinityPoints)}</span></div>
-        <div className="ad-segments is-fill" role="group">
+      <div className="adlab-infinity-head">
+        <div className="adlab-auto-ip"><span className="adlab-auto-ip-label">IP</span><span className="adlab-number adlab-card-value">{formatNumber(ad.game.infinityPoints)}</span></div>
+        <div className="adlab-segments is-fill" role="group">
           {VIEWS.map(item => (
-            <button key={item.id} type="button" className={`ad-segment${item.id === view ? ' is-active' : ''}`} aria-pressed={item.id === view} onClick={() => {
+            <button key={item.id} type="button" className={`adlab-segment${item.id === view ? ' is-active' : ''}`} aria-pressed={item.id === view} onClick={() => {
               if (item.id === view) return;
               setView(item.id);
               emitAdFeedback({ kind: 'navigate' });
