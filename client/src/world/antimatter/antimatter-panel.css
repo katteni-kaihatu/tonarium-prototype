@@ -72,8 +72,8 @@
 .ad-header-tools { flex: none; margin-left: auto; }
 .ad-number { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .ad-shell { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
-.ad-tabs { flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(min-content, 1fr); border-bottom: 1px solid rgba(255,255,255,.16); }
-.ad-lab-panel .ad-tab { min-height: 44px; padding: 4px 2px; overflow-wrap: normal; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: transparent; color: rgba(242,238,245,.75); font-size: var(--ad-text, 13px); font-weight: 600; cursor: pointer; }
+.ad-tabs { flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(min-content, 1fr); overflow-x: auto; border-bottom: 1px solid rgba(255,255,255,.16); }
+.ad-lab-panel .ad-tab { min-width: 44px; min-height: 44px; padding: 4px 8px; white-space: nowrap; overflow-wrap: normal; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: transparent; color: rgba(242,238,245,.75); font-size: var(--ad-text, 13px); font-weight: 600; cursor: pointer; }
 .ad-lab-panel .ad-tab.is-active { border-bottom-color: #7fffe3; background: rgba(127,255,227,.1); color: #b5fff2; }
 .ad-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-gutter: stable; display: flex; flex-direction: column; gap: 10px; }
 .ad-body > * { flex-shrink: 0; min-width: 0; }

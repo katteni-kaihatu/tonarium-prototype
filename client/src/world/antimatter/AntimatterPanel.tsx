@@ -4,6 +4,8 @@ import type { AntimatterPanelProps } from './types.ts';
 import { formatDurationMs, formatNumber } from './format.ts';
 import { s } from './styles.ts';
 import { DimensionList } from './DimensionList.tsx';
+import { AchievementsPanel } from './AchievementsPanel.tsx';
+import { RankingPanel } from './RankingPanel.tsx';
 import { StatsPanel } from './StatsPanel.tsx';
 import { ProfilePanel } from './ProfilePanel.tsx';
 import { ProgressPicker, ProgressSummary } from './ProgressPicker.tsx';
@@ -15,12 +17,14 @@ import { AdPurchaseParticles } from './AdPurchaseParticles.tsx';
 import { AdBgmToggle } from '../../ad/AdBgmToggle.tsx';
 import { t, useLanguage, msg, systemText, type UiMessage } from '../../i18n/index.ts';
 
-type TabId = 'dimensions' | 'infinity' | 'stats' | 'profiles' | 'layers';
+type TabId = 'dimensions' | 'infinity' | 'stats' | 'achievements' | 'ranking' | 'profiles' | 'layers';
 
 const TABS: { id: TabId; label: string; visible?: (game: AntimatterPanelProps['ad']['game']) => boolean }[] = [
   { id: 'dimensions', label: 'adLabText4' },
   { id: 'infinity', label: 'adInfinityTab', visible: game => game.infinities > 0 },
   { id: 'stats', label: 'adLabText6' },
+  { id: 'achievements', label: 'ui819' },
+  { id: 'ranking', label: 'adLabText52' },
   { id: 'profiles', label: 'adSaveTab' },
   { id: 'layers', label: 'adLabText7', visible: game => game.infinities > 0 },
 ];
@@ -95,7 +99,9 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
           </div>}
           {activeTab === 'dimensions' && <DimensionList ad={ad} notice={showNotice} />}
           {activeTab === 'infinity' && <InfinityPanel ad={ad} />}
-          {activeTab === 'stats' && <StatsPanel ad={ad} notice={showNotice} />}
+          {activeTab === 'stats' && <StatsPanel ad={ad} />}
+          {activeTab === 'achievements' && <AchievementsPanel ad={ad} />}
+          {activeTab === 'ranking' && <RankingPanel ad={ad} notice={showNotice} />}
           {activeTab === 'profiles' && <ProfilePanel ad={ad} notice={showNotice} />}
           {activeTab === 'layers' && <LayerTabs ad={ad} />}
         </div>
