@@ -465,6 +465,67 @@ test('legacy v2 confirmation cannot be bypassed by parsing first; invalid format
   assert.notEqual(active.id, 'source'); assert.equal(readConnection(data, active.id), null);
 });
 
+test('ranking investigation: timer submission and refresh can finish in either order after Infinity', async t => {
+  const data = storage();
+  const server = api(t);
+  const { state, start, fire } = harness(t, data);
+  start(); await setImmediate();
+  assert.equal(state.adSync, 'ready');
+  assert.ok(server.stats().submissions > 0, 'adoption submits automatically');
+  const game = state.adGame!;
+  game.antimatter = bigFromLog10(309);
+  game.totalAntimatter = bigFromLog10(310);
+  let stored = { name: 'Synthetic', antimatterLog10: 309, infinities: 0, playTimeSec: 1 };
+  const post = deferred<Response>();
+  const read = deferred<Response>();
+  const bodies: typeof stored[] = [];
+  let delayRead = false;
+  server.mock.mock.mockImplementation(async (url, options) => {
+    if (!String(url).endsWith('/leaderboard')) return server.implementation(url, options);
+    if (options?.method === 'POST') {
+      const body = JSON.parse(String(options.body));
+      bodies.push(body);
+      await post.promise;
+      stored = body;
+      return response({});
+    }
+    const snapshot = response({ entries: [stored] });
+    if (delayRead) await read.promise;
+    return snapshot;
+  });
+  await state.adRefreshLeaderboard();
+  assert.equal(state.adPrestige(), true);
+  assert.equal(bodies.length, 0, 'Infinity itself does not submit');
+  assert.equal(state.adLeaderboard[0].antimatterLog10, 309, 'waiting for timer');
+  fire(30000); await setImmediate();
+  assert.equal(bodies.length, 1);
+  assert.equal(bodies[0].antimatterLog10, 1);
+  assert.equal(bodies[0].infinities, 1);
+  assert.equal(Object.hasOwn(bodies[0], 'totalAntimatter'), false);
+  assert.equal(state.adLeaderboard[0].antimatterLog10, 309, 'GET completed before POST');
+  assert.equal(await state.adSubmitScore(), false, 'pending submission is skipped');
+  post.resolve(response({})); await setImmediate();
+  assert.equal(stored.antimatterLog10, 1);
+  assert.equal(state.adLeaderboard[0].antimatterLog10, 309, 'POST success alone does not refresh');
+  await state.adRefreshLeaderboard();
+  assert.equal(state.adLeaderboard[0].antimatterLog10, 1);
+
+  delayRead = true;
+  const pendingRead = state.adRefreshLeaderboard();
+  game.antimatter = bigFromLog10(20);
+  assert.equal(await state.adSubmitScore(), true);
+  assert.equal(stored.antimatterLog10, 20, 'POST completes before earlier GET response');
+  assert.equal(await state.adRefreshLeaderboard(), false, 'pending refresh is skipped');
+  read.resolve(response({})); await pendingRead;
+  assert.equal(state.adLeaderboard[0].antimatterLog10, 1, 'late GET still contains old snapshot');
+  await state.adRefreshLeaderboard();
+  assert.equal(state.adLeaderboard[0].antimatterLog10, 20);
+  state.adSync = 'choice';
+  const count = bodies.length;
+  assert.equal(await state.adSubmitScore(), false);
+  assert.equal(bodies.length, count, 'unresolved progress is not submitted');
+});
+
 function paired(t: TestContext) {
   t.mock.method(Date, 'now', () => 10_000);
   const seed = createNewGame();
