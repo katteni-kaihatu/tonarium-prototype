@@ -16,9 +16,16 @@ export function RankingPanel({ ad, notice }: { ad: AntimatterSlice; notice: (mes
     if (next.has(name)) next.delete(name); else next.add(name);
     return next;
   });
+  const selfRank = groups.find(group => group.representative.self || group.hasSelfInRecords)?.rank;
+  const refresh = () => { void ad.refreshLeaderboard().catch(() => notice(msg('adRankingFailed'))); };
   return (
     <div className="adlab-ranking">
-      <h3 style={s.sectionTitle}>{t('adLabText52')}</h3>
+      <div className="adlab-ranking-top">
+        <h3 style={s.sectionTitle}>{t('adLabText52')}</h3>
+        {selfRank !== undefined && <span className="adlab-ranking-you"><Icon name="user" size={14} />{t('adUiRankYou', selfRank)}</span>}
+        <span className="adlab-ranking-auto">{t('adRankingAuto', ad.activeProfile?.name ?? '')}</span>
+        <button type="button" style={s.btn} className="adlab-ranking-refresh" onClick={refresh}><Icon name="refresh" size={14} />{t('adRankingRefresh')}</button>
+      </div>
       {groups.length === 0 ? (
         <p style={s.muted}>{t('adLabText53')}</p>
       ) : (
@@ -32,7 +39,7 @@ export function RankingPanel({ ad, notice }: { ad: AntimatterSlice; notice: (mes
               return <Fragment key={e.name}>
                 <tbody>
                   <tr className={e.self ? 'adlab-ranking-self' : undefined}>
-                    <td style={s.num} className="adlab-ranking-rank">{rank}</td>
+                    <td style={s.num} className={`adlab-ranking-rank${rank <= 3 ? ` adlab-medal adlab-medal-${rank}` : ''}`}><span>{rank}</span></td>
                     <th scope="row" className="adlab-ranking-name">
                       <span>{e.name}</span>
                       {e.self && <span className="adlab-ranking-badge"><Icon name="user" size={14} />{t('adRankingSelf')}</span>}
@@ -65,10 +72,6 @@ export function RankingPanel({ ad, notice }: { ad: AntimatterSlice; notice: (mes
           </table>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-        <span style={s.muted}>{t('adRankingAuto', ad.activeProfile?.name ?? '')}</span>
-        <button type="button" style={s.btn} onClick={() => { void ad.refreshLeaderboard().catch(() => notice(msg('adRankingFailed'))); }}>{t('adRankingRefresh')}</button>
-      </div>
     </div>
   );
 }
