@@ -13,9 +13,14 @@ import {
   offlineProgress,
   prestigeInfinity,
   rescueIfStuck,
+  runAutobuyers,
   sacrifice,
   serialize,
+  setAutobuyerEnabled,
   tick,
+  unlockAutobuyer,
+  upgradeAutobuyerInterval,
+  type AutobuyerId,
   type GameState,
   type OfflineResult,
 } from './engine.mjs';
@@ -83,6 +88,9 @@ export interface AdSlice {
   adGalaxy: () => boolean;
   adSacrifice: () => boolean;
   adPrestige: () => boolean;
+  adUnlockAutobuyer: (id: AutobuyerId) => boolean;
+  adSetAutobuyer: (id: AutobuyerId, enabled: boolean) => boolean;
+  adUpgradeAutobuyer: (id: AutobuyerId) => boolean;
   adCreateProfile: (name: string) => AdProfile;
   adSwitchProfile: (userId: string) => void;
   adSaveLocal: () => boolean;
@@ -405,6 +413,7 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
           const game = get().adGame;
           if (!game || frozen()) return;
           tick(game, 100);
+          runAutobuyers(game, 100);
           const rescued = rescueIfStuck(game);
           acknowledgeClock(JSON.parse(serialize(game)));
           // エンジンはインプレース更新のため、参照は変わらない。購読を起こす版カウンタで知らせる
@@ -558,6 +567,30 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
         set({ adVersion: get().adVersion + 1 });
         emitAdFeedback({ kind: 'crunch' });
       }
+      return ok;
+    },
+
+    adUnlockAutobuyer(id) {
+      const game = get().adGame;
+      if (!game || frozen()) return false;
+      const ok = unlockAutobuyer(game, id);
+      if (ok) set({ adVersion: get().adVersion + 1 });
+      return ok;
+    },
+
+    adSetAutobuyer(id, enabled) {
+      const game = get().adGame;
+      if (!game || frozen()) return false;
+      const ok = setAutobuyerEnabled(game, id, enabled);
+      if (ok) set({ adVersion: get().adVersion + 1 });
+      return ok;
+    },
+
+    adUpgradeAutobuyer(id) {
+      const game = get().adGame;
+      if (!game || frozen()) return false;
+      const ok = upgradeAutobuyerInterval(game, id);
+      if (ok) set({ adVersion: get().adVersion + 1 });
       return ok;
     },
 

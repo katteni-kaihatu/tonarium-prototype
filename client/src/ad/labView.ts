@@ -17,6 +17,7 @@ import {
   getGalaxyRequirement,
   getMaxUnlockedTier,
   getTickspeedCost,
+  type AutobuyerId,
   type GameState,
 } from './engine.mjs';
 import type { AdPanelTarget, AdLabSnapshot } from '../../../shared/antimatterLayout.ts';
@@ -36,6 +37,8 @@ const EXHIBIT_KEYS: Record<string, string> = {
   'exhibit-celestials': 'adExhibitCelestials',
 };
 export const adExhibitTitle = (id: string): string => t(EXHIBIT_KEYS[id] ?? 'adLabText125');
+
+const autoActive = (game: GameState, id: AutobuyerId): boolean => game.autobuyers[id].unlocked && game.autobuyers[id].enabled;
 
 export function buildAdLabSnapshot(game: GameState): AdLabSnapshot {
   const maxUnlockedTier = getMaxUnlockedTier(game);
@@ -77,6 +80,10 @@ export function buildAdLabSnapshot(game: GameState): AdLabSnapshot {
     infinityPointsText: formatNumber(game.infinityPoints),
     infinities: game.infinities,
     canCrunch: canInfinity(game),
+    autoTickspeed: autoActive(game, 'tickspeed'),
+    autoBoost: autoActive(game, 'boost'),
+    autoGalaxy: autoActive(game, 'galaxy'),
+    autoCrunch: autoActive(game, 'crunch'),
   };
 }
 

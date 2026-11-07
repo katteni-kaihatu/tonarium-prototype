@@ -106,6 +106,11 @@ function Foot({ onClose }: { onClose?: () => void }) {
   );
 }
 
+function AutoBadge() {
+  useLanguage();
+  return <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 999, background: 'rgba(127,255,227,.2)', color: '#b5fff2', fontSize: 11 }}>{t('adAutoBadge')}</span>;
+}
+
 /** 照準＋クリックで開く操作パネル。ポインターロック中は DOM を触れないので、
 //  3D 側の use() が開くと同時に exitPointerLock し、親がこのパネルを前面に出す。
 //  Big Crunch の確認ダイアログはここでは出さず、親が action 呼び出し前に確認する責務とする */
@@ -135,7 +140,7 @@ function AntimatterSpaceContent({ target, snapshot, actions, isOwn, onClose }: {
   if (target === 'tickspeed') {
     return (
       <div style={panelStyle}>
-        <h3>Tickspeed</h3>
+        <h3>Tickspeed{snapshot.autoTickspeed && <AutoBadge />}</h3>
         <p>{t('adLabText103', snapshot.tickspeedText, snapshot.tickspeedBought)}</p>
         <Btn label={t('adLabText114')} onClick={actions.buyTickspeed} disabled={!own} />
         {actions.buyMaxTickspeed && <Btn label="Max" onClick={actions.buyMaxTickspeed} disabled={!own} />}
@@ -146,7 +151,7 @@ function AntimatterSpaceContent({ target, snapshot, actions, isOwn, onClose }: {
   if (target === 'boost') {
     return (
       <div style={panelStyle}>
-        <h3>Dimension Boost / Shift</h3>
+        <h3>Dimension Boost / Shift{snapshot.autoBoost && <AutoBadge />}</h3>
         <p>{t('adLabText104', snapshot.boosts)}</p>
         <p>{t('adLabText105', snapshot.boostRequirementText)}</p>
         <p>{t('adRequirementCurrentAmount', snapshot.boostCurrentAmountText)}</p>
@@ -168,7 +173,7 @@ function AntimatterSpaceContent({ target, snapshot, actions, isOwn, onClose }: {
   if (target === 'galaxy') {
     return (
       <div style={panelStyle}>
-        <h3>Antimatter Galaxy</h3>
+        <h3>Antimatter Galaxy{snapshot.autoGalaxy && <AutoBadge />}</h3>
         <p>{t('adLabText106', snapshot.galaxies)}</p>
         <p>{t('adLabText105', snapshot.galaxyRequirementText)}</p>
         <p>{t('adRequirementCurrentAmount', snapshot.galaxyCurrentAmountText)}</p>
@@ -180,7 +185,7 @@ function AntimatterSpaceContent({ target, snapshot, actions, isOwn, onClose }: {
   if (target === 'crunch') {
     return (
       <div style={panelStyle}>
-        <h3>Big Crunch / Infinity</h3>
+        <h3>Big Crunch / Infinity{snapshot.autoCrunch && <AutoBadge />}</h3>
         <p>{snapshot.canCrunch ? t('adLabText120') : t('adLabText121')}</p>
         <Btn label={t('adLabText122')} onClick={actions.prestigeInfinity} disabled={!own || !snapshot.canCrunch} />
         <Foot onClose={onClose} />

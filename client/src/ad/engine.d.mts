@@ -1,5 +1,7 @@
 export interface BigNum { mantissa: number; exponent: number }
 export interface DimensionState { amount: BigNum; bought: number; tier: number }
+export type AutobuyerId = 'lowDims' | 'highDims' | 'tickspeed' | 'boost' | 'galaxy' | 'crunch';
+export interface AutobuyerState { unlocked: boolean; enabled: boolean; level: number; elapsedMs: number }
 export interface GameState {
   version: number;
   antimatter: BigNum;
@@ -13,6 +15,7 @@ export interface GameState {
   achievements: string[];
   infinityPoints: BigNum;
   infinities: number;
+  autobuyers: Record<AutobuyerId, AutobuyerState>;
   totalAntimatter: BigNum;
   lastTick: number;
   createdAt: number;
@@ -27,6 +30,21 @@ export interface OfflineResult {
 export const VERSION: number;
 export const OFFLINE_CAP_MS: number;
 export const SACRIFICE_MIN_GAIN: number;
+export const INFINITY_THRESHOLD_LOG10: number;
+export const AUTOBUYER_IDS: AutobuyerId[];
+export const AUTOBUYER_RUN_ORDER: AutobuyerId[];
+export const AUTOBUYER_UNLOCK_COST: Record<AutobuyerId, number>;
+export const AUTOBUYER_BASE_INTERVAL_MS: number;
+export const AUTOBUYER_INTERVAL_FACTOR: number;
+export const AUTOBUYER_MIN_INTERVAL_MS: number;
+export const AUTOBUYER_MAX_LEVEL: number;
+export function createAutobuyers(): Record<AutobuyerId, AutobuyerState>;
+export function getAutobuyerInterval(level: number): number;
+export function getAutobuyerUpgradeCost(state: GameState, id: AutobuyerId): number | null;
+export function unlockAutobuyer(state: GameState, id: AutobuyerId): boolean;
+export function setAutobuyerEnabled(state: GameState, id: AutobuyerId, enabled: boolean): boolean;
+export function upgradeAutobuyerInterval(state: GameState, id: AutobuyerId): boolean;
+export function runAutobuyers(state: GameState, dtMs: number): void;
 export function bigNormalize(mantissa: number, exponent?: number): BigNum;
 export function toBig(value: unknown): BigNum;
 export function bigFromNumber(n: number): BigNum;

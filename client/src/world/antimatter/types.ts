@@ -4,6 +4,26 @@ export interface BigNum {
   exponent: number;
 }
 
+export type AutobuyerId = 'lowDims' | 'highDims' | 'tickspeed' | 'boost' | 'galaxy' | 'crunch';
+
+export interface AutobuyerState {
+  unlocked: boolean;
+  enabled: boolean;
+  level: number;
+  elapsedMs: number;
+}
+
+export interface AutobuyerDerived {
+  id: AutobuyerId;
+  unlocked: boolean;
+  enabled: boolean;
+  intervalMs: number;
+  unlockCost: number;
+  canUnlock: boolean;
+  upgradeCost: number | null;
+  canUpgrade: boolean;
+}
+
 export interface DimensionState {
   amount: BigNum;
   bought: number;
@@ -23,6 +43,7 @@ export interface GameState {
   achievements: string[];
   infinityPoints: BigNum;
   infinities: number;
+  autobuyers: Record<AutobuyerId, AutobuyerState>;
   totalAntimatter: BigNum;
   lastTick: number;
   createdAt: number;
@@ -72,6 +93,7 @@ export interface DerivedSnapshot {
   galaxy: RequirementDerived;
   sacrifice: SacrificeDerived;
   infinity: InfinityDerived;
+  autobuyers: AutobuyerDerived[];
 }
 
 export interface AdProfile {
@@ -135,6 +157,9 @@ export interface AntimatterSlice {
   antimatterGalaxy: () => boolean;
   sacrifice: () => boolean;
   prestigeInfinity: () => number;
+  unlockAutobuyer: (id: AutobuyerId) => void;
+  setAutobuyer: (id: AutobuyerId, enabled: boolean) => void;
+  upgradeAutobuyer: (id: AutobuyerId) => void;
   resetGame: () => void;
   exportBundle: () => string;
   recoveryRecords: { key: string; createdAt: string | null }[];

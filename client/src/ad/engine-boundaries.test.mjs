@@ -7,7 +7,11 @@ import {
   buyDimension, buyMaxDimension, buyMax, getDimensionCost, formatNumber,
   getDimensionalBoostRequirement, getGalaxyRequirement,
   canDimensionalBoost, canAntimatterGalaxy, dimensionalBoost, antimatterGalaxy,
+  getInfinityGain, prestigeInfinity, offlineProgress, runAutobuyers, unlockAutobuyer, setAutobuyerEnabled,
+  upgradeAutobuyerInterval, getAutobuyerInterval, getAutobuyerUpgradeCost, createAutobuyers,
+  AUTOBUYER_IDS, AUTOBUYER_RUN_ORDER, AUTOBUYER_UNLOCK_COST, AUTOBUYER_MAX_LEVEL, getMaxUnlockedTier, buyTickspeed,
 } from './engine.mjs';
+import { validateSave } from './sync.mjs';
 
 const operations = {
   boost: { requirement: getDimensionalBoostRequirement, can: canDimensionalBoost, run: dimensionalBoost },
@@ -241,4 +245,187 @@ test('Galaxy30・Tickspeed3000回でもtickは例外なく反物質が有限で�
   assert.ok(bigLog10(game.antimatter) > before);
   assert.ok(Number.isFinite(bigLog10(getDimensionProductionPerSecond(game, 1))));
   assert.doesNotThrow(() => JSON.parse(serialize(game)));
+});
+
+const withIp = (n) => { const g = createNewGame(0); g.infinityPoints = bigFromNumber(n); return g; };
+const ipNumber = (g) => g.infinityPoints.mantissa * 10 ** g.infinityPoints.exponent;
+
+test('IP の獲得量は桁数に比例し、1.79e308 未満では 0', () => {
+  const gainAt = (log10) => { const g = createNewGame(0); g.antimatter = bigFromLog10(log10); return getInfinityGain(g); };
+  assert.equal(gainAt(308.2), 0);
+  assert.equal(gainAt(Math.log10(1.79e308)), 1);
+  assert.equal(gainAt(500), 1);
+  assert.equal(gainAt(617), 2);
+  assert.equal(gainAt(925), 3);
+  const g = createNewGame(0);
+  g.antimatter = bigFromLog10(617);
+  assert.equal(prestigeInfinity(g), 2);
+  assert.equal(ipNumber(g), 2);
+});
+
+test('自動購入の解放・短縮の費用と IP の減り方', () => {
+  const g = withIp(100);
+  for (const id of AUTOBUYER_IDS) {
+    const before = ipNumber(g);
+    assert.equal(unlockAutobuyer(g, id), true);
+    assert.equal(ipNumber(g), before - AUTOBUYER_UNLOCK_COST[id]);
+    assert.equal(g.autobuyers[id].enabled, true);
+    assert.equal(unlockAutobuyer(g, id), false);
+  }
+  assert.deepEqual(AUTOBUYER_IDS.map((id) => AUTOBUYER_UNLOCK_COST[id]), [1, 1, 1, 2, 2, 3]);
+  const intervals = [];
+  for (let level = 0; level <= AUTOBUYER_MAX_LEVEL; level++) {
+    intervals.push(getAutobuyerInterval(level));
+    if (level < AUTOBUYER_MAX_LEVEL) {
+      const before = ipNumber(g);
+      assert.equal(getAutobuyerUpgradeCost(g, 'tickspeed'), level + 1);
+      assert.equal(upgradeAutobuyerInterval(g, 'tickspeed'), true);
+      assert.equal(ipNumber(g), before - (level + 1));
+    }
+  }
+  assert.deepEqual(intervals.map(Math.round), [5000, 3000, 1800, 1080, 648, 500]);
+  const before = ipNumber(g);
+  assert.equal(getAutobuyerUpgradeCost(g, 'tickspeed'), null);
+  assert.equal(upgradeAutobuyerInterval(g, 'tickspeed'), false);
+  assert.equal(ipNumber(g), before);
+});
+
+test('IP が足りないと解放も短縮も何も変わらない', () => {
+  const g = withIp(2);
+  const snapshot = structuredClone(g);
+  assert.equal(unlockAutobuyer(g, 'crunch'), false);
+  assert.equal(upgradeAutobuyerInterval(g, 'lowDims'), false);
+  assert.equal(setAutobuyerEnabled(g, 'lowDims', true), false);
+  assert.deepEqual(g, snapshot);
+  assert.equal(unlockAutobuyer(g, 'lowDims'), true);
+  assert.equal(upgradeAutobuyerInterval(g, 'lowDims'), true);
+  assert.equal(upgradeAutobuyerInterval(g, 'lowDims'), false);
+});
+
+test('自動購入は間隔どおりに動き、オフでは動かない', () => {
+  const g = withIp(5);
+  g.antimatter = bigFromNumber(1e6);
+  unlockAutobuyer(g, 'tickspeed');
+  runAutobuyers(g, 4900);
+  assert.equal(g.tickspeedBought, 0);
+  runAutobuyers(g, 100);
+  assert.ok(g.tickspeedBought > 0);
+  const bought = g.tickspeedBought;
+  g.antimatter = bigFromNumber(1e12);
+  setAutobuyerEnabled(g, 'tickspeed', false);
+  runAutobuyers(g, 60_000);
+  assert.equal(g.tickspeedBought, bought);
+  setAutobuyerEnabled(g, 'tickspeed', true);
+  runAutobuyers(g, 5000);
+  assert.ok(g.tickspeedBought > bought);
+});
+
+test('自動購入の次元は解放済みの階層だけを高い順に買う', () => {
+  const g = withIp(5);
+  g.antimatter = bigFromNumber(1e30);
+  unlockAutobuyer(g, 'lowDims');
+  unlockAutobuyer(g, 'highDims');
+  assert.equal(getMaxUnlockedTier(g), 4);
+  runAutobuyers(g, 5000);
+  assert.ok(g.dimensions.slice(0, 4).every((d) => d.bought > 0));
+  assert.ok(g.dimensions.slice(4).every((d) => d.bought === 0));
+  g.dimensionalBoosts = 4;
+  g.antimatter = bigFromNumber(1e60);
+  runAutobuyers(g, 5000);
+  assert.ok(g.dimensions.slice(4).every((d) => d.bought > 0));
+});
+
+test('同時に動くときは Galaxy が Boost より先、リセット系が購入より先', () => {
+  assert.deepEqual(AUTOBUYER_RUN_ORDER, ['crunch', 'galaxy', 'boost', 'highDims', 'lowDims', 'tickspeed']);
+  const g = withIp(10);
+  for (const id of ['galaxy', 'boost']) unlockAutobuyer(g, id);
+  g.dimensionalBoosts = 10;
+  g.dimensions[7].amount = bigFromNumber(1000);
+  runAutobuyers(g, 5000);
+  assert.equal(g.galaxies, 1);
+  assert.equal(g.dimensionalBoosts, 0);
+  const h = withIp(10);
+  for (const id of ['crunch', 'lowDims']) unlockAutobuyer(h, id);
+  h.antimatter = bigFromLog10(400);
+  runAutobuyers(h, 5000);
+  assert.equal(h.infinities, 1);
+  assert.equal(h.dimensions[0].bought, 1);
+  assert.equal(ipNumber(h), 10 - 1 - 3 + 1);
+});
+
+test('Big Crunch・Galaxy・Boost の後も自動購入の設定は残る', () => {
+  const g = withIp(10);
+  for (const id of AUTOBUYER_IDS) unlockAutobuyer(g, id);
+  upgradeAutobuyerInterval(g, 'crunch');
+  setAutobuyerEnabled(g, 'boost', false);
+  const before = structuredClone(g.autobuyers);
+  g.antimatter = bigFromLog10(400);
+  g.dimensions[7].amount = bigFromNumber(1000);
+  prestigeInfinity(g);
+  antimatterGalaxy(g);
+  dimensionalBoost(g);
+  assert.deepEqual(g.autobuyers, before);
+});
+
+test('オフライン進行でも自動購入が動く', () => {
+  const g = withIp(5);
+  g.antimatter = bigFromNumber(1e6);
+  unlockAutobuyer(g, 'tickspeed');
+  g.lastTick = 1;
+  offlineProgress(g, 60_000);
+  assert.ok(g.tickspeedBought > 0);
+  const off = withIp(5);
+  off.antimatter = bigFromNumber(1e6);
+  off.lastTick = 1;
+  offlineProgress(off, 60_000);
+  assert.equal(off.tickspeedBought, 0);
+});
+
+test('autobuyers のないセーブ・壊れた値のセーブを読み込める', () => {
+  const g = withIp(5);
+  unlockAutobuyer(g, 'galaxy');
+  upgradeAutobuyerInterval(g, 'galaxy');
+  const saved = JSON.parse(serialize(g));
+  validateSave(saved);
+  assert.deepEqual(deserialize(saved).autobuyers, g.autobuyers);
+
+  const legacy = { ...saved };
+  delete legacy.autobuyers;
+  validateSave(legacy);
+  assert.deepEqual(deserialize(legacy).autobuyers, createAutobuyers());
+
+  for (const broken of [null, 'x', 5, [], { galaxy: 1 }, { galaxy: { unlocked: 'yes', level: -3 } },
+    { galaxy: { unlocked: true, enabled: 'x', level: 99, elapsedMs: 'NaN' } }]) {
+    const state = deserialize({ ...saved, autobuyers: broken });
+    for (const id of AUTOBUYER_IDS) {
+      const ab = state.autobuyers[id];
+      assert.equal(typeof ab.unlocked, 'boolean');
+      assert.ok(ab.level >= 0 && ab.level <= AUTOBUYER_MAX_LEVEL);
+      assert.ok(Number.isFinite(ab.elapsedMs) && ab.elapsedMs >= 0);
+    }
+  }
+  assert.equal(deserialize({ ...saved, autobuyers: { galaxy: { unlocked: true, level: 99 } } }).autobuyers.galaxy.level, AUTOBUYER_MAX_LEVEL);
+  assert.throws(() => validateSave({ ...saved, autobuyers: { galaxy: 1 } }));
+  assert.throws(() => validateSave({ ...saved, autobuyers: 'x' }));
+});
+
+test('全部オンの新規ゲームが例外なく自動で Big Crunch まで進む', () => {
+  const g = createNewGame(0);
+  g.infinityPoints = bigFromNumber(100);
+  for (const id of AUTOBUYER_IDS) {
+    unlockAutobuyer(g, id);
+    while (upgradeAutobuyerInterval(g, id));
+  }
+  g.infinityPoints = bigZero();
+  const capSec = 48 * 3600;
+  let sec = 0;
+  while (g.infinities === 0 && sec < capSec) {
+    tick(g, 1000);
+    runAutobuyers(g, 1000);
+    rescueIfStuck(g);
+    sec += 1;
+  }
+  console.log(`auto crunch after ${(sec / 3600).toFixed(2)} simulated hours`);
+  assert.ok(g.infinities >= 1, 'auto crunch never happened');
+  assert.ok(ipNumber(g) >= 1);
 });

@@ -1,6 +1,7 @@
 import { msg, getLanguage, useLanguage } from '../../i18n/index.ts';
 import {
-  bigGte, canAntimatterGalaxy, canDimensionalBoost, canInfinity, canSacrifice,
+  AUTOBUYER_IDS, AUTOBUYER_UNLOCK_COST, getAutobuyerInterval, getAutobuyerUpgradeCost,
+  bigFromNumber, bigGte, canAntimatterGalaxy, canDimensionalBoost, canInfinity, canSacrifice,
   getAntimatterPerSecond, getDimensionalBoostRequirement, getDimensionCost,
   getDimensionProductionPerSecond, getEffectiveTickspeedBig, getSacrificeCandidate, getGalaxyRequirement,
   getInfinityGain, getMaxUnlockedTier, getTickspeedCost, getTickspeedPerPurchase,
@@ -47,6 +48,20 @@ function derivedFrom(game: GameState): DerivedSnapshot {
     })(),
     sacrifice: { unlocked: game.dimensionalBoosts >= 5, can: canSacrifice(game), boost: game.sacrificeBoost, next: getSacrificeCandidate(game), boosts: game.dimensionalBoosts },
     infinity: { can: canInfinity(game), gain: getInfinityGain(game) },
+    autobuyers: AUTOBUYER_IDS.map((id) => {
+      const ab = game.autobuyers[id];
+      const upgradeCost = getAutobuyerUpgradeCost(game, id);
+      return {
+        id,
+        unlocked: ab.unlocked,
+        enabled: ab.enabled,
+        intervalMs: getAutobuyerInterval(ab.level),
+        unlockCost: AUTOBUYER_UNLOCK_COST[id],
+        canUnlock: bigGte(game.infinityPoints, bigFromNumber(AUTOBUYER_UNLOCK_COST[id])),
+        upgradeCost,
+        canUpgrade: upgradeCost !== null && bigGte(game.infinityPoints, bigFromNumber(upgradeCost)),
+      };
+    }),
   };
 }
 
@@ -104,6 +119,9 @@ export function adaptAdSlice(slice: AdSlice, options: AdaptOptions = {}): Antima
       const gain = getInfinityGain(game);
       return slice.adPrestige() ? gain : 0;
     },
+    unlockAutobuyer: (id) => { slice.adUnlockAutobuyer(id); },
+    setAutobuyer: (id, enabled) => { slice.adSetAutobuyer(id, enabled); },
+    upgradeAutobuyer: (id) => { slice.adUpgradeAutobuyer(id); },
     resetGame: slice.adResetGame,
     recoveryRecords: slice.adListRecovery(),
     exportRecoveryBundle: (source, key) => { const bundle = slice.adExportRecovery(source, key); return bundle ? JSON.stringify(bundle, null, 2) : ''; },

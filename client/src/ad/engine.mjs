@@ -68,6 +68,18 @@ export const TICKSPEED_MULTIPLIER_PER_PURCHASE = TICKSPEED_BASE_PER_PURCHASE;
 export const SACRIFICE_MIN_GAIN = 2;
 
 export const INFINITY_THRESHOLD_LOG10 = Math.log10(1.79e308); // ≈ 308.2529
+// IP は桁数に比例（floor(log10 / この値)）。指数的にすると上限なく伸び続けるため線形にする。
+export const INFINITY_IP_STEP_LOG10 = INFINITY_THRESHOLD_LOG10;
+
+/** 自動購入の定数表。表示順は AUTOBUYER_IDS、同時に動くときの実行順は AUTOBUYER_RUN_ORDER。 */
+export const AUTOBUYER_IDS = ['lowDims', 'highDims', 'tickspeed', 'boost', 'galaxy', 'crunch'];
+export const AUTOBUYER_RUN_ORDER = ['crunch', 'galaxy', 'boost', 'highDims', 'lowDims', 'tickspeed'];
+export const AUTOBUYER_UNLOCK_COST = { lowDims: 1, highDims: 1, tickspeed: 1, boost: 2, galaxy: 2, crunch: 3 };
+export const AUTOBUYER_BASE_INTERVAL_MS = 5000;
+export const AUTOBUYER_INTERVAL_FACTOR = 0.6;
+export const AUTOBUYER_MIN_INTERVAL_MS = 500;
+// 5000 * 0.6^5 = 389ms で最短を下回る最初の段階
+export const AUTOBUYER_MAX_LEVEL = 5;
 export const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000; // 8 hours
 
 // ---------------------------------------------------------------------------
@@ -298,6 +310,7 @@ export function createNewGame(now = Date.now()) {
     achievements: [],
     infinityPoints: bigZero(),
     infinities: 0,
+    autobuyers: createAutobuyers(),
     totalAntimatter: bigZero(), // lifetime, never reset by boosts/galaxies
     lastTick: now,
     createdAt: now,
@@ -443,9 +456,9 @@ export function canAntimatterGalaxy(state) {
 }
 
 export function getInfinityGain(state) {
-  // MVP decision (spec §7.2): Big Crunch always grants exactly 1 IP once
-  // antimatter reaches 1.79e308 — no scaling formula.
-  return bigLog10(state.antimatter) >= INFINITY_THRESHOLD_LOG10 ? 1 : 0;
+  const log10 = bigLog10(state.antimatter);
+  if (!(log10 >= INFINITY_THRESHOLD_LOG10)) return 0;
+  return Math.max(1, Math.floor(log10 / INFINITY_IP_STEP_LOG10));
 }
 export const canInfinity = (state) => getInfinityGain(state) > 0;
 
@@ -685,7 +698,7 @@ export function sacrifice(state) {
  * prestigeInfinity(state) -> number (IP gained, 0 if not eligible)
  * Requires antimatter >= 1.79e308. Resets antimatter, dimensions, tickspeed,
  * sacrifice, boosts and galaxies; keeps achievements / infinities / IP.
- * IP gain is fixed at 1 (MVP decision, spec §7.2).
+ * IP gain is getInfinityGain (floor(log10(antimatter) / 308.25), min 1).
  */
 export function prestigeInfinity(state) {
   const gain = getInfinityGain(state);
@@ -695,6 +708,88 @@ export function prestigeInfinity(state) {
   softReset(state, { keepBoosts: false, keepGalaxies: false, keepSacrifice: false });
   checkAchievements(state);
   return gain;
+}
+
+// ---------------------------------------------------------------------------
+// Autobuyers
+// ---------------------------------------------------------------------------
+
+function emptyAutobuyer() {
+  return { unlocked: false, enabled: false, level: 0, elapsedMs: 0 };
+}
+
+export function createAutobuyers() {
+  return Object.fromEntries(AUTOBUYER_IDS.map((id) => [id, emptyAutobuyer()]));
+}
+
+export function getAutobuyerInterval(level) {
+  const l = Math.min(AUTOBUYER_MAX_LEVEL, Math.max(0, Math.trunc(level) || 0));
+  return Math.max(AUTOBUYER_MIN_INTERVAL_MS, AUTOBUYER_BASE_INTERVAL_MS * AUTOBUYER_INTERVAL_FACTOR ** l);
+}
+
+/** 次の短縮の IP 費用（今の段階 + 1）。最短なら null。 */
+export function getAutobuyerUpgradeCost(state, id) {
+  const level = state.autobuyers[id].level;
+  return level >= AUTOBUYER_MAX_LEVEL ? null : level + 1;
+}
+
+function spendIp(state, cost) {
+  if (bigLt(state.infinityPoints, cost)) return false;
+  state.infinityPoints = bigSub(state.infinityPoints, cost);
+  return true;
+}
+
+export function unlockAutobuyer(state, id) {
+  const ab = state.autobuyers[id];
+  if (!ab || ab.unlocked || !spendIp(state, AUTOBUYER_UNLOCK_COST[id])) return false;
+  ab.unlocked = true;
+  ab.enabled = true;
+  ab.elapsedMs = 0;
+  return true;
+}
+
+export function setAutobuyerEnabled(state, id, enabled) {
+  const ab = state.autobuyers[id];
+  if (!ab || !ab.unlocked) return false;
+  ab.enabled = !!enabled;
+  return true;
+}
+
+export function upgradeAutobuyerInterval(state, id) {
+  const ab = state.autobuyers[id];
+  if (!ab || !ab.unlocked) return false;
+  const cost = getAutobuyerUpgradeCost(state, id);
+  if (cost === null || !spendIp(state, cost)) return false;
+  ab.level += 1;
+  return true;
+}
+
+function buyTiers(state, tiers) {
+  const max = getMaxUnlockedTier(state);
+  for (const tier of tiers) if (tier <= max) buyMaxDimension(state, tier);
+}
+
+const AUTOBUYER_ACTIONS = {
+  crunch: (state) => { prestigeInfinity(state); },
+  galaxy: (state) => { antimatterGalaxy(state); },
+  boost: (state) => { dimensionalBoost(state); },
+  highDims: (state) => buyTiers(state, [8, 7, 6, 5]),
+  lowDims: (state) => buyTiers(state, [4, 3, 2, 1]),
+  tickspeed: (state) => { buyMaxTickspeed(state); },
+};
+
+/** 経過時間を足し、間隔を超えた自動購入を1回ずつ動かす。長い dt でも1回だけ。 */
+export function runAutobuyers(state, dtMs) {
+  if (!(dtMs > 0)) return;
+  for (const id of AUTOBUYER_RUN_ORDER) {
+    const ab = state.autobuyers[id];
+    if (!ab.unlocked || !ab.enabled) continue;
+    const interval = getAutobuyerInterval(ab.level);
+    ab.elapsedMs += dtMs;
+    if (ab.elapsedMs < interval) continue;
+    ab.elapsedMs %= interval;
+    AUTOBUYER_ACTIONS[id](state);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -714,7 +809,10 @@ export function offlineProgress(state, now = Date.now()) {
   if (simulatedMs > 0) {
     const chunks = Math.min(1000, Math.max(1, Math.ceil(simulatedMs / 50)));
     const chunkMs = simulatedMs / chunks;
-    for (let i = 0; i < chunks; i++) tick(state, chunkMs);
+    for (let i = 0; i < chunks; i++) {
+      tick(state, chunkMs);
+      runAutobuyers(state, chunkMs);
+    }
   }
   state.lastTick = now;
   return {
@@ -739,6 +837,24 @@ function sanitizeBig(value, fallback) {
 }
 const sanitizeInt = (v, fallback = 0) =>
   Number.isFinite(Number(v)) ? Math.max(0, Math.trunc(Number(v))) : fallback;
+
+function sanitizeAutobuyers(raw) {
+  const result = createAutobuyers();
+  if (!raw || typeof raw !== 'object') return result;
+  for (const id of AUTOBUYER_IDS) {
+    const r = raw[id];
+    if (!r || typeof r !== 'object' || r.unlocked !== true) continue;
+    const level = Math.min(AUTOBUYER_MAX_LEVEL, sanitizeInt(r.level));
+    const elapsed = Number(r.elapsedMs);
+    result[id] = {
+      unlocked: true,
+      enabled: r.enabled !== false,
+      level,
+      elapsedMs: Number.isFinite(elapsed) && elapsed > 0 ? Math.min(elapsed, getAutobuyerInterval(level)) : 0,
+    };
+  }
+  return result;
+}
 
 /**
  * deserialize(jsonOrObject) -> GameState
@@ -777,6 +893,7 @@ export function deserialize(input, now = Date.now()) {
   state.achievements = Array.isArray(raw.achievements) ? raw.achievements.filter((a) => typeof a === 'string') : [];
   state.infinityPoints = sanitizeBig(raw.infinityPoints, bigZero());
   state.infinities = sanitizeInt(raw.infinities);
+  state.autobuyers = sanitizeAutobuyers(raw.autobuyers);
   state.totalAntimatter = sanitizeBig(raw.totalAntimatter, bigZero());
   state.lastTick = Number.isFinite(Number(raw.lastTick)) ? Number(raw.lastTick) : now;
   state.createdAt = Number.isFinite(Number(raw.createdAt)) ? Number(raw.createdAt) : now;
@@ -790,6 +907,8 @@ export default {
   formatNumber, getDimensionCost, getDimensionCostForBulk, getTickspeedCost,
   getEffectiveTickspeed, getEffectiveTickspeedBig, getEffectiveTickspeedLog10, getTickspeedPerPurchase,
   rescueIfStuck, getMaxUnlockedTier,
+  runAutobuyers, createAutobuyers, unlockAutobuyer, setAutobuyerEnabled,
+  upgradeAutobuyerInterval, getAutobuyerInterval, getAutobuyerUpgradeCost,
   getDimensionMultiplier, getDimensionMultiplierBig,
   getDimensionProductionPerSecond, getAntimatterPerSecond,
   getDimensionalBoostRequirement, getGalaxyRequirement,

@@ -16,6 +16,7 @@ import { DimensionList } from './DimensionList.tsx';
 import { LayerTabs } from './LayerTabs.tsx';
 import { serialize } from '../../ad/engine.mjs';
 import { AntimatterPanel } from './AntimatterPanel.tsx';
+import { AutomationPanel } from './AutomationPanel.tsx';
 import { confirmAd } from './confirmAd.tsx';
 import { shouldFillWindow, simpleWindowSize } from '../windowSize.ts';
 
@@ -313,6 +314,36 @@ test('first Infinity unlocks the Layers tab, and the Crunch card appears only on
       const restored = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
       assert.ok(!tabButton(restored, 'adLabText7'));
       assert.ok(!restored.includes(t('adLabText31')));
+    }
+  } finally { setLanguage(previous); }
+});
+
+test('自動化タブは Infinity 後に出て、解放・切り替え・短縮が IP を使い、3D には自動の印が出る', () => {
+  const previous = getLanguage();
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      const game = createNewGame(0);
+      const slice = harness(game);
+      const tabButton = (html: string) => html.includes('>' + t('adAutoTab') + '</button>');
+      assert.ok(!tabButton(renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />)));
+      game.infinities = 1;
+      game.infinityPoints = bigFromNumber(2);
+      assert.ok(tabButton(renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />)));
+      const html = () => renderToStaticMarkup(<AutomationPanel ad={adaptAdSlice(slice)!} />);
+      assert.ok(html().includes(t('adAutoUnlock', 1)) && html().includes(t('adAutoUnlock', 3)));
+      assert.equal(disabled(html(), t('adAutoUnlock', 3)), true);
+      assert.equal(slice.adUnlockAutobuyer('crunch'), false);
+      assert.equal(slice.adUnlockAutobuyer('tickspeed'), true);
+      assert.equal(buildAdLabSnapshot(game).autoTickspeed, true);
+      assert.ok(panels(slice, 'tickspeed').space.includes(t('adAutoBadge')));
+      assert.ok(!panels(slice, 'boost').space.includes(t('adAutoBadge')));
+      assert.ok(html().includes(t('adAutoInterval', 5)) && html().includes(t('adAutoShorten', 1)));
+      assert.equal(slice.adSetAutobuyer('tickspeed', false), true);
+      assert.ok(html().includes(t('adAutoOff')));
+      assert.ok(!panels(slice, 'tickspeed').space.includes(t('adAutoBadge')));
+      assert.equal(slice.adUpgradeAutobuyer('tickspeed'), true);
+      assert.ok(html().includes(t('adAutoInterval', 3)));
     }
   } finally { setLanguage(previous); }
 });

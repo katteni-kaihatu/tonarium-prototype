@@ -93,6 +93,13 @@
 .ad-card-head { display: flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; line-height: 1.25; }
 .ad-card-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .ad-card-value { font-size: 1.3em; font-weight: 700; line-height: 1.25; }
+.ad-auto-ip { display: flex; align-items: baseline; gap: 8px; }
+.ad-auto-ip-label { color: #a9fff0; font-weight: 900; letter-spacing: .12em; }
+.ad-auto-card.is-unlocked { grid-template-rows: auto auto 1fr auto; }
+.ad-auto-card:not(.is-on) { opacity: .92; }
+.ad-auto-card.is-on { border-color: #7fffe38c; }
+.ad-lab-panel .ad-auto-toggle { min-height: 44px; font-size: 16px !important; font-weight: 800; }
+.ad-auto-card.is-on .ad-auto-toggle { background: linear-gradient(115deg, #2c8c7caa, #3b6fb08a) !important; border-color: #7fffe3 !important; }
 .ad-segments { display: flex; flex-wrap: nowrap; gap: 2px; padding: 2px; overflow-x: auto; overscroll-behavior-x: contain; border-radius: 10px; background: rgba(0,0,0,.28); scrollbar-width: none; }
 .ad-segments::-webkit-scrollbar { display: none; }
 .ad-lab-panel .ad-segment { flex: 0 0 auto; min-height: 36px; padding: 4px 12px; border: 0; border-radius: 8px; background: transparent; color: rgba(242,238,245,.8); white-space: nowrap; cursor: pointer; }
