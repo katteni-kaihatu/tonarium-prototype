@@ -13,7 +13,7 @@ export function systemItemDefinitions(): SystemItemDefinition[] {
   const basics: SystemItemDefinition[] = (Object.keys(ITEM_INFO) as ItemKind[])
     .filter(kind => !ITEM_INFO[kind].media && !MARKET_PRODUCTS.some(product => product.category === 'items' && (product.id === kind || product.kind === kind)))
     .map(kind => ({ id: kind, kind, info: { ...ITEM_INFO[kind] } }));
-  return [...basics, ...Object.values(ITEM_VARIANTS).filter(entry => !entry.info.media && !MARKET_PRODUCTS.some(product => product.category === 'items' && product.id === entry.id))
+  return [...basics, ...Object.values(ITEM_VARIANTS).filter(entry => entry.spawnable !== false && !entry.info.media && !MARKET_PRODUCTS.some(product => product.category === 'items' && product.id === entry.id))
     .map(entry => ({ id: entry.id, kind: entry.kind, variant: entry.id, info: { ...entry.info } }))];
 }
 

@@ -8,6 +8,7 @@ import { receiveSystems } from '../systems/state.ts';
 import { receiveSystemCommandResult, resetSystemCommands } from '../systems/api.ts';
 import { COMPAT_VERSION, isRoomClientMsg, type ClientMsg, type ServerMsg, type SessionInfo, type SessionSnapshot } from '../../../shared/protocol.ts';
 import type { SurvivorState } from '../../../shared/survivor.ts';
+import { battlefieldAvatars } from '../battlefield-state.ts';
 import { applyAvatars } from '../sessionView.ts';
 import { get, recompute, set, showToast, spawnPoint } from '../store.ts';
 import { wsSessionQuery } from '../auth.ts';
@@ -156,13 +157,15 @@ export function applySessionSnapshot(snap: SessionSnapshot) {
   if (nextSelf?.alive && nextSelf.choiceQueue.length > 0 && !(previousSelf?.choiceQueue.length ?? 0)) playSurvivorSound('choice');
   set((s) => ({
     chats: { ...s.chats, [sid]: snap.chats.map(m => chatReactions.body(sid, m, s.chats[sid]?.find(old => old.id === m.id))) },
-    avatarsBy: { ...s.avatarsBy, [sid]: snap.avatars },
+    avatarsBy: { ...s.avatarsBy, [sid]: snap.battlefield ? battlefieldAvatars(snap.battlefield) : snap.avatars },
     itemsBy: { ...s.itemsBy, [sid]: Object.fromEntries(snap.items.map((n) => [n.id, n])) },
     presence: snap.presence,
     broadcast: { ...s.broadcast, [sid]: snap.broadcast },
     worldBy: { ...s.worldBy, [sid]: snap.world },
     games: { ...s.games, [sid]: snap.game },
     survivors: { ...s.survivors, [sid]: snap.survivor },
+    battlefields: { ...s.battlefields, [sid]: snap.battlefield ?? null },
+    ...(snap.world === 'battlefield' ? { walk: null, teleport: null } : {}),
     elevators: { ...s.elevators, [sid]: snap.elevator },
     serverOffset: snap.now - Date.now(),
   }));
@@ -249,6 +252,7 @@ export function onMessage(msg: ServerMsg) {
       return;
     }
     case 'avatar':
+      if (get().worldBy[msg.sid] === 'battlefield') return;
       set(applyAvatars(get(), msg.sid, msg.id, msg.s));
       return;
     case 'avatarRemove':
@@ -316,6 +320,15 @@ export function onMessage(msg: ServerMsg) {
       return;
     case 'game':
       set((s) => ({ games: { ...s.games, [msg.sid]: msg.game } }));
+      return;
+    case 'battlefield':
+      if (msg.sid === get().session) {
+        const positions = battlefieldAvatars(msg.state);
+        set((s) => ({ battlefields: { ...s.battlefields, [msg.sid]: msg.state },
+          ...(msg.state ? { walk: null, teleport: null } : {}),
+          ...(msg.state ? { avatarsBy: { ...s.avatarsBy, [msg.sid]: positions }, selfAvatar: positions[s.selfId] ?? s.selfAvatar } : {}) }));
+        recompute();
+      }
       return;
     case 'survivor':
       playSurvivorTransitions(msg.sid, msg.state);

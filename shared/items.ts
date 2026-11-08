@@ -39,6 +39,7 @@ export interface ItemMapPlacement {
 }
 
 interface ItemBase {
+  variant?: ItemVariant;
   id: string;
   x: number;
   z: number;
@@ -219,7 +220,7 @@ export function createItem(
   const clock: MediaClock = { playing: false, base: 0, at: 0 };
   const size = (n: number) => Math.max(1, Math.min(10000, Math.round(Number(n) || 1)));
   switch (kind) {
-    case 'bike': return { ...b, ...vehicleInitial(b.x, b.z, b.ry), kind, rider: null, rideVersion: 0 };
+    case 'bike': return { ...b, ...vehicleInitial(b.x, b.z, b.ry), kind, ...(variant ? { variant } : {}), rider: null, rideVersion: 0 };
     case 'image':
       if (!media || !('url' in media) || !MEDIA_URL_RE.test(media.url)) return null;
       return { ...b, kind, url: media.url, w: size(media.w), h: size(media.h) };
@@ -245,6 +246,7 @@ export function createItem(
 export function applyItemAction(item: Item, act: ItemAction, userId: string, rng: () => number): boolean {
   // クライアント由来の非有限数がアイテムに保存されないようにする変換
   const fin = (v: number) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  if (item.variant === 'battlefield-tank') return false;
   switch (item.kind) {
     case 'bike': {
       if (act.a === 'bikeMount' && item.rider === null) {

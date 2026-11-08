@@ -9,7 +9,7 @@ export function useOwnedItems(): OwnedItem[] {
   const owned = useOwnedContent();
   return [
     ...(Object.keys(ITEM_INFO) as ItemKind[]).filter((kind) => !ITEM_INFO[kind].media && !MARKET_PRODUCTS.some(p => p.category === 'items' && p.kind === kind)).map((kind) => ({ id: kind, kind, info: ITEM_INFO[kind], creator: 'Tonarium' })),
-    ...Object.values(ITEM_VARIANTS).map(definition => ({ id: definition.id, kind: definition.kind, variant: definition.id, creator: 'Tonarium',
+    ...Object.values(ITEM_VARIANTS).filter(definition => definition.spawnable !== false).map(definition => ({ id: definition.id, kind: definition.kind, variant: definition.id, creator: 'Tonarium',
       info: localizedVariantInfo(definition.id)!, usage: localizedVariantUsage(definition.id) })),
     ...MARKET_PRODUCTS.flatMap((p): OwnedItem[] => p.category === 'items' && owned.includes(p.id) ? [{
       id: p.id, kind: p.kind ?? 'note', creator: p.creator, productId: p.id, text: p.kind ? undefined : p.text,

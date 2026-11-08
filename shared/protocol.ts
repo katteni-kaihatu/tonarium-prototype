@@ -6,6 +6,7 @@ import type { ItemVariant } from './item-variants.ts';
 import type { WorldKind } from './worlds.ts';
 import type { DiceRoll } from './dice.ts';
 import type { GameState } from './game.ts';
+import type { BattleCommand, BattlefieldState } from './battlefield.ts';
 import type { SurvivorMetaUpgrade, SurvivorProfile, SurvivorState, SurvivorStyle } from './survivor.ts';
 import type { ElevatorState } from './city.ts';
 import type { SyncConfig } from './session-wire.ts';
@@ -323,6 +324,7 @@ export interface SessionSnapshot {
   world: WorldKind;
   game: GameState;
   survivor: SurvivorState;
+  battlefield?: BattlefieldState | null;
   elevator: ElevatorState;
   now: number;
 }
@@ -382,7 +384,7 @@ export type HomeClientMsg =
   | { t: 'invite'; kind: 'session' | 'group'; id: string; to: string };
 
 /** kokosync でサーバーへ送るもの（セッションの中だけ）。 */
-export type RoomClientMsg =
+export type RoomClientMsg = BattleCommand
   | { t: 'chatReact'; id: string; emoji: string; on: boolean }
   | { t: 'systemLoad'; mapId: string }
   | { t: 'systemCommand'; command: Exclude<SystemCommand, { kind: 'map' }> }
@@ -439,6 +441,7 @@ export type ClientMsg = HomeClientMsg | RoomClientMsg;
 
 /** 部屋へ送る種類の一覧（送り先の振り分けに使う。型と同じ並び） */
 const ROOM_CLIENT_TYPES: Record<RoomClientMsg['t'], true> = {
+  battleInput: true, battleMount: true, battleBot: true,
   chatReact: true,
   systemLoad: true, systemCommand: true, systemResync: true,
   sharedCommand: true, sharedResync: true,
@@ -509,6 +512,7 @@ export type HomeServerMsg =
 
 /** kokosync でサーバーから届くもの。 */
 export type RoomServerMsg =
+  | { t: 'battlefield'; sid: string; state: BattlefieldState | null }
   | { t: 'chatReactions'; sid: string; id: string; reactions: Record<string, string[]>; reactionRevision: number }
   | { t: 'systemState'; sid: string; view: SystemView; error?: string; commandResult?: SystemCommandResult }
   | { t: 'sharedDelta'; sid: string; delta: AssetDelta; commandId?: string }

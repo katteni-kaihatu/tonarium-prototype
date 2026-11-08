@@ -1,4 +1,5 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { BattlefieldMap } from './Battlefield.tsx';
 import { Canvas, useFrame } from '@react-three/fiber';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
@@ -79,6 +80,9 @@ function Projection({ plane, marks, cameraRef }: {
 }
 
 export function Map2D({ kind }: { kind: WorldKind }) {
+  return kind === 'battlefield' ? <BattlefieldMap /> : <StandardMap2D kind={kind} />;
+}
+function StandardMap2D({ kind }: { kind: WorldKind }) {
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
   const box = useMapBox();
   const bounds = boundsOf(kind);
