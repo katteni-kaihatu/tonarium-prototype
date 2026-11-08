@@ -17,7 +17,8 @@ test('registry exposes non-market builtins and explicit variants without mutatin
   const originalItems = structuredClone(ITEM_INFO), originalMarket = structuredClone(MARKET_PRODUCTS);
   const definitions = systemItemDefinitions();
   const builtinIds = (Object.keys(ITEM_INFO) as ItemKind[]).filter(kind => !ITEM_INFO[kind].media && !MARKET_PRODUCTS.some(product => product.category === 'items' && (product.id === kind || product.kind === kind)));
-  assert.deepEqual(definitions.map(definition => definition.id), [...builtinIds, ...Object.keys(ITEM_VARIANTS)]);
+  assert.deepEqual(definitions.map(definition => definition.id), [...builtinIds, ...Object.values(ITEM_VARIANTS).filter(entry => entry.spawnable !== false && !entry.info.media && !MARKET_PRODUCTS.some(product => product.category === 'items' && product.id === entry.id)).map(entry => entry.id)]);
+  assert.equal(systemItemDefinition('battlefield-tank'), undefined);
   assert.equal(systemItemDefinition('camera-timer')?.kind, 'camera');
   assert.equal(systemItemDefinition('camera-timer')?.variant, 'camera-timer');
   assert.equal(new Set(definitions.map(definition => definition.id)).size, definitions.length);
