@@ -1,3 +1,4 @@
+import { BattlefieldObjects } from './battlefield3d.tsx';
 import { t as tr, getLanguage } from '../i18n/index.ts';
 import { Suspense, useMemo } from 'react';
 import * as THREE from 'three';
@@ -19,6 +20,7 @@ const WALL_H = 4;
 
 export interface Palette { floor: string; wall: string; spawn: string }
 const PALETTES: Record<WorldKind, Palette> = {
+  battlefield: { floor: '#56634a', wall: '#3d4939', spawn: '#b9b99b' },
   fantasy: { floor: '#c7b78a', wall: '#e6dcc3', spawn: '#d0ac61' },
   starlounge: { floor: '#353f69', wall: '#202b4d', spawn: '#e8c983' },
   room: { floor: '#565961', wall: '#80848e', spawn: '#7fb3ff' },
@@ -282,6 +284,7 @@ function StarLounge() {
 export function WorldMesh({ kind, map = false }: { kind: WorldKind; map?: boolean }) {
   if (kind === 'fantasy') return null;
   if (kind === 'starlounge') return <StarLounge />;
+  if (kind === 'battlefield') return <><Shell pal={PALETTES.battlefield} /><BattlefieldObjects /></>;
   if (kind === 'game') return <GameWorld pal={PALETTES.game} />;
   if (kind === 'survivors') return <><Hall /><SurvivorObjects /></>;
   if (kind === 'city') return <CityWorld map={map} />;
@@ -291,4 +294,4 @@ export function WorldMesh({ kind, map = false }: { kind: WorldKind; map?: boolea
   return kind === 'cafe' ? <Cafe /> : <Hall />;
 }
 
-export const WORLD_BG: Record<WorldKind, string> = { room: '#2b2d31', cafe: '#1f1a17', game: '#7fb6e6', survivors: '#2b2d31', city: '#bcd6ec', garden: '#c8e3ed', starlounge: '#151c37', antimatter: '#0b0d1a', fantasy: '#d9cfb5' };
+export const WORLD_BG: Record<WorldKind, string> = { battlefield: '#52614a', room: '#2b2d31', cafe: '#1f1a17', game: '#7fb6e6', survivors: '#2b2d31', city: '#bcd6ec', garden: '#c8e3ed', starlounge: '#151c37', antimatter: '#0b0d1a', fantasy: '#d9cfb5' };

@@ -94,7 +94,7 @@ export async function configureSessionSync(id: string, next: SyncConfig) {
     if (gen !== generation) { connection.close(); return; }
     client = connection; config = next; key = encryptionKey;
     const peerTransport = next.positionKey ? new SessionPositions(connection, next, (id, state) => {
-      if (gen !== generation) return;
+      if (gen !== generation || worldKindOf(get()) === 'battlefield') return;
       const s = clampAvatar(worldKindOf(get()), state);
       if (ready) onMessage({ t: 'avatar', sid: next.sid, id, s });
       else initialPositions.set(id, s);
@@ -240,6 +240,7 @@ export function roomSend(msg: RoomClientMsg) {
   const c = client, cfg = config, k = key, gen = generation;
   if (!c || !cfg || !k) return;
   if (msg.t === 'avatar') {
+    if (worldKindOf(get()) === 'battlefield') return;
     if (peerPositions) { void peerPositions.send(msg.s).catch(() => {}); return; }
     const seq = ++positionSeq;
     void seal(k, cfg.token, 'client-position', seq, msg).then((p) => {

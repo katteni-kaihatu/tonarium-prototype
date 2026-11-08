@@ -30,6 +30,7 @@ export function useMapBox() {
 
 export function moveSelfTo(x: number, z: number) {
   const s = get();
+  if (worldKindOf(s) === 'battlefield') return;
   const from = placesOf(s).get(s.selfId);
   if (from) walkTo(x, z, from);
 }

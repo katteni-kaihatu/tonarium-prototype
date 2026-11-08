@@ -1,5 +1,8 @@
 # アイテムとメディア共有
 
+[戦場の戦車](battlefield.md)は一人乗りの乗り物です。戦場に配置され、通常のアイテムメニューからは出せません。搭乗者だけが両表示から運転・射撃でき、表示を切り替えても搭乗を保ちます。
+
+
 アイテムの定義は `shared/items.ts`（状態・操作・リストに出すマークと色）、2D 画面はキャンバスで描くものが `client/src/items/panels.ts`、React で作るウィンドウが `client/src/world/`（サイコロは `DiceBody.tsx`）、3D 表示は `client/src/view3d/items3d.tsx`。
 
 ## コードで作るマップへの配置
