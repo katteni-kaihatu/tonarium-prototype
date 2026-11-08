@@ -96,12 +96,15 @@ DB のテーブルを変えるときは `server/db/schema.ts` を直して `npm 
 { "id": "lounge", "name": "ラウンジ", "topic": "ゆっくり話そう", "world": "cafe" }
 ```
 - `id` は英数字で一意に。セッションごとに別の LiveKit ルーム（`tonarium-<id>`）・3D空間・アイテム・チャットになる
-- `world` は最初に読み込むワールド（`room` ＝ホール、`cafe` ＝カフェ、`game` ＝ゲーム（板わたり）、`survivors` ＝宵闇サバイバーズ、`city` ＝街、`garden` ＝ガーデン、`antimatter` ＝ AD 研究所、`fantasy` ＝悠久の旅路。省略時は `room`）
+- `world` は最初に読み込むワールド（`battlefield` ＝戦場、`room` ＝ホール、`cafe` ＝カフェ、`game` ＝ゲーム（板わたり）、`survivors` ＝宵闇サバイバーズ、`city` ＝街、`garden` ＝ガーデン、`antimatter` ＝ AD 研究所、`fantasy` ＝悠久の旅路。省略時は `room`）
 - 既存セッションの初期ワールドはそのまま。ガーデンは設定の「ワールド」から選べる。新しいセッションの初期ワールドにする場合だけ `"world": "garden"` を指定する
 - ここに書いたセッションはパブリック（だれでも見える）。公開範囲を絞ったセッションはホームの「セッションを作る」で作る
 - `npm run dev` 中は保存するとサーバーが再起動する（セッション内のチャットは消える。アイテムは DB から戻る）。`npm start` の場合は再起動が必要
 
 ## 主な機能
+
+- [戦場](docs/battlefield.md)：2D・3D共通のチーム戦、拠点占領、繰り返し復活、一人乗り戦車、所有者が追加する歩兵ボット。検証状況は[検証報告](docs/battlefield-validation.md)を参照。
+
 
 - [自由配合の料理・有害な失敗作](docs/fantasy-freeform-cooking.md)
 - [五枠の料理・反復製作・倉庫利用](docs/fantasy-five-slot-cooking.md)

@@ -3,6 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:battlefield": "tsx --test server/battlefield.test.ts client/src/battlefield.test.ts",
+    "test:battlefield:integration": "tsx --test server/battlefield.integration.test.ts",
+    "test:battlefield:browser": "tsx scripts/test-battlefield-browser.ts",
+    "benchmark:battlefield": "tsx scripts/benchmark-battlefield.ts",
+    "benchmark:battlefield:core": "tsx scripts/benchmark-battlefield-core.ts",
     "check:kokoa-ai": "node --import tsx scripts/check-kokoa-ai.ts",
     "test:fantasy-ai-config": "tsx --test server/kokoa-ai-config.test.ts server/kokoa-ai.test.ts",
     "test:kokoa-ai": "tsx --test server/kokoa-ai-config.test.ts server/kokoa-ai.test.ts server/kokoa-ai-ws.test.ts scripts/check-kokoa-ai.test.ts",

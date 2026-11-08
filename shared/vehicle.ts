@@ -1,3 +1,5 @@
+export const TANK = { radius: 1.1, speed: 3, fireMs: 900, damage: 50 } as const;
+
 export const BIKE = {
   step: 1 / 120, maxSpeed: 10, acceleration: 3.5, braking: 7, drag: 0.35,
   wheelbase: 1.3, wheelRadius: 0.32, maxSteer: 0.55, grip: 5,

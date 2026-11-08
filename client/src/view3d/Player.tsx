@@ -40,6 +40,9 @@ import { CrouchInput, CROUCH_WEIGHT } from './crouch.ts';
 import { requestTimedCamera } from '../items/useTimedCamera.ts';
 import { MEDIA_PLACEMENT, adjustMediaPlacement, mediaPosition, mediaTransform } from '../../../shared/media-placement.ts';
 
+import { battleInputFor } from '../battlefield-input.ts';
+import { toggleBattleTank } from '../battlefield-actions.ts';
+
 const SPEED = 4;
 const BODY_R = 0.3;
 
@@ -175,6 +178,13 @@ export function Player({ rig }: { rig: PlayerCamera }) {
     };
     const onMouseDown = (e: MouseEvent) => {
       if (xrState().active) return;
+      if (worldKindOf(get()) === 'battlefield') {
+        if (e.button === 0 && e.target === canvas) {
+          if (document.pointerLockElement !== canvas) void canvas.requestPointerLock();
+          else keys.current.Mouse0 = true;
+        }
+        return;
+      }
       if (survivorPlaying(get())) return;
       if (riddenBike() && e.button === 2) return;
       if (e.button === 2) {
@@ -192,6 +202,7 @@ export function Player({ rig }: { rig: PlayerCamera }) {
       use();
     };
     const onMouseUp = (e: MouseEvent) => {
+      keys.current.Mouse0 = false;
       if (e.button !== 0 || !dragging.current) return;
       dragging.current.data.drag!('end', dragging.current.hit);
       dragging.current = null;
@@ -219,6 +230,13 @@ export function Player({ rig }: { rig: PlayerCamera }) {
         return;
       }
       if (isTyping(e.target)) return;
+      if (worldKindOf(get()) === 'battlefield') {
+        if (rig.keyDown(e)) return;
+        keys.current[e.code] = true;
+        if (e.code === 'KeyE' && !e.repeat) toggleBattleTank();
+        if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+        return;
+      }
       if (rig.keyDown(e)) return;
       const systems = useSystems.getState();
       const seat = systems.sid === get().session ? systemSeat(systems.view, get().selfId) : undefined;
@@ -380,6 +398,27 @@ export function Player({ rig }: { rig: PlayerCamera }) {
     eye.current += (eye.target - eye.current) * (1 - Math.exp(-dt / 0.2));
     const s = get();
     const b = body.current;
+    if (worldKindOf(s) === 'battlefield') {
+      const actor = s.battlefields[s.session ?? '']?.actors[s.selfId];
+      if (!actor) return;
+      const yaw = look.current.yaw, pitch = look.current.pitch;
+      rig.lean = 0;
+      position.current.set(actor.x, eye.current + (actor.tank ? 1 : 0), actor.z);
+      rig.avatarPosition.set(actor.x, actor.tank ? 1 : 0, actor.z);
+      rig.yaw = yaw;
+      camera.rotation.set(pitch, yaw, 0, 'YXZ');
+      camera.up.set(0, 1, 0);
+      rig.place(camera, scene, position.current);
+      const now = performance.now();
+      if (now - sent.current.t >= 50) {
+        sent.current.t = now;
+        const k = s.locked || immersive ? keys.current : {};
+        send({ t: 'battleInput', input: battleInputFor(k, yaw, true, !!k.Mouse0) });
+        set({ selfAvatar: { x: actor.x, z: actor.z, ry: actor.aim, y: actor.tank ? 1 : 0 } });
+      }
+      b.y = 0; b.vy = 0; b.car = null; b.grounded = true;
+      return;
+    }
     const toLobby = () => {
       const p = spawnPoint();
       set({ teleport: p });

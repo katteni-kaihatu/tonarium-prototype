@@ -1159,6 +1159,56 @@
           }
         }
       }
+    },
+    "world/battlefield": {
+      "fields": {
+        "name": {
+          "source": "戦場",
+          "translations": {
+            "en": "Battlefield",
+            "ko": "전장"
+          }
+        },
+        "desc": {
+          "source": "2チームで撃ち合いと拠点争奪。倒されても3秒後に復活します。",
+          "translations": {
+            "en": "Fight for control points with two teams. Respawn three seconds after each defeat.",
+            "ko": "두 팀으로 사격과 거점 점령을 즐기세요. 쓰러져도 3초 후 부활합니다."
+          }
+        }
+      }
+    },
+    "item/battlefield-tank": {
+      "fields": {
+        "name": {
+          "source": "戦車",
+          "translations": {
+            "en": "Tank",
+            "ko": "전차"
+          }
+        },
+        "desc": {
+          "source": "戦場に配置された一人乗りの戦車。両表示で移動・照準・射撃ができます。",
+          "translations": {
+            "en": "A single-seat battlefield tank. Move, aim and fire in both views.",
+            "ko": "전장에 배치된 1인승 전차. 두 보기에서 이동, 조준, 사격할 수 있습니다."
+          }
+        },
+        "genre": {
+          "source": "のりもの",
+          "translations": {
+            "en": "Vehicles",
+            "ko": "탈것"
+          }
+        },
+        "usage": {
+          "source": "戦場の戦車に近づいて搭乗します。操縦と射撃は搭乗者だけが行えます。",
+          "translations": {
+            "en": "Approach a battlefield tank to mount it. Only its rider can drive and fire.",
+            "ko": "전장의 전차에 다가가 탑승하세요. 탑승자만 운전하고 사격할 수 있습니다."
+          }
+        }
+      }
     }
   }
 }

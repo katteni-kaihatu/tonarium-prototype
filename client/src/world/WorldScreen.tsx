@@ -42,6 +42,7 @@ import { closeWindow, isAdWindow, openWindow, setWinMode } from './windows.ts';
 import { touchOnly, usePhone } from '../phone.ts';
 import { MasterVolume } from './VolumeMenus.tsx';
 import { SurvivorPanel } from './SurvivorPanel.tsx';
+import { BattlefieldHUD } from './Battlefield.tsx';
 import { EmoteDockButton } from './Emotes.tsx';
 import { unlockEmoteAudio } from './sounds.ts';
 import { AdAudio } from '../ad/AdAudio.tsx';
@@ -586,6 +587,7 @@ export function WorldScreen() {
       <WindowLayer />
       <PortraitCanvas />
       <div className="front">
+        {worldKind === 'battlefield' && <BattlefieldHUD />}
         {worldKind === 'survivors' && mode === '3d' && <SurvivorPanel overlay />}
         <WorldBadge />
         <NearList />

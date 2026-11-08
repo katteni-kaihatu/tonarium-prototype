@@ -7,6 +7,7 @@ const Map3D = lazy(() => import('./Map3D.tsx').then(m => ({ default: m.Map3D }))
 export function MapLayer() {
   const mode = useStore(s => s.mapMode);
   const kind = useStore(s => worldKindOf(s));
+  if (kind === 'battlefield') return <Suspense fallback={null}><Map2D kind={kind} /></Suspense>;
   return <Suspense fallback={null}>
     {mode === '2d' && <Map2D key={kind} kind={kind} />}
     {mode === '3d' && <Map3D key={kind} kind={kind} />}

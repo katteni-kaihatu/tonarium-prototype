@@ -1,0 +1,114 @@
+import assert from 'node:assert/strict';
+import { writeFile, unlink } from 'node:fs/promises';
+import { createServer } from 'vite';
+import { battlefieldPlaytest, delay, until } from '../server/battlefield-playtest.ts';
+
+// 既存のブラウザ検証と同様、導入済み Playwright のモジュールを引数でも受け取る。
+const playwrightModule = process.argv[2] || 'playwright';
+const { chromium } = await import(playwrightModule);
+const cleanup: (() => unknown)[] = [];
+const fixture = new URL(`../client/.battlefield-${process.pid}.html`, import.meta.url);
+try {
+  const server = await battlefieldPlaytest({ after: fn => { cleanup.push(fn as () => unknown); } }, { fixedClock: true });
+  const observer = await server.peer('battle-browser-owner');
+  await observer.send({ t: 'battleBot', action: 'add' });
+  await until(() => Object.values(observer.state?.actors ?? {}).some(p => p.bot) ? true : undefined);
+  process.env.SERVER_PORT = new URL(server.base).port;
+  process.env.VITE_SYSTEM_PLAYTEST = '1';
+  const vite = await createServer({ server: { host: '127.0.0.1', port: 0 } });
+  cleanup.push(() => vite.close());
+  await vite.listen();
+  const origin = vite.resolvedUrls!.local[0].replace(/\/$/, '');
+  await writeFile(fixture, `<!doctype html><meta charset="utf-8"><div id="root"></div><script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { _roots } from '@react-three/fiber';
+import { WorldScreen } from '/src/world/WorldScreen.tsx';
+import { Sidebar } from '/src/home/Home.tsx';
+import { get, set } from '/src/store.ts';
+import { connectWs } from '/src/net/ws.ts';
+import { setLanguage } from '/src/i18n/index.ts';
+import '/src/style.css';
+const query = new URLSearchParams(location.search);
+setLanguage('en');
+set({selfId:query.get('id'), selfName:'Browser', session:query.get('sid'), mode:'2d', loadScale:0, hubOpen:false});
+window.battleTest = {get, scene: () => {
+ const canvas = document.querySelector('canvas');
+ const root = canvas && _roots.get(canvas)?.store.getState();
+ const bots = [];
+ root?.scene.traverse(node => { if (node.userData.bot) {
+   const labels = []; node.traverse(child => { if (child.userData.text) labels.push(child.userData.text); });
+   bots.push({id:node.userData.battleActor, labels});
+ }});
+ return {bots, calls:root?.gl.info.render.calls};
+}};
+createRoot(document.getElementById('root')).render(React.createElement(React.Fragment,null,
+ React.createElement(WorldScreen),React.createElement('aside',{style:{position:'fixed',right:0,top:0,zIndex:1000}},React.createElement(Sidebar,{inSession:true}))));
+connectWs();
+</script>`);
+  cleanup.push(() => unlink(fixture));
+  const browser = await chromium.launch({ headless: true, ...(process.argv[3] ? { executablePath: process.argv[3] } : {}) });
+  cleanup.push(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+  const login = await context.request.post(`${origin}/auth/dev`, { headers: { Origin: origin }, data: { name: 'battle-browser-player' } });
+  assert.ok(login.ok());
+  const { account, session } = await login.json();
+  await context.addCookies([{ name: 'tonarium_session', value: session, url: origin }]);
+  const page = await context.newPage(), errors: string[] = [];
+  page.on('pageerror', (e: Error) => errors.push(e.message));
+  const url = `${origin}/${fixture.pathname.split('/').at(-1)}?sid=${encodeURIComponent(observer.sid)}&id=${encodeURIComponent(account.id)}`;
+  const state = () => page.evaluate(() => {
+    const s = (window as any).battleTest.get();
+    return s.battlefields[s.session];
+  });
+  const advance = async (steps = 1) => { for (let i = 0; i < steps; i++) { await delay(60); await server.advance(50); } };
+  await page.goto(url);
+  await page.locator('.battle-map svg').waitFor();
+  await page.waitForFunction(() => { const s = (window as any).battleTest.get(); return s.battlefields[s.session]?.actors[s.selfId]; });
+  assert.match(await page.locator('.battle-map svg').textContent() ?? '', /Bot/);
+  const before2d = (await state()).actors[account.id];
+  await page.keyboard.down('KeyS'); await advance(4); await page.keyboard.up('KeyS');
+  assert.ok((await state()).actors[account.id].z > before2d.z);
+  const map = await page.locator('.battle-map svg').boundingBox();
+  assert.ok(map);
+  await page.mouse.move(map.x + map.width * .7, map.y + map.height * .7);
+  await page.mouse.down(); await advance(); await page.mouse.up();
+  assert.ok((await state()).actors[account.id].firedAt > 0);
+  assert.notEqual((await state()).actors[account.id].aim, before2d.aim);
+  await page.keyboard.press('KeyE');
+  await page.waitForFunction(id => { const s = (window as any).battleTest.get(); return !!s.battlefields[s.session]?.actors[id].tank; }, account.id);
+  const tank = (await state()).actors[account.id].tank;
+  await page.getByRole('button', { name: /3D/, exact: false }).filter({ hasText: '3D' }).first().click();
+  await page.locator('.world.3d canvas').waitFor();
+  await page.waitForFunction(() => (window as any).battleTest.scene().bots.some((b: any) => b.labels.some((text: string) => text.includes('Bot'))));
+  assert.equal((await state()).actors[account.id].tank, tank);
+  const canvas = page.locator('.world.3d canvas');
+  await canvas.click({ position: { x: 600, y: 500 } });
+  await page.waitForFunction(() => !!document.pointerLockElement);
+  const before3d = (await state()).actors[account.id];
+  await page.mouse.move(620, 500);
+  await page.keyboard.down('KeyW'); await page.mouse.down(); await advance(22); await page.mouse.up(); await page.keyboard.up('KeyW');
+  const after3d = (await state()).actors[account.id];
+  assert.ok(Math.hypot(after3d.x - before3d.x, after3d.z - before3d.z) > 0);
+  assert.ok(after3d.firedAt > before3d.firedAt);
+  assert.notEqual(after3d.aim, before3d.aim);
+  await page.evaluate(() => document.exitPointerLock());
+  await page.getByRole('button', { name: /2D/, exact: false }).filter({ hasText: '2D' }).first().click();
+  await page.locator('.battle-map svg').waitFor();
+  assert.equal((await state()).tanks[tank].rider, account.id);
+  await page.goto('about:blank');
+  await until(() => observer.state?.actors[account.id]?.active === false ? true : undefined);
+  const retained = structuredClone(observer.state!);
+  await page.goto(url);
+  await page.waitForFunction(() => { const s = (window as any).battleTest.get(); return s.battlefields[s.session]?.actors[s.selfId]?.active; });
+  const restored = await state();
+  assert.equal(restored.actors[account.id].hp, retained.actors[account.id].hp);
+  assert.equal(restored.actors[account.id].tank, null);
+  assert.deepEqual(restored.bases, retained.bases);
+  assert.deepEqual(Object.values(restored.actors).filter((p: any) => p.bot), Object.values(retained.actors).filter(p => p.bot));
+  assert.match(await page.locator('.battle-map svg').textContent() ?? '', /Bot/);
+  assert.deepEqual(errors, []);
+  console.log('PASS: authenticated browser 2D/3D movement, aim/fire, mount, mode switch, bot labels and full disconnect/rejoin through production receive handlers');
+} finally {
+  for (const fn of cleanup.reverse()) await fn();
+}

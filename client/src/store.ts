@@ -1,3 +1,4 @@
+import type { BattlefieldState } from '../../shared/battlefield.ts';
 import { initialArrivalState, type Arrival, type ArrivalKind } from './newArrival.ts';
 import { t } from './i18n/core.ts';
 import { create } from 'zustand';
@@ -168,6 +169,7 @@ interface State extends AdSlice {
   games: Record<string, GameState>;
   /** セッションごとの協力サバイバルラン */
   survivors: Record<string, SurvivorState>;
+  battlefields: Record<string, BattlefieldState | null>;
   /** 仮IDに紐づくサーバー保存の個人進行 */
   survivorProfile: SurvivorProfile;
   fantasyProfile: FantasyProfile | null;
@@ -344,6 +346,7 @@ export const useStore = create<State>((set, get) => ({
   worldBy: {},
   games: {},
   survivors: {},
+  battlefields: {},
   survivorProfile: newSurvivorProfile(),
   fantasyProfile: null,
   fantasyRanking: null,
@@ -479,7 +482,7 @@ export function dropSession(sid: string | null) {
   set({ emotes: {} });
   set((s) => {
     const omit = <T,>(m: Record<string, T>) => { const { [sid]: _, ...rest } = m; return rest; };
-    return { chats: omit(s.chats), avatarsBy: omit(s.avatarsBy), itemsBy: omit(s.itemsBy), games: omit(s.games), survivors: omit(s.survivors), elevators: omit(s.elevators), broadcast: omit(s.broadcast), presence: {} };
+    return { chats: omit(s.chats), avatarsBy: omit(s.avatarsBy), itemsBy: omit(s.itemsBy), games: omit(s.games), survivors: omit(s.survivors), battlefields: omit(s.battlefields), elevators: omit(s.elevators), broadcast: omit(s.broadcast), presence: {} };
   });
 }
 

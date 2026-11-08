@@ -61,6 +61,9 @@ import { systemSeat, systemSolids } from '../shared/system-presentation.ts';
 import { assetDelta } from '../shared/shared-sync.ts';
 import { PERSON as PERSON_R, freeSpot, itemRadius, pushApart2D } from './spacing.ts';
 import { clearGame, eliminate, gameOf, resetGame, startGame, stepTile, type GameDeps } from './game.ts';
+import { Battlefields } from './battlefield.ts';
+import { battlefieldClock } from './battlefield-test-clock.ts';
+import { BATTLEFIELD } from '../shared/battlefield.ts';
 import { chooseSurvivorGear, chooseSurvivorStyle, clearSurvivor, moveSurvivor, removeSurvivor, resetSurvivorUpgrades, rerollSurvivorChoice, startSurvivor, tickSurvivors, upgradeSurvivor, survivorOf, type SurvivorDeps } from './survivors.ts';
 import { newSurvivorProfile, SURVIVOR_META_UPGRADES, SURVIVOR_PROFILE_VERSION, SURVIVOR_TICK_MS, survivorUpgradeRefund, type SurvivorMetaUpgrade, type SurvivorProfile, type SurvivorStyle } from '../shared/survivor.ts';
 import { Follows } from './follows.ts';
@@ -1016,7 +1019,7 @@ function releaseCameras(sid: string, u: User, at?: AvatarState) {
 }
 function releaseBikes(sid: string, id: string) {
   for (const it of items.get(sid)!.values()) {
-    if (it.kind !== 'bike' || it.rider !== id) continue;
+    if (it.kind !== 'bike' || it.variant === 'battlefield-tank' || it.rider !== id) continue;
     Object.assign(it, releaseBike(it));
     sendItem(sid, it);
   }
@@ -1141,6 +1144,7 @@ function refreshTelephones(sid: string) {
 setInterval(() => { for (const sid of items.keys()) refreshTelephones(sid); }, 250);
 
 function sendSessionSnapshot(sid: string, id: string) {
+  if (worldOf.get(sid) === 'battlefield') { battlefields.ensure(sid); battlefields.publish(sid); }
   syncSystemItems(sid);
   for (const item of timedCameras.tick(sid, items.get(sid)?.values() ?? [], inSession(sid).map(user => user.id))) sendItem(sid, item);
   refreshTelephones(sid);
@@ -1156,6 +1160,7 @@ function sendSessionSnapshot(sid: string, id: string) {
     world: worldOf.get(sid) ?? 'room',
     game: gameOf(sid),
     survivor: survivorOf(sid),
+    battlefield: worldOf.get(sid) === 'battlefield' ? battlefields.state(sid) : null,
     elevator: elevatorOf(sid),
     now: Date.now(),
   });
@@ -1192,11 +1197,64 @@ function placeDisplay(sid: string, u: Participant, av: AvatarState) {
   u.display = { ...p, ry: av.ry };
 }
 
+const battleClock = battlefieldClock();
+const battlefields = new Battlefields({
+  now: battleClock.now, random: battleClock.random,
+  members: inSession,
+  owner: sid => guild.sessions.find(s => s.id === sid)?.owner,
+  solids: solidsOf,
+  publish: (sid, state) => {
+    const collection = items.get(sid);
+    if (!collection || worldOf.get(sid) !== 'battlefield') return;
+    for (const tank of Object.values(state.tanks)) {
+      let item = collection.get(tank.id);
+      let changed = !item;
+      if (!item || item.kind !== 'bike' || item.variant !== 'battlefield-tank') {
+        item = createItem('bike', { id: tank.id, x: tank.x, z: tank.z, ry: tank.ry, createdBy: 'server', variant: 'battlefield-tank' }, Math.random)!;
+        collection.set(tank.id, item);
+      }
+      if (item.kind === 'bike') {
+        changed ||= item.x !== tank.x || item.z !== tank.z || item.ry !== tank.ry || item.rider !== tank.rider;
+        Object.assign(item, tank);
+        if (changed) sendItem(sid, item);
+      }
+    }
+    for (const actor of Object.values(state.actors)) {
+      if (actor.bot || !actor.active) continue;
+      const user = users.get(actor.id);
+      if (!user || user.session !== sid) continue;
+      const position = { x: actor.x, z: actor.z, ry: actor.aim, y: actor.tank ? 1 : 0 };
+      user.pos = position; user.follow = null;
+      avatars.get(sid)?.set(actor.id, position);
+    }
+    roomSend(sid, { t: 'battlefield', sid, state });
+    sendPresence(sid);
+  },
+});
+function clearBattlefield(sid: string) {
+  battlefields.clear(sid);
+  for (const [id, item] of items.get(sid) ?? []) if (item.variant === 'battlefield-tank') {
+    items.get(sid)!.delete(id); sendItemRemove(sid, id);
+  }
+  roomSend(sid, { t: 'battlefield', sid, state: null });
+}
+function tickBattlefields() {
+  const started = performance.now();
+  battlefields.tick();
+  if (battleClock.testing && process.env.BATTLEFIELD_BENCHMARK === '1') process.send?.({ type: 'battlefieldMetrics', at: Date.now(), durationMs: performance.now() - started });
+}
+if (battleClock.testing) process.on('message', (message: unknown) => {
+  if (!message || typeof message !== 'object') return;
+  const m = message as { type?: string; ms?: number };
+  if (m.type === 'battlefieldAdvance' && typeof m.ms === 'number') { battleClock.advance(m.ms); tickBattlefields(); }
+});
+setInterval(tickBattlefields, BATTLEFIELD.tickMs);
 const worldPending = new Set<string>();
 /** ワールドごとに広さや家具が違うので、全員をスポーンエリアに戻す（3D の人は各自の手元で戻る） */
 function switchWorld(sid: string, world: WorldKind, clear: boolean, byName: string) {
   worldPending.delete(sid);
   const previousWorld = worldOf.get(sid);
+  clearBattlefield(sid);
   worldOf.set(sid, world);
   resetGame(sid, gameDeps);
   const sessItems = items.get(sid)!;
@@ -1228,6 +1286,7 @@ function switchWorld(sid: string, world: WorldKind, clear: boolean, byName: stri
     broadcastUsers();
     broadcastSessions();
   }
+  if (world === 'battlefield') { battlefields.ensure(sid); battlefields.publish(sid); }
   roomSend(sid, { t: 'world', sid, world });
   roomSend(sid, { t: 'elevator', sid, elevator: elevatorOf(sid) });
   broadcastSessionInfo();
@@ -1257,6 +1316,7 @@ function leaveSession(u: Participant) {
   if (!sid) return;
   eliminate(sid, u.id, gameDeps);
   removeSurvivor(sid, u.id, survivorDeps);
+  battlefields.leave(sid, u.id);
   const av = avatars.get(sid)!.get(u.id);
   if (avatars.get(sid)!.delete(u.id)) roomSend(sid, { t: 'avatarRemove', sid, id: u.id });
   for (const it of items.get(sid)!.values()) {
@@ -1851,7 +1911,7 @@ function handleMessage(ws: WebSocket, state: HomeConnectionState, msg: ClientMsg
       if (!sid || typeof msg.requestId !== 'string') return;
       state.syncRequest = msg.requestId;
       const current = () => state.syncRequest === msg.requestId && me.session === sid;
-      void createSyncGrant(sid, me.id, ws, roomHandlers, () => send(ws, { t: 'syncReset', sid }), current, msg.peerPositions === true, msg.peerDelivery === true).then(
+      void createSyncGrant(sid, me.id, ws, roomHandlers, () => send(ws, { t: 'syncReset', sid }), current, msg.peerPositions === true && worldOf.get(sid) !== 'battlefield', msg.peerDelivery === true).then(
         (config) => { if (current()) send(ws, { t: 'syncConfig', requestId: msg.requestId, config }); },
         () => { if (current()) send(ws, { t: 'syncError', requestId: msg.requestId, error: 'kokosync に接続できません。サーバー設定と接続先を確認してください' }); },
       );
@@ -2018,6 +2078,17 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
       eliminate(sid, me.id, gameDeps);
       return;
     }
+    case 'battleInput':
+    case 'battleMount':
+    case 'battleBot':
+      if (worldOf.get(sid) === 'battlefield') {
+        const started = performance.now();
+        battlefields.ensure(sid);
+        const accepted = battlefields.command(sid, me.id, msg);
+        if (battleClock.testing && process.env.BATTLEFIELD_BENCHMARK === '1' && msg.t === 'battleInput')
+          process.send?.({ type: 'battlefieldInputMetrics', at: Date.now(), durationMs: performance.now() - started, accepted });
+      }
+      return;
     case 'survivorStyle': {
       if (worldOf.get(sid) !== 'survivors') return;
       chooseSurvivorStyle(sid, me, msg.style as SurvivorStyle, survivorDeps);
@@ -2095,7 +2166,7 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
       return;
     }
     case 'itemCreate': {
-      if (!Object.hasOwn(ITEM_INFO, msg.kind)) return;
+      if (!Object.hasOwn(ITEM_INFO, msg.kind) || msg.variant === 'battlefield-tank') return;
       if (ONLY_3D[msg.kind] && me.mode !== '3d') return;
       if (msg.kind === 'mirror' && !canAddMirror(sessItems.values())) return;
       let at = placeIn(sid, msg.x, msg.z, 0.4);
@@ -2121,6 +2192,7 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
     }
     case 'itemRemove': {
       const it = sessItems.get(msg.id);
+      if (it?.variant === 'battlefield-tank') return;
       if (it && isSystemControlledItem(it)) {
         const map = cameraTimerRemoval(systems.view(sid), it);
         if (!map) return;
@@ -2143,7 +2215,7 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
     }
     case 'itemMove': {
       const it = sessItems.get(msg.id);
-      if (!it || isSystemControlledItem(it) || (it.kind === 'hammer' && it.holder) || (it.kind === 'bike' && it.rider)) return;
+      if (!it || it.variant === 'battlefield-tank' || isSystemControlledItem(it) || (it.kind === 'hammer' && it.holder) || (it.kind === 'bike' && it.rider)) return;
       const media = it.kind === 'image';
       const half = (worldOf.get(sid) === 'city' ? CITY_HALF : ROOM_HALF) - 0.5;
       const p = media ? { x: Math.max(-half, Math.min(half, finNum(msg.x))), z: Math.max(-half, Math.min(half, finNum(msg.z))) }
@@ -2160,6 +2232,12 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
     case 'itemAction': {
       const it = sessItems.get(msg.id);
       if (!it || isSystemControlledItem(it)) return;
+      if (it.variant === 'battlefield-tank') {
+        if (worldOf.get(sid) !== 'battlefield') return;
+        if (msg.action?.a === 'bikeMount') battlefields.command(sid, me.id, { t: 'battleMount', id: it.id });
+        if (msg.action?.a === 'bikeDismount') battlefields.command(sid, me.id, { t: 'battleMount', id: null });
+        return;
+      }
       if (msg.action?.a === 'timedCameraRequest') {
         if (me.mode === '3d' && timedCameras.request(sid, me.id, it, msg.action.token, inSession(sid).map(user => user.id))) {
           it.updatedBy = me.id;
@@ -2248,6 +2326,7 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
       return;
     }
     case 'follow': {
+      if (worldOf.get(sid) === 'battlefield') return;
       const target = msg.target ? users.get(msg.target) : null;
       if (msg.target && (!target || target.session !== sid || target.mode !== '3d' || target.id === me.id || me.mode !== '2d')) return;
       if (me.follow === (target?.id ?? null)) return;
@@ -2257,6 +2336,7 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
       return;
     }
     case 'place2d': {
+      if (worldOf.get(sid) === 'battlefield') return;
       const target = users.get(msg.target);
       if (!target || target.session !== sid || target.mode !== '2d') return;
       if (me.mode !== '3d' && target.id !== me.id) return;
@@ -2293,6 +2373,7 @@ function handleSession(me: Participant, sid: string, msg: RoomClientMsg, peerPos
       return;
     }
     case 'avatar': {
+      if (worldOf.get(sid) === 'battlefield') return;
       // 2D の人の分も覚えるが、使う側はみな mode を見て 3D の人の分だけ使う（mode より先に届くことがある）
       const seat = systemSeat(systems.view(sid), me.id);
       const s = seat ? { ...clampAvatar(worldOf.get(sid) ?? 'room', msg.s), x: seat.x, y: seat.y, z: seat.z, walking: false } : clampAvatar(worldOf.get(sid) ?? 'room', msg.s);
@@ -2345,6 +2426,7 @@ function destroyUserSession(sessionId: string) {
   broadcastMode.delete(def.id);
   worldPending.delete(def.id);
   clearSurvivor(def.id);
+  clearBattlefield(def.id);
   clearGame(def.id);
   resetElevator(def.id);
   broadcastSessionInfo();

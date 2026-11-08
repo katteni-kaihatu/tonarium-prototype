@@ -8,6 +8,17 @@ import { reconcileSystemItems } from '../server/system-items.ts';
 
 const base = { id: 'timer-camera-one', x: 2, z: -3, ry: 1, createdBy: 'alice' };
 const rng = () => 0.5;
+test('battlefield tanks reuse bike storage but cannot be created or controlled through generic systems and item actions', () => {
+  assert.equal(ITEM_VARIANTS['battlefield-tank'].kind, 'bike');
+  assert.equal(ITEM_VARIANTS['battlefield-tank'].spawnable, false);
+  assert.equal(systemItemDefinition('battlefield-tank'), undefined);
+  const tank = createItem('bike', { ...base, variant: 'battlefield-tank' }, rng)!;
+  assert.equal(tank.variant, 'battlefield-tank');
+  const before = structuredClone(tank);
+  assert.equal(applyItemAction(tank, { a: 'bikeMount' }, 'alice', rng), false);
+  assert.equal(applyItemAction(tank, { a: 'bikeDismount' }, 'alice', rng), false);
+  assert.deepEqual(tank, before);
+});
 const view = (mapId: string, objects: SystemObject[] = []): SystemView => ({
   revision: 1, map: { schema: 1, id: mapId, objects, systems: [], connections: [] }, systems: [],
   objects: Object.fromEntries(objects.map(object => [object.id, { position: [...object.position] }])),
