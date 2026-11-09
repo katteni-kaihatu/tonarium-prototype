@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { createRequire } from 'node:module';
+import { Children, isValidElement, type ReactNode, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { bigFromLog10, bigFromNumber, bigMulNumber, bigLog10, bigSub, createAntimatterEta, createNewGame, getDimensionCostForBulk, getDimensionalBoostRequirement, getGalaxyRequirement, getSacrificeCandidate, type GameState } from '../../ad/engine.mjs';
 import { createAdSlice, type AdSlice } from '../../ad/slice.ts';
@@ -24,6 +26,9 @@ import { InfinityPanel } from './InfinityPanel.tsx';
 import { InfinityUpgradesPanel } from './InfinityUpgradesPanel.tsx';
 import { confirmAd } from './confirmAd.tsx';
 import { shouldFillWindow, simpleWindowSize } from '../windowSize.ts';
+import { AUTOBUYER_IDS, AUTOBUYER_MAX_LEVEL, AUTOBUYER_UNLOCK_COST, INFINITY_UPGRADES } from '../../ad/engine.mjs';
+import { getLayerTabs } from './layersData.ts';
+import { subscribeAdFeedback } from '../../ad/feedback.ts';
 
 test('personal BGM toggle is accessible in 2D and every 3D target regardless of ownership', () => {
   const previous = getLanguage();
@@ -87,6 +92,234 @@ function harness(game: GameState) {
   slice.adGame = game;
   return slice;
 }
+
+// DOM のないテストでも実コンポーネントのクリック処理と次の描画をつなぐ。
+function interactivePanel(slice: AdSlice) {
+  const react = createRequire(import.meta.url)('react') as {
+    __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: { H: unknown };
+  };
+  const hooks = react.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+  const states: unknown[] = [];
+  const render = () => {
+    let index = 0;
+    const previous = hooks.H;
+    hooks.H = {
+      useState(initial: unknown) {
+        const slot = index++;
+        if (!(slot in states)) states[slot] = initial;
+        return [states[slot], (next: unknown) => { states[slot] = next; }];
+      },
+      useRef: (current: unknown) => ({ current }),
+      useEffect: () => {},
+      useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
+    };
+    try { return AntimatterPanel({ ad: adaptAdSlice(slice)! }); }
+    finally { hooks.H = previous; }
+  };
+  let tree = render();
+  const findTab = (node: ReactNode, label: string): ReactElement<{ children: ReactNode; onClick: () => void; disabled?: boolean; 'aria-pressed'?: boolean }> | undefined => {
+    let found: ReturnType<typeof findTab>;
+    Children.forEach(node, child => {
+      if (found || !isValidElement<{ children: ReactNode; className?: string }>(child)) return;
+      if (child.type === 'button' && child.props.className?.split(' ').includes('adlab-tab') && Children.toArray(child.props.children).includes(label)) {
+        found = child as NonNullable<ReturnType<typeof findTab>>;
+      } else found = findTab(child.props.children, label);
+    });
+    return found;
+  };
+  return {
+    html: () => renderToStaticMarkup(tree),
+    clickTab(key: string) {
+      const button = findTab(tree, t(key));
+      assert.ok(button);
+      assert.ok(!button.props.disabled);
+      button.props.onClick();
+      tree = render();
+      assert.equal(findTab(tree, t(key))?.props['aria-pressed'], true);
+    },
+  };
+}
+
+test('clicking Infinity before reaching it shows every upgrade and autobuyer with disabled actions', context => {
+  const previous = getLanguage();
+  context.after(() => setLanguage(previous));
+  for (const language of ['ja', 'en', 'ko'] as const) {
+    setLanguage(language);
+    for (const mode of ['initial', 'rich-locked', 'rich-off', 'rich-on'] as const) {
+      const game = createNewGame(0);
+      game.infinities = 0;
+      if (mode !== 'initial') game.infinityPoints = bigFromNumber(10000);
+      for (const id of AUTOBUYER_IDS) {
+        game.autobuyers[id].unlocked = mode === 'rich-off' || mode === 'rich-on';
+        game.autobuyers[id].enabled = mode === 'rich-on';
+      }
+      const slice = harness(game);
+      const before = serialize(game);
+      const panel = interactivePanel(slice);
+      assert.ok(!panel.html().includes('adlab-infinity-columns'));
+      panel.clickTab('adInfinityTab');
+      const html = panel.html().split('class="adlab-infinity"')[1];
+      assert.ok(html.includes(t('adInfinityPreview')));
+      for (const { id } of INFINITY_UPGRADES) assert.ok(html.includes(`data-iu="${id}"`));
+      assert.equal([...html.matchAll(/class="adlab-iu-desc"/g)].length, INFINITY_UPGRADES.length);
+      assert.equal([...html.matchAll(/class="adlab-auto-row/g)].length, AUTOBUYER_IDS.length);
+      const buttons = [...html.matchAll(/<button\b([^>]*)>/g)];
+      assert.ok(buttons.length >= AUTOBUYER_IDS.length);
+      for (const button of buttons) assert.match(button[1], /\bdisabled=""/);
+      const ad = adaptAdSlice(slice)!;
+      assert.ok(ad.derived.infinityUpgrades.every(item => !item.canBuy));
+      assert.ok(ad.derived.autobuyers.every(item => !item.canUnlock && !item.canUpgrade));
+      assert.equal(serialize(game), before);
+      panel.clickTab('adLabText4');
+      assert.ok(!panel.html().includes('adlab-infinity-columns'));
+    }
+    const game = createNewGame(0);
+    game.infinities = 1;
+    game.infinityPoints = bigFromNumber(0);
+    for (const id of AUTOBUYER_IDS) game.autobuyers[id].unlocked = true;
+    const panel = interactivePanel(harness(game));
+    panel.clickTab('adInfinityTab');
+    assert.ok(!panel.html().includes(t('adInfinityPreview')));
+    for (const button of panel.html().matchAll(/<button\b([^>]*role="switch"[^>]*)>/g)) assert.doesNotMatch(button[1], /disabled/);
+  }
+});
+
+test('Infinity history is independent from layer unlocks', () => {
+  for (const count of [0, 1, 0]) {
+    assert.deepEqual(getLayerTabs(count).map(layer => [layer.id, layer.unlocked]), [
+      ['dimensions', true], ['infinity', count > 0], ['eternity', false], ['reality', false], ['celestials', false],
+    ]);
+  }
+});
+
+test('slice rejects every Infinity operation before reaching it without changing progress, version or feedback', async context => {
+  const events: unknown[] = [];
+  context.after(subscribeAdFeedback(event => events.push(event)));
+  const unchanged = (slice: AdSlice, action: () => boolean) => {
+    const before = structuredClone(slice.adGame);
+    const version = slice.adVersion;
+    assert.equal(action(), false);
+    assert.deepEqual(slice.adGame, before);
+    assert.equal(slice.adVersion, version);
+  };
+  for (const ip of [0, 10000]) {
+    const game = createNewGame(0);
+    game.infinities = 0;
+    game.infinityPoints = bigFromNumber(ip);
+    game.antimatter = bigFromLog10(400);
+    const slice = harness(game);
+    for (const def of INFINITY_UPGRADES) {
+      game.infinityUpgrades = INFINITY_UPGRADES.filter(u => u.id !== def.id).map(u => u.id);
+      unchanged(slice, () => slice.adBuyInfinityUpgrade(def.id));
+    }
+    for (const id of AUTOBUYER_IDS) {
+      game.autobuyers[id] = { unlocked: false, enabled: false, level: 0, elapsedMs: 123 };
+      unchanged(slice, () => slice.adUnlockAutobuyer(id));
+      unchanged(slice, () => slice.adUpgradeAutobuyer(id));
+      unchanged(slice, () => slice.adSetAutobuyer(id, true));
+      for (const enabled of [false, true]) {
+        game.autobuyers[id] = { unlocked: true, enabled, level: 1, elapsedMs: 123 };
+        unchanged(slice, () => slice.adSetAutobuyer(id, !enabled));
+        unchanged(slice, () => slice.adUpgradeAutobuyer(id));
+        unchanged(slice, () => slice.adUnlockAutobuyer(id));
+      }
+    }
+  }
+  await Promise.resolve();
+  assert.deepEqual(events, []);
+});
+
+test('slice and adapter preserve every post-Infinity purchase condition and frozen-state guard', async context => {
+  const events: unknown[] = [];
+  context.after(subscribeAdFeedback(event => events.push(event)));
+  const game = createNewGame(0);
+  game.infinities = 1;
+  const slice = harness(game);
+  const check = (action: () => boolean, expected: boolean) => {
+    const before = structuredClone(game);
+    const version = slice.adVersion;
+    assert.equal(action(), expected);
+    assert.equal(slice.adVersion, version + Number(expected));
+    if (!expected) assert.deepEqual(game, before);
+  };
+  for (const def of INFINITY_UPGRADES) {
+    game.infinityUpgrades = [];
+    game.infinityPoints = bigFromNumber(10000);
+    if (def.row > 1) {
+      assert.equal(adaptAdSlice(slice)!.derived.infinityUpgrades.find(u => u.id === def.id)!.canBuy, false);
+      check(() => slice.adBuyInfinityUpgrade(def.id), false);
+    }
+    game.infinityUpgrades = INFINITY_UPGRADES.filter(u => u.column === def.column && u.row < def.row).map(u => u.id);
+    game.infinityPoints = bigFromNumber(def.cost - 1);
+    assert.equal(adaptAdSlice(slice)!.derived.infinityUpgrades.find(u => u.id === def.id)!.canBuy, false);
+    check(() => slice.adBuyInfinityUpgrade(def.id), false);
+    game.infinityPoints = bigFromNumber(def.cost);
+    assert.equal(adaptAdSlice(slice)!.derived.infinityUpgrades.find(u => u.id === def.id)!.canBuy, true);
+    check(() => slice.adBuyInfinityUpgrade(def.id), true);
+    await Promise.resolve();
+    assert.deepEqual(game.infinityPoints, bigFromNumber(0));
+    assert.ok(game.infinityUpgrades.includes(def.id));
+    game.infinityPoints = bigFromNumber(10000);
+    assert.equal(adaptAdSlice(slice)!.derived.infinityUpgrades.find(u => u.id === def.id)!.canBuy, false);
+    check(() => slice.adBuyInfinityUpgrade(def.id), false);
+  }
+  await Promise.resolve();
+  assert.equal(events.length, INFINITY_UPGRADES.length);
+  for (const id of AUTOBUYER_IDS) {
+    const item = () => adaptAdSlice(slice)!.derived.autobuyers.find(ab => ab.id === id)!;
+    game.infinityPoints = bigFromNumber(10000);
+    assert.equal(item().canUpgrade, false);
+    check(() => slice.adUpgradeAutobuyer(id), false);
+    check(() => slice.adSetAutobuyer(id, true), false);
+    game.infinityPoints = bigFromNumber(AUTOBUYER_UNLOCK_COST[id] - 1);
+    assert.equal(item().canUnlock, false);
+    check(() => slice.adUnlockAutobuyer(id), false);
+    game.infinityPoints = bigFromNumber(AUTOBUYER_UNLOCK_COST[id]);
+    assert.equal(item().canUnlock, true);
+    check(() => slice.adUnlockAutobuyer(id), true);
+    assert.deepEqual(game.infinityPoints, bigFromNumber(0));
+    assert.equal(item().canUnlock, false);
+    for (const enabled of [false, true]) {
+      check(() => slice.adSetAutobuyer(id, enabled), true);
+      assert.equal(game.autobuyers[id].enabled, enabled);
+      assert.deepEqual(game.infinityPoints, bigFromNumber(0));
+    }
+    game.infinityPoints = bigFromNumber(10000);
+    check(() => slice.adUnlockAutobuyer(id), false);
+    for (let level = 0; level < AUTOBUYER_MAX_LEVEL; level++) {
+      game.infinityPoints = bigFromNumber(level);
+      assert.equal(item().canUpgrade, false);
+      check(() => slice.adUpgradeAutobuyer(id), false);
+      game.infinityPoints = bigFromNumber(level + 1);
+      assert.equal(item().canUpgrade, true);
+      check(() => slice.adUpgradeAutobuyer(id), true);
+      assert.equal(game.autobuyers[id].level, level + 1);
+      assert.deepEqual(game.infinityPoints, bigFromNumber(0));
+    }
+    game.infinityPoints = bigFromNumber(10000);
+    assert.equal(item().canUpgrade, false);
+    check(() => slice.adUpgradeAutobuyer(id), false);
+  }
+  for (const frozen of ['loading', 'choice', 'migration'] as const) {
+    slice.adSync = frozen === 'migration' ? 'ready' : frozen;
+    slice.adMigration = frozen === 'migration';
+    game.infinityPoints = bigFromNumber(10000);
+    game.infinityUpgrades = [];
+    for (const def of INFINITY_UPGRADES) {
+      game.infinityUpgrades = INFINITY_UPGRADES.filter(u => u.column === def.column && u.row < def.row).map(u => u.id);
+      check(() => slice.adBuyInfinityUpgrade(def.id), false);
+    }
+    for (const id of AUTOBUYER_IDS) {
+      game.autobuyers[id] = { unlocked: false, enabled: false, level: 0, elapsedMs: 0 };
+      check(() => slice.adUnlockAutobuyer(id), false);
+      game.autobuyers[id].unlocked = true;
+      check(() => slice.adSetAutobuyer(id, true), false);
+      check(() => slice.adUpgradeAutobuyer(id), false);
+    }
+  }
+  await Promise.resolve();
+  assert.equal(events.length, INFINITY_UPGRADES.length);
+});
 
 test('separated statistics and achievements preserve every value and save in three languages', (context) => {
   const previous = getLanguage();
@@ -346,7 +579,7 @@ for (const language of ['ja', 'en', 'ko'] as const) {
 
 }
 
-test('first Infinity unlocks the Layers and Infinity tabs, and the Crunch card is enabled only once reachable, in all languages', () => {
+test('Infinity is always browsable, Layers unlocks after Infinity, and Crunch requires reaching the threshold, in all languages', () => {
   const previous = getLanguage();
   try {
     for (const language of ['ja', 'en', 'ko'] as const) {
@@ -357,7 +590,8 @@ test('first Infinity unlocks the Layers and Infinity tabs, and the Crunch card i
       const before = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
       for (const key of ['adLabText4', 'adLabText6', 'ui819', 'adLabText52', 'adSaveTab']) assert.ok(tabButton(before, key));
       assert.ok(!tabButton(before, 'adLabText7'));
-      assert.match(before, new RegExp(`<button[^>]*class="adlab-tab is-locked"[^>]*disabled=""[^>]*>[\\s\\S]*?${t('adInfinityTab')}<svg`));
+      assert.ok(tabButton(before, 'adInfinityTab'));
+      assert.doesNotMatch(before, /adlab-tab is-locked/);
       assert.equal(disabled(before, t('adLabText31')), true);
       assert.ok(before.includes(t('adLabText26')) && before.includes(t('adLabText28')) && before.includes(t('adLabText30')));
       game.antimatter = bigFromNumber(1.79e308);
@@ -367,16 +601,18 @@ test('first Infinity unlocks the Layers and Infinity tabs, and the Crunch card i
       assert.equal(slice.adGame!.infinities, 1);
       const after = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
       assert.ok(tabButton(after, 'adLabText7'));
+      assert.ok(tabButton(after, 'adInfinityTab'));
       assert.equal(disabled(after, t('adLabText31')), true);
       slice.adGame = createNewGame(0);
       const restored = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />);
       assert.ok(!tabButton(restored, 'adLabText7'));
+      assert.ok(tabButton(restored, 'adInfinityTab'));
       assert.equal(disabled(restored, t('adLabText31')), true);
     }
   } finally { setLanguage(previous); }
 });
 
-test('自動化タブは Infinity 後に出て、解放・切り替え・短縮が IP を使い、3D には自動の印が出る', () => {
+test('自動化は Infinity 後に解放・切り替え・短縮でき、3D には自動の印が出る', () => {
   const previous = getLanguage();
   try {
     for (const language of ['ja', 'en', 'ko'] as const) {
@@ -384,7 +620,7 @@ test('自動化タブは Infinity 後に出て、解放・切り替え・短縮�
       const game = createNewGame(0);
       const slice = harness(game);
       const tabButton = (html: string) => html.includes('>' + t('adInfinityTab') + '</button>');
-      assert.ok(!tabButton(renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />)));
+      assert.ok(tabButton(renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />)));
       game.infinities = 1;
       game.infinityPoints = bigFromNumber(2);
       assert.ok(tabButton(renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(slice)!} />)));

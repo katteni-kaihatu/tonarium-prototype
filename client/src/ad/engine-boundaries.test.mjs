@@ -330,7 +330,89 @@ test('Galaxy30・Tickspeed3000回でもtickは例外なく反物質が有限で�
   assert.doesNotThrow(() => JSON.parse(serialize(game)));
 });
 
-const withIp = (n) => { const g = createNewGame(0); g.infinityPoints = bigFromNumber(n); return g; };
+const withIp = (n) => { const g = createNewGame(0); g.infinities = 1; g.infinityPoints = bigFromNumber(n); return g; };
+
+test('Infinity 未到達なら残高や Crunch 可否にかかわらず全操作を拒否する', () => {
+  const unchanged = (game, action) => {
+    const before = structuredClone(game);
+    assert.equal(action(), false);
+    assert.deepEqual(game, before);
+  };
+  for (const ip of [0, 10000]) {
+    const g = withIp(ip);
+    g.infinities = 0;
+    g.antimatter = bigFromLog10(400);
+    assert.equal(canInfinity(g), true);
+    for (const def of INFINITY_UPGRADES) {
+      g.infinityUpgrades = INFINITY_UPGRADE_IDS.filter(id => id !== def.id);
+      assert.equal(canBuyInfinityUpgrade(g, def.id), false);
+      unchanged(g, () => buyInfinityUpgrade(g, def.id));
+    }
+    for (const id of AUTOBUYER_IDS) {
+      g.autobuyers[id] = { unlocked: false, enabled: false, level: 0, elapsedMs: 123 };
+      unchanged(g, () => unlockAutobuyer(g, id));
+      for (const enabled of [false, true]) {
+        g.autobuyers[id] = { unlocked: true, enabled, level: 1, elapsedMs: 123 };
+        unchanged(g, () => setAutobuyerEnabled(g, id, !enabled));
+        unchanged(g, () => upgradeAutobuyerInterval(g, id));
+        unchanged(g, () => unlockAutobuyer(g, id));
+      }
+    }
+  }
+});
+
+test('Infinity 到達後も全定義の費用・前提・所有・解放・最大段階を守る', () => {
+  const unchanged = (game, action) => {
+    const before = structuredClone(game);
+    assert.equal(action(), false);
+    assert.deepEqual(game, before);
+  };
+  for (const def of INFINITY_UPGRADES) {
+    const g = withIp(10000);
+    const prerequisites = INFINITY_UPGRADES.filter(u => u.column === def.column && u.row < def.row).map(u => u.id);
+    if (def.row > 1) unchanged(g, () => buyInfinityUpgrade(g, def.id));
+    g.infinityUpgrades = [...prerequisites];
+    g.infinityPoints = bigFromNumber(def.cost - 1);
+    unchanged(g, () => buyInfinityUpgrade(g, def.id));
+    g.infinityPoints = bigFromNumber(def.cost);
+    assert.equal(canBuyInfinityUpgrade(g, def.id), true);
+    assert.equal(buyInfinityUpgrade(g, def.id), true);
+    assert.equal(ipNumber(g), 0);
+    assert.deepEqual(g.infinityUpgrades, [...prerequisites, def.id]);
+    g.infinityPoints = bigFromNumber(10000);
+    unchanged(g, () => buyInfinityUpgrade(g, def.id));
+  }
+  for (const id of AUTOBUYER_IDS) {
+    const g = withIp(10000);
+    unchanged(g, () => setAutobuyerEnabled(g, id, true));
+    unchanged(g, () => upgradeAutobuyerInterval(g, id));
+    g.infinityPoints = bigFromNumber(AUTOBUYER_UNLOCK_COST[id] - 1);
+    unchanged(g, () => unlockAutobuyer(g, id));
+    g.infinityPoints = bigFromNumber(AUTOBUYER_UNLOCK_COST[id]);
+    assert.equal(unlockAutobuyer(g, id), true);
+    assert.equal(ipNumber(g), 0);
+    assert.equal(g.autobuyers[id].unlocked, true);
+    assert.equal(g.autobuyers[id].enabled, true);
+    for (const enabled of [false, true]) {
+      assert.equal(setAutobuyerEnabled(g, id, enabled), true);
+      assert.equal(g.autobuyers[id].enabled, enabled);
+      assert.equal(ipNumber(g), 0);
+    }
+    g.infinityPoints = bigFromNumber(10000);
+    unchanged(g, () => unlockAutobuyer(g, id));
+    for (let level = 0; level < AUTOBUYER_MAX_LEVEL; level++) {
+      const cost = getAutobuyerUpgradeCost(g, id);
+      g.infinityPoints = bigFromNumber(cost - 1);
+      unchanged(g, () => upgradeAutobuyerInterval(g, id));
+      g.infinityPoints = bigFromNumber(cost);
+      assert.equal(upgradeAutobuyerInterval(g, id), true);
+      assert.equal(g.autobuyers[id].level, level + 1);
+      assert.equal(ipNumber(g), 0);
+    }
+    g.infinityPoints = bigFromNumber(10000);
+    unchanged(g, () => upgradeAutobuyerInterval(g, id));
+  }
+});
 const ipNumber = (g) => g.infinityPoints.mantissa * 10 ** g.infinityPoints.exponent;
 
 test('IP の獲得量は桁数に比例し、1.79e308 未満では 0', () => {
@@ -431,7 +513,7 @@ test('同時に動くときは Galaxy が Boost より先、リセット系が�
   for (const id of ['crunch', 'lowDims']) unlockAutobuyer(h, id);
   h.antimatter = bigFromLog10(400);
   runAutobuyers(h, 5000);
-  assert.equal(h.infinities, 1);
+  assert.equal(h.infinities, 2);
   assert.equal(h.dimensions[0].bought, 1);
   assert.equal(ipNumber(h), 10 - 1 - 3 + 1);
 });
@@ -492,8 +574,9 @@ test('autobuyers のないセーブ・壊れた値のセーブを読み込める
   assert.throws(() => validateSave({ ...saved, autobuyers: 'x' }));
 });
 
-test('全部オンの新規ゲームが例外なく自動で Big Crunch まで進む', () => {
+test('到達済みで全部オンのゲームが例外なく次の Big Crunch まで進む', () => {
   const g = createNewGame(0);
+  g.infinities = 1;
   g.infinityPoints = bigFromNumber(100);
   for (const id of AUTOBUYER_IDS) {
     unlockAutobuyer(g, id);
@@ -502,14 +585,14 @@ test('全部オンの新規ゲームが例外なく自動で Big Crunch まで�
   g.infinityPoints = bigZero();
   const capSec = 48 * 3600;
   let sec = 0;
-  while (g.infinities === 0 && sec < capSec) {
+  while (g.infinities === 1 && sec < capSec) {
     tick(g, 1000);
     runAutobuyers(g, 1000);
     rescueIfStuck(g);
     sec += 1;
   }
   console.log(`auto crunch after ${(sec / 3600).toFixed(2)} simulated hours`);
-  assert.ok(g.infinities >= 1, 'auto crunch never happened');
+  assert.ok(g.infinities >= 2, 'auto crunch never happened');
   assert.ok(ipNumber(g) >= 1);
 });
 
@@ -529,6 +612,7 @@ test('Infinity 強化の表は16種・合計67 IP・4列×4段', () => {
 
 test('強化は列の上の段から順にしか買えず、IP が足りないと何も変わらない', () => {
   const g = createNewGame(0);
+  g.infinities = 1;
   g.infinityPoints = bigFromNumber(1);
   assert.equal(buyInfinityUpgrade(g, 'dims18'), false);
   assert.equal(isInfinityUpgradeAvailable(g, 'dims18'), false);

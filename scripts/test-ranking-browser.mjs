@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
+import { AUTOBUYER_IDS, INFINITY_UPGRADES } from '../client/src/ad/engine.mjs';
 
 // fixture サーバーを先に起動。引数: Playwright の module URL、ブラウザ実行ファイル。
 const { chromium } = await import(process.argv[2] || 'playwright');
@@ -122,7 +123,7 @@ try {
       for (const width of [320, 639, 640, 641, 655, 656, 657, 900]) {
         await page.setViewportSize({ width: Math.max(360, width + 32), height: 950 });
         await page.locator('.ranking-fixture-panel').evaluate((el, value) => { el.style.width = `${value}px`; }, width);
-        const keys = tabKeys.filter(key => infinity || !['adInfinityTab', 'adLabText7'].includes(key));
+        const keys = tabKeys.filter(key => infinity || key !== 'adLabText7');
         const tabs = panel.locator('.adlab-tabs button');
         assert.deepEqual(await tabs.allTextContents(), keys.map(label));
         assert.equal(await tabs.first().evaluate(el => getComputedStyle(el).whiteSpace), 'nowrap');
@@ -160,7 +161,7 @@ try {
       }
       if (infinity) {
         // 非表示になるタブを開いたまま進行を戻し、次元へ復帰する。
-        for (const key of ['adInfinityTab', 'adLabText7']) {
+        for (const key of ['adLabText7']) {
           await panel.locator('.adlab-tabs').getByRole('button', { name: label(key), exact: true }).click();
           await page.getByRole('button', { name: 'Infinity: true', exact: true }).click();
           assert.equal(await panel.locator('.adlab-tabs button').first().getAttribute('aria-pressed'), 'true');
@@ -188,6 +189,28 @@ try {
       assert.equal(await panel.locator('.adlab-tabs [aria-pressed="true"]').textContent(), labels[language](key));
       assert.equal(await body.locator('h3').filter({ hasText: labels[language](heading) }).count(), 1);
     }
+  }
+  for (const preview of ['initial', 'locked', 'off', 'on', 'zero']) {
+    await page.goto(`http://127.0.0.1:5193/scripts/fixtures/ranking.html?panel&preview=${preview}`);
+    await panel.waitFor();
+    for (const language of ['ja', 'en', 'ko']) {
+      await page.getByRole('button', { name: language, exact: true }).click();
+      await panel.locator('.adlab-tabs').getByRole('button', { name: labels[language]('adInfinityTab'), exact: true }).click();
+      assert.equal(await panel.locator('.adlab-tabs [aria-pressed="true"]').textContent(), labels[language]('adInfinityTab'));
+      for (const def of INFINITY_UPGRADES) assert.equal(await body.locator(`[data-iu="${def.id}"] .adlab-iu-desc`).count(), 1);
+      assert.equal(await body.locator('.adlab-auto-row').count(), AUTOBUYER_IDS.length);
+      assert.ok(await body.getByText(labels[language]('adInfinityPreview'), { exact: true }).count());
+      assert.equal(await body.locator('.adlab-infinity button:enabled').count(), 0);
+    }
+    await page.getByRole('button', { name: 'Infinity: false', exact: true }).click();
+    assert.equal(await body.getByText(labels.ko('adInfinityPreview'), { exact: true }).count(), 0);
+    assert.equal(await body.locator('.adlab-iu-card').count(), INFINITY_UPGRADES.length);
+    if (['off', 'on', 'zero'].includes(preview)) {
+      assert.equal(await body.locator('[role="switch"]:enabled').count(), AUTOBUYER_IDS.length);
+    }
+    await page.getByRole('button', { name: 'Infinity: true', exact: true }).click();
+    assert.equal(await body.locator('.adlab-infinity button:enabled').count(), 0);
+    assert.equal(await body.locator('.adlab-iu-card').count(), INFINITY_UPGRADES.length);
   }
   assert.deepEqual(errors, []);
   console.log('PASS: ranking values, self labels, expansion, reorder, refresh/rejection, keyboard/focus; all panel tabs in ja/en/ko before/after Infinity at 320px and around 640px; screenshots in .local/ranking-verification');

@@ -351,6 +351,7 @@ export default {
   adChipGalaxy: "Galaxy {0}",
   adUiBuyAll: "Buy all",
   adUiInfinityLocked: "Unlocks after 1 Big Crunch",
+  adInfinityPreview: "Preview upgrades and automation here. Buying, unlocking, toggling and upgrading become available after your first Big Crunch.",
   adUiTimes: "{0}×",
   adUiGalaxyCount: "{0}",
   adUiInfinityCount: "Infinity {0}×",
