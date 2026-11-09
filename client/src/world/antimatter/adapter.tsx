@@ -1,6 +1,6 @@
 import { msg, getLanguage, useLanguage } from '../../i18n/index.ts';
 import {
-  AUTOBUYER_IDS, AUTOBUYER_UNLOCK_COST, getAutobuyerInterval, getAutobuyerUpgradeCost,
+  createAntimatterEta, AUTOBUYER_IDS, AUTOBUYER_UNLOCK_COST, getAutobuyerInterval, getAutobuyerUpgradeCost,
   INFINITY_UPGRADES, bigDiv, bigFromNumber, bigGte, canBuyInfinityUpgrade, getInfinityUpgradeEffect,
   hasInfinityUpgrade, isInfinityUpgradeAvailable, canAntimatterGalaxy, canDimensionalBoost, canInfinity, canSacrifice,
   getAntimatterPerSecond, getDimensionalBoostRequirement, getDimensionCost,
@@ -46,6 +46,7 @@ function previewFrom(game: GameState, maxUnlockedTier: number): PreviewDerived {
 
 function derivedFrom(game: GameState): DerivedSnapshot {
   const maxUnlockedTier = getMaxUnlockedTier(game);
+  const predictEta = createAntimatterEta(game);
   return {
     antimatterPerSecond: getAntimatterPerSecond(game),
     tickspeedValue: getEffectiveTickspeedBig(game),
@@ -63,6 +64,8 @@ function derivedFrom(game: GameState): DerivedSnapshot {
         amount: dim.amount,
         bought: dim.bought,
         cost,
+        purchaseEtaSeconds: predictEta(cost),
+        milestoneEtaSeconds: predictEta(bigMulNumber(cost, 10 - dim.bought % 10)),
         productionPerSecond: getDimensionProductionPerSecond(game, tier),
         multiplier: tier === 8 ? bigDiv(getDimensionMultiplierBig(game, tier), game.sacrificeBoost) : getDimensionMultiplierBig(game, tier),
         affordable: !locked && bigGte(game.antimatter, cost),
