@@ -69,6 +69,8 @@ export interface GameState {
 }
 
 export interface DimensionDerived {
+  purchaseEtaSeconds: number;
+  milestoneEtaSeconds: number;
   tier: number;
   amount: BigNum;
   bought: number;

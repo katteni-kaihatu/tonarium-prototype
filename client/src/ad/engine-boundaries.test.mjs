@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import {
   createNewGame, bigFromNumber, bigFromLog10, bigNormalize, bigCompare, bigAdd, bigSub, bigMulNumber,
   serialize, deserialize, sacrifice, canSacrifice, rescueIfStuck, tick, getSacrificeCandidate, bigZero, bigLog10,
-  getDimensionProductionPerSecond,
+  getDimensionProductionPerSecond, createAntimatterEta, ANTIMATTER_ETA_MAX_SECONDS,
   buyDimension, buyMaxDimension, buyMax, getDimensionCost, formatNumber,
   getDimensionalBoostRequirement, getGalaxyRequirement,
   canDimensionalBoost, canAntimatterGalaxy, dimensionalBoost, antimatterGalaxy,
@@ -15,6 +15,86 @@ import {
   AUTOBUYER_IDS, AUTOBUYER_RUN_ORDER, AUTOBUYER_UNLOCK_COST, AUTOBUYER_MAX_LEVEL, getMaxUnlockedTier, buyTickspeed,
 } from './engine.mjs';
 import { validateSave } from './sync.mjs';
+
+test('ETA matches the frozen 100ms chain from every tier and mixed strengthened dimensions', () => {
+  for (let source = 0; source <= 8; source++) {
+    for (const strengthened of [false, true]) {
+      const game = createNewGame(0);
+      game.antimatter = bigZero();
+      game.dimensionalBoosts = strengthened ? 9 : 4;
+      game.tickspeedBought = strengthened ? 5 : 0;
+      game.sacrificeBoost = bigFromNumber(strengthened ? 13 : 1);
+      game.infinityUpgrades = strengthened ? ['buy10', 'boostMult', 'galaxyBoost', 'dims18'] : [];
+      game.infinities = 3;
+      game.dimensions.forEach((dim, i) => {
+        dim.amount = bigFromNumber(source === 8 || source === i ? 2 + i : 0);
+        dim.bought = strengthened ? 20 : 0;
+      });
+      const before = structuredClone(game);
+      const saved = serialize(game);
+      const eta = createAntimatterEta(game);
+      const simulated = structuredClone(game);
+      let previous = bigZero();
+      for (let n = 1; n <= 300; n++) {
+        tick(simulated, 100);
+        if (n >= 8 && n % 13 === 0) {
+          // 刻みの中間と境界近くを調べ、到達した刻みも一致するか確かめる。
+          for (const fraction of [0.01, 0.5, 0.99]) {
+            const target = bigAdd(previous, bigMulNumber(bigSub(simulated.antimatter, previous), fraction));
+            const seconds = eta(target);
+            const expected = (n - 1 + fraction) / 10;
+            assert.ok(Math.abs(seconds - expected) < 1e-6, `${source}/${strengthened}: ${seconds} vs ${expected}`);
+            assert.ok(seconds <= n / 10 && n / 10 - seconds <= 0.100001);
+            assert.equal(Math.ceil(seconds * 10), n);
+          }
+        }
+        previous = simulated.antimatter;
+      }
+      assert.deepEqual(game, before);
+      assert.equal(serialize(game), saved);
+    }
+  }
+});
+
+test('ETA handles affordable, unreachable, huge and very distant targets without mutating saves', () => {
+  const game = createNewGame(0);
+  const empty = createAntimatterEta(game);
+  assert.equal(empty(game.antimatter), 0);
+  assert.equal(empty(bigFromNumber(1e9)), Infinity);
+  game.antimatter = bigZero();
+  game.dimensions[0].amount = bigFromLog10(1000);
+  assert.equal(createAntimatterEta(game)(bigFromLog10(1002)), 100);
+  game.dimensions[0].amount = bigFromNumber(1);
+  assert.ok(Math.abs(createAntimatterEta(game)(bigFromNumber(ANTIMATTER_ETA_MAX_SECONDS - 2)) - (ANTIMATTER_ETA_MAX_SECONDS - 2)) < 1e-5);
+  assert.equal(createAntimatterEta(game)(bigFromNumber(ANTIMATTER_ETA_MAX_SECONDS + 1)), Infinity);
+  game.dimensions[0].amount = bigZero();
+  game.dimensions[7].amount = bigFromLog10(1000);
+  const eta = createAntimatterEta(game);
+  assert.ok(Number.isFinite(eta(bigFromLog10(1048))));
+  assert.equal(eta(bigFromLog10(1200)), Infinity);
+  const seconds = eta(bigFromLog10(1048));
+  assert.ok(seconds > 86400 * 100);
+});
+
+test('ETA freezes time and IP multipliers and is replaced after real state updates', () => {
+  const game = createNewGame(0);
+  game.lastTick = 3600000;
+  game.infinityUpgrades = ['totalTime', 'runTime', 'ipGen', 'unspentIp'];
+  game.bestInfinityMs = 1000;
+  game.infinityPoints = bigFromNumber(4);
+  game.dimensions[0].amount = bigFromNumber(1);
+  const before = structuredClone(game);
+  const saved = serialize(game);
+  const target = bigFromLog10(6);
+  const eta = createAntimatterEta(game);
+  const expected = 10 ** (bigLog10(bigSub(target, game.antimatter)) - bigLog10(getDimensionProductionPerSecond(game, 1)));
+  assert.equal(eta(target), expected);
+  assert.deepEqual(game, before);
+  assert.equal(serialize(game), saved);
+  tick(game, 600000);
+  assert.equal(eta(target), expected);
+  assert.ok(createAntimatterEta(game)(target) < expected);
+});
 
 const operations = {
   boost: { requirement: getDimensionalBoostRequirement, can: canDimensionalBoost, run: dimensionalBoost },

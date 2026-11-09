@@ -1,7 +1,7 @@
 import { t, useLanguage, type UiMessage } from '../../i18n/index.ts';
 import { Icon } from '../Icon.tsx';
 import { memo, type CSSProperties } from 'react';
-import { bigGte, bigLog10, bigMulNumber, bigSub } from '../../ad/engine.mjs';
+import { bigGte, bigMulNumber } from '../../ad/engine.mjs';
 import type { AntimatterSlice, BigNum, DimensionDerived } from './types.ts';
 import { formatNumber } from './format.ts';
 import { TIER_EN } from './styles.ts';
@@ -10,9 +10,9 @@ import { percent, ratio } from './progress.ts';
 import { ActionBar } from './ActionBar.tsx';
 
 // 毎 tick 数字が動くとうるさいので、いちばん大きい単位だけを切り上げて出す（秒が動くのは 1 分を切ってから）。
-function etaText(antimatter: BigNum, cost: BigNum, perSecond: BigNum): string {
+function etaText(antimatter: BigNum, cost: BigNum, etaSeconds: number): string {
   if (bigGte(antimatter, cost)) return t('adUiEtaNow');
-  const seconds = Math.ceil(10 ** (bigLog10(bigSub(cost, antimatter)) - bigLog10(perSecond)));
+  const seconds = Math.ceil(etaSeconds);
   if (!Number.isFinite(seconds)) return t('adUiEtaFar');
   if (seconds < 60) return t('adUiEtaSec', seconds);
   if (seconds < 3600) return t('adUiEtaMin', Math.ceil(seconds / 60));
@@ -21,8 +21,8 @@ function etaText(antimatter: BigNum, cost: BigNum, perSecond: BigNum): string {
   return days > 9999 ? t('adUiEtaFar') : t('adUiEtaDay', days);
 }
 
-function BuyButton({ label, count, cost, antimatter, perSecond, reachesDouble, partial, disabled, onClick }: {
-  label: string; count: number; cost: BigNum; antimatter: BigNum; perSecond: BigNum;
+function BuyButton({ label, count, cost, antimatter, etaSeconds, reachesDouble, partial, disabled, onClick }: {
+  label: string; count: number; cost: BigNum; antimatter: BigNum; etaSeconds: number;
   reachesDouble: boolean; partial: boolean; disabled: boolean; onClick: () => void;
 }) {
   const fill = percent(ratio(antimatter, cost));
@@ -32,7 +32,7 @@ function BuyButton({ label, count, cost, antimatter, perSecond, reachesDouble, p
     <button type="button" className={state} aria-label={label} title={t('adUiFundProgress', fill)} style={{ '--ad-fill': fill } as CSSProperties} disabled={disabled} onClick={onClick}>
       <b>+{count}</b>
       <small className="adlab-number">{formatNumber(cost)}</small>
-      <small className="adlab-dim-eta">{etaText(antimatter, cost, perSecond)}</small>
+      <small className="adlab-dim-eta">{etaText(antimatter, cost, etaSeconds)}</small>
     </button>
   );
 }
@@ -49,10 +49,9 @@ function DimensionName({ d }: { d: DimensionDerived }) {
   );
 }
 
-function DimensionRow({ d, antimatter, perSecond, sacrificeBoost, buyDimension, buyUntilNextTen }: {
+function DimensionRow({ d, antimatter, sacrificeBoost, buyDimension, buyUntilNextTen }: {
   d: DimensionDerived;
   antimatter: AntimatterSlice['game']['antimatter'];
-  perSecond: BigNum;
   sacrificeBoost: AntimatterSlice['game']['sacrificeBoost'];
   buyDimension: AntimatterSlice['buyDimension'];
   buyUntilNextTen: AntimatterSlice['buyUntilNextTen'];
@@ -88,9 +87,9 @@ function DimensionRow({ d, antimatter, perSecond, sacrificeBoost, buyDimension, 
         <span className="adlab-number">{done}/10</span>
       </div>
       <div className="adlab-dim-buy">
-        <BuyButton label={t('adLabText23', d.tier)} count={1} cost={d.cost} antimatter={antimatter} perSecond={perSecond}
+        <BuyButton label={t('adLabText23', d.tier)} count={1} cost={d.cost} antimatter={antimatter} etaSeconds={d.purchaseEtaSeconds}
           reachesDouble={d.nextMilestoneRemaining === 1} partial={false} disabled={!d.affordable} onClick={() => buyDimension(d.tier)} />
-        <BuyButton label={t('adLabText24', d.tier)} count={d.nextMilestoneRemaining} cost={blockCost} antimatter={antimatter} perSecond={perSecond}
+        <BuyButton label={t('adLabText24', d.tier)} count={d.nextMilestoneRemaining} cost={blockCost} antimatter={antimatter} etaSeconds={d.milestoneEtaSeconds}
           reachesDouble partial={!blockAffordable} disabled={!d.affordable} onClick={() => buyUntilNextTen(d.tier)} />
       </div>
     </div>
@@ -116,7 +115,7 @@ export function DimensionList({ ad, notice = () => {} }: { ad: AntimatterSlice; 
         </div>
         {derived.dimensions.map((d) => (
           <MemoRow
-            key={d.tier} d={d} antimatter={game.antimatter} perSecond={derived.antimatterPerSecond} sacrificeBoost={game.sacrificeBoost}
+            key={d.tier} d={d} antimatter={game.antimatter} sacrificeBoost={game.sacrificeBoost}
             buyDimension={ad.buyDimension} buyUntilNextTen={ad.buyUntilNextTen}
           />
         ))}

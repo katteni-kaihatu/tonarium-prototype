@@ -504,6 +504,55 @@ export function getAntimatterPerSecond(state) {
   return getDimensionProductionPerSecond(state, 1);
 }
 
+export const ANTIMATTER_ETA_MAX_SECONDS = 9999 * 86400;
+
+/** 現在の状態を固定した、複数の目標額で共有できる到達時間（秒）の計算。 */
+export function createAntimatterEta(state) {
+  // totalTime・runTime と ipGen による unspentIp の変化も開始時に固定する。
+  // 将来の購入・自動購入・リセットは含めず、実際の状態更新時に作り直す。
+  const antimatter = bigClone(state.antimatter);
+  const speed = getEffectiveTickspeedBig(state);
+  let product = bigOne();
+  const coefficients = state.dimensions.map((dim, i) => {
+    product = bigMul(product, bigMulNumber(bigMul(getDimensionMultiplierBig(state, i + 1), speed), DIMENSION_BASE_RATES[i] * 0.1));
+    return bigMul(dim.amount, product);
+  });
+  const perSecond = getAntimatterPerSecond(state);
+  const linear = coefficients.slice(1).every(c => c.mantissa === 0);
+  // (I + A)^n の反物質の成分。A は100ms開始時数量だけを使う更新で、A^9 = 0。
+  const gain = (ticks) => {
+    let sum = bigZero();
+    let choose = 1;
+    for (let k = 1; k <= 8 && k <= ticks; k++) {
+      choose *= (ticks - k + 1) / k;
+      sum = bigAdd(sum, bigMulNumber(coefficients[k - 1], choose));
+    }
+    return sum;
+  };
+  return (target) => {
+    if (bigGte(antimatter, target)) return 0;
+    const missing = bigSub(target, antimatter);
+    if (linear) {
+      // 第一次元だけの場合は、従来の表示と丸め境界までそろえる。
+      const seconds = 10 ** (bigLog10(missing) - bigLog10(perSecond));
+      return seconds <= ANTIMATTER_ETA_MAX_SECONDS ? seconds : Infinity;
+    }
+    let low = 0;
+    let high = ANTIMATTER_ETA_MAX_SECONDS * 10;
+    if (!bigGte(gain(high), missing)) return Infinity;
+    // 表示範囲内なら最大34回。隣接する刻みの間は直線で補間するため、
+    // 固定係数の100ms反復で最初に到達する時刻との差は最大0.1秒（数値丸めを除く）。
+    while (high - low > 1) {
+      const mid = Math.floor((low + high) / 2);
+      if (bigGte(gain(mid), missing)) high = mid;
+      else low = mid;
+    }
+    const before = gain(low);
+    const fraction = bigToNumber(bigDiv(bigSub(missing, before), bigSub(gain(high), before)));
+    return (low + Math.max(0, Math.min(1, fraction))) / 10;
+  };
+}
+
 /**
  * Next boost/shift requirement (spec §4.1/§4.2). `boosts` = boosts already owned:
  * - boosts < 4 (Dimension Shift): 20 of tier (boosts + 4) — unlocks the next tier
