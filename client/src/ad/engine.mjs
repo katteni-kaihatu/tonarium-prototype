@@ -889,7 +889,7 @@ export function isInfinityUpgradeAvailable(state, id) {
 
 export function canBuyInfinityUpgrade(state, id) {
   const def = INFINITY_UPGRADES.find((u) => u.id === id);
-  return !!def && !hasInfinityUpgrade(state, id) && isInfinityUpgradeAvailable(state, id)
+  return state.infinities > 0 && !!def && !hasInfinityUpgrade(state, id) && isInfinityUpgradeAvailable(state, id)
     && bigGte(state.infinityPoints, def.cost);
 }
 
@@ -950,6 +950,7 @@ export function getAutobuyerUpgradeCost(state, id) {
 }
 
 export function unlockAutobuyer(state, id) {
+  if (!(state.infinities > 0)) return false;
   const ab = state.autobuyers[id];
   if (!ab || ab.unlocked || !spendIp(state, AUTOBUYER_UNLOCK_COST[id])) return false;
   ab.unlocked = true;
@@ -959,6 +960,7 @@ export function unlockAutobuyer(state, id) {
 }
 
 export function setAutobuyerEnabled(state, id, enabled) {
+  if (!(state.infinities > 0)) return false;
   const ab = state.autobuyers[id];
   if (!ab || !ab.unlocked) return false;
   ab.enabled = !!enabled;
@@ -966,6 +968,7 @@ export function setAutobuyerEnabled(state, id, enabled) {
 }
 
 export function upgradeAutobuyerInterval(state, id) {
+  if (!(state.infinities > 0)) return false;
   const ab = state.autobuyers[id];
   if (!ab || !ab.unlocked) return false;
   const cost = getAutobuyerUpgradeCost(state, id);

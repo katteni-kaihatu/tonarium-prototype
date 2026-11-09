@@ -351,6 +351,7 @@ export default {
   adChipGalaxy: "은하 {0}",
   adUiBuyAll: "모두 구매",
   adUiInfinityLocked: "Big Crunch 1회로 해금",
+  adInfinityPreview: "강화와 자동화 내용을 미리 확인할 수 있습니다. 구매·해금·켜기/끄기·강화는 첫 Big Crunch 이후에 사용할 수 있습니다.",
   adUiTimes: "{0}회",
   adUiGalaxyCount: "{0}개",
   adUiInfinityCount: "Infinity {0}회",

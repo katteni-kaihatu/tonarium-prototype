@@ -34,6 +34,7 @@ function AutobuyerCard({ ad, item }: { ad: AntimatterSlice; item: AutobuyerDeriv
             style={s.btn}
             role="switch"
             aria-checked={item.enabled}
+            disabled={!(ad.game.infinities > 0)}
             onClick={() => ad.setAutobuyer(item.id, !item.enabled)}
           >{t(item.enabled ? 'adAutoOn' : 'adAutoOff')}</button>
           {item.upgradeCost === null
