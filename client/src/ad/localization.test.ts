@@ -12,6 +12,22 @@ import { LAYERS, INFINITY_DIMENSIONS, CHALLENGES, TIME_DIMENSIONS, TIME_STUDIES,
 import { ANTIMATTER_EXHIBITS } from '../../../shared/antimatterLayout.ts';
 import { adReadoutLines, drawAdBoard, drawAdReadings } from '../view3d/antimatterText.ts';
 
+test('Infinity preview guidance is available in every language', () => {
+  const previous = getLanguage();
+  const expected = {
+    ja: '強化と自動化の内容を確認できます。購入・解放・切り替え・強化は、初めての Big Crunch 後に使えます。',
+    en: 'Preview upgrades and automation here. Buying, unlocking, toggling and upgrading become available after your first Big Crunch.',
+    ko: '강화와 자동화 내용을 미리 확인할 수 있습니다. 구매·해금·켜기/끄기·강화는 첫 Big Crunch 이후에 사용할 수 있습니다.',
+  };
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      assert.equal(resources[language].adInfinityPreview, expected[language]);
+      setLanguage(language);
+      assert.equal(t('adInfinityPreview'), expected[language]);
+    }
+  } finally { setLanguage(previous); }
+});
+
 test('ja → en → ko → ja preserves progress, saved data, IDs and user names', () => {
   const previous = getLanguage();
   const game = createNewGame(0);

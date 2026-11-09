@@ -14,6 +14,7 @@ export function InfinityPanel({ ad }: { ad: AntimatterSlice }) {
         <div className="adlab-auto-ip"><Icon name="infinity" size={16} /><span className="adlab-auto-ip-label">IP</span><span className="adlab-number adlab-card-value">{formatNumber(ad.game.infinityPoints)}</span></div>
         <span className="adlab-infinity-count">{t('adUiInfinityCount', ad.game.infinities)}</span>
       </div>
+      {!(ad.game.infinities > 0) && <p style={{ margin: 0 }}>{t('adInfinityPreview')}</p>}
       <div className="adlab-infinity-columns">
         <section className="adlab-infinity-section">
           <div className="adlab-box-head"><b>{t('adIuSegUpgrades')}</b><span>{t('adIuCount', owned, ad.derived.infinityUpgrades.length)} · {t('adUiIuOrder')}</span></div>
