@@ -1,4 +1,6 @@
 export interface BigNum { mantissa: number; exponent: number }
+export const ANTIMATTER_ETA_MAX_SECONDS: number;
+export function createAntimatterEta(state: GameState): (target: BigNum) => number;
 export interface DimensionState { amount: BigNum; bought: number; tier: number }
 export type AutobuyerId = 'lowDims' | 'highDims' | 'tickspeed' | 'boost' | 'galaxy' | 'crunch';
 export interface AutobuyerState { unlocked: boolean; enabled: boolean; level: number; elapsedMs: number }
