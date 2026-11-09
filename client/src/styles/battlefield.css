@@ -1,0 +1,7 @@
+.battle-map { display: grid; place-items: center; background: #303b2b; }
+.battle-map > svg { width: min(90vw, 78vh); height: min(90vw, 78vh); touch-action: none; }
+.battle-hud { position: absolute; top: 62px; left: 50%; transform: translateX(-50%); max-width: min(680px, 95vw); padding: 12px 16px; border: 1px solid #849472; border-radius: 8px; background: #172119ee; color: #f4f3de; pointer-events: auto; line-height: 1.7; }
+.battle-hud strong, .battle-hud small { display: block; }
+.battle-hud button, .battle-touch button { padding: 6px 10px; margin: 4px; color: #f4f3de; background: #3c4d34; border: 1px solid #849472; border-radius: 4px; }
+.battle-hud button:disabled { opacity: .45; }
+.battle-touch { position: absolute; bottom: 155px; left: 50%; transform: translateX(-50%); display: flex; pointer-events: auto; touch-action: none; }

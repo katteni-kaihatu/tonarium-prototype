@@ -1,3 +1,4 @@
+import { Tank3D } from './battlefield3d.tsx';
 import { t as tr, systemText, getLanguage } from '../i18n/index.ts';
 import { HammerModel, ChessModel, NoteModel, PanelModel } from './itemModels.tsx';
 export { HammerModel } from './itemModels.tsx';
@@ -332,7 +333,7 @@ function NativeItem3D({ item }: { item: Item }) {
     case 'telephone': return <Telephone3D item={item} />;
     case 'jumpPad': return <JumpPad3D item={item} />;
     case 'mirror': return <Mirror3D item={item} />;
-    case 'bike': return <Bike3D item={item} />;
+    case 'bike': if (item.variant === 'battlefield-tank') return <Tank3D tank={item} />; return <Bike3D item={item} />;
     case 'image': return <Image3D item={item} />;
     case 'youtube': return <YouTube3D item={item} />;
     case 'note': return <Note3D item={item} />;

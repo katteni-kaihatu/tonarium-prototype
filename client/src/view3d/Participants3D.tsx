@@ -48,6 +48,7 @@ function MapName({ name, height }: { name: string; height: number }) {
 }
 
 function seatOf(id: string) {
+  if (get().worldBy[get().session ?? ''] === 'battlefield') return undefined;
   const systems = useSystems.getState();
   return systems.sid === get().session ? systemSeat(systems.view, id) : undefined;
 }

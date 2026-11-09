@@ -41,6 +41,27 @@ beforeEach(() => {
 
 const systemView = revision => ({ revision, map: { schema: 1, id: 'test-map', objects: [], systems: [], connections: [] }, systems: [], objects: {}, seats: {}, diagnostics: [], traces: [] });
 
+test('battlefield receive and initial snapshot restore death waits, tank, bases and bots in both modes', () => {
+  const actor = { id: 'self', participantId: 'self', bot: false, active: true, team: 'red', x: 2, z: 3, aim: 1, hp: 0, alive: false, respawnAt: 4000, firedAt: 0, tank: null };
+  const battle = { at: 1000, revision: 4, actors: { self: actor, bot: { ...actor, id: 'bot', participantId: null, bot: true, alive: true, hp: 100, respawnAt: null, tank: 'tank' } },
+    tanks: { tank: { id: 'tank', x: 1, z: 1, ry: 0, rider: 'bot' } }, bases: [{ id: 'A', owner: 'blue', capturing: null, progress: 0 }] };
+  for (const mode of ['2d', '3d']) {
+    Object.assign(state, { mode, survivors: {}, avatarsBy: {}, itemsBy: {}, broadcast: {}, worldBy: {}, games: {}, elevators: {}, battlefields: {}, walk: { to: { x: 9, z: 9 } }, teleport: { x: 9, z: 9 } });
+    applySessionSnapshot({ sid: state.session, now: 1000, chats: [], avatars: { self: { x: 9, z: 9, ry: 0 } }, items: [], presence: [], broadcast: null, world: 'battlefield', game: null, survivor: null, battlefield: structuredClone(battle), elevator: null });
+    assert.deepEqual(state.battlefields[state.session], battle);
+    assert.equal(state.avatarsBy[state.session].self.x, 2);
+    assert.equal(state.walk, null); assert.equal(state.teleport, null);
+    const next = structuredClone(battle);
+    Object.assign(next.actors.self, { alive: true, hp: 100, respawnAt: null, x: 4 }); next.at = 4000; next.revision++;
+    onMessage({ t: 'battlefield', sid: 'other', state: next });
+    assert.equal(state.battlefields[state.session].revision, 4);
+    onMessage({ t: 'battlefield', sid: state.session, state: next });
+    assert.deepEqual(state.battlefields[state.session], next);
+    assert.equal(state.selfAvatar.x, 4);
+    assert.equal(state.battlefields[state.session].actors.bot.bot, true);
+  }
+});
+
 test('reaction updates survive peer body retries and history restoration without arrivals', () => {
   const r = chatReceiver('session', 'reactions');
   const m = r.message('first');
