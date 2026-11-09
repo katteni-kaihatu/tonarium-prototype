@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { bigFromLog10, bigFromNumber, bigMulNumber, createNewGame, getDimensionCostForBulk, getDimensionalBoostRequirement, getGalaxyRequirement, getSacrificeCandidate, type GameState } from '../../ad/engine.mjs';
+import { bigFromLog10, bigFromNumber, bigMulNumber, bigLog10, bigSub, createAntimatterEta, createNewGame, getDimensionCostForBulk, getDimensionalBoostRequirement, getGalaxyRequirement, getSacrificeCandidate, type GameState } from '../../ad/engine.mjs';
 import { createAdSlice, type AdSlice } from '../../ad/slice.ts';
 import { buildAdActions, buildAdLabSnapshot } from '../../ad/labView.ts';
 import { AntimatterSpacePanel } from '../../view3d/antimatterPanels.tsx';
@@ -512,6 +512,96 @@ test('次元の購入ボタンは貯まった割合・残り時間を出し、×
       game.dimensions[0].bought = 9;
       game.antimatter = adaptAdSlice(slice)!.derived.dimensions[0].cost;
       assert.ok(buttons().single.includes('is-double'));
+    }
+  } finally { setLanguage(previous); }
+});
+
+function displayedEta(seconds: number) {
+  const rounded = Math.ceil(seconds);
+  if (!Number.isFinite(rounded) || rounded > 9999 * 86400) return t('adUiEtaFar');
+  if (rounded === 0) return t('adUiEtaNow');
+  if (rounded < 60) return t('adUiEtaSec', rounded);
+  if (rounded < 3600) return t('adUiEtaMin', Math.ceil(rounded / 60));
+  if (rounded < 86400) return t('adUiEtaHour', Math.ceil(rounded / 3600));
+  return t('adUiEtaDay', Math.ceil(rounded / 86400));
+}
+
+function dimensionBuyButtons(ad: NonNullable<ReturnType<typeof adaptAdSlice>>, tier = 1) {
+  const html = renderToStaticMarkup(<DimensionList ad={ad} />);
+  const buttons = [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(m => m[0]);
+  return [t('adLabText23', tier), t('adLabText24', tier)].map(label => {
+    const button = buttons.find(b => b.includes(`aria-label="${label}"`));
+    assert.ok(button);
+    assert.doesNotMatch(button, /NaN|Infinity/);
+    return button;
+  });
+}
+
+test('purchase ETAs use full single and milestone costs, preserve linear estimates and update after production changes', () => {
+  const previous = getLanguage();
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      for (const bought of [0, 9, 10]) {
+        const game = createNewGame(0);
+        game.antimatter = bigFromNumber(0);
+        game.dimensions[0].bought = bought;
+        game.dimensions[0].amount = bigFromNumber(0.1);
+        const slice = harness(game);
+        const linear = adaptAdSlice(slice)!;
+        const d = linear.derived.dimensions[0];
+        const costs = [d.cost, bigMulNumber(d.cost, d.nextMilestoneRemaining)];
+        const expected = costs.map(cost => 10 ** (bigLog10(bigSub(cost, game.antimatter)) - bigLog10(linear.derived.antimatterPerSecond)));
+        dimensionBuyButtons(linear).forEach((button, i) => assert.ok(button.includes(displayedEta(expected[i]))));
+        assert.equal(d.purchaseEtaSeconds, expected[0]);
+        assert.equal(d.milestoneEtaSeconds, expected[1]);
+        assert.equal(d.nextMilestoneRemaining, bought === 9 ? 1 : 10);
+        game.dimensions[0].amount = bigFromNumber(0);
+        game.dimensions[7].amount = bigFromNumber(1e6);
+        game.dimensionalBoosts = 4;
+        const save = serialize(game);
+        const chain = adaptAdSlice(slice)!;
+        assert.equal(chain.derived.antimatterPerSecond.mantissa, 0);
+        const predict = createAntimatterEta(game);
+        for (const dim of chain.derived.dimensions) {
+          const times = [predict(dim.cost), predict(bigMulNumber(dim.cost, dim.nextMilestoneRemaining))];
+          assert.ok(times.every(Number.isFinite));
+          dimensionBuyButtons(chain, dim.tier).forEach((button, i) => assert.ok(button.includes(displayedEta(times[i]))));
+        }
+        assert.equal(serialize(game), save);
+        game.dimensions[7].amount = bigFromNumber(1e12);
+        const updated = adaptAdSlice(slice)!;
+        assert.ok(updated.derived.dimensions[0].purchaseEtaSeconds < chain.derived.dimensions[0].purchaseEtaSeconds);
+        assert.notDeepEqual(dimensionBuyButtons(updated), dimensionBuyButtons(chain));
+      }
+    }
+  } finally { setLanguage(previous); }
+});
+
+test('ETA formatting retains second, minute, hour and day ceilings in all three languages', () => {
+  const previous = getLanguage();
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      const game = createNewGame(0);
+      game.antimatter = bigFromNumber(0);
+      const ad = adaptAdSlice(harness(game))!;
+      const cases: [number, string][] = [
+        [0.1, t('adUiEtaSec', 1)], [59, t('adUiEtaSec', 59)],
+        [59.01, t('adUiEtaMin', 1)], [60, t('adUiEtaMin', 1)], [60.01, t('adUiEtaMin', 2)],
+        [3599, t('adUiEtaMin', 60)], [3599.01, t('adUiEtaHour', 1)], [3600, t('adUiEtaHour', 1)],
+        [3600.01, t('adUiEtaHour', 2)], [86399, t('adUiEtaHour', 24)],
+        [86399.01, t('adUiEtaDay', 1)], [86400, t('adUiEtaDay', 1)], [86400.01, t('adUiEtaDay', 2)],
+        [9999 * 86400, t('adUiEtaDay', 9999)], [9999 * 86400 + 0.1, t('adUiEtaFar')],
+        [Infinity, t('adUiEtaFar')], [NaN, t('adUiEtaFar')],
+      ];
+      for (const [seconds, label] of cases) {
+        ad.derived.dimensions[0].purchaseEtaSeconds = seconds;
+        ad.derived.dimensions[0].milestoneEtaSeconds = seconds;
+        dimensionBuyButtons(ad).forEach(button => assert.ok(button.includes(label), `${language}: ${seconds}`));
+      }
+      game.antimatter = bigMulNumber(ad.derived.dimensions[0].cost, 10);
+      dimensionBuyButtons(ad).forEach(button => assert.ok(button.includes(t('adUiEtaNow'))));
     }
   } finally { setLanguage(previous); }
 });
