@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createNewGame } from '../../client/src/ad/engine.mjs';
+import { AUTOBUYER_IDS, bigFromNumber, createNewGame } from '../../client/src/ad/engine.mjs';
 import { createAdSlice, type AdSlice } from '../../client/src/ad/slice.ts';
 import { adaptAdSlice } from '../../client/src/world/antimatter/adapter.tsx';
 import { RankingPanel } from '../../client/src/world/antimatter/RankingPanel.tsx';
@@ -25,6 +25,14 @@ function Fixture() {
   const [notice, setNotice] = useState<UiMessage | null>(null);
   const [infinity, setInfinity] = useState(false);
   const panel = new URLSearchParams(location.search).has('panel');
+  const preview = new URLSearchParams(location.search).get('preview');
+  if (preview) {
+    slice.adGame!.infinityPoints = bigFromNumber(['initial', 'zero'].includes(preview) ? 0 : 10000);
+    for (const id of AUTOBUYER_IDS) {
+      slice.adGame!.autobuyers[id].unlocked = ['off', 'on', 'zero'].includes(preview);
+      slice.adGame!.autobuyers[id].enabled = preview === 'on';
+    }
+  }
   slice.adGame!.infinities = infinity ? 1 : 0;
   const ad = adaptAdSlice(slice)!;
   const refreshLeaderboard = async () => {

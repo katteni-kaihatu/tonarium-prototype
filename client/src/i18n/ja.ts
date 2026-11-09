@@ -351,6 +351,7 @@ export default {
   adChipGalaxy: "銀河 {0}",
   adUiBuyAll: "全部買う",
   adUiInfinityLocked: "Big Crunch 1回で解放",
+  adInfinityPreview: "強化と自動化の内容を確認できます。購入・解放・切り替え・強化は、初めての Big Crunch 後に使えます。",
   adUiTimes: "{0}回",
   adUiGalaxyCount: "{0}個",
   adUiInfinityCount: "Infinity {0}回",

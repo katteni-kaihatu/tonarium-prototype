@@ -92,9 +92,9 @@ function derivedFrom(game: GameState): DerivedSnapshot {
         enabled: ab.enabled,
         intervalMs: getAutobuyerInterval(ab.level),
         unlockCost: AUTOBUYER_UNLOCK_COST[id],
-        canUnlock: bigGte(game.infinityPoints, bigFromNumber(AUTOBUYER_UNLOCK_COST[id])),
+        canUnlock: game.infinities > 0 && !ab.unlocked && bigGte(game.infinityPoints, bigFromNumber(AUTOBUYER_UNLOCK_COST[id])),
         upgradeCost,
-        canUpgrade: upgradeCost !== null && bigGte(game.infinityPoints, bigFromNumber(upgradeCost)),
+        canUpgrade: game.infinities > 0 && ab.unlocked && upgradeCost !== null && bigGte(game.infinityPoints, bigFromNumber(upgradeCost)),
       };
     }),
     infinityUpgrades: INFINITY_UPGRADES.map(({ id, column, row, cost }) => ({

@@ -21,10 +21,9 @@ import { t, useLanguage, msg, systemText, type UiMessage } from '../../i18n/inde
 type TabId = 'dimensions' | 'infinity' | 'stats' | 'achievements' | 'ranking' | 'profiles' | 'layers';
 type Game = AntimatterPanelProps['ad']['game'];
 
-// lockedHint があるタブは、見えない間も鍵付きで場所だけ見せて解放条件を伝える。
-const TABS: { id: TabId; label: string; icon: IconName; visible?: (game: Game) => boolean; lockedHint?: string }[] = [
+const TABS: { id: TabId; label: string; icon: IconName; visible?: (game: Game) => boolean }[] = [
   { id: 'dimensions', label: 'adLabText4', icon: 'cube' },
-  { id: 'infinity', label: 'adInfinityTab', icon: 'infinity', visible: game => game.infinities > 0, lockedHint: 'adUiInfinityLocked' },
+  { id: 'infinity', label: 'adInfinityTab', icon: 'infinity' },
   { id: 'stats', label: 'adLabText6', icon: 'chart' },
   { id: 'achievements', label: 'ui819', icon: 'trophy' },
   { id: 'ranking', label: 'adLabText52', icon: 'podium' },
@@ -81,12 +80,7 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
           <div className="adlab-tabs" role="group" aria-label={t('adLabText10')}>
             {TABS.map((item) => {
               const shown = item.visible?.(game) ?? true;
-              if (!shown && !item.lockedHint) return null;
-              if (!shown) {
-                return <button key={item.id} type="button" className="adlab-tab is-locked" disabled title={t(item.lockedHint!)} aria-label={`${t(item.label)} (${t(item.lockedHint!)})`}>
-                  <Icon name={item.icon} size={15} />{t(item.label)}<Icon name="lock" size={12} />
-                </button>;
-              }
+              if (!shown) return null;
               return <button key={item.id} type="button" className={`adlab-tab${item.id === activeTab ? ' is-active' : ''}`} aria-pressed={item.id === activeTab} onClick={() => {
                 if (item.id === activeTab) return;
                 setTab(item.id);
