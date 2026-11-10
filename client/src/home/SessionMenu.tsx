@@ -3,10 +3,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useStore, set, sessionOf } from '../store.ts';
 import { Icon } from '../world/Icon.tsx';
 import { Home, Sidebar } from './Home.tsx';
-import { touchOnly } from '../phone.ts';
+import { touchOnly, usePhone } from '../phone.ts';
 
 /** セッション中に、背面を暗くぼかしてホームをシートで重ねる。Esc か背面のクリックで閉じる */
-function HomeOverlay() {
+function HomeOverlay({ nav }: { nav: boolean }) {
   const sessionName = useStore((s) => sessionOf(s.session)?.name);
   const count = useStore((s) => s.participants.length);
   useEffect(() => {
@@ -20,14 +20,13 @@ function HomeOverlay() {
     <div className="hoverlay">
       <div className="hnow"><i />{tr("ui325")}<strong>{sessionName}</strong><span>· {count} {tr("ui125")}</span></div>
       <button className="hoverlayclose" aria-label={tr("ui73")} onClick={() => set({ hubOpen: false })}><Icon name="close" size={18} /></button>
-      <Home sheet />
+      <Home sheet nav={nav} />
     </div>
   );
 }
 
-/** セッション中の左上のメニュー。ホバーで項目が左から出て、ボタンを押すと最後に開いたページを重ねて開く */
-export function SessionMenu({ children }: { children: ReactNode }) {
-  const hubOpen = useStore((s) => s.hubOpen);
+/** スマホ幅のセッション中の左上のメニュー。ホバーで項目が左から出て、ボタンを押すと最後に開いたページを重ねて開く */
+function PhoneMenu({ hubOpen }: { hubOpen: boolean }) {
   const [hover, setHover] = useState(false);
   // 項目へ動かす途中で一瞬外れても閉じないよう、少し待ってから閉じる
   const timer = useRef(0);
@@ -35,24 +34,42 @@ export function SessionMenu({ children }: { children: ReactNode }) {
   const leave = () => { timer.current = window.setTimeout(() => setHover(false), 180); };
   const show = hover && !hubOpen;
   return (
+    <div className="smenu" onMouseEnter={enter} onMouseLeave={leave}>
+      <button
+        className={`smenubtn ${hubOpen ? 'on' : ''}`} aria-label={tr("ui326")} title={tr("ui327")} aria-expanded={hubOpen}
+        onClick={() => { set({ hubOpen: !hubOpen }); setHover(false); }}
+      ><Icon name="menu" size={20} /></button>
+      <div className="smenubridge" aria-hidden="true" style={{ pointerEvents: show ? 'auto' : 'none' }} />
+      <div className={`smenunav ${show ? 'show' : ''}`} aria-hidden={!show}>
+        <Sidebar inSession onPick={() => { set({ hubOpen: true }); setHover(false); }} />
+      </div>
+    </div>
+  );
+}
+
+/** セッション中のメニュー。PC では左端にアイコンの列を常に出して各ページを直接開き、開いている間は同じ位置で名前つきのメニューに広げる */
+export function SessionMenu({ children }: { children: ReactNode }) {
+  const hubOpen = useStore((s) => s.hubOpen);
+  const phone = usePhone();
+  // 列と名前つきのメニューでボタンが作り直されるので、キーボードで押したときにフォーカスを戻す
+  const toggle = () => {
+    set({ hubOpen: !hubOpen });
+    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.srailmenu')?.focus());
+  };
+  return (
     <>
       <div className={`session-surface ${hubOpen ? 'hub-open' : ''}`}>
         {hubOpen && <div className="hoverlaybg" onClick={() => set({ hubOpen: false })} />}
         <div className="session-sheet-frame">
-          {hubOpen && <HomeOverlay />}
+          {hubOpen && <HomeOverlay nav={phone} />}
           {children}
         </div>
       </div>
-      <div className="smenu" onMouseEnter={enter} onMouseLeave={leave}>
-        <button
-          className={`smenubtn ${hubOpen ? 'on' : ''}`} aria-label={tr("ui326")} title={tr("ui327")} aria-expanded={hubOpen}
-          onClick={() => { set({ hubOpen: !hubOpen }); setHover(false); }}
-        ><Icon name="menu" size={20} /></button>
-        <div className="smenubridge" aria-hidden="true" style={{ pointerEvents: show ? 'auto' : 'none' }} />
-        <div className={`smenunav ${show ? 'show' : ''}`} aria-hidden={!show}>
-          <Sidebar inSession onPick={() => { set({ hubOpen: true }); setHover(false); }} />
+      {phone ? <PhoneMenu hubOpen={hubOpen} /> : (
+        <div className="srail">
+          <Sidebar inSession rail={!hubOpen} onMenu={toggle} onPick={() => set({ hubOpen: true })} />
         </div>
-      </div>
+      )}
     </>
   );
 }

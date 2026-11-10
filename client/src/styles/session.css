@@ -37,7 +37,24 @@
 .hcalev { display: block; padding: 1px 6px; border-radius: 6px; background: var(--sand); font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hcalev.more { background: transparent; color: var(--muted); font-weight: 400; }
 
-/* セッション中：左上のメニューボタン。ホバーで左のメニューが出て、押すとホームをシートで重ねる */
+/* セッション中の PC：左端のメニュー。たたむとアイコンの列、シートを開いている間は同じ位置で名前つきに広げる */
+.srail { position: fixed; left: 20px; top: 20px; bottom: 20px; z-index: 46; display: flex; }
+.srail > .hside { position: static; height: 100%; max-height: none; box-sizing: border-box; width: 228px; padding: 8px 6px; gap: 2px; }
+.srail > .hside > * { flex-shrink: 0; }
+.srail .hbrand { padding: 0 0 6px; gap: 10px; }
+.srail .hside-sec { margin-left: 6px; margin-right: 6px; }
+.srail .hself { margin-top: 6px; }
+button.srailmenu, button.srailmenu:hover:not(:disabled) { width: 46px; height: 46px; padding: 0; border-radius: 14px; background: var(--accent); color: #fff; }
+button.srailmenu.on, button.srailmenu.on:hover:not(:disabled) { background: var(--paper); color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.srail > .hrail { width: 60px; align-items: center; overflow-x: hidden; background: rgba(255, 253, 249, .92); backdrop-filter: blur(16px); }
+.hrailsep { width: 32px; height: 1px; margin: 6px 0; background: var(--line2); }
+.hrailbtn { position: relative; width: 44px; height: 42px; padding: 0; border-radius: 12px; color: var(--ink2); }
+.hrailbtn .hbadge { position: absolute; right: 2px; top: 2px; min-width: 16px; height: 16px; padding: 0 4px; font-size: 9.5px; line-height: 16px; }
+.hrailself { width: 44px; height: 44px; padding: 0; border-radius: 22px; }
+.world.locked .srail { opacity: .4; pointer-events: none; }
+.home.sheet.nonav { grid-template-columns: minmax(0, 1fr) auto; }
+
+/* セッション中のスマホ幅：左上のメニューボタン。ホバーで左のメニューが出て、押すとホームをシートで重ねる */
 .smenu { position: fixed; left: 0; top: 0; z-index: 46; }
 .smenubtn { position: absolute; left: 20px; top: 20px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 14px; background: rgba(255, 253, 249, .92); color: var(--ink); box-shadow: 0 2px 10px rgba(60, 40, 10, .12); }
 .smenubtn.on { background: var(--paper); color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent), 0 2px 10px rgba(60, 40, 10, .12); }
@@ -50,10 +67,10 @@
 .session-sheet-frame { display: contents; }
 .session-surface .dock { pointer-events: auto; }
 .session-surface.hub-open { z-index: 45; }
-.hub-open .session-sheet-frame { position: absolute; inset: 72px 24px max(22px, env(safe-area-inset-bottom)) 12px; z-index: 1; display: grid; grid-template-rows: minmax(0, 1fr) auto; border-radius: 20px; background: var(--ground); box-shadow: 0 30px 80px rgba(0, 0, 0, .35); overflow: hidden; pointer-events: auto; }
+.hub-open .session-sheet-frame { position: absolute; inset: 72px 24px max(22px, env(safe-area-inset-bottom)) 264px; z-index: 1; display: grid; grid-template-rows: minmax(0, 1fr) auto; border-radius: 20px; background: var(--ground); box-shadow: 0 30px 80px rgba(0, 0, 0, .35); overflow: hidden; pointer-events: auto; }
 .hoverlay { display: contents; pointer-events: auto; }
 .hoverlaybg { position: absolute; inset: 0; background: rgba(30, 28, 24, .42); backdrop-filter: blur(8px) saturate(.9); pointer-events: auto; }
-.hnow { position: fixed; left: 76px; top: 20px; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: 14px; background: rgba(20, 20, 24, .45); color: #fff; font-size: 13px; pointer-events: none; }
+.hnow { position: fixed; left: 264px; top: 20px; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: 14px; background: rgba(20, 20, 24, .45); color: #fff; font-size: 13px; pointer-events: none; }
 .hnow i { width: 8px; height: 8px; border-radius: 50%; background: #5BD394; }
 .hnow span { opacity: .8; }
 .hoverlayclose { position: fixed; right: 24px; top: 20px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 14px; background: rgba(20, 20, 24, .45); color: #fff; }
@@ -74,6 +91,8 @@
   .hevents { grid-column: 2; width: auto; position: static; max-height: none; }
   .home.sheet:has(> .hevents) { grid-template-rows: minmax(0, 2fr) minmax(0, 1fr); }
   .home.sheet > .hside { grid-row: 1 / -1; }
+  .home.sheet.nonav { grid-template-columns: minmax(0, 1fr); }
+  .home.sheet.nonav > .hevents { grid-column: 1; }
 }
 @media (max-width: 720px), (hover: none) and (pointer: coarse) and (max-width: 1024px) and (max-height: 540px) {
   .home { grid-template-columns: 1fr; }

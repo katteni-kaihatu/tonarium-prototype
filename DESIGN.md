@@ -81,8 +81,8 @@ Web の基底値は [styles/base.css](client/src/styles/base.css) の `:root` �
 | --- | --- | --- |
 | 参加 | ドット背景の中央カード、ロゴ・プロフィールアイコン・名前・言語選択・開始操作。横からマスコット、下に工事中の案内 | [App.tsx](client/src/App.tsx)、[style.css](client/src/style.css)、[screens.md](docs/screens.md) |
 | ホーム・一覧 | 左ナビ228px、中央の検索・見出し・各ページ、右ウィジェット300pxの3列。ホームの各セクションは横スクロール1段、一覧 `.scards` は最小260pxの自動列。フレンド/DM、セッション、イベント/カレンダー、グループ、ワールド、アイテム、履歴等を切り替える | [Home.tsx](client/src/home/Home.tsx)、[pages.tsx](client/src/home/pages.tsx)、[home.md](docs/home.md)、[style.css](client/src/style.css) |
-| セッション | 背景マップまたは3D空間、窓と顔描画、前面にワールド表示・左の人/アイテム・上部の顔・右の通知/ログ・下のドック。通常の左パネル幅320・左20・上74・下20、右幅300・右20・上下20 | [WorldScreen.tsx](client/src/world/WorldScreen.tsx)、[style.css](client/src/style.css)、[screens.md](docs/screens.md) |
-| セッション中のホーム | 左上メニューから同じホームをシートで表示。背面は `rgba(30,28,24,.42)` とblur 8px、シートは上72・右24・下88・左12、radius 20 | [SessionMenu.tsx](client/src/home/SessionMenu.tsx)、[style.css](client/src/style.css)、[screens.md](docs/screens.md) |
+| セッション | 背景マップまたは3D空間、窓と顔描画、前面にワールド表示・左の人/アイテム・上部の顔・右の通知/ログ・下のドック。通常の左パネル幅320・左92（左端のメニューの列の右）・上74・下20、右幅300・右20・上下20 | [WorldScreen.tsx](client/src/world/WorldScreen.tsx)、[style.css](client/src/style.css)、[screens.md](docs/screens.md) |
+| セッション中のホーム | PC は左端のアイコンの列（幅60・左上20）から同じホームをシートで表示し、開いている間は列が同じ位置で名前つきの左メニュー（幅228）に広がる。スマホ幅は左上メニューから。背面は `rgba(30,28,24,.42)` とblur 8px、PC のシートは上72・右24・下22・左264、radius 20 | [SessionMenu.tsx](client/src/home/SessionMenu.tsx)、[style.css](client/src/style.css)、[screens.md](docs/screens.md) |
 | マーケット・所有アイテム | ナビと一覧、フィルター、商品カード、共通の詳細・3Dプレビュー、購入確認。カード最小255px・gap18・radius15・line枠、hoverはaccent枠。詳細は2列・gap32・padding26。キーボードfocusは3px accent輪郭・offset3。いいね済みdisabledは金色の独自表示 | [Market.tsx](client/src/market/Market.tsx)、[ItemDetail.tsx](client/src/market/ItemDetail.tsx)、[market.css](client/src/market/market.css)、[home.md](docs/home.md) |
 
 レスポンシブは単一の境界値ではない。ホームは1100px以下で2列、720px以下では下ナビと「もっと見る」に変わり右ウィジェットを非表示にする。セッションは900px以下で左右パネルの幅・顔の配置を調整し、720px以下の `.world.phone` は下タブで前面パネルを切り替える。マーケット詳細は1000px以下で1列。根拠：[style.css](client/src/style.css)、[phone.ts](client/src/phone.ts)、[market.css](client/src/market/market.css)。
