@@ -6,6 +6,7 @@ const { chromium } = await import(process.argv[2] || 'playwright');
 const browser = await chromium.launch({ headless: true, ...(process.argv[3] ? { executablePath: process.argv[3] } : {}) });
 const base = process.env.AD_TEST_URL || 'http://127.0.0.1:5173/ad-localization-test.html';
 const beforeMode = process.argv.includes('--before');
+const noticeOnly = process.argv.includes('--notice-only');
 const rules = '.ad-body, .ad-card, .ad-header, .ad-small, .ad-tabs { display: none !important; }';
 const results = { browser: `Chromium ${browser.version()}`, reproduction: 'CSS injection only; no ad blocker installed', checks: [] };
 await mkdir('.local/verification', { recursive: true });
@@ -72,6 +73,85 @@ async function panelLayout(tab = 0, segment = 0) {
   assert.deepEqual(report, [], 'required counts, visible area, horizontal layout');
 }
 
+async function verifyBoostNotice(language, width, blocked) {
+  await page.evaluate(({ language, width }) => {
+    window.adBrowserTest.reset(language, width);
+    window.adBrowserTest.prepareBoost();
+  }, { language, width });
+  const labels = await page.evaluate(() => window.adBrowserTest.labels());
+  const toast = page.locator('.adlab-toast');
+  const boost = page.locator('[data-kind="boost"] > button');
+  // 通知と操作ボタンが重なる位置を先に決め、測定中はスクロールを補正しない。
+  await boost.evaluate(button => {
+    const body = document.querySelector('.adlab-body');
+    body.scrollTop += button.getBoundingClientRect().top - body.getBoundingClientRect().top - 12;
+  });
+  const measure = () => page.locator('#panel').evaluate(host => ({
+    rects: [...host.querySelectorAll('.adlab-actions, .adlab-actions button')].map(node => {
+      const { x, y, width, height } = node.getBoundingClientRect();
+      return { x, y, width, height };
+    }),
+    pageX: scrollX, pageY: scrollY, body: host.querySelector('.adlab-body').scrollTop,
+  }));
+  const before = await measure();
+  const assertStable = async stage => assert.deepEqual(await measure(), before, `${width}/${language}/${stage}: actions and scroll unchanged`);
+  const initial = await page.evaluate(() => window.adBrowserTest.snapshot());
+  const bounds = await boost.boundingBox();
+  const point = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+  await page.mouse.click(point.x, point.y);
+  assert.equal(await toast.textContent(), labels.boostNotice, 'existing translated boost message');
+  assert.equal((await page.evaluate(() => window.adBrowserTest.snapshot())).boosts, initial.boosts + 1);
+  await assertStable('shown');
+  await page.evaluate(() => window.adBrowserTest.prepareBoost());
+  await assertStable('game prepared for next real boost');
+  const overlap = await toast.boundingBox();
+  assert.ok(point.x >= overlap.x && point.x <= overlap.x + overlap.width && point.y >= overlap.y && point.y <= overlap.y + overlap.height, 'coordinate click is behind the bubble');
+  await page.clock.runFor(3000);
+  await page.mouse.click(point.x, point.y);
+  assert.equal((await page.evaluate(() => window.adBrowserTest.snapshot())).boosts, initial.boosts + 2, 'covered button dispatches a real boost');
+  await assertStable('updated');
+  await page.clock.runFor(2001);
+  assert.equal(await toast.count(), 1, 'old deadline does not clear replacement');
+  await assertStable('old deadline');
+  await page.clock.runFor(2998);
+  assert.equal(await toast.count(), 1, 'replacement remains before five seconds');
+  await page.clock.runFor(1);
+  assert.equal(await toast.count(), 0, 'replacement expires five seconds after latest boost');
+  await assertStable('cleared');
+
+  await page.evaluate(() => window.adBrowserTest.sync('error'));
+  const status = page.locator('.adlab-notices');
+  assert.equal(await status.textContent(), labels.status, 'server status alone');
+  const statusBefore = await status.boundingBox();
+  await page.evaluate(() => window.adBrowserTest.prepareBoost());
+  // サーバー状態追加後の位置でクリックする。以降は位置を補正しない。
+  await boost.click();
+  assert.equal(await toast.count(), 1);
+  assert.equal(await status.textContent(), labels.status, 'status coexists with notice');
+  assert.deepEqual(await status.boundingBox(), statusBefore, 'status stays in its original position');
+  const noticeBounds = await toast.boundingBox();
+  const statusBounds = await status.boundingBox();
+  assert.ok(noticeBounds.y >= statusBounds.y + statusBounds.height, 'notice does not cover server status');
+  const wheelBefore = await page.locator('.adlab-body').evaluate(node => node.scrollTop);
+  const bubble = await toast.boundingBox();
+  await page.mouse.move(bubble.x + bubble.width / 2, bubble.y + bubble.height / 2);
+  await page.mouse.wheel(0, 100);
+  await page.clock.runFor(100);
+  await page.waitForFunction(before => document.querySelector('.adlab-body').scrollTop > before, wheelBefore);
+  await page.clock.runFor(4900);
+  assert.equal(await toast.count(), 0);
+  assert.equal(await status.textContent(), labels.status, 'status survives notice expiry');
+  for (const migration of [false, true]) {
+    await page.evaluate(migration => window.adBrowserTest.sync('choice', migration), migration);
+    assert.equal(await page.getByRole('button', { name: labels.local, exact: true }).count(), migration ? 0 : 1);
+    assert.equal(await page.getByRole('button', { name: labels.remote, exact: true }).count(), migration ? 0 : 1);
+    assert.equal(await page.getByRole('combobox', { name: labels.migration, exact: true }).count(), migration ? 1 : 0);
+  }
+  await page.evaluate(() => window.adBrowserTest.sync('ready'));
+  assert.equal(await status.count(), 0);
+  results.checks.push({ blocked, width, language, notice: 'PASS: stable actions/scroll, covered coordinate click, wheel, latest five-second deadline, server status and save conditions', measurements: before });
+}
+
 try {
   if (beforeMode) {
     await page.addInitScript(rules => {
@@ -108,15 +188,24 @@ try {
     }
   } else {
     for (const blocked of [false, true]) {
-      await page.goto(base + (blocked ? '?blocker=1' : ''));
-      await page.waitForFunction(() => /^(PASS|FAIL):/.test(document.getElementById('result').textContent), null, { timeout: 300000 });
-      const result = await page.locator('#result').textContent();
-      results.checks.push({ blocked, existingRegression: result });
+      if (!noticeOnly) {
+        await page.goto(base + (blocked ? '?blocker=1' : ''));
+        await page.waitForFunction(() => /^(PASS|FAIL):/.test(document.getElementById('result').textContent), null, { timeout: 300000 });
+        const result = await page.locator('#result').textContent();
+        results.checks.push({ blocked, existingRegression: result });
+      }
 
       await page.goto(base + '?interactive=1');
       await page.waitForFunction(() => window.adBrowserTest);
+      await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+      await page.clock.pauseAt(new Date('2026-01-01T00:00:00Z'));
       const style = blocked ? await page.addStyleTag({ content: rules }) : null;
       for (const width of [320, 375, 390, 540, 1000]) {
+        await page.setViewportSize({ width, height: 900 });
+        for (const language of ['ja', 'en', 'ko']) await verifyBoostNotice(language, width, blocked);
+      }
+      await page.clock.resume();
+      for (const width of noticeOnly ? [] : [320, 375, 390, 540, 1000]) {
         await page.setViewportSize({ width, height: 900 });
         for (const language of ['ja', 'en', 'ko']) {
           await page.evaluate(({ language, width }) => window.adBrowserTest.reset(language, width), { language, width });
@@ -218,6 +307,6 @@ try {
 } finally {
   await context.close();
   await browser.close();
-  await writeFile(`.local/verification/ad-browser${beforeMode ? '-before' : ''}.json`, JSON.stringify(results, null, 2));
+  await writeFile(`.local/verification/ad-browser${beforeMode ? '-before' : noticeOnly ? '-notice' : ''}.json`, JSON.stringify(results, null, 2));
   console.log(JSON.stringify(results, null, 2));
 }

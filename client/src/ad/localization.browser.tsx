@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { Canvas, useThree } from '@react-three/fiber';
 import type { Scene, Mesh, MeshBasicMaterial } from 'three';
-import { createNewGame, bigFromLog10, bigFromNumber, serialize } from './engine.mjs';
+import { createNewGame, bigFromLog10, bigFromNumber, serialize, getDimensionalBoostRequirement } from './engine.mjs';
 import { createAdSlice, type AdSlice } from './slice.ts';
 import { buildAdActions, buildAdLabSnapshot } from './labView.ts';
 import { adaptAdSlice } from '../world/antimatter/adapter.tsx';
@@ -66,14 +66,29 @@ function mountInteractiveFixture() {
   };
   const api = {
     reset,
+    prepareBoost: () => {
+      const game = fixture.adGame!;
+      const requirement = getDimensionalBoostRequirement(game);
+      game.dimensions[requirement.tier - 1].amount = bigFromNumber(requirement.amount);
+      flushSync(render);
+    },
+    sync: (state: AdSlice['adSync'], migration = false) => {
+      fixture.adSync = state;
+      fixture.adMigration = migration;
+      flushSync(render);
+    },
     snapshot: () => ({
       bought: fixture.adGame!.dimensions[0].bought,
       antimatter: { ...fixture.adGame!.antimatter },
       infinities: fixture.adGame!.infinities,
+      boosts: fixture.adGame!.dimensionalBoosts,
     }),
     labels: () => ({
       buy: t('adLabText23', 1), crunch: t('adLabText31'), cancel: t('ui338'), ok: t('adConfirmOk'),
       automation: t('adAutoTab'),
+      boost: t('adLabText26'), boostNotice: t('adLabText38'),
+      status: t('adSyncError'), migration: t('adPreviousProgress'),
+      local: t('adChooseLocal'), remote: t('adChooseRemote'),
     }),
     dispose: () => { flushSync(() => root.unmount()); setLanguage(previous); },
   };
