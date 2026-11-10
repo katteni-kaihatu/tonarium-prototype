@@ -34,10 +34,15 @@ export function describeSaveError(error: unknown): Pick<AdSaveFailure, 'name' | 
   return { name, message: named.message.slice(0, 300), status, quota };
 }
 
+const sameFailure = (item: AdSaveFailure, entry: Omit<AdSaveFailure, 'count' | 'lastAt'>) =>
+  item.op === entry.op && item.phase === entry.phase && item.name === entry.name && item.message === entry.message && item.status === entry.status;
+
 export function pushSaveFailure(list: AdSaveFailure[], entry: Omit<AdSaveFailure, 'count' | 'lastAt'>): AdSaveFailure[] {
-  const last = list[0];
-  if (last && last.op === entry.op && last.phase === entry.phase && last.name === entry.name && last.message === entry.message && last.status === entry.status) {
-    return [{ ...last, lastAt: entry.at, count: last.count + 1, revision: entry.revision, infinities: entry.infinities, antimatterLog10: entry.antimatterLog10, boosts: entry.boosts, galaxies: entry.galaxies, lastTick: entry.lastTick, profileId: entry.profileId, storageKeys: entry.storageKeys, storageChars: entry.storageChars, recoveryCount: entry.recoveryCount }, ...list.slice(1)];
+  const index = list.findIndex(item => sameFailure(item, entry));
+  if (index >= 0) {
+    const current = list[index];
+    const next = { ...current, lastAt: entry.at, count: current.count + 1, revision: entry.revision, infinities: entry.infinities, antimatterLog10: entry.antimatterLog10, boosts: entry.boosts, galaxies: entry.galaxies, lastTick: entry.lastTick, profileId: entry.profileId, storageKeys: entry.storageKeys, storageChars: entry.storageChars, recoveryCount: entry.recoveryCount };
+    return [next, ...list.slice(0, index), ...list.slice(index + 1)];
   }
   return [{ ...entry, lastAt: entry.at, count: 1 }, ...list].slice(0, SAVE_FAILURE_LIMIT);
 }

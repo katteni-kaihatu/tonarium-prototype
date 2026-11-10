@@ -4,6 +4,7 @@ import { setImmediate } from 'node:timers/promises';
 import { createNewGame, serialize, bigFromLog10, bigLog10, getGalaxyRequirement } from './engine.mjs';
 import { compareProgress, sameSave } from './sync.mjs';
 import { createAdSlice, type AdSlice } from './slice.ts';
+import { pushSaveFailure, type AdSaveFailure } from './saveFailure.ts';
 import { buildExportBundle, createProfile, getActiveProfile, importBundleInto, listProfiles, listRecoveryRecords, retainSyncSources, parseImportBundle, readConnection, readSaveRaw, switchProfile, writeConnection, writeSave, prepareProgressSelection, readProgressSelection, selectProgress, type StorageLike } from './user.mjs';
 import { linkTonariumProfile } from './link.ts';
 import { subscribeAdFeedback } from './feedback.ts';
@@ -1319,4 +1320,22 @@ test('the API timeout aborts a stalled read and the next automatic attempt recon
   a.fire(30000); await setImmediate();
   assert.equal(a.state.adSync, 'ready');
   assert.equal(server.stats().writes, 0);
+});
+
+test('repeated save failures stay one entry when another failure happens between them', () => {
+  const entry = (at: number, op: AdSaveFailure['op']): Omit<AdSaveFailure, 'count' | 'lastAt'> => ({
+    at, op, phase: op === 'local' ? 'write' : 'backup', name: 'QuotaExceededError', message: 'quota', status: null, quota: true,
+    revision: 3, infinities: at, antimatterLog10: 1, boosts: 0, galaxies: 0, lastTick: at, profileId: 'profile', storageKeys: 1, storageChars: 1, recoveryCount: 1,
+  });
+  let list = pushSaveFailure([], entry(1, 'local'));
+  list = pushSaveFailure(list, entry(2, 'server'));
+  list = pushSaveFailure(list, entry(3, 'local'));
+  assert.equal(list.length, 2);
+  assert.equal(list[0].op, 'local');
+  assert.equal(list[0].count, 2);
+  assert.equal(list[0].at, 1);
+  assert.equal(list[0].lastAt, 3);
+  assert.equal(list[0].infinities, 3);
+  assert.equal(list[1].op, 'server');
+  assert.equal(list[1].count, 1);
 });
