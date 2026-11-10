@@ -51,6 +51,11 @@ function PhoneMenu({ hubOpen }: { hubOpen: boolean }) {
 export function SessionMenu({ children }: { children: ReactNode }) {
   const hubOpen = useStore((s) => s.hubOpen);
   const phone = usePhone();
+  // 列と名前つきのメニューでボタンが作り直されるので、キーボードで押したときにフォーカスを戻す
+  const toggle = () => {
+    set({ hubOpen: !hubOpen });
+    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.srailmenu')?.focus());
+  };
   return (
     <>
       <div className={`session-surface ${hubOpen ? 'hub-open' : ''}`}>
@@ -62,7 +67,7 @@ export function SessionMenu({ children }: { children: ReactNode }) {
       </div>
       {phone ? <PhoneMenu hubOpen={hubOpen} /> : (
         <div className="srail">
-          <Sidebar inSession rail={!hubOpen} onMenu={() => set({ hubOpen: !hubOpen })} onPick={() => set({ hubOpen: true })} />
+          <Sidebar inSession rail={!hubOpen} onMenu={toggle} onPick={() => set({ hubOpen: true })} />
         </div>
       )}
     </>
