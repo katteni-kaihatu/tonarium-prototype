@@ -36,9 +36,11 @@ try {
   assert.deepEqual(await ranks(), ['1', '2', '3']);
   assert.equal(await children.count(), 2);
   assert.deepEqual(await children.locator('td:nth-child(4)').allTextContents(), ['0', '未取得']);
-  assert.equal(await ranking.locator('th[scope="col"]:visible').count(), 6);
+  assert.equal(await ranking.locator('th[scope="col"]:visible').count(), 7);
   assert.equal(await ranking.locator('tbody').first().locator('td').nth(2).textContent(), '17');
-  assert.deepEqual(await children.locator('td:nth-child(5)').allTextContents(), ['7', '5']);
+  assert.deepEqual(await children.locator('td:nth-child(5)').allTextContents(), ['0', '未取得']);
+  assert.equal(await ranking.locator('tbody').first().locator('td').nth(3).textContent(), '12');
+  assert.deepEqual(await children.locator('td:nth-child(6)').allTextContents(), ['7', '5']);
   assert.deepEqual(await children.locator('td:nth-child(1)').allTextContents(), ['', '']);
   assert.equal(await children.locator('.adlab-ranking-badge').count(), 1);
   assert.equal(await alphaButton.evaluate(el => el === document.activeElement), true);
@@ -53,15 +55,50 @@ try {
   assert.deepEqual(await ranks(), ['1', '2', '3']);
   for (const button of await buttons.all()) if (await button.getAttribute('aria-expanded') === 'false') await button.click();
   assert.equal(await children.count(), 4);
-  assert.deepEqual(await children.locator('td:nth-child(5)').allTextContents(), ['6', '987654321012345', '7', '5']);
+  assert.deepEqual(await children.locator('td:nth-child(6)').allTextContents(), ['6', '987654321012345', '7', '5']);
+  await mkdir('.local/ranking-verification', { recursive: true });
   for (const language of ['en', 'ko', 'ja']) {
     await page.getByRole('button', { name: language, exact: true }).click();
     assert.equal(await children.count(), 4);
     assert.equal(await ranking.locator('th[scope="col"]:visible').nth(3).textContent(), 'Boost');
     assert.deepEqual(await children.locator('td:nth-child(4)').allTextContents(), [language === 'en' ? 'Not recorded' : language === 'ko' ? '미수집' : '未取得', language === 'en' ? 'Not recorded' : language === 'ko' ? '미수집' : '未取得', '0', language === 'en' ? 'Not recorded' : language === 'ko' ? '미수집' : '未取得']);
-    assert.equal(await ranking.locator('th[scope="col"]').nth(5).textContent(), language === 'en' ? 'Play time' : language === 'ko' ? '플레이 시간' : 'プレイ時間');
+    const unavailable = language === 'en' ? 'Not recorded' : language === 'ko' ? '미수집' : '未取得';
+    assert.equal(await ranking.locator('th[scope="col"]').nth(4).textContent(), language === 'en' ? 'Galaxies' : language === 'ko' ? '은하' : '銀河');
+    assert.deepEqual(await children.locator('td:nth-child(5)').allTextContents(), ['6', unavailable, '0', unavailable]);
+    assert.deepEqual(await ranking.locator('tbody:not([id]) tr td:nth-child(5)').allTextContents(), ['0', unavailable, '12']);
+    assert.ok(await ranking.getByText(language === 'en' ? /Past records that are no longer kept cannot be recovered/ : language === 'ko' ? /저장 대상에서 제외된 과거 기록은 복원할 수 없습니다/ : /保存対象から外れた過去記録は復元できません/).count());
+    assert.equal(await ranking.locator('th[scope="col"]').nth(6).textContent(), language === 'en' ? 'Play time' : language === 'ko' ? '플레이 시간' : 'プレイ時間');
+    for (const width of [900, 320]) {
+      await page.locator('.ranking-fixture-panel').evaluate((el, value) => { el.style.width = `${value}px`; }, width);
+      const scroll = ranking.locator('.adlab-ranking-scroll');
+      const dimensions = await scroll.evaluate(el => ({ client: el.clientWidth, content: el.scrollWidth, parent: el.parentElement.clientWidth }));
+      assert.ok(dimensions.client <= dimensions.parent);
+      if (width === 320) assert.ok(dimensions.client <= 304 && dimensions.content > dimensions.client);
+      if (dimensions.content > dimensions.client) {
+        await scroll.evaluate(el => { el.scrollLeft = 0; });
+        await scroll.focus();
+        await page.keyboard.press('ArrowRight');
+        await page.waitForFunction(() => document.querySelector('.adlab-ranking-scroll').scrollLeft > 0);
+      }
+      for (const button of await buttons.all()) {
+        await button.focus();
+        await page.keyboard.press('Space');
+        assert.equal(await button.getAttribute('aria-expanded'), 'false');
+        await page.keyboard.press('Enter');
+        assert.equal(await button.getAttribute('aria-expanded'), 'true');
+      }
+      assert.equal(await children.count(), 4);
+      for (const cell of await ranking.locator('th, td').all()) {
+        if (!(await cell.isVisible()) || !(await cell.textContent())) continue;
+        await cell.scrollIntoViewIfNeeded();
+        const cellBox = await cell.boundingBox(), scrollBox = await scroll.boundingBox();
+        assert.ok(cellBox.x >= scrollBox.x - 1 && cellBox.x + cellBox.width <= scrollBox.x + scrollBox.width + 1);
+      }
+      await scroll.evaluate(el => { el.scrollLeft = 0; });
+      await page.screenshot({ path: `.local/ranking-verification/ranking-${language}-${width}.png`, fullPage: true });
+    }
   }
-  await mkdir('.local/ranking-verification', { recursive: true });
+  await page.locator('.ranking-fixture-panel').evaluate(el => { el.style.width = '900px'; });
   await page.screenshot({ path: '.local/ranking-verification/wide.png', fullPage: true });
   await page.getByRole('button', { name: '幅 (900px)', exact: true }).click();
   const scroll = ranking.locator('.adlab-ranking-scroll');
@@ -213,7 +250,7 @@ try {
     assert.equal(await body.locator('.adlab-iu-card').count(), INFINITY_UPGRADES.length);
   }
   assert.deepEqual(errors, []);
-  console.log('PASS: ranking values, self labels, expansion, reorder, refresh/rejection, keyboard/focus; all panel tabs in ja/en/ko before/after Infinity at 320px and around 640px; screenshots in .local/ranking-verification');
+  console.log('PASS: ranking values, self labels, expansion, all columns and keyboard/scroll at 900px/320px in ja/en/ko; reorder, refresh/rejection, keyboard/focus; all panel tabs in ja/en/ko before/after Infinity at 320px and around 640px; screenshots in .local/ranking-verification');
 } finally {
   await browser.close();
 }
