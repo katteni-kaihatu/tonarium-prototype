@@ -7,14 +7,25 @@ import { createAdSlice, type AdSlice } from './slice.ts';
 import { buildExportBundle, createProfile, getActiveProfile, importBundleInto, listProfiles, listRecoveryRecords, retainSyncSources, parseImportBundle, readConnection, readSaveRaw, switchProfile, writeConnection, writeSave, prepareProgressSelection, readProgressSelection, selectProgress, type StorageLike } from './user.mjs';
 import { linkTonariumProfile } from './link.ts';
 import { subscribeAdFeedback } from './feedback.ts';
+import { adaptAdSlice } from '../world/antimatter/adapter.tsx';
+import { readFileSync } from 'node:fs';
 
-function storage() {
-  const values = new Map<string, string>();
+type StorageOperation = { phase: string; op: 'get' | 'set' | 'remove'; key: string; value?: string; failed?: boolean };
+function storage(seed: Iterable<[string, string]> = []) {
+  const values = new Map<string, string>(seed);
+  const operations: StorageOperation[] = [];
+  const control = { phase: 'setup', intercept: null as ((operation: StorageOperation) => string | void) | null };
+  function record(op: StorageOperation['op'], key: string, value?: string) {
+    const operation: StorageOperation = { phase: control.phase, op, key, value };
+    operations.push(operation);
+    try { return control.intercept?.(operation); }
+    catch (error) { operation.failed = true; throw error; }
+  }
   return Object.assign({
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => { values.set(key, value); },
-    removeItem: (key: string) => { values.delete(key); },
-  }, { values });
+    getItem: (key: string) => record('get', key) ?? values.get(key) ?? null,
+    setItem: (key: string, value: string) => { record('set', key, value); values.set(key, value); },
+    removeItem: (key: string) => { record('remove', key); values.delete(key); },
+  }, { values, operations, control });
 }
 let testTimerId = 0;
 function harness(t: TestContext, data: StorageLike) {
@@ -74,6 +85,284 @@ function api(t: TestContext) {
   return { mock, implementation, replace: (save: ReturnType<typeof createNewGame>) => { remote = save; revision++; },
     stats: () => ({ writes, submissions, reads }) };
 }
+
+const mutations = (data: ReturnType<typeof storage>, phase?: string) => data.operations.filter(op => op.op !== 'get' && (!phase || op.phase === phase));
+const importWriteOrder = ['save', 'baseline', 'recovery', 'index', 'last', 'pending', 'save'];
+function importKey(key: string) {
+  if (key.startsWith('ad:v2:save:')) return 'save';
+  if (key.startsWith('ad:v4:baseline:')) return 'baseline';
+  if (key.startsWith('ad:v3:recovery:')) return 'recovery';
+  if (key.startsWith('ad:v3:recoveryIndex:')) return 'index';
+  if (key.startsWith('ad:v3:lastRecovery:')) return 'last';
+  if (key.startsWith('ad:v3:importPending:')) return 'pending';
+  return key;
+}
+async function importFixture(t: TestContext) {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  t.mock.method(Date, 'now', () => 100000);
+  const data = storage(), profile = createProfile(data, '日本語 한글');
+  const original = createNewGame(Date.now()); original.infinities = 5;
+  writeSave(data, profile.id, serialize(original));
+  selectProgress(data, profile.id);
+  const server = api(t); server.replace(original);
+  const h = harness(t, data);
+  data.control.phase = 'startup';
+  h.start(); await setImmediate();
+  assert.equal(h.state.adSync, 'ready');
+  data.control.phase = 'export';
+  h.state.adGame!.infinities = 7;
+  const bundle = h.state.adExport()!;
+  const text = JSON.stringify(bundle);
+  assert.equal(bundle.version, 3);
+  assert.deepEqual(parseImportBundle(text), bundle);
+  assert.deepEqual(parseImportBundle(parseImportBundle(text)), bundle);
+  assert.deepEqual(parseImportBundle(adaptAdSlice(h.state)!.exportBundle()).save, bundle.save);
+  h.state.adGame!.infinities = 5;
+  assert.equal(mutations(data, 'export').length, 0);
+  data.control.phase = 'import';
+  return { ...h, data, profile, server, bundle, text, original: serialize(h.state.adGame!),
+    saveKey: 'ad:v2:save:' + profile.id, pendingKey: 'ad:v3:importPending:' + profile.id };
+}
+function hasOriginalRecovery(data: ReturnType<typeof storage>, original: string) {
+  return [...data.values].some(([key, value]) => key.startsWith('ad:v3:recovery:') && sameSave(JSON.parse(value).local, JSON.parse(original)));
+}
+
+for (const route of ['slice', 'adapter'] as const) {
+  test(`v3 import investigation: real export string via ${route}, comparison, save and fresh restart`, async t => {
+    const f = await importFixture(t);
+    const before = [...f.data.values];
+    if (route === 'slice') assert.equal(f.state.adImport(parseImportBundle(f.text)).id, f.profile.id);
+    else assert.equal(adaptAdSlice(f.state)!.importBundle(f.text).ok, true);
+    assert.equal(f.state.adSync, 'loading');
+    assert.equal(f.state.adGame!.infinities, 7);
+    assert.equal(JSON.parse(readSaveRaw(f.data, f.profile.id)!).infinities, 7);
+    assert.equal(f.data.getItem(f.pendingKey), 'true');
+    assert.ok(hasOriginalRecovery(f.data, f.original));
+    assert.deepEqual(mutations(f.data, 'import').map(op => importKey(op.key)), importWriteOrder);
+    assert.ok(sameSave(JSON.parse(mutations(f.data, 'import')[2].value!).local, JSON.parse(f.original)));
+    for (const [key, value] of before.filter(([key]) => !['save', 'baseline', 'index', 'last'].includes(importKey(key)))) {
+      assert.equal(f.data.getItem(key), value);
+    }
+    f.data.control.phase = 'sync';
+    await setImmediate();
+    assert.equal(f.state.adSync, 'choice');
+    assert.equal(f.state.adSyncSources!.local.infinities, 7);
+    assert.equal(f.state.adSyncSources!.remote.infinities, 5);
+    assert.equal(f.server.stats().writes, 0);
+    f.fire(100); f.fire(1000); f.fire(30000); await setImmediate();
+    assert.equal(f.server.stats().writes, 0);
+    f.state.adChooseSave('local');
+    assert.equal(await f.state.adSaveServer(), true);
+    assert.equal(f.data.getItem(f.pendingKey), null);
+    f.state.adStop();
+    const restartedData = storage(f.data.values);
+    restartedData.control.phase = 'restart';
+    const restarted = harness(t, restartedData);
+    restarted.start(); await setImmediate();
+    assert.equal(restarted.state.adSync, 'ready');
+    assert.equal(restarted.state.adGame!.infinities, 7);
+    assert.ok(hasOriginalRecovery(restartedData, f.original));
+    assert.equal(readConnection(restartedData, f.profile.id)?.id, 'destination');
+    assert.ok(mutations(f.data, 'startup').length > 0);
+  });
+}
+
+for (const busy of ['migration', 'loading', 'choice'] as const) {
+  test(`v3 import investigation: ${busy} rejects before writes`, async t => {
+    const f = await importFixture(t);
+    if (busy === 'migration') f.state.adMigration = true;
+    else f.state.adSync = busy;
+    const before = [...f.data.values], game = serialize(f.state.adGame!);
+    assert.throws(() => f.state.adImport(parseImportBundle(f.text)), /^Error: Busy$/);
+    assert.equal(adaptAdSlice(f.state)!.importBundle(f.text).ok, false);
+    assert.deepEqual([...f.data.values], before);
+    assert.equal(serialize(f.state.adGame!), game);
+    assert.equal(mutations(f.data, 'import').length, 0);
+  });
+}
+
+for (const route of ['slice', 'adapter'] as const) for (let failedIndex = 0; failedIndex < importWriteOrder.length; failedIndex++) {
+  test(`v3 import investigation: synchronous write ${failedIndex + 1} (${importWriteOrder[failedIndex]}) via ${route}`, async t => {
+    const f = await importFixture(t);
+    const oldRecords = f.state.adListRecovery().map(record => [record.key, f.data.getItem(record.key)]);
+    let writes = 0;
+    f.data.control.intercept = op => {
+      if (op.op !== 'get' && ++writes === failedIndex + 1) throw new Error('injected storage failure');
+    };
+    if (route === 'slice') assert.throws(() => f.state.adImport(parseImportBundle(f.text)), failedIndex < 2 ? /Local save failed/ : /injected storage failure/);
+    else {
+      const result = adaptAdSlice(f.state)!.importBundle(f.text);
+      assert.equal(result.ok, false);
+      assert.equal(result.message.key, 'adImportFailed');
+    }
+    const trace = mutations(f.data, 'import');
+    assert.deepEqual(trace.map(op => importKey(op.key)), importWriteOrder.slice(0, failedIndex + 1));
+    assert.equal(trace.at(-1)!.failed, true);
+    assert.equal(f.state.adSync, 'ready');
+    assert.equal(f.state.adGame!.infinities, 5);
+    assert.equal(readSaveRaw(f.data, f.profile.id), f.original);
+    assert.equal(f.data.getItem(f.pendingKey), failedIndex === 6 ? 'true' : null);
+    for (const [key, value] of oldRecords) assert.equal(f.data.getItem(key!), value);
+    if (failedIndex >= 3) {
+      assert.ok(sameSave(JSON.parse(trace[2].value!).local, JSON.parse(f.original)));
+      assert.equal(f.data.getItem(trace[2].key), trace[2].value);
+    }
+    f.data.control.intercept = null;
+    f.state.adStop();
+    const restartedData = storage(f.data.values), restarted = harness(t, restartedData);
+    restarted.start(); await setImmediate();
+    assert.equal(restarted.state.adSync, 'ready');
+    assert.equal(restarted.state.adGame!.infinities, 5);
+  });
+}
+
+for (const fault of ['save-read', 'save-restore', 'baseline-restore'] as const) {
+  test(`v3 import investigation: ${fault} is caught after import writes despite success result`, async t => {
+    const f = await importFixture(t);
+    let imported = false, reached = false;
+    f.data.control.intercept = op => {
+      if (op.op === 'set' && op.key === f.saveKey && JSON.parse(op.value!).infinities === 7) imported = true;
+      if (op.op !== 'get' || !imported) return;
+      if (op.key === (fault === 'baseline-restore' ? 'ad:v4:baseline:' + f.profile.id : f.saveKey)) {
+        reached = true;
+        if (fault === 'save-read') throw new Error('injected read failure');
+        return '{';
+      }
+    };
+    const result = adaptAdSlice(f.state)!.importBundle(f.text);
+    assert.equal(result.ok, true);
+    assert.equal(reached, true);
+    assert.equal(f.state.adSync, 'error');
+    assert.equal(f.state.adGame, null);
+    assert.deepEqual(mutations(f.data, 'import').map(op => importKey(op.key)), importWriteOrder);
+    f.data.control.intercept = null;
+    assert.equal(JSON.parse(f.data.getItem(f.saveKey)!).infinities, 7);
+    assert.equal(f.data.getItem(f.pendingKey), 'true');
+    assert.ok(hasOriginalRecovery(f.data, f.original));
+    f.fire(30000); await setImmediate();
+    assert.equal(f.state.adSync, 'error');
+    f.state.adStop();
+    const restarted = harness(t, storage(f.data.values));
+    restarted.start(); await setImmediate();
+    assert.equal(restarted.state.adSync, 'choice');
+    assert.equal(restarted.state.adGame!.infinities, 7);
+  });
+}
+
+for (const fault of ['network', 'sync-recovery'] as const) {
+  test(`v3 import investigation: delayed ${fault} failure is separate from synchronous import and can retry`, async t => {
+    const f = await importFixture(t);
+    const load = deferred<Response>();
+    const baselineKey = 'ad:v4:baseline:' + f.profile.id;
+    const baselineBefore = f.data.getItem(baselineKey);
+    f.server.mock.mock.mockImplementation((url, options) => String(url).includes('/api/save/') && options?.method !== 'POST' ? load.promise : f.server.implementation(url, options));
+    assert.equal(adaptAdSlice(f.state)!.importBundle(f.text).ok, true);
+    assert.equal(f.state.adSync, 'loading');
+    assert.equal(f.state.adGame!.infinities, 7);
+    assert.deepEqual(mutations(f.data, 'import').map(op => importKey(op.key)), importWriteOrder);
+    f.data.control.phase = 'sync';
+    f.fire(100); f.fire(1000); f.fire(30000);
+    assert.equal(mutations(f.data, 'sync').length, 0);
+    if (fault === 'sync-recovery') f.data.control.intercept = op => {
+      if (op.op === 'set' && importKey(op.key) === 'recovery') throw new Error('injected recovery failure');
+    };
+    load.resolve(fault === 'network' ? response({}, 503) : response({ save: JSON.parse(f.original), revision: 1 }));
+    await setImmediate();
+    assert.equal(f.state.adSync, 'error');
+    assert.equal(f.state.adGame!.infinities, 7);
+    assert.equal(JSON.parse(f.data.getItem(f.saveKey)!).infinities, 7);
+    assert.equal(f.data.getItem(f.pendingKey), 'true');
+    assert.ok(hasOriginalRecovery(f.data, f.original));
+    const trace = mutations(f.data, 'sync');
+    assert.deepEqual(trace.map(op => importKey(op.key)), fault === 'network' ? ['save', 'baseline'] : ['recovery', 'save', 'baseline']);
+    assert.deepEqual(trace.map(op => !!op.failed), fault === 'network' ? [false, false] : [true, false, false]);
+    assert.equal(f.data.getItem(baselineKey), baselineBefore);
+    assert.equal(f.server.stats().writes, 0);
+    f.data.control.intercept = null;
+    f.server.mock.mock.mockImplementation(f.server.implementation);
+    f.fire(30000); await setImmediate();
+    assert.equal(f.state.adSync, 'choice');
+    assert.equal(f.state.adGame!.infinities, 7);
+  });
+}
+
+for (const populated of [false, true]) {
+  test(`v3 import investigation: invalid strings and v2 without confirmation never mutate ${populated ? 'existing' : 'empty'} storage`, async t => {
+    const f = await importFixture(t);
+    // 保存先を空にしても、拒否時にプロフィールを作成しないことを確認する。
+    if (!populated) { f.state.adStop(); f.data.values.clear(); }
+    const legacy = { ...f.bundle, version: 2 }; delete legacy.checksum;
+    const invalid: [string, RegExp][] = [
+      ['{', /JSON|position|property/i],
+      [JSON.stringify(null), /Invalid export/],
+      [JSON.stringify({ ...f.bundle, type: 'other' }), /Invalid export/],
+      [JSON.stringify({ ...f.bundle, save: {} }), /Invalid AD save/],
+      [JSON.stringify({ ...f.bundle, checksum: 'invalid' }), /Checksum/],
+      [JSON.stringify({ ...f.bundle, save: { ...f.bundle.save, infinities: 8 } }), /Checksum/],
+    ];
+    const before = [...f.data.values], game = f.state.adGame && serialize(f.state.adGame);
+    const profile = structuredClone(f.state.adProfile), connection = populated ? readConnection(f.data, f.profile.id) : null;
+    const count = mutations(f.data).length;
+    for (const [text, error] of invalid) {
+      assert.throws(() => parseImportBundle(text), error);
+      assert.throws(() => importBundleInto(f.data, text), error);
+      assert.throws(() => f.state.adImport(text as unknown as ReturnType<typeof parseImportBundle>), error);
+      assert.equal(adaptAdSlice(f.state)!.importBundle(text).ok, false);
+      assert.deepEqual([...f.data.values], before);
+      assert.equal(mutations(f.data).length, count, 'same-value writes and removals must also be absent');
+    }
+    const text = JSON.stringify(legacy), parsed = parseImportBundle(text);
+    assert.throws(() => importBundleInto(f.data, text), /confirmation/);
+    assert.throws(() => f.state.adImport(parsed), /confirmation/);
+    assert.equal(adaptAdSlice(f.state)!.importBundle(text, false).ok, false);
+    assert.deepEqual(f.state.adProfile, profile);
+    assert.equal(f.state.adGame && serialize(f.state.adGame), game);
+    if (populated) assert.deepEqual(readConnection(f.data, f.profile.id), connection);
+    assert.deepEqual([...f.data.values], before);
+    assert.equal(mutations(f.data).length, count);
+  });
+}
+
+test('v3 import investigation report contains evidence, reproducible checks and explicit limits', () => {
+  const report = readFileSync(new URL('../../../docs/ad-v3-import-investigation.md', import.meta.url), 'utf8');
+  const sections = new Map([...report.matchAll(/^## (.+)\r?\n([\s\S]*?)(?=^## |$(?![\s\S]))/gm)].map(match => [match[1], match[2].trim()]));
+  for (const heading of ['対象コミットと確認範囲', '再現手順', 'コマンドと結果', '段階別の観測事実', '原因候補と検証結果', '否定できた原因', '未確認事項', '進捗を保護する対応案', '次に必要な証拠', '本番で確認する事項']) {
+    const body = sections.get(heading);
+    assert.ok(body && body.length >= 60, `missing or empty section: ${heading}`);
+    assert.doesNotMatch(body, /TODO|TBD|後で記載/);
+  }
+  assert.match(sections.get('対象コミットと確認範囲')!, /\b[0-9a-f]{40}\b/);
+  for (const command of ['node --import ./scripts/register-test-css.mjs --import tsx --test client/src/ad/sync.test.ts', 'npm run test:ad', 'npm run check:completion']) {
+    assert.ok(sections.get('コマンドと結果')!.includes(command));
+  }
+  assert.match(sections.get('コマンドと結果')!, /終了コード/);
+  const commands = sections.get('コマンドと結果')!;
+  assert.match(commands, /修正後） \| 0 \| \d+成功／0失敗/);
+  assert.match(commands, /test:ad後半のNodeコマンド \| 0 \| \d+成功／0失敗/);
+  for (const command of ['npm run test:ad', 'npm run check:completion']) {
+    const row = commands.split('\n').find(line => line.startsWith(`| \`${command}\` |`));
+    assert.ok(row);
+    const cells = row.split('|').map(cell => cell.trim());
+    assert.match(cells[2], /^\d+$/);
+    assert.ok(cells[3].length >= 30, `missing outcome and reason: ${command}`);
+  }
+  for (const [id, cases] of Object.entries({
+    'export-import-restart': 2, busy: 3, 'write-failure': 14, 'load-failure': 3,
+    'delayed-sync-failure': 2, 'invalid-input': 2, 'report-validation': 1,
+  })) {
+    assert.match(sections.get('段階別の観測事実')!, new RegExp(`^\\| ${id} \\| ${cases} \\| 成功 \\| .{30,} \\|$`, 'm'), `missing measured result: ${id}`);
+  }
+  assert.match(sections.get('未確認事項')!, /失敗したJSON/);
+  assert.match(sections.get('未確認事項')!, /添付/);
+  assert.match(sections.get('未確認事項')!, /利用端末/);
+  assert.match(sections.get('未確認事項')!, /利用バージョン/);
+  assert.match(sections.get('未確認事項')!, /ブラウザ.*Electron/);
+  for (const stage of ['Busy', 'persistBeforeChange', 'retainSyncSources', 'importPending', 'loadProfileGame', '同期後']) {
+    assert.ok(sections.get('段階別の観測事実')!.includes(stage), `missing stage: ${stage}`);
+  }
+  assert.match(sections.get('本番で確認する事項')!, /上書き.*再試行/);
+  assert.match(sections.get('進捗を保護する対応案')!, /PM/);
+});
 
 test('smaller imports and recovery imports require a choice and preserve every source across restart and comparison', async t => {
   const data = storage();
@@ -478,13 +767,16 @@ test('v3 checksum covers fields, is deterministic across key order and unicode, 
   assert.equal(buildExportBundle(profile, JSON.parse(serialize(game)), 2000).checksum, bundle.checksum);
   writeSave(data, profile.id, serialize(game));
   const before = [...data.values];
+  const beforeWrites = mutations(data).length;
   for (const mutate of [(b: typeof bundle) => { b.save.infinities = 9; }, (b: typeof bundle) => { b.user.name = 'other'; }, (b: typeof bundle) => { b.exportedAt = new Date(3000).toISOString(); }]) {
     const changed = structuredClone(bundle); mutate(changed);
     assert.throws(() => importBundleInto(data, changed), /Checksum/);
     assert.deepEqual([...data.values], before);
+    assert.equal(mutations(data).length, beforeWrites);
   }
   assert.throws(() => importBundleInto(data, { user: bundle.user, save: bundle.save }), /Invalid export/);
   assert.deepEqual([...data.values], before);
+  assert.equal(mutations(data).length, beforeWrites);
 });
 
 test('legacy v2 confirmation cannot be bypassed by parsing first; invalid formats and cancellation create no profile', () => {
@@ -496,8 +788,10 @@ test('legacy v2 confirmation cannot be bypassed by parsing first; invalid format
   assert.throws(() => importBundleInto(data, parsed), /confirmation/);
   assert.throws(() => importBundleInto(data, parsed, { confirmLegacy: false }), /confirmation/);
   assert.equal(data.values.size, 0);
+  assert.equal(mutations(data).length, 0);
   assert.throws(() => importBundleInto(data, { ...legacy, save: {} }, { confirmLegacy: true }), /Invalid AD save/);
   assert.equal(data.values.size, 0);
+  assert.equal(mutations(data).length, 0);
   importBundleInto(data, parsed, { confirmLegacy: true });
   const active = getActiveProfile(data)!;
   assert.notEqual(active.id, 'source'); assert.equal(readConnection(data, active.id), null);
