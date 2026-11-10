@@ -87,6 +87,8 @@ export default {
   adLabText54: "名前",
   adLabText55: "反物質",
   adRankingBoost: "Boost",
+  adRankingGalaxy: "銀河",
+  adRankingGuide: "順位は Infinity 回数 → 銀河数 → Boost 数 → 送信時点の反物質量の順で、多い記録が上になります。旧記録の銀河数・Boost 数の未取得は、比較時だけ 0 として扱います。この基準への変更により、順位・同名の代表記録・保存対象の上位50記録が変わります。購入やリセット後に順位が下がる場合があります。保存対象から外れた過去記録は復元できません。",
   adRankingUnavailable: "未取得",
   adLabText56: "プレイ時間",
   adLabText57: "解除済みの実績",

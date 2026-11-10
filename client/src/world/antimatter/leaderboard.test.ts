@@ -5,7 +5,7 @@ import type { LeaderboardEntry } from './types.ts';
 
 const entry = (name: string, antimatterLog10 = 10, self?: boolean): LeaderboardEntry => ({ name, antimatterLog10, self, infinities: 2, playTimeSec: 60 });
 
-test('Boost snapshots remain attached to each record without affecting ranks, representatives or self', () => {
+test('Boost snapshots select representatives and preserve each record and self', () => {
   const entries = [
     { ...entry('A', 1, true), dimensionalBoosts: 100 },
     { ...entry('B', 5), dimensionalBoosts: 0 },
@@ -14,13 +14,11 @@ test('Boost snapshots remain attached to each record without affecting ranks, re
     entry('A', 2),
   ];
   const groups = groupLeaderboard(entries);
-  assert.deepEqual(groups.map(g => [g.rank, g.representative]), [[1, entries[1]], [2, entries[2]]]);
-  assert.deepEqual(groups[1].records, [entries[0], entries[3], entries[4]]);
-  assert.deepEqual(groups[1].records.map(r => r.dimensionalBoosts), [100, 0, undefined]);
-  assert.equal(groups[1].representative, entries[2]);
-  assert.equal(groups[1].records[0], entries[0]);
-  assert.equal(groups[1].hasSelfInRecords, true);
-  assert.equal(groups[1].representative.self, undefined);
+  assert.deepEqual(groups.map(g => [g.rank, g.representative]), [[1, entries[0]], [2, entries[1]]]);
+  assert.deepEqual(groups[0].records, [entries[2], entries[3], entries[4]]);
+  assert.deepEqual(groups[0].records.map(r => r.dimensionalBoosts), [4, 0, undefined]);
+  assert.equal(groups[0].representative.self, true);
+  assert.equal(groups[0].hasSelfInRecords, false);
 });
 
 test('empty and single record', () => {
@@ -36,12 +34,12 @@ test('nonadjacent names retain every other record in input order', () => {
   assert.deepEqual(groups[0].records, [entries[2], entries[4]]);
 });
 
-test('later maximum becomes representative; groups follow representative original indices', () => {
+test('later maximum becomes representative and unsorted groups rank by score', () => {
   const entries = [entry('A', 1), entry('B', 5), entry('A', 9), entry('A', 3)];
   const groups = groupLeaderboard(entries);
-  assert.deepEqual(groups.map(g => g.representative), [entries[1], entries[2]]);
+  assert.deepEqual(groups.map(g => g.representative), [entries[2], entries[1]]);
   assert.deepEqual(groups.map(g => g.rank), [1, 2]);
-  assert.deepEqual(groups[1].records, [entries[0], entries[3]]);
+  assert.deepEqual(groups[0].records, [entries[0], entries[3]]);
 });
 
 test('tied representatives and tied different names preserve input order', () => {
@@ -50,6 +48,23 @@ test('tied representatives and tied different names preserve input order', () =>
   assert.equal(groups[0].representative, entries[0]);
   assert.deepEqual(groups.map(g => g.representative.name), ['B', 'A', 'C']);
   assert.deepEqual(groups[0].records, [entries[2]]);
+});
+
+test('unsorted progress chooses later representatives using Infinity, galaxies and Boost', () => {
+  const entries = [
+    { ...entry('A', 1000, true), galaxies: 0, dimensionalBoosts: 50 },
+    { ...entry('B', 500), galaxies: 1 },
+    { ...entry('A', 1), galaxies: 2 },
+    { ...entry('C', 0), infinities: 3 },
+    { ...entry('A', 1), galaxies: 2, dimensionalBoosts: 0, self: true },
+    { ...entry('D', 1), galaxies: 2 },
+  ];
+  const groups = groupLeaderboard(Object.freeze(entries.map(e => Object.freeze(e))));
+  assert.deepEqual(groups.map(g => g.representative), [entries[3], entries[2], entries[5], entries[1]]);
+  assert.deepEqual(groups.map(g => g.rank), [1, 2, 3, 4]);
+  assert.deepEqual(groups[1].records, [entries[0], entries[4]]);
+  assert.equal(groups[1].hasSelfInRecords, true);
+  assert.equal(groups[1].representative.self, undefined);
 });
 
 test('names use exact equality including whitespace, case, Unicode and empty strings', () => {
@@ -75,8 +90,8 @@ test('input array and records remain unchanged and keep their identity', () => {
   const before = structuredClone(entries);
   const groups = groupLeaderboard(entries);
   assert.deepEqual(entries, before);
-  assert.equal(groups[1].representative, entries[2]);
-  assert.equal(groups[1].records[0], entries[0]);
-  groups[1].records.reverse();
+  assert.equal(groups[0].representative, entries[2]);
+  assert.equal(groups[0].records[0], entries[0]);
+  groups[0].records.reverse();
   assert.deepEqual(entries, before);
 });

@@ -12,6 +12,21 @@ import { LAYERS, INFINITY_DIMENSIONS, CHALLENGES, TIME_DIMENSIONS, TIME_STUDIES,
 import { ANTIMATTER_EXHIBITS } from '../../../shared/antimatterLayout.ts';
 import { adReadoutLines, drawAdBoard, drawAdReadings } from '../view3d/antimatterText.ts';
 
+test('ranking galaxy headings and progress guidance are translated in all languages', () => {
+  const previous = getLanguage();
+  try {
+    for (const [language, heading, terms] of [
+      ['ja', '銀河', ['Infinity 回数 → 銀河数 → Boost 数', '比較時だけ 0', '上位50', '購入やリセット', '復元できません']],
+      ['en', 'Galaxies', ['Infinity count, then galaxies, Boost count', '0 only for comparison', 'top 50', 'Purchases or resets', 'cannot be recovered']],
+      ['ko', '은하', ['Infinity 횟수 → 은하 수 → Boost 수', '비교할 때만 0', '상위 50', '구매나 초기화', '복원할 수 없습니다']],
+    ] as const) {
+      setLanguage(language);
+      assert.equal(t('adRankingGalaxy'), heading);
+      for (const term of terms) assert.ok(t('adRankingGuide').includes(term), `${language}: ${term}`);
+    }
+  } finally { setLanguage(previous); }
+});
+
 test('Infinity preview guidance is available in every language', () => {
   const previous = getLanguage();
   const expected = {

@@ -1,8 +1,9 @@
 import fs from 'node:fs';
+import { compareAdRanking } from '../shared/ad-ranking.ts';
 import { createHash, randomBytes } from 'node:crypto';
 
 interface Save { save: unknown; revision: number }
-interface Score { playerId: string; name: string; antimatterLog10: number; infinities: number; playTimeSec: number; dimensionalBoosts?: number }
+interface Score { playerId: string; name: string; antimatterLog10: number; infinities: number; playTimeSec: number; dimensionalBoosts?: number; galaxies?: number }
 interface State {
   saves: Record<string, Save>;
   grants: Record<string, string>;
@@ -100,8 +101,8 @@ export class AdStore {
   leaderboard(token: string) {
     let self = '';
     try { self = this.owner(token); } catch { /* 公開ランキングは認証不要 */ }
-    return this.state.scores.map(({ playerId, name, antimatterLog10, infinities, playTimeSec, dimensionalBoosts }) => ({
-      name, antimatterLog10, infinities, playTimeSec, ...(dimensionalBoosts !== undefined ? { dimensionalBoosts } : {}), ...(playerId === self ? { self: true } : {}),
+    return [...this.state.scores].sort(compareAdRanking).slice(0, 50).map(({ playerId, name, antimatterLog10, infinities, playTimeSec, dimensionalBoosts, galaxies }) => ({
+      name, antimatterLog10, infinities, playTimeSec, ...(dimensionalBoosts !== undefined ? { dimensionalBoosts } : {}), ...(galaxies !== undefined ? { galaxies } : {}), ...(playerId === self ? { self: true } : {}),
     }));
   }
   submit(token: string, entry: Partial<Score>) {
@@ -111,11 +112,12 @@ export class AdStore {
       if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw new AdStoreError(400);
     }
     if (entry.dimensionalBoosts !== undefined && (typeof entry.dimensionalBoosts !== 'number' || !Number.isSafeInteger(entry.dimensionalBoosts) || entry.dimensionalBoosts < 0)) throw new AdStoreError(400);
-    const score: Score = { playerId: id, name: String(entry.name ?? '').slice(0, 24), antimatterLog10: entry.antimatterLog10!, infinities: entry.infinities!, playTimeSec: entry.playTimeSec!, ...(entry.dimensionalBoosts !== undefined ? { dimensionalBoosts: entry.dimensionalBoosts } : {}) };
+    if (entry.galaxies !== undefined && (typeof entry.galaxies !== 'number' || !Number.isSafeInteger(entry.galaxies) || entry.galaxies < 0)) throw new AdStoreError(400);
+    const score: Score = { playerId: id, name: String(entry.name ?? '').slice(0, 24), antimatterLog10: entry.antimatterLog10!, infinities: entry.infinities!, playTimeSec: entry.playTimeSec!, ...(entry.dimensionalBoosts !== undefined ? { dimensionalBoosts: entry.dimensionalBoosts } : {}), ...(entry.galaxies !== undefined ? { galaxies: entry.galaxies } : {}) };
     this.change(next => {
       next.scores = next.scores.filter(e => e.playerId !== id);
       next.scores.push(score);
-      next.scores.sort((a, b) => b.antimatterLog10 - a.antimatterLog10 || b.infinities - a.infinities);
+      next.scores.sort(compareAdRanking);
       next.scores = next.scores.slice(0, 50);
     });
   }

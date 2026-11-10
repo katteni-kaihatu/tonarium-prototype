@@ -287,7 +287,7 @@ const guestIds = new Set<string>();
 const saveSurvivorProfiles = debounced('survivors', () => putAppData('survivors.profile',
   Object.entries(survivorProfiles).filter(([id]) => !guestIds.has(id)).map(([id, data]) => ({ key: id, accountId: id, data }))));
 /** AD のセーブとランキングは AdStore（DATA_DIR/ad-access.json）。端末ごとのトークンと引き継ぎコードで、ログインのアカウントには結び付けない */
-interface AdLeaderboardEntry { playerId: string; name: string; antimatterLog10: number; infinities: number; playTimeSec: number; dimensionalBoosts?: number }
+interface AdLeaderboardEntry { playerId: string; name: string; antimatterLog10: number; infinities: number; playTimeSec: number; dimensionalBoosts?: number; galaxies?: number }
 function legacyAdScores(): AdLeaderboardEntry[] {
   try { return JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'ad-leaderboard.json'), 'utf-8')) as AdLeaderboardEntry[]; } catch { return []; }
 }

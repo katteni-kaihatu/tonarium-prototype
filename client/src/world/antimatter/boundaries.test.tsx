@@ -370,10 +370,10 @@ test('ranking labels and collapsed self inclusion are shown in all three languag
   const slice = harness(createNewGame());
   slice.adProfile = { id: 'profile', name: 'Other', createdAt: null };
   slice.adLeaderboard = [
-    { name: 'Shared', antimatterLog10: 100, infinities: 3, playTimeSec: 90061, dimensionalBoosts: 17 },
+    { name: 'Shared', antimatterLog10: 100, infinities: 3, playTimeSec: 90061, dimensionalBoosts: 17, galaxies: 12 },
     { name: 'Other', antimatterLog10: 90, infinities: 2, playTimeSec: 60 },
-    { name: 'Shared', antimatterLog10: 80, infinities: 1, playTimeSec: 10, self: true, dimensionalBoosts: 0 },
-    { name: 'Shared', antimatterLog10: 70, infinities: 0, playTimeSec: 5, dimensionalBoosts: 8 },
+    { name: 'Shared', antimatterLog10: 80, infinities: 1, playTimeSec: 10, self: true, dimensionalBoosts: 0, galaxies: 0 },
+    { name: 'Shared', antimatterLog10: 70, infinities: 0, playTimeSec: 5, dimensionalBoosts: 8, galaxies: 7 },
     { name: 'Shared', antimatterLog10: 60, infinities: 0, playTimeSec: 1 },
   ];
   try {
@@ -384,10 +384,15 @@ test('ranking labels and collapsed self inclusion are shown in all three languag
       for (const key of ['adLabText52', 'adRankingRank', 'adLabText54', 'adLabText55', 'adRankingInfinity', 'adLabText56', 'adRankingContainsSelf', 'adRankingExpand']) assert.ok(representatives.includes(t(key)));
       assert.ok(representatives.includes(t('adRankingRecordCount', 4)));
       assert.ok(representatives.includes(t('adRankingBoost')));
+      assert.ok(representatives.includes(t('adRankingGalaxy')));
+      assert.ok(html.includes(t('adRankingGuide')));
+      assert.match(representatives, /<td[^>]*>12<\/td>/);
       assert.ok(html.includes(t('adRankingUnavailable')));
       assert.match(representatives, /<td[^>]*>17<\/td>/);
       const childRows = [...children.split('</tbody>')[0].matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/g)];
       assert.deepEqual(childRows.map(row => [...row[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)][2][1]), ['0', '8', t('adRankingUnavailable')]);
+      assert.deepEqual(childRows.map(row => [...row[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)][3][1]), ['0', '7', t('adRankingUnavailable')]);
+      assert.equal([...html.matchAll(/scope="col"/g)].length, 7);
       assert.match(html, /class="adlab-ranking-scroll"[^>]*tabindex="0"/);
       assert.ok(!representatives.includes(t('adRankingSelf') + '</span>'));
       assert.ok(children.includes(t('adRankingSelf')));
