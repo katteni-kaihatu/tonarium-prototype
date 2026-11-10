@@ -1168,6 +1168,12 @@ test('backup failure aborts remote adoption and writes; recovery safely handles 
   assert.equal(a.state.adGame!.infinities, 0);
   assert.equal(a.state.adSync, 'error');
   assert.equal(server.stats().writes, 0);
+  assert.equal(a.state.adSaveErrors.length, 1);
+  assert.equal(a.state.adSaveErrors[0].op, 'sync');
+  assert.equal(a.state.adSaveErrors[0].phase, 'backup');
+  assert.equal(a.state.adSaveErrors[0].quota, true);
+  assert.equal(a.state.adSaveErrors[0].count, 1);
+  assert.equal(JSON.stringify(a.state.adSaveErrors).includes('grant-a'), false);
   failure.mock.restore();
   a.fire(30000); await setImmediate();
   assert.equal(a.state.adGame!.infinities, 10);

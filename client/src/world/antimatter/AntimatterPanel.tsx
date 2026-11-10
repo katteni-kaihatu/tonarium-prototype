@@ -11,6 +11,7 @@ import { ProfilePanel } from './ProfilePanel.tsx';
 import { ProgressPicker, ProgressSummary } from './ProgressPicker.tsx';
 import { InfinityPanel } from './InfinityPanel.tsx';
 import { LayerTabs } from './LayerTabs.tsx';
+import { SaveErrorLog } from './SaveErrorLog.tsx';
 import './antimatter-panel.css';
 import { emitAdFeedback } from '../../ad/feedback.ts';
 import { AdPurchaseParticles } from './AdPurchaseParticles.tsx';
@@ -18,7 +19,7 @@ import { AdBgmToggle } from '../../ad/AdBgmToggle.tsx';
 import { Icon, type IconName } from '../Icon.tsx';
 import { t, useLanguage, msg, systemText, type UiMessage } from '../../i18n/index.ts';
 
-type TabId = 'dimensions' | 'infinity' | 'stats' | 'achievements' | 'ranking' | 'profiles' | 'layers';
+type TabId = 'dimensions' | 'infinity' | 'stats' | 'achievements' | 'ranking' | 'profiles' | 'layers' | 'errors';
 type Game = AntimatterPanelProps['ad']['game'];
 
 const TABS: { id: TabId; label: string; icon: IconName; visible?: (game: Game) => boolean }[] = [
@@ -34,7 +35,13 @@ const TABS: { id: TabId; label: string; icon: IconName; visible?: (game: Game) =
 export function AntimatterPanel({ ad }: AntimatterPanelProps) {
   useLanguage();
   const root = useRef<HTMLDivElement>(null);
-  const [tab, setTab] = useState<TabId>('dimensions');
+  const [tab, setTab] = useState<TabId>(ad.saveErrors.length > 0 ? 'errors' : 'dimensions');
+  const revealedErrors = useRef(ad.saveErrors.length > 0);
+  useEffect(() => {
+    if (revealedErrors.current || ad.saveErrors.length === 0) return;
+    revealedErrors.current = true;
+    setTab('errors');
+  }, [ad.saveErrors.length]);
   const [notice, setNotice] = useState<UiMessage | null>(null);
   const showNotice = (message: UiMessage) => setNotice(message);
 
@@ -53,7 +60,7 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
 
   const { game, derived } = ad;
   const tabs = TABS.filter(item => item.visible?.(game) ?? true);
-  const activeTab = tabs.some(item => item.id === tab) ? tab : 'dimensions';
+  const activeTab: TabId = (tab === 'errors' && ad.saveErrors.length > 0) || tabs.some(item => item.id === tab) ? tab : 'dimensions';
   if (activeTab !== tab) setTab(activeTab);
   const offline = ad.offlineNotice;
   const offlineGained = offline && (offline.antimatterGained.mantissa ?? 0) !== 0 && offline.elapsedMs >= 5000;
@@ -88,6 +95,13 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
               }}><Icon name={item.icon} size={15} />{t(item.label)}</button>;
             })}
           </div>
+          {ad.saveErrors.length > 0 && (
+            <button type="button" className={`adlab-tab adlab-tab-error${activeTab === 'errors' ? ' is-active' : ''}`} aria-pressed={activeTab === 'errors'} onClick={() => {
+              if (activeTab === 'errors') return;
+              setTab('errors');
+              emitAdFeedback({ kind: 'navigate' });
+            }}><Icon name="alert" size={15} />{t('adSaveErrorTab')}<span className="adlab-tab-count">{ad.saveErrors.reduce((sum, entry) => sum + entry.count, 0)}</span></button>
+          )}
           {activeTab === 'dimensions' && (
             <button type="button" className="adlab-buy-all" title={t('adLabText22')} aria-label={t('adLabText22')} onClick={() => ad.buyMax()}>
               <Icon name="zap" size={15} />{t('adUiBuyAll')}
@@ -118,6 +132,7 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
             {activeTab === 'ranking' && <RankingPanel ad={ad} notice={showNotice} />}
             {activeTab === 'profiles' && <ProfilePanel ad={ad} notice={showNotice} />}
             {activeTab === 'layers' && <LayerTabs ad={ad} />}
+            {activeTab === 'errors' && <SaveErrorLog entries={ad.saveErrors} notice={showNotice} />}
           </div>
         </div>
       </div>
