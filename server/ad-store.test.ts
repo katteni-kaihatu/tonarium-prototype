@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { AdStore, AdStoreError } from './ad-store.ts';
+import { createNewGame, serialize } from '../client/src/ad/engine.mjs';
 
 function fixture(t: TestContext) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tonarium-ad-'));
@@ -13,6 +14,41 @@ function fixture(t: TestContext) {
   return { file, store: new AdStore(file, () => now), advance: () => { now += 600_001; } };
 }
 const rejected = (status: number) => (error: unknown) => error instanceof AdStoreError && error.status === status;
+
+test('sleep investigation: committed whole save survives lost response and store recreation; stale retry cannot overwrite it', t => {
+  const { store, file } = fixture(t);
+  const account = store.create();
+  const game = createNewGame(1000);
+  game.infinities = 2; game.galaxies = 3;
+  game.dimensions[0].bought = 10;
+  game.autobuyers.lowDims.unlocked = true;
+  const submitted = JSON.parse(serialize(game));
+  assert.deepEqual(store.load(account.id, account.token), { save: null, revision: 0 });
+  store.save(account.id, account.token, 0, submitted);
+  const committed = { save: submitted, revision: 1 };
+  assert.deepEqual(store.load(account.id, account.token), committed);
+  const restarted = new AdStore(file);
+  assert.deepEqual(restarted.load(account.id, account.token), committed);
+  assert.throws(() => restarted.save(account.id, account.token, 0, createNewGame(1000)), rejected(409));
+  assert.deepEqual(restarted.load(account.id, account.token), committed);
+  assert.deepEqual(new AdStore(file).load(account.id, account.token), committed);
+});
+
+test('sleep investigation: failed save rename preserves memory and persisted revision before retry', t => {
+  const { store, file } = fixture(t);
+  const account = store.create();
+  const old = JSON.parse(serialize(createNewGame(1000)));
+  store.save(account.id, account.token, 0, old);
+  const changed = structuredClone(old); changed.galaxies = 3; changed.dimensions[0].bought = 1;
+  const failure = t.mock.method(fs, 'renameSync', () => { throw new Error('disk unavailable'); });
+  assert.throws(() => store.save(account.id, account.token, 1, changed), /disk unavailable/);
+  const expected = { save: old, revision: 1 };
+  assert.deepEqual(store.load(account.id, account.token), expected);
+  assert.deepEqual(new AdStore(file).load(account.id, account.token), expected);
+  failure.mock.restore();
+  store.save(account.id, account.token, 1, changed);
+  assert.deepEqual(new AdStore(file).load(account.id, account.token), { save: changed, revision: 2 });
+});
 
 test('all private operations require the matching capability, never a claimed ID', t => {
   const { store } = fixture(t);

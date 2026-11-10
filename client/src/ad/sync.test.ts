@@ -7,6 +7,7 @@ import { createAdSlice, type AdSlice } from './slice.ts';
 import { buildExportBundle, createProfile, getActiveProfile, importBundleInto, listProfiles, listRecoveryRecords, retainSyncSources, parseImportBundle, readConnection, readSaveRaw, switchProfile, writeConnection, writeSave, prepareProgressSelection, readProgressSelection, selectProgress, type StorageLike } from './user.mjs';
 import { linkTonariumProfile } from './link.ts';
 import { subscribeAdFeedback } from './feedback.ts';
+import { safeStorage } from './storage.ts';
 
 function storage() {
   const values = new Map<string, string>();
@@ -1019,4 +1020,289 @@ test('the API timeout aborts a stalled read and the next automatic attempt recon
   a.fire(30000); await setImmediate();
   assert.equal(a.state.adSync, 'ready');
   assert.equal(server.stats().writes, 0);
+});
+
+function sleepSnapshot(device: ReturnType<typeof paired>['a']) {
+  return JSON.parse(serialize(device.state.adGame!));
+}
+function assertSleepCopies(server: ReturnType<typeof paired>, memory: unknown, local: unknown, remote: unknown) {
+  assert.deepEqual({
+    adopted: sleepSnapshot(server.a),
+    local: JSON.parse(readSaveRaw(server.a.data, server.a.profile.id)!),
+    remote: server.remote(),
+  }, { adopted: memory, local, remote }, 'active/adopted game, local and server saves');
+}
+function markSleepOperations(device: ReturnType<typeof paired>['a']) {
+  assert.equal(device.state.adBuyDimension(1), true);
+  device.state.adGame!.galaxies = 3;
+  device.state.adGame!.autobuyers.lowDims.enabled = false;
+  device.state.adGame!.autobuyers.lowDims.unlocked = true;
+}
+
+for (const order of [[100, 1000, 30000], [30000, 1000, 100]]) {
+  test(`sleep investigation: live resume preserves whole saves with callback order ${order}`, async t => {
+    const server = paired(t), { a } = server;
+    let now = 10_000;
+    t.mock.method(Date, 'now', () => now);
+    a.start(); await setImmediate();
+    const before = sleepSnapshot(a), remote = server.remote();
+    markSleepOperations(a);
+    const changed = sleepSnapshot(a);
+    assertSleepCopies(server, changed, before, remote);
+    now += 12 * 60 * 60 * 1000;
+    assertSleepCopies(server, changed, before, remote);
+    for (const ms of order) a.fire(ms);
+    await setImmediate();
+    const resumed = sleepSnapshot(a);
+    assert.equal(resumed.lastTick, changed.lastTick + 100);
+    assert.equal(resumed.dimensions[0].bought, 1);
+    assert.equal(resumed.galaxies, 3);
+    assert.deepEqual(resumed.autobuyers, changed.autobuyers);
+    assert.equal(a.state.adSync, 'ready');
+    assert.equal(a.state.adSyncSources, null);
+    a.fire(1000); a.fire(30000); await setImmediate();
+    assertSleepCopies(server, resumed, resumed, resumed);
+    const baseline = JSON.parse(a.data.getItem('ad:v4:baseline:' + a.profile.id)!);
+    assert.equal(baseline.revision, server.stats().revision);
+    assert.deepEqual(baseline.save, resumed);
+    assert.ok(a.state.adListRecovery().length > 0);
+  });
+}
+
+test('sleep investigation: restart applies capped offline time and retains purchases and settings', async t => {
+  const server = paired(t), { a } = server;
+  let now = 10_000;
+  t.mock.method(Date, 'now', () => now);
+  a.start(); await setImmediate();
+  const before = sleepSnapshot(a), remote = server.remote();
+  markSleepOperations(a);
+  const changed = sleepSnapshot(a);
+  assertSleepCopies(server, changed, before, remote);
+  a.state.adStop();
+  assertSleepCopies(server, changed, changed, remote);
+  now += 12 * 60 * 60 * 1000;
+  a.start();
+  assertSleepCopies(server, changed, changed, remote);
+  assert.equal(a.state.adSync, 'loading');
+  await setImmediate();
+  const resumed = sleepSnapshot(a);
+  assert.equal(a.state.adOffline!.elapsedMs, 12 * 60 * 60 * 1000);
+  assert.equal(a.state.adOffline!.simulatedMs, 8 * 60 * 60 * 1000);
+  assert.equal(resumed.lastTick, now);
+  assert.equal(resumed.dimensions[0].bought, 1);
+  assert.equal(resumed.galaxies, 3);
+  assert.deepEqual(resumed.autobuyers, changed.autobuyers);
+  assertSleepCopies(server, resumed, resumed, remote);
+  a.fire(30000); await setImmediate();
+  assertSleepCopies(server, resumed, resumed, resumed);
+});
+
+for (const method of ['GET', 'POST']) {
+  for (const committed of method === 'POST' ? [false, true] : [false]) {
+    test(`sleep investigation: ${method} timeout committed=${committed} reconnects without restart`, async t => {
+      const server = paired(t), { a } = server;
+      a.start(); await setImmediate();
+      const before = sleepSnapshot(a), oldRemote = server.remote();
+      const oldBaseline = a.data.getItem('ad:v4:baseline:' + a.profile.id);
+      markSleepOperations(a);
+      const changed = sleepSnapshot(a);
+      assertSleepCopies(server, changed, before, oldRemote);
+      t.mock.timers.enable({ apis: ['setTimeout'] });
+      const entered = deferred<void>();
+      let aborted = false;
+      server.mock.mock.mockImplementation(async (url, options) => {
+        if (String(url).includes('/save/') && (options?.method ?? 'GET') === method) {
+          if (committed) await server.implementation(url, options);
+          entered.resolve();
+          return new Promise<Response>((_, reject) => options?.signal?.addEventListener('abort', () => {
+            aborted = true; reject(new DOMException('Aborted', 'AbortError'));
+          }, { once: true }));
+        }
+        return server.implementation(url, options);
+      });
+      a.fire(30000); await entered.promise;
+      assertSleepCopies(server, changed, method === 'GET' ? before : changed, committed ? changed : oldRemote);
+      t.mock.timers.tick(5000); await setImmediate();
+      assert.equal(aborted, true);
+      assert.equal(a.state.adSync, 'error');
+      assert.equal(a.state.adSyncSources, null);
+      assert.equal(a.data.getItem('ad:v4:baseline:' + a.profile.id), oldBaseline);
+      assertSleepCopies(server, changed, changed, committed ? changed : oldRemote);
+      server.mock.mock.mockImplementation(server.implementation);
+      a.fire(30000); await setImmediate();
+      assert.equal(a.state.adSync, 'ready');
+      assertSleepCopies(server, changed, changed, committed ? changed : oldRemote);
+      a.fire(1000); a.fire(30000); await setImmediate();
+      assertSleepCopies(server, changed, changed, changed);
+      const baseline = JSON.parse(a.data.getItem('ad:v4:baseline:' + a.profile.id)!);
+      assert.equal(baseline.revision, server.stats().revision);
+      assert.deepEqual(baseline.save, changed);
+    });
+  }
+}
+
+test('sleep investigation: lost POST acknowledgement followed by more operations retains both sources for choice', async t => {
+  const server = paired(t), { a } = server;
+  a.start(); await setImmediate();
+  markSleepOperations(a);
+  const submitted = sleepSnapshot(a);
+  const gate = deferred<void>();
+  server.mock.mock.mockImplementation(async (url, options) => {
+    const result = await server.implementation(url, options);
+    if (String(url).includes('/save/') && options?.method === 'POST') {
+      await gate.promise; throw new TypeError('connection lost after commit');
+    }
+    return result;
+  });
+  a.fire(30000); await setImmediate();
+  a.state.adGame!.galaxies = 4;
+  const later = sleepSnapshot(a);
+  assertSleepCopies(server, later, submitted, submitted);
+  gate.resolve(); await setImmediate();
+  assert.equal(a.state.adSync, 'error');
+  assertSleepCopies(server, later, later, submitted);
+  server.mock.mock.mockImplementation(server.implementation);
+  a.fire(30000); await setImmediate();
+  assert.equal(a.state.adSync, 'choice');
+  assertSleepCopies(server, later, later, submitted);
+  assert.deepEqual(a.state.adExportRecovery('local')!.save, later);
+  assert.deepEqual(a.state.adExportRecovery('remote')!.save, submitted);
+  a.fire(100); a.fire(1000); a.fire(30000); await setImmediate();
+  assertSleepCopies(server, later, later, submitted);
+  a.state.adChooseSave('local'); a.fire(30000); await setImmediate();
+  assertSleepCopies(server, later, later, later);
+});
+
+for (const failureKey of ['save', 'baseline', 'recovery']) {
+  test(`sleep investigation: ${failureKey} failure keeps complete sources through retry without restart`, async t => {
+    const server = paired(t), { a } = server;
+    a.start(); await setImmediate();
+    const before = sleepSnapshot(a);
+    const other = structuredClone(before); other.infinities = 7; other.galaxies = 6;
+    server.replace(other);
+    const oldBaseline = a.data.getItem('ad:v4:baseline:' + a.profile.id);
+    const saveKey = [...a.data.values.keys()].find(key => a.data.getItem(key) === serialize(a.state.adGame!))!;
+    const setItem = a.data.setItem;
+    const failure = t.mock.method(a.data, 'setItem', (key: string, value: string) => {
+      const fails = failureKey === 'recovery' ? key.startsWith('ad:v3:recovery:')
+        : key === (failureKey === 'save' ? saveKey : 'ad:v4:baseline:' + a.profile.id);
+      if (fails) throw new Error('quota');
+      setItem(key, value);
+    });
+    a.fire(30000); await setImmediate();
+    assert.equal(a.state.adSync, 'error');
+    assertSleepCopies(server, before, before, other);
+    assert.equal(a.data.getItem('ad:v4:baseline:' + a.profile.id), oldBaseline);
+    assert.equal(server.stats().writes, 0);
+    failure.mock.restore();
+    a.fire(30000); await setImmediate();
+    assert.equal(a.state.adSync, 'ready');
+    assertSleepCopies(server, other, other, other);
+    a.fire(1000); a.fire(30000); await setImmediate();
+    assertSleepCopies(server, other, other, other);
+  });
+}
+
+test('sleep investigation: inaccessible storage uses isolated memory; quota errors do not switch storage', t => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  t.after(() => {
+    if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
+    else Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new DOMException('Denied', 'SecurityError'); } });
+  const first = safeStorage();
+  const save = serialize(createNewGame(1000));
+  first.setItem('save', save);
+  assert.equal(first.getItem('save'), save);
+  assert.equal(safeStorage().getItem('save'), null, 'a new fallback does not retain the previous map');
+  const quota = storage();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: quota });
+  quota.setItem = () => { throw new DOMException('Full', 'QuotaExceededError'); };
+  assert.equal(safeStorage(), quota);
+  assert.throws(() => safeStorage().setItem('save', save), /Full/);
+});
+
+test('sleep investigation: stale server content after a known baseline must not silently roll back adopted progress', async t => {
+  const server = paired(t), { a } = server;
+  a.start(); await setImmediate();
+  const stale = server.remote();
+  markSleepOperations(a);
+  a.state.adGame!.infinities = 2;
+  a.fire(30000); await setImmediate();
+  const advanced = sleepSnapshot(a);
+  assertSleepCopies(server, advanced, advanced, advanced);
+  server.replace(stale);
+  assertSleepCopies(server, advanced, advanced, stale);
+  a.fire(30000); await setImmediate();
+  const observe = () => ({ adopted: sleepSnapshot(a), local: JSON.parse(readSaveRaw(a.data, a.profile.id)!), remote: server.remote() });
+  const afterResponse = observe();
+  assert.deepEqual(a.state.adExportRecovery('local')!.save, advanced);
+  assert.deepEqual(a.state.adExportRecovery('remote')!.save, stale);
+  a.fire(1000); a.fire(30000); await setImmediate();
+  const afterSave = observe();
+  a.state.adStop(); a.start(); await setImmediate();
+  const afterRestart = observe();
+  const expected = { adopted: advanced, local: advanced, remote: stale };
+  // 保持の期待は現状の自動採用に合わせて弱めず、調査結果として失敗を残す。
+  assert.deepEqual({ afterResponse, afterSave, afterRestart }, { afterResponse: expected, afterSave: expected, afterRestart: expected });
+});
+
+test('sleep investigation: live resume must account for elapsed wall time', async t => {
+  const server = paired(t), { a } = server;
+  let now = 10_000;
+  t.mock.method(Date, 'now', () => now);
+  a.start(); await setImmediate();
+  const before = sleepSnapshot(a);
+  now += 60 * 60 * 1000;
+  assertSleepCopies(server, before, before, before);
+  a.fire(100); a.fire(1000); a.fire(30000); await setImmediate();
+  const resumed = sleepSnapshot(a);
+  assertSleepCopies(server, resumed, resumed, before);
+  assert.equal(resumed.lastTick, now, 'sleep time must be accounted for independently of retained operations');
+});
+
+for (const status of [0, 429, 500]) {
+  test(`sleep investigation: live reconnect after ${status || 'network interruption'} retains all copies`, async t => {
+    const server = paired(t), { a } = server;
+    a.start(); await setImmediate();
+    const before = sleepSnapshot(a);
+    markSleepOperations(a);
+    const changed = sleepSnapshot(a);
+    assertSleepCopies(server, changed, before, before);
+    server.mock.mock.mockImplementation(async () => {
+      if (!status) throw new TypeError('network interrupted');
+      return response({}, status);
+    });
+    a.fire(30000); await setImmediate();
+    assert.equal(a.state.adSync, 'error');
+    assertSleepCopies(server, changed, changed, before);
+    server.mock.mock.mockImplementation(server.implementation);
+    a.fire(30000); await setImmediate();
+    assert.equal(a.state.adSync, 'ready');
+    assertSleepCopies(server, changed, changed, before);
+    a.fire(30000); await setImmediate();
+    assertSleepCopies(server, changed, changed, changed);
+  });
+}
+
+test('sleep investigation: 409 with equal metrics retains whole conflicting saves until selection', async t => {
+  const server = paired(t), { a } = server;
+  a.start(); await setImmediate();
+  const before = sleepSnapshot(a);
+  markSleepOperations(a);
+  const local = sleepSnapshot(a);
+  const remote = structuredClone(before); remote.galaxies = 9;
+  assert.equal(compareProgress(local, remote), 0);
+  server.replace(remote);
+  assertSleepCopies(server, local, before, remote);
+  assert.equal(await a.state.adSaveServer(), false);
+  assert.equal(a.state.adSync, 'choice');
+  assertSleepCopies(server, local, local, remote);
+  assert.deepEqual(a.state.adExportRecovery('local')!.save, local);
+  assert.deepEqual(a.state.adExportRecovery('remote')!.save, remote);
+  a.fire(100); a.fire(1000); a.fire(30000); await setImmediate();
+  assertSleepCopies(server, local, local, remote);
+  a.state.adChooseSave('local'); a.fire(30000); await setImmediate();
+  assertSleepCopies(server, local, local, local);
+  assert.equal(JSON.parse(a.data.getItem('ad:v4:baseline:' + a.profile.id)!).revision, server.stats().revision);
 });
