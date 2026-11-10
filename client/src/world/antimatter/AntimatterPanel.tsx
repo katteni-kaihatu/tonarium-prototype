@@ -94,27 +94,31 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
             </button>
           )}
         </div>
-        <div className="adlab-body">
-          {(notice || ad.serverStatus) && <div className="adlab-notices">
-            {notice && <div style={s.notice}>{systemText(notice)}</div>}
-            {ad.serverStatus && <div role="status" style={s.notice}>{systemText(ad.serverStatus)}</div>}
+        <div className="adlab-body-frame">
+          {notice && <div className={`adlab-toast-layer${ad.serverStatus ? ' has-server-status' : ''}`}>
+            <div className="adlab-toast" role="status">{systemText(notice)}</div>
           </div>}
-          {ad.migration && <div style={s.notice}><h3>{t('adUseProgress')}</h3><ProgressPicker ad={ad} migration notice={showNotice} /></div>}
-          {!ad.migration && ad.syncState === 'choice' && <div style={s.row}>
-            {(['local', 'remote'] as const).map(source => <div key={source}>
-              {ad.syncSources && <ProgressSummary save={ad.syncSources[source]} />}
-              <button style={s.btn} onClick={() => {
-                try { ad.chooseSave(source); } catch { showNotice(msg('adProfileFailed')); }
-              }}>{t(source === 'local' ? 'adChooseLocal' : 'adChooseRemote')}</button>
-            </div>)}
-          </div>}
-          {activeTab === 'dimensions' && <DimensionList ad={ad} notice={showNotice} />}
-          {activeTab === 'infinity' && <InfinityPanel ad={ad} />}
-          {activeTab === 'stats' && <StatsPanel ad={ad} />}
-          {activeTab === 'achievements' && <AchievementsPanel ad={ad} />}
-          {activeTab === 'ranking' && <RankingPanel ad={ad} notice={showNotice} />}
-          {activeTab === 'profiles' && <ProfilePanel ad={ad} notice={showNotice} />}
-          {activeTab === 'layers' && <LayerTabs ad={ad} />}
+          <div className="adlab-body">
+            {ad.serverStatus && <div className="adlab-notices">
+              <div role="status" style={s.notice}>{systemText(ad.serverStatus)}</div>
+            </div>}
+            {ad.migration && <div style={s.notice}><h3>{t('adUseProgress')}</h3><ProgressPicker ad={ad} migration notice={showNotice} /></div>}
+            {!ad.migration && ad.syncState === 'choice' && <div style={s.row}>
+              {(['local', 'remote'] as const).map(source => <div key={source}>
+                {ad.syncSources && <ProgressSummary save={ad.syncSources[source]} />}
+                <button style={s.btn} onClick={() => {
+                  try { ad.chooseSave(source); } catch { showNotice(msg('adProfileFailed')); }
+                }}>{t(source === 'local' ? 'adChooseLocal' : 'adChooseRemote')}</button>
+              </div>)}
+            </div>}
+            {activeTab === 'dimensions' && <DimensionList ad={ad} notice={showNotice} />}
+            {activeTab === 'infinity' && <InfinityPanel ad={ad} />}
+            {activeTab === 'stats' && <StatsPanel ad={ad} />}
+            {activeTab === 'achievements' && <AchievementsPanel ad={ad} />}
+            {activeTab === 'ranking' && <RankingPanel ad={ad} notice={showNotice} />}
+            {activeTab === 'profiles' && <ProfilePanel ad={ad} notice={showNotice} />}
+            {activeTab === 'layers' && <LayerTabs ad={ad} />}
+          </div>
         </div>
       </div>
       <AdPurchaseParticles root={root} />
