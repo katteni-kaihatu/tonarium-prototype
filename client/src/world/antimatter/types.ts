@@ -1,3 +1,4 @@
+import type { AdSaveFailure } from '../../ad/saveFailure.ts';
 import type { UiMessage } from '../../i18n/core.ts';
 export interface BigNum {
   mantissa: number;
@@ -189,6 +190,7 @@ export interface AntimatterSlice {
   offlineNotice: OfflineNotice | null;
   rescueCount: number;
   leaderboard: LeaderboardEntry[];
+  saveErrors: AdSaveFailure[];
   serverStatus: UiMessage | null;
   syncState: 'disconnected' | 'loading' | 'choice' | 'ready' | 'error';
   chooseSave: (source: 'local' | 'remote') => void;
