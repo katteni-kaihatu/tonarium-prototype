@@ -137,6 +137,7 @@ export function adaptAdSlice(slice: AdSlice, options: AdaptOptions = {}): Antima
     offlineNotice: offline,
     rescueCount: slice.adRescues,
     leaderboard: slice.adLeaderboard,
+    saveErrors: slice.adSaveErrors ?? [],
     serverStatus,
     syncState: slice.adSync,
     chooseSave: slice.adChooseSave,
