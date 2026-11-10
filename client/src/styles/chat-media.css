@@ -22,8 +22,8 @@
 .chipbtn:disabled { opacity: .6; }
 
 /* 顔：中央のグリッドと、ウィンドウとして開いた顔 */
-.facegrid { position: absolute; left: 360px; right: 340px; top: 90px; bottom: 144px; display: flex; align-items: center; justify-content: center; pointer-events: none !important; }
-.world.fl .facegrid { left: 92px; }
+.facegrid { position: absolute; left: 432px; right: 340px; top: 90px; bottom: 144px; display: flex; align-items: center; justify-content: center; pointer-events: none !important; }
+.world.fl .facegrid { left: 164px; }
 .world.fr .facegrid { right: 92px; }
 .facegridin { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-content: center; max-width: 100%; }
 .facegridin .bigface { pointer-events: auto; min-width: 0; flex-shrink: 0; }
