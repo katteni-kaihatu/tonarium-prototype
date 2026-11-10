@@ -154,6 +154,7 @@ export interface LeaderboardEntry {
   infinities: number;
   playTimeSec: number;
   dimensionalBoosts?: number;
+  galaxies?: number;
   self?: boolean;
 }
 
