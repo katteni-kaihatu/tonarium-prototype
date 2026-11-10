@@ -1,4 +1,5 @@
 import type { LeaderboardEntry } from './types.ts';
+import { compareAdRanking } from '../../../../shared/ad-ranking.ts';
 
 export interface LeaderboardGroup {
   rank: number;
@@ -14,11 +15,11 @@ export function groupLeaderboard(entries: readonly LeaderboardEntry[]): Leaderbo
     if (!group) groups.set(entry.name, { representativeIndex: index, indices: [index] });
     else {
       group.indices.push(index);
-      if (entry.antimatterLog10 > entries[group.representativeIndex].antimatterLog10) group.representativeIndex = index;
+      if (compareAdRanking(entry, entries[group.representativeIndex]) < 0) group.representativeIndex = index;
     }
   });
   return [...groups.values()]
-    .sort((a, b) => a.representativeIndex - b.representativeIndex)
+    .sort((a, b) => compareAdRanking(entries[a.representativeIndex], entries[b.representativeIndex]) || a.representativeIndex - b.representativeIndex)
     .map((group, index) => {
       const records = group.indices.filter(i => i !== group.representativeIndex).map(i => entries[i]);
       return { rank: index + 1, representative: entries[group.representativeIndex], records, hasSelfInRecords: records.some(e => e.self === true) };

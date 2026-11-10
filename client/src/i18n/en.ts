@@ -87,6 +87,8 @@ export default {
   adLabText54: "Name",
   adLabText55: "Antimatter",
   adRankingBoost: "Boost",
+  adRankingGalaxy: "Galaxies",
+  adRankingGuide: "Records rank by Infinity count, then galaxies, Boost count, and antimatter held at submission, highest first. Missing galaxy and Boost counts in older records count as 0 only for comparison. This change affects ranks, representative records for matching names, and which top 50 records are kept. Purchases or resets may lower your rank. Past records that are no longer kept cannot be recovered.",
   adRankingUnavailable: "Not recorded",
   adLabText56: "Play time",
   adLabText57: "Unlocked achievement",

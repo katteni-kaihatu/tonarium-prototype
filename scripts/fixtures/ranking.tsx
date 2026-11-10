@@ -13,8 +13,8 @@ let slice: AdSlice;
 slice = createAdSlice(partial => Object.assign(slice, partial), () => slice);
 slice.adGame = createNewGame();
 const longName = '長い名前_LongName_긴이름_'.repeat(5);
-const entry = (name: string, score: number, infinities: number, playTimeSec: number, self = false, dimensionalBoosts?: number) => ({ name, antimatterLog10: score, infinities, playTimeSec, self, dimensionalBoosts });
-const initial = [entry('Alpha', 1000, 10, 90061, false, 17), entry('Beta', 900, 9, 3600, true), entry(longName, 800, 1234567890123456, 9876543210), entry('Alpha', 700, 7, 70, true, 0), entry('Beta', 600, 6, 60), entry('Alpha', 500, 5, 50), entry(longName, 400, 987654321012345, 1234567890, true)];
+const entry = (name: string, score: number, infinities: number, playTimeSec: number, self = false, dimensionalBoosts?: number, galaxies?: number) => ({ name, antimatterLog10: score, infinities, playTimeSec, self, dimensionalBoosts, galaxies });
+const initial = [entry('Alpha', 1000, 1234567890123458, 90061, false, 17, 12), entry('Beta', 900, 1234567890123457, 3600, true, undefined, 0), entry(longName, 800, 1234567890123456, 9876543210), entry('Alpha', 700, 7, 70, true, 0, 0), entry('Beta', 600, 6, 60, false, undefined, 6), entry('Alpha', 500, 5, 50), entry(longName, 400, 987654321012345, 1234567890, true)];
 
 function Fixture() {
   const [updated, setUpdated] = useState(false);
@@ -40,7 +40,7 @@ function Fixture() {
     if (reject) throw new Error('fixture rejection');
     setUpdated(value => !value);
   };
-  const props = { ...ad, leaderboard: updated ? [initial[1], initial[2], initial[0], ...initial.slice(3)] : initial, refreshLeaderboard };
+  const props = { ...ad, leaderboard: updated ? [initial[1], initial[2], { ...initial[0], infinities: 8 }, ...initial.slice(3)] : initial, refreshLeaderboard };
   return <>
     <h1>Ranking verification</h1>
     <p>実コンポーネント・合成記録7件。Alpha: 3件 / Beta: 2件 / 長名: 2件。</p>

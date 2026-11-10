@@ -85,14 +85,14 @@ test('failed persistence issues no grant and does not consume the code', t => {
   assert.throws(() => restarted.exchange(code, 'peer'), rejected(400));
 });
 
-test('public leaderboard hides identifiers and preserves the existing score order', t => {
+test('public leaderboard hides identifiers and prioritizes Infinity count', t => {
   const { store } = fixture(t);
   const a = store.create(), b = store.create();
   store.submit(a.token, { playerId: a.id, name: 'A', antimatterLog10: 10, infinities: 100, playTimeSec: 1 });
   store.submit(b.token, { playerId: b.id, name: 'B', antimatterLog10: 20, infinities: 1, playTimeSec: 1 });
   const rows = store.leaderboard(a.token);
-  assert.deepEqual(rows.map(r => r.name), ['B', 'A']);
-  assert.equal(rows[1].self, true);
+  assert.deepEqual(rows.map(r => r.name), ['A', 'B']);
+  assert.equal(rows[0].self, true);
   const publicText = JSON.stringify(store.leaderboard(''));
   for (const secret of [a.id, a.token, b.id, b.token, 'playerId', 'self']) assert.ok(!publicText.includes(secret));
 });
@@ -151,4 +151,78 @@ test('invalid Boost values and unauthorized submissions never mutate stored stat
   const { dimensionalBoosts: _, ...oldSubmission } = score;
   store.submit(a.token, oldSubmission);
   assert.equal(Object.hasOwn(new AdStore(file).leaderboard('')[0], 'dimensionalBoosts'), false);
+});
+
+test('galaxy snapshots preserve zero, omission and replacement across restart', t => {
+  const { store, file } = fixture(t);
+  const a = store.create(), b = store.create(), c = store.create();
+  const score = { name: 'Shared', antimatterLog10: 20, infinities: 2, playTimeSec: 60 };
+  store.submit(a.token, { ...score, playerId: a.id, galaxies: Number.MAX_SAFE_INTEGER });
+  store.submit(b.token, { ...score, playerId: b.id, galaxies: 0 });
+  store.submit(c.token, { ...score, playerId: c.id });
+  const expected = [{ ...score, galaxies: Number.MAX_SAFE_INTEGER, self: true }, { ...score, galaxies: 0 }, score];
+  assert.deepEqual(new AdStore(file).leaderboard(a.token), expected);
+  const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+  raw.scores[0].token = 'private-extra';
+  fs.writeFileSync(file, JSON.stringify(raw));
+  assert.deepEqual(new AdStore(file).leaderboard(a.token), expected);
+  assert.equal(Object.hasOwn(raw.scores[2], 'galaxies'), false);
+  store.submit(a.token, { ...score, playerId: a.id, galaxies: 0, antimatterLog10: 1 });
+  assert.deepEqual(store.leaderboard(a.token).map(r => r.galaxies), [0, undefined, 0]);
+  assert.equal(store.leaderboard(a.token).length, 3);
+  store.submit(a.token, { ...score, playerId: a.id });
+  const restarted = new AdStore(file);
+  assert.equal(Object.hasOwn(restarted.leaderboard(a.token).find(r => r.self)!, 'galaxies'), false);
+  assert.deepEqual(restarted.leaderboard(a.token), store.leaderboard(a.token));
+});
+
+test('invalid galaxies reject before changing memory or the save file', t => {
+  const { store, file } = fixture(t);
+  const a = store.create();
+  const score = { playerId: a.id, name: 'A', antimatterLog10: 10, infinities: 1, playTimeSec: 3, galaxies: 0 };
+  store.submit(a.token, score);
+  const before = fs.readFileSync(file, 'utf8'), rows = store.leaderboard(a.token);
+  for (const value of [null, '4', -1, 1.5, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity, -Infinity, true, false, [], {}]) {
+    assert.throws(() => store.submit(a.token, { ...score, galaxies: value as number }), rejected(400));
+    assert.equal(fs.readFileSync(file, 'utf8'), before);
+    assert.deepEqual(store.leaderboard(a.token), rows);
+  }
+});
+
+test('top 50 selection uses progress and keeps earlier ties at the boundary', t => {
+  const { store, file } = fixture(t);
+  const accounts = Array.from({ length: 53 }, () => store.create());
+  accounts.forEach((a, i) => store.submit(a.token, {
+    playerId: a.id, name: `P${i}`, infinities: i < 49 ? 2 : 1,
+    galaxies: i === 52 ? 1 : 0, dimensionalBoosts: 0, antimatterLog10: i < 49 ? 1 : 1000, playTimeSec: 0,
+  }));
+  const rows = store.leaderboard('');
+  assert.equal(rows.length, 50);
+  assert.deepEqual(rows.map(r => r.name), [...Array.from({ length: 49 }, (_, i) => `P${i}`), 'P52']);
+  assert.deepEqual(new AdStore(file).leaderboard(''), rows);
+  store.submit(accounts[52].token, { playerId: accounts[52].id, name: 'P52', infinities: 1, galaxies: 0, dimensionalBoosts: 0, antimatterLog10: 1000, playTimeSec: 0 });
+  store.submit(accounts[50].token, { playerId: accounts[50].id, name: 'P50', infinities: 1, galaxies: 0, dimensionalBoosts: 0, antimatterLog10: 1000, playTimeSec: 0 });
+  assert.equal(store.leaderboard('').at(-1)!.name, 'P52');
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).scores.length, 50);
+});
+
+test('existing and legacy scores sort before their first top 50 read without mutating storage', t => {
+  const { file } = fixture(t);
+  const scores = Array.from({ length: 53 }, (_, i) => ({
+    playerId: `legacy-${i}`, name: `P${i}`, infinities: i === 52 ? 2 : 1,
+    antimatterLog10: 100 - i, playTimeSec: 0,
+    ...(i === 51 ? { galaxies: 1 } : {}), ...(i === 50 ? { dimensionalBoosts: 1 } : {}),
+  }));
+  const original = structuredClone(scores);
+  const imported = new AdStore(file, Date.now, scores);
+  const expected = ['P52', 'P51', 'P50', ...Array.from({ length: 47 }, (_, i) => `P${i}`)];
+  assert.deepEqual(imported.leaderboard('').map(r => r.name), expected);
+  assert.deepEqual(scores, original);
+  imported.create();
+  const before = fs.readFileSync(file, 'utf8');
+  const restarted = new AdStore(file);
+  assert.deepEqual(restarted.leaderboard(''), imported.leaderboard(''));
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  assert.equal(Object.hasOwn(restarted.leaderboard('')[0], 'galaxies'), false);
+  assert.equal(Object.hasOwn(restarted.leaderboard('')[0], 'dimensionalBoosts'), false);
 });

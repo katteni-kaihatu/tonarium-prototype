@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import { setImmediate } from 'node:timers/promises';
-import { createNewGame, serialize, bigFromLog10 } from './engine.mjs';
+import { createNewGame, serialize, bigFromLog10, bigLog10, getGalaxyRequirement } from './engine.mjs';
 import { compareProgress, sameSave } from './sync.mjs';
 import { createAdSlice, type AdSlice } from './slice.ts';
 import { buildExportBundle, createProfile, getActiveProfile, importBundleInto, listProfiles, listRecoveryRecords, retainSyncSources, parseImportBundle, readConnection, readSaveRaw, switchProfile, writeConnection, writeSave, prepareProgressSelection, readProgressSelection, selectProgress, type StorageLike } from './user.mjs';
@@ -384,7 +384,7 @@ test('failed local persistence stops profile switching and preserves the current
   assert.equal(getActiveProfile(data)!.id, a.id);
 });
 
-test('manual and automatic score bodies capture the current Boost count, including reset to zero', async t => {
+test('manual and automatic scores capture current galaxies, Boost and antimatter after purchases and resets', async t => {
   const data = storage();
   const server = api(t);
   const { state, start, fire } = harness(t, data);
@@ -395,13 +395,51 @@ test('manual and automatic score bodies capture the current Boost count, includi
     return server.implementation(url, options);
   });
   state.adGame!.dimensionalBoosts = 23;
+  state.adGame!.galaxies = 3;
+  state.adGame!.antimatter = bigFromLog10(6);
+  state.adGame!.totalAntimatter = bigFromLog10(100);
   const manual = state.adSubmitScore();
   state.adGame!.dimensionalBoosts = 24;
+  state.adGame!.galaxies = 4;
   assert.equal(await manual, true);
   assert.equal(bodies[0].dimensionalBoosts, 23);
-  state.adGame!.dimensionalBoosts = 0;
+  assert.equal(bodies[0].galaxies, 3);
+  assert.equal(bodies[0].antimatterLog10, 6);
+  const snapshot = () => ({ galaxies: state.adGame!.galaxies, dimensionalBoosts: state.adGame!.dimensionalBoosts, antimatterLog10: bigLog10(state.adGame!.antimatter) });
+  const current = () => {
+    const body = bodies.at(-1)!;
+    return { galaxies: body.galaxies, dimensionalBoosts: body.dimensionalBoosts, antimatterLog10: body.antimatterLog10 };
+  };
+  assert.equal(state.adBuyDimension(1), true);
+  const purchased = snapshot();
+  assert.ok(purchased.antimatterLog10 < 6);
   fire(30000); await setImmediate();
-  assert.deepEqual(bodies.map(body => body.dimensionalBoosts), [23, 0]);
+  assert.deepEqual(current(), purchased);
+  const requirement = getGalaxyRequirement(state.adGame!);
+  state.adGame!.dimensions[requirement.tier - 1].amount = bigFromLog10(6);
+  assert.equal(state.adGalaxy(), true);
+  const galaxyReset = snapshot();
+  assert.equal(galaxyReset.galaxies, 5);
+  assert.equal(galaxyReset.dimensionalBoosts, 0);
+  assert.equal(galaxyReset.antimatterLog10, 1);
+  fire(30000); await setImmediate();
+  assert.deepEqual(current(), galaxyReset);
+  state.adGame!.antimatter = bigFromLog10(309);
+  assert.equal(state.adPrestige(), true);
+  const infinityReset = snapshot();
+  assert.equal(infinityReset.galaxies, 0);
+  assert.equal(infinityReset.dimensionalBoosts, 0);
+  assert.equal(infinityReset.antimatterLog10, 1);
+  fire(30000); await setImmediate();
+  assert.deepEqual(current(), infinityReset);
+  assert.equal(bodies.at(-1)!.infinities, 1);
+  state.adResetGame(); await setImmediate();
+  const fullReset = snapshot();
+  fire(30000); await setImmediate();
+  assert.deepEqual(current(), fullReset);
+  assert.equal(fullReset.galaxies, 0);
+  assert.equal(fullReset.dimensionalBoosts, 0);
+  assert.deepEqual(bodies.map(body => body.galaxies), [3, 4, 5, 0, 0]);
 });
 
 test('timers and requests do not duplicate, stop removes timers, ranking read survives submission failure, and automatic work is silent', async t => {

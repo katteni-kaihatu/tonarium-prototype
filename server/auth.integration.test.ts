@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import http from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
 import os from 'node:os';
@@ -80,6 +80,31 @@ test('guests, dev and Misskey logins decide who you are and what you may do', { 
     await new Promise<void>((resolve) => { child.once('exit', () => resolve()); child.kill(); });
   });
   await until(() => ready ? true : undefined);
+
+  const adAccount = await (await fetch(`${base}/api/ad/create`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: '{}' })).json() as { id: string; token: string };
+  const adBody = { playerId: adAccount.id, name: 'AD', antimatterLog10: 1, infinities: 0, playTimeSec: 0 };
+  const adPostBody = (body: string) => fetch(`${base}/api/leaderboard`, {
+    method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json', Authorization: `Bearer ${adAccount.token}` },
+    body,
+  });
+  const adPost = (galaxies: unknown) => adPostBody(JSON.stringify({ ...adBody, galaxies }));
+  assert.equal((await adPost(0)).status, 200);
+  const adFile = path.join(data, 'ad-access.json');
+  const adBefore = await readFile(adFile, 'utf8');
+  const adRows = await (await fetch(`${base}/api/leaderboard`)).json();
+  for (const value of [null, '4', -1, 1.5, Number.MAX_SAFE_INTEGER + 1, true, false, [], {}]) {
+    assert.equal((await adPost(value)).status, 400);
+    assert.equal(await readFile(adFile, 'utf8'), adBefore);
+    assert.deepEqual(await (await fetch(`${base}/api/leaderboard`)).json(), adRows);
+  }
+  // JSON.stringify は非有限数を null にするため、桁あふれする JSON の数値を直接送る。
+  for (const value of ['1e999', '-1e999']) {
+    const body = `${JSON.stringify(adBody).slice(0, -1)},"galaxies":${value}}`;
+    assert.equal(Number.isFinite(JSON.parse(body).galaxies), false);
+    assert.equal((await adPostBody(body)).status, 400);
+    assert.equal(await readFile(adFile, 'utf8'), adBefore);
+    assert.deepEqual(await (await fetch(`${base}/api/leaderboard`)).json(), adRows);
+  }
 
   const post = (p: string, body: unknown, cookie?: string, origin: string | null = base) => fetch(`${base}${p}`, {
     method: 'POST', redirect: 'manual', body: JSON.stringify(body),

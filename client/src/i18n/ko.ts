@@ -87,6 +87,8 @@ export default {
   adLabText54: "이름",
   adLabText55: "반물질",
   adRankingBoost: "Boost",
+  adRankingGalaxy: "은하",
+  adRankingGuide: "Infinity 횟수 → 은하 수 → Boost 수 → 전송 시점의 반물질 보유량 순으로, 많은 기록이 상위에 오릅니다. 이전 기록에서 미수집된 은하 수와 Boost 수는 비교할 때만 0으로 취급합니다. 이 기준 변경으로 순위, 같은 이름의 대표 기록, 저장 대상인 상위 50개 기록이 달라집니다. 구매나 초기화 후 순위가 내려갈 수 있습니다. 저장 대상에서 제외된 과거 기록은 복원할 수 없습니다.",
   adRankingUnavailable: "미수집",
   adLabText56: "플레이 시간",
   adLabText57: "해제한 업적",
