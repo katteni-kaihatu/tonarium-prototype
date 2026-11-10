@@ -1820,7 +1820,7 @@ export default {
   "ui1205": "Added home and social features",
   "ui1206": "View friends, groups and events, create sessions with visibility controls, and message absent friends through status, DMs and group chat.",
   "ui1207": "Made home available during sessions",
-  "ui1208": "Open home from the top-left menu without leaving, move to other sessions or change worlds.",
+  "ui1208": "Open home from the left menu without leaving, move to other sessions or change worlds.",
   "ui1209": "Improved 3D carrying and conversation display",
   "ui1210": "Carry objects with right-click in 3D. Nearby speech also appears in bubbles above heads.",
   "ui1211": "Added Tile Survival game world",
