@@ -126,7 +126,7 @@ async function verifyNumberLayouts(root: ReturnType<typeof createRoot>, host: HT
     });
   };
   try {
-    for (const width of [320, 375, 390, 540, 1000]) {
+    for (const width of [320, 375, 390, 540, 700, 1000]) {
       host.style.width = width + 'px';
       for (const language of ['ja', 'en', 'ko'] as const) {
         flushSync(() => setLanguage(language));
@@ -403,7 +403,7 @@ async function run() {
       await cycle(() => check(gameButtons().length > 0 && gameButtons().every(button => button.disabled === !available), `${target}: owner eligibility retained`));
     }
     await verifyNumberLayouts(root, host);
-    document.getElementById('result')!.textContent = 'PASS: mounted ja → en → ko → ja; tabs, inputs, notices, unchanged-number Canvas, disposal, ownership; number layout at 320/375/390/540/1000px in ja/en/ko before and after Infinity.\nVisual clipping in the full application still requires manual inspection.';
+    document.getElementById('result')!.textContent = 'PASS: mounted ja → en → ko → ja; tabs, inputs, notices, unchanged-number Canvas, disposal, ownership; number layout at 320/375/390/540/700/1000px in ja/en/ko before and after Infinity.\nVisual clipping in the full application still requires manual inspection.';
   } finally {
     flushSync(() => root.unmount());
     // 途中で失敗したときも Three の購読とタイマーを残さない。

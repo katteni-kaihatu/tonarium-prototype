@@ -1,3 +1,4 @@
+.adlab-scale-frame { width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
 .adlab-lab-panel {
   position: relative;
   container-type: inline-size;
@@ -122,13 +123,23 @@
 .adlab-action-count { margin-left: auto; flex: none; color: var(--ad-muted); font-size: 11px; }
 .adlab-action-value { font-size: 15px; font-weight: 700; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adlab-action-value > span { margin-left: 4px; color: var(--ad-muted); font-size: 11px; font-weight: 500; }
-.adlab-action-req { display: flex; flex-direction: column; gap: 3px; }
 .adlab-action-req-text { display: flex; justify-content: space-between; gap: 6px; color: var(--ad-muted); font-size: 11px; }
 .adlab-action-req-text > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adlab-action-req-text > span:first-child { flex: 0 1 auto; }
 .adlab-action-req-text > span:last-child { flex: 0 1 auto; text-align: right; }
-.adlab-action > button { margin-top: auto; font-weight: 700; }
-.adlab-action.is-ready > button { border-color: var(--ad-accent) !important; background: color-mix(in srgb, var(--ad-accent) 18%, transparent) !important; }
+/* 実行ボタンの背景は必要量に対する進み具合。押せないときも塗りが読めるよう半透明にしない。 */
+.adlab-action-buttons { display: flex; gap: 4px; margin-top: auto; }
+.adlab-lab-panel .adlab-action-run { flex: 1 1 auto; min-width: 0; padding: 4px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px !important; letter-spacing: -.01em; font-weight: 700; background: linear-gradient(90deg, rgba(139,127,214,.38) var(--ad-fill, 0%), transparent var(--ad-fill, 0%)) !important; }
+.adlab-lab-panel .adlab-action-run:disabled { opacity: 1; color: var(--ad-muted) !important; }
+.adlab-lab-panel .adlab-action.is-ready .adlab-action-run { border-color: var(--ad-accent) !important; background: color-mix(in srgb, var(--ad-accent) 18%, transparent) !important; }
+.adlab-lab-panel .adlab-auto-toggle-mini { flex: none; display: flex; align-items: center; justify-content: center; width: 26px; min-height: 30px; padding: 0; border: 1px solid #3a3266; border-radius: 7px; background: #241e42; color: var(--ad-muted); cursor: pointer; }
+.adlab-lab-panel .adlab-auto-toggle-mini.is-on { border-color: #5eead4; background: #1d3a3a; color: #a7f3e4; }
+.adlab-lab-panel .adlab-auto-toggle-mini.is-locked { opacity: .85; border-style: dashed; border-color: #4a3f7c; background: transparent; color: #9b94bb; }
+.adlab-lab-panel .adlab-auto-toggle-mini.is-vertical { width: 26px; height: 100%; min-height: 0; flex-direction: column-reverse; justify-content: space-between; gap: 4px; padding: 5px 0; border-radius: 13px; }
+.adlab-lab-panel .adlab-auto-toggle-mini.is-vertical.is-on, .adlab-lab-panel .adlab-auto-toggle-mini.is-vertical.is-locked { flex-direction: column; }
+.adlab-auto-knob { flex: none; width: 16px; height: 16px; border-radius: 8px; background: #6b6390; }
+.is-on > .adlab-auto-knob { background: #5eead4; }
+.adlab-auto-toggle-text { writing-mode: vertical-rl; font-size: 10px; font-weight: 700; letter-spacing: .08em; white-space: nowrap; }
 .adlab-tip { display: none; position: absolute; z-index: 40; top: calc(100% - 4px); left: 0; width: min(288px, calc(100cqw - 24px)); box-sizing: border-box; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid #4a3f7c; border-radius: 12px; background: #2a2249; box-shadow: 0 12px 32px rgba(5,3,15,.6); pointer-events: none; text-align: left; }
 .adlab-action:hover > .adlab-tip, .adlab-action:focus-within > .adlab-tip { display: flex; }
 .adlab-actions > .adlab-action:nth-child(2n) > .adlab-tip { left: auto; right: 0; }
@@ -145,7 +156,17 @@
 .adlab-tip-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .adlab-tip-chips > span { padding: 2px 6px; border-radius: 5px; background: #3b2433; color: #f4b4c4; font-size: 11px; }
 
-.adlab-dim-table { display: flex; flex-direction: column; border: 1px solid #2f2854; border-radius: 10px; background: var(--ad-box); overflow: hidden; }
+.adlab-dim-table { display: grid; grid-template-columns: 34px minmax(0, 1fr); border: 1px solid #2f2854; border-radius: 10px; background: var(--ad-box); overflow: hidden; }
+/* 自動購入は第1〜4次元と第5〜8次元の 2 本なので、行の高さが違っても 4 行ぶんにそろうよう行番号で置く。 */
+.adlab-dim-table > .adlab-dim-row { grid-column: 2; }
+.adlab-dim-table > .adlab-dim-header { grid-row: 1; }
+.adlab-dim-row[data-tier="1"] { grid-row: 2; } .adlab-dim-row[data-tier="2"] { grid-row: 3; }
+.adlab-dim-row[data-tier="3"] { grid-row: 4; } .adlab-dim-row[data-tier="4"] { grid-row: 5; }
+.adlab-dim-row[data-tier="5"] { grid-row: 6; } .adlab-dim-row[data-tier="6"] { grid-row: 7; }
+.adlab-dim-row[data-tier="7"] { grid-row: 8; } .adlab-dim-row[data-tier="8"] { grid-row: 9; }
+.adlab-dim-autos { grid-column: 1; display: flex; justify-content: center; padding: 6px 0 6px 8px; min-height: 0; }
+.adlab-dim-autos.is-low { grid-row: 2 / 6; }
+.adlab-dim-autos.is-high { grid-row: 6 / 10; }
 .adlab-dim-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "name owned" "mult prod" "next next" "buy buy"; align-items: center; gap: 6px 10px; padding: 8px 10px; border-bottom: 1px solid #262046; }
 .adlab-dim-row:last-child { border-bottom: 0; }
 .adlab-dim-header { display: none; }
@@ -292,6 +313,7 @@
   .adlab-lab-panel .adlab-dim-buy b { font-size: 14px; }
   .adlab-lab-panel input, .adlab-lab-panel select { min-height: 44px; font-size: 14px !important; }
   .adlab-lab-panel summary { min-height: 44px; }
+  .adlab-lab-panel .adlab-action-run { white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
 }
 @container (min-width: 560px) {
   .adlab-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -312,7 +334,7 @@
 @container (min-width: 760px) {
   .adlab-stat-columns { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; }
   .adlab-infinity-columns { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
-  .adlab-dim-row { grid-template-columns: 132px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(64px, 1fr) 188px; grid-template-areas: "name owned mult prod next buy"; padding: 3px 10px; min-height: 46px; }
+  .adlab-dim-row { grid-template-columns: 124px minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.15fr) minmax(56px, .7fr) 188px; grid-template-areas: "name owned mult prod next buy"; padding: 3px 10px; min-height: 46px; }
   .adlab-dim-header { display: grid; min-height: 28px; color: var(--ad-muted); font-size: 11px; }
   .adlab-dim-mult { text-align: right; }
   .adlab-dim-buy { grid-template-columns: repeat(2, 90px); justify-content: end; }
