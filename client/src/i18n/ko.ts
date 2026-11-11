@@ -395,6 +395,8 @@ export default {
   adUiColNext: "다음 ×2",
   adUiColBuy: "구매",
   adUiFundProgress: "비용의 {0}만큼 모였습니다",
+  adUiDigits: "{0}자리",
+  adUiDigitsTitle: "반물질을 모두 쓰면 {0}자리. Big Crunch는 {1}자리에서 도달 (정확한 것은 상위 약 15자리이고 아래 자리는 장식)",
   adUiTickBuyShort: "구매",
   adUiCrunchShort: "Crunch",
   adUiLevel: "Lv{0}",
