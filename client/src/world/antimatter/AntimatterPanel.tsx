@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import type { AntimatterPanelProps } from './types.ts';
 import { formatDurationMs, formatNumber } from './format.ts';
@@ -12,6 +12,7 @@ import { ProgressPicker, ProgressSummary } from './ProgressPicker.tsx';
 import { InfinityPanel } from './InfinityPanel.tsx';
 import { LayerTabs } from './LayerTabs.tsx';
 import { SaveErrorLog } from './SaveErrorLog.tsx';
+import { adPanelScale } from './panelScale.ts';
 import './antimatter-panel.css';
 import { emitAdFeedback } from '../../ad/feedback.ts';
 import { AdPurchaseParticles } from './AdPurchaseParticles.tsx';
@@ -35,6 +36,15 @@ const TABS: { id: TabId; label: string; icon: IconName; visible?: (game: Game) =
 export function AntimatterPanel({ ad }: AntimatterPanelProps) {
   useLanguage();
   const root = useRef<HTMLDivElement>(null);
+  const frame = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    const element = frame.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => setBox({ width: entry.contentRect.width, height: entry.contentRect.height }));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   const [tab, setTab] = useState<TabId>(ad.saveErrors.length > 0 ? 'errors' : 'dimensions');
   const revealedErrors = useRef(ad.saveErrors.length > 0);
   useEffect(() => {
@@ -62,11 +72,17 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
   const tabs = TABS.filter(item => item.visible?.(game) ?? true);
   const activeTab: TabId = (tab === 'errors' && ad.saveErrors.length > 0) || tabs.some(item => item.id === tab) ? tab : 'dimensions';
   if (activeTab !== tab) setTab(activeTab);
+  const scale = box ? adPanelScale(box.width) : 1;
+  // 狭い窓では PC 用の並びのまま縮める。コンテナクエリは縮める前の幅で効くので、並びは崩れない。
+  const rootStyle: CSSProperties = scale < 1 && box
+    ? { ...s.root, width: box.width / scale, height: box.height / scale, transform: `scale(${scale})`, transformOrigin: '0 0' }
+    : s.root;
   const offline = ad.offlineNotice;
   const offlineGained = offline && (offline.antimatterGained.mantissa ?? 0) !== 0 && offline.elapsedMs >= 5000;
 
   return (
-    <div ref={root} className="adlab-lab-panel" style={s.root} role="region" aria-label={t('mergeAdLab')} tabIndex={0}>
+    <div ref={frame} className="adlab-scale-frame">
+    <div ref={root} className="adlab-lab-panel" style={rootStyle} role="region" aria-label={t('mergeAdLab')} tabIndex={0}>
       <div className="adlab-header" style={s.header}>
         <div className="adlab-resource" data-ad-core role="group" aria-label={t('adLabText1')}>
           <Icon name="atom" size={24} stroke={1.8} />
@@ -150,6 +166,7 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
         </div>,
         document.body,
       )}
+    </div>
     </div>
   );
 }

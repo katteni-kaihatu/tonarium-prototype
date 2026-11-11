@@ -78,6 +78,7 @@ const PATHS = {
   devices: <><rect x="2" y="4" width="14" height="10" rx="2" /><rect x="15" y="9" width="7" height="11" rx="1.5" /><path d="M6 18h6" /></>,
   file: <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6" />,
   arrowRight: <path d="M5 12h14M13 6l6 6-6 6" />,
+  repeat: <path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3" />,
   more: null,
 } as const;
 
