@@ -87,8 +87,9 @@ function ClientMode() {
   );
 }
 
-/** 左のメニュー。ホームの左列と、セッション中のホバーメニューで同じものを使う */
-export function Sidebar({ inSession, onPick }: { inSession?: boolean; onPick?: () => void }) {
+/** 左のメニュー。ホームの左列と、セッション中の左端のメニューで同じものを使う。
+ * rail はアイコンだけの縦の列。onMenu を渡すと、ロゴの代わりにメニューを開け閉めするボタンを出す */
+export function Sidebar({ inSession, onPick, rail, onMenu }: { inSession?: boolean; onPick?: () => void; rail?: boolean; onMenu?: () => void }) {
   const seen = useChangelog((s) => s.seen);
   const changelogUnread = !!CHANGELOG[0] && CHANGELOG[0].date > seen;
   const page = useStore((s) => homePageOf(s.homePage));
@@ -108,11 +109,33 @@ export function Sidebar({ inSession, onPick }: { inSession?: boolean; onPick?: (
   const [more, setMore] = useState(false);
   const picked = () => { setMore(false); onPick?.(); };
   const badge = { friends: unreadDm || onlineFriends, events: upcoming } as Partial<Record<HomePage, number>>;
+  const menuBtn = onMenu && (
+    <button className={`ib srailmenu ${rail ? '' : 'on'}`} aria-label={rail ? tr("ui326") : tr("ui73")} title={rail ? tr("ui327") : tr("ui73")} aria-expanded={!rail} onClick={onMenu}>
+      <Icon name="menu" size={20} />
+    </button>
+  );
+  if (rail) return (
+    <nav className="hside hrail">
+      {menuBtn}
+      <span className="hrailsep" aria-hidden="true" />
+      {NAV.map((n) => (
+        <button key={n.page} className="ib hrailbtn" aria-label={n.name} title={n.name} onClick={() => { goHome(n.page); picked(); }}>
+          <Icon name={n.icon} size={20} />
+          {!!badge[n.page] && <span className={`hbadge ${n.page === 'friends' && unreadDm ? 'red' : ''}`}>{badge[n.page]}</span>}
+        </button>
+      ))}
+      <span className="spacer" />
+      <button className="ib hrailself" onClick={() => setStatus(true)} title={tr("ui171")} aria-label={tr("ui171")}>
+        <span className="fface"><Face id={selfId} name={selfName} size={36} /><StatusDot st={st} /></span>
+      </button>
+      {status && createPortal(<StatusDialog onClose={() => setStatus(false)} />, document.body)}
+    </nav>
+  );
   return (
     <>
       {phone && more && <div className="hmorebg" onClick={() => setMore(false)} />}
       <nav className={`hside ${phone && more ? 'open' : ''}`}>
-        <div className="hbrand"><img src="/brand/mark.png" alt="" /><b>{tr("ui163")}</b></div>
+        <div className="hbrand">{menuBtn ?? <img src="/brand/mark.png" alt="" />}<b>{tr("ui163")}</b></div>
         <ul className="hnav">
           {NAV.map((n) => (
             <li key={n.page}>
@@ -480,8 +503,8 @@ function HomePageView({ q }: { q: string }) {
   );
 }
 
-/** sheet の高さと操作バーの領域は SessionMenu が確保する */
-export function Home({ sheet }: { sheet?: boolean }) {
+/** sheet の高さと操作バーの領域は SessionMenu が確保する。PC のシートでは左のメニューを SessionMenu が外に出すので nav を外す */
+export function Home({ sheet, nav = true }: { sheet?: boolean; nav?: boolean }) {
   const page = useStore((s) => homePageOf(s.homePage));
   const timelineSide = useStore((s) => s.timelineSide);
   const wsConnected = useStore((s) => s.wsConnected);
@@ -494,8 +517,8 @@ export function Home({ sheet }: { sheet?: boolean }) {
     previousPage.current = page;
   }, [page, setQ]);
   return (
-    <div className={`home ${sheet ? 'sheet' : ''} ${page === 'market' ? 'market-home' : ''}`} role={sheet ? 'dialog' : undefined} aria-label={sheet ? title : undefined}>
-      <Sidebar inSession={sheet} />
+    <div className={`home ${sheet ? 'sheet' : ''} ${nav ? '' : 'nonav'} ${page === 'market' ? 'market-home' : ''}`} role={sheet ? 'dialog' : undefined} aria-label={sheet ? title : undefined}>
+      {nav && <Sidebar inSession={sheet} />}
       <main className="hmain">
         <header className="hhead">
           {page === 'group' ? <GroupTitle /> : title && <h1>{title}</h1>}

@@ -47,6 +47,7 @@ import { safeStorage } from './storage.ts';
 import { linkTonariumProfile } from './link.ts';
 import { AdApiClient, type LeaderboardEntry } from './api.ts';
 import { emitAdFeedback, type AdFeedbackKind } from './feedback.ts';
+import { describeSaveError, pushSaveFailure, type AdSaveFailure, type SaveFailureOp, type SaveFailurePhase } from './saveFailure.ts';
 
 export interface AdStartOptions {
   /** 任意の上書き。未指定なら同一オリジン（Tonarium サーバー内の /api/*）を使い、Workers などの外部 API は必須ではない */
@@ -78,6 +79,7 @@ export interface AdSlice {
   adLastLocalSaveAt: number | null;
   adLastServerSaveAt: number | null;
   adLeaderboard: LeaderboardEntry[];
+  adSaveErrors: AdSaveFailure[];
   adStart: (options?: AdStartOptions) => void;
   adStop: () => void;
   adBindTonarium: (selfId: string, selfName: string) => void;
@@ -140,6 +142,43 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
   const current = (ctx: SyncContext) => started && context === ctx && generation === ctx.generation && get().adProfile?.id === ctx.profileId;
   const frozen = () => get().adMigration || ['loading', 'choice'].includes(get().adSync);
   const publicApi = () => new AdApiClient(apiBase, createAuthProvider());
+  function storageFacts(profileId: string | undefined) {
+    const empty = { storageKeys: null as number | null, storageChars: null as number | null, recoveryCount: null as number | null };
+    try {
+      if (typeof storage.key !== 'function' || typeof storage.length !== 'number') return empty;
+      let chars = 0;
+      let recovery = 0;
+      const prefix = profileId ? `ad:v3:recovery:${profileId}:` : 'ad:v3:recovery:';
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (!key) continue;
+        chars += key.length + (storage.getItem(key)?.length ?? 0);
+        if (key.startsWith(prefix)) recovery += 1;
+      }
+      return { storageKeys: storage.length, storageChars: chars, recoveryCount: recovery };
+    } catch { return empty; }
+  }
+  function recordSaveFailure(op: SaveFailureOp, phase: SaveFailurePhase, error: unknown) {
+    // 記録のための計測が失敗しても、保存の成否は変えない。
+    try {
+      const game = get().adGame;
+      const am = game ? bigLog10(game.antimatter) : null;
+      set({ adSaveErrors: pushSaveFailure(get().adSaveErrors ?? [], {
+        at: Date.now(),
+        op,
+        phase,
+        ...describeSaveError(error),
+        revision,
+        infinities: game?.infinities ?? null,
+        antimatterLog10: am !== null && Number.isFinite(am) ? Math.round(am * 100) / 100 : null,
+        boosts: game?.dimensionalBoosts ?? null,
+        galaxies: game?.galaxies ?? null,
+        lastTick: game?.lastTick ?? null,
+        profileId: get().adProfile?.id ?? null,
+        ...storageFacts(get().adProfile?.id),
+      }) });
+    } catch { /* 画面の記録だけで、セーブは触らない */ }
+  }
   function saveLocalNow(): boolean {
     const { adProfile, adGame } = get();
     if (!adProfile || !adGame || frozen()) return false;
@@ -149,7 +188,10 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
       if (baseline) storage.setItem(baselineKey(adProfile.id), JSON.stringify(baseline));
       set({ adLastLocalSaveAt: Date.now() });
       return true;
-    } catch { return false; }
+    } catch (error) {
+      recordSaveFailure('local', 'write', error);
+      return false;
+    }
   }
   function adopt(source: string, applyOffline = false, nextBaseline = baseline, resolved?: string) {
     const game = deserialize(source);
@@ -193,6 +235,7 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
     if (!current(ctx) || syncing === ctx || get().adSync === 'choice' || get().adMigration) return false;
     syncing = ctx;
     const initial = initialLocalSource !== null;
+    let phase: SaveFailurePhase = 'load';
     try {
       const remote = await ctx.api.load(ctx.connection.id);
       if (!current(ctx)) return false;
@@ -226,7 +269,9 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
         }
       }
       if (initial || choice || forceRemote || chosen !== local) {
+        phase = 'backup';
         const key = retainSources(ctx.profileId, localSave, remote.save);
+        phase = 'load';
         set({ adRecoveryKey: key });
       }
       if (choice) {
@@ -259,7 +304,7 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
       }
       return true;
     } catch (error) {
-      if (current(ctx)) { initialLocalSource = null; retryAllowed = retryable(error); set({ adSync: 'error', adServer: 'error' }); saveLocalNow(); }
+      if (current(ctx)) { recordSaveFailure('sync', phase, error); initialLocalSource = null; retryAllowed = retryable(error); set({ adSync: 'error', adServer: 'error' }); saveLocalNow(); }
       return false;
     } finally { if (syncing === ctx) syncing = null; }
   }
@@ -277,6 +322,7 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
       await resolveServer(context);
     } catch (error) {
       if (started && generation === epoch) {
+        recordSaveFailure('sync', 'load', error);
         retryAllowed = retryable(error);
         initialLocalSource = null;
         set({ adSync: 'error', adServer: 'error' });
@@ -317,9 +363,11 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
       return false;
     }
     syncing = ctx;
+    let phase: SaveFailurePhase = 'backup';
     try {
       const snapshot = JSON.parse(serialize(get().adGame!));
       retainSources(ctx.profileId, snapshot, baseline?.save ?? null);
+      phase = 'request';
       const next = await ctx.api.save(ctx.connection.id, snapshot, revision);
       if (!current(ctx)) return false;
       remember(ctx, snapshot, next);
@@ -335,7 +383,7 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
           if (syncing === ctx) syncing = null;
           await resolveServer(ctx);
         }
-        else { retryAllowed = retryable(error); revision = null; set({ adSync: 'error', adServer: 'error' }); saveLocalNow(); }
+        else { recordSaveFailure('server', phase, error); retryAllowed = retryable(error); revision = null; set({ adSync: 'error', adServer: 'error' }); saveLocalNow(); }
         if (manual) emitAdFeedback({ kind: 'error' });
       }
       return false;
@@ -396,6 +444,7 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
     adLastLocalSaveAt: null,
     adLastServerSaveAt: null,
     adLeaderboard: [],
+    adSaveErrors: [],
 
     adStart(options = {}) {
       if (started) return;
@@ -437,7 +486,7 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
                 set({ adSync: 'loading' });
                 void connect(profile, generation);
               }
-            } catch { set({ adSync: 'error', adServer: 'error' }); }
+            } catch (error) { recordSaveFailure('sync', 'load', error); set({ adSync: 'error', adServer: 'error' }); }
           } else if (idle && get().adSync === 'ready' && context) {
             const ctx = context;
             void resolveServer(ctx).then(ok => {

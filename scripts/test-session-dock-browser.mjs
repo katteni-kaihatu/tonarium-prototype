@@ -59,7 +59,7 @@ try {
             { voice: 'connected', micEnabled: false, sharer: 'other' },
           ]) {
             await set(status);
-            await page.locator('.smenubtn').click();
+            await page.locator('.smenubtn, .srailmenu').click();
             await page.locator('.home.sheet').waitFor();
             assert.equal(await dock.count(), 1);
             assert.equal(await dock.getAttribute('data-test-identity'), 'original');
@@ -116,7 +116,7 @@ try {
             assert.equal(await dock.evaluate(el => getComputedStyle(el).position), 'absolute');
             await anchors.last().click();
             await popover.waitFor();
-            await page.locator('.smenubtn').click();
+            await page.locator('.smenubtn, .srailmenu').click();
             await popover.waitFor({ state: 'detached' });
             if (phone) {
               await page.locator('.home.sheet .hmorebtn').click();
@@ -124,7 +124,7 @@ try {
               await reachable(dock.locator('button').last());
               await page.locator('.home.sheet .hmorebtn').click();
             }
-            await page.locator('.smenubtn').click();
+            await page.locator('.smenubtn, .srailmenu').click();
           }
           await set({ voice: 'off', hubOpen: true });
           const mic = dock.locator('button').first();
