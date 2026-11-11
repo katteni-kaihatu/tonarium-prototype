@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, type CSSProperties, type ReactNode } from 'react';
 import { t, useLanguage, msg, type UiMessage } from '../../i18n/index.ts';
 import { bigLog10 } from '../../ad/engine.mjs';
 import { Icon, type IconName } from '../Icon.tsx';
@@ -6,6 +6,7 @@ import type { AntimatterSlice, BigNum } from './types.ts';
 import { formatNumber } from './format.ts';
 import { s } from './styles.ts';
 import { confirmAd } from './confirmAd.tsx';
+import { AutoToggle } from './AutoToggle.tsx';
 import { digitRatio, percent, ratio, remaining } from './progress.ts';
 
 interface Effect { label: string; now: string; next: string }
@@ -35,23 +36,24 @@ interface CardProps {
   can: boolean;
   onClick: () => void;
   tip: Tip;
+  auto?: ReactNode;
 }
 
 export function tickspeedText(value: BigNum): string {
   return value.exponent >= 4 ? formatNumber(value) : (value.mantissa * 10 ** value.exponent).toFixed(2);
 }
 
-function ActionCard({ kind, icon, title, fullTitle, count, value, valueLabel, reqLabel, reqText, progress, label, can, onClick, tip }: CardProps) {
+function ActionCard({ kind, icon, title, fullTitle, count, value, valueLabel, reqLabel, reqText, progress, label, can, onClick, tip, auto }: CardProps) {
   const tipId = useId();
   return (
     <div className={`adlab-action${can ? ' is-ready' : ''}`} data-kind={kind}>
       <div className="adlab-action-head"><Icon name={icon} size={15} /><b>{title}</b>{count && <span className="adlab-action-count">{count}</span>}</div>
       <div className="adlab-action-value adlab-number" title={`${value} ${valueLabel}`}>{value}<span>{valueLabel}</span></div>
-      <div className="adlab-action-req">
-        <div className="adlab-action-req-text" title={`${reqLabel} ${reqText}`}><span>{reqLabel}</span><span className="adlab-number">{reqText}</span></div>
-        <div className="adlab-bar" aria-hidden="true"><span style={{ width: percent(progress) }} /></div>
+      <div className="adlab-action-req-text" title={`${reqLabel} ${reqText}`}><span>{reqLabel}</span><span className="adlab-number">{reqText}</span></div>
+      <div className="adlab-action-buttons">
+        <button type="button" className="adlab-action-run" style={{ ...s.btn, '--ad-fill': percent(progress) } as CSSProperties} disabled={!can} onClick={onClick} aria-describedby={tipId}>{label}</button>
+        {auto}
       </div>
-      <button type="button" style={s.btn} disabled={!can} onClick={onClick} aria-describedby={tipId}>{label}</button>
       <TipBody id={tipId} title={fullTitle ?? title} ready={can} tip={tip} progress={progress} />
     </div>
   );
@@ -124,7 +126,7 @@ export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (messag
   return (
     <div className="adlab-actions">
       <ActionCard
-        kind="tick" icon="gauge" title="Tickspeed" count={t('adUiTimes', derived.tickspeedBought)}
+        kind="tick" auto={<AutoToggle ad={ad} id="tickspeed" />} icon="gauge" title="Tickspeed" count={t('adUiTimes', derived.tickspeedBought)}
         value={`×${tickspeedText(derived.tickspeedValue)}`} valueLabel={t('adUiAllDims')}
         reqLabel={resAntimatter} reqText={`${formatNumber(game.antimatter)} / ${formatNumber(derived.tickspeedCost)}`} progress={tickProgress}
         label={t('adBuyTickspeed')} can={derived.tickspeedAffordable} onClick={() => ad.buyTickspeed()}
@@ -139,7 +141,7 @@ export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (messag
         }}
       />
       <ActionCard
-        kind="boost" icon="rocket" title="Boost" fullTitle="Dimension Boost" count={t('adUiTimes', game.dimensionalBoosts)}
+        kind="boost" auto={<AutoToggle ad={ad} id="boost" />} icon="rocket" title="Boost" fullTitle="Dimension Boost" count={t('adUiTimes', game.dimensionalBoosts)}
         value={`×${formatNumber(preview.boostFirst)}`} valueLabel={t('adLabText13', 1)}
         reqLabel={t('adLabText13', boost.tier)} reqText={`${formatNumber(boost.currentAmount)} / ${boost.amount}`} progress={boostProgress}
         label={t('adLabText26')} can={boost.can} onClick={() => { if (ad.dimensionalBoost()) notice(msg('adLabText38')); }}
@@ -154,7 +156,7 @@ export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (messag
         }}
       />
       <ActionCard
-        kind="galaxy" icon="galaxy" title="Galaxy" fullTitle="Antimatter Galaxy" count={t('adUiGalaxyCount', game.galaxies)}
+        kind="galaxy" auto={<AutoToggle ad={ad} id="galaxy" />} icon="galaxy" title="Galaxy" fullTitle="Antimatter Galaxy" count={t('adUiGalaxyCount', game.galaxies)}
         value={`×${derived.tickspeedPerPurchase.toFixed(4)}`} valueLabel={t('adUiPerTick')}
         reqLabel={t('adLabText13', galaxy.tier)} reqText={`${formatNumber(galaxy.currentAmount)} / ${galaxy.amount}`} progress={galaxyProgress}
         label={t('adLabText28')} can={galaxy.can} onClick={onGalaxy}
@@ -184,7 +186,7 @@ export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (messag
         }}
       />
       <ActionCard
-        kind="crunch" icon="infinity" title="Big Crunch" count={t('adUiTimes', game.infinities)}
+        kind="crunch" auto={<AutoToggle ad={ad} id="crunch" />} icon="infinity" title="Big Crunch" count={t('adUiTimes', game.infinities)}
         value={`+${infinity.gain} IP`} valueLabel={t('adUiNow')}
         reqLabel={resAntimatter} reqText={`e${infinityDigits} / e${infinityGoal}`} progress={crunchProgress}
         label={t('adLabText31')} can={infinity.can} onClick={onBigCrunch}

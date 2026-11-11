@@ -8,6 +8,7 @@ import { TIER_EN } from './styles.ts';
 import { DimensionReactor } from './DimensionReactor.tsx';
 import { percent, ratio } from './progress.ts';
 import { ActionBar } from './ActionBar.tsx';
+import { AutoToggle } from './AutoToggle.tsx';
 
 // 毎 tick 数字が動くとうるさいので、いちばん大きい単位だけを切り上げて出す（秒が動くのは 1 分を切ってから）。
 function etaText(antimatter: BigNum, cost: BigNum, etaSeconds: number): string {
@@ -113,6 +114,8 @@ export function DimensionList({ ad, notice = () => {} }: { ad: AntimatterSlice; 
           <span>{t('adUiColNext')}</span>
           <span className="adlab-dim-cell">{t('adUiColBuy')}</span>
         </div>
+        <div className="adlab-dim-autos is-low"><AutoToggle ad={ad} id="lowDims" vertical range={[1, 4]} /></div>
+        <div className="adlab-dim-autos is-high"><AutoToggle ad={ad} id="highDims" vertical range={[5, 8]} /></div>
         {derived.dimensions.map((d) => (
           <MemoRow
             key={d.tier} d={d} antimatter={game.antimatter} sacrificeBoost={game.sacrificeBoost}

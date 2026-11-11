@@ -30,6 +30,8 @@ export function AdPurchaseParticles({ root }: { root: RefObject<HTMLDivElement |
         ? panel.querySelector(`[data-tier="${event.tier}"] .adlab-dimension-reactor`)
         : null;
       const bounds = panel.getBoundingClientRect();
+      // 狭い窓ではパネルごと縮めているので、画面上の距離をパネル内の距離に戻す。
+      const scale = panel.offsetWidth > 0 ? bounds.width / panel.offsetWidth : 1;
       const candidates = [reactor, panel.querySelector('[data-ad-core] svg'), interactedButton];
       const anchor = candidates.filter((candidate) => candidate && panel.contains(candidate))
         .map((candidate) => candidate!.getBoundingClientRect())
@@ -41,8 +43,8 @@ export function AdPurchaseParticles({ root }: { root: RefObject<HTMLDivElement |
       const color = event.kind === 'crunch' || event.kind === 'galaxy' ? '#e4a3ff' : '#8affdf';
       setBursts((previous) => [...previous.slice(-(BURST_LIMIT - 1)), {
         id, color,
-        x: anchor.left + anchor.width / 2 - bounds.left + panel.scrollLeft,
-        y: centerY - bounds.top + panel.scrollTop,
+        x: (anchor.left + anchor.width / 2 - bounds.left) / scale + panel.scrollLeft,
+        y: (centerY - bounds.top) / scale + panel.scrollTop,
       }]);
       // Coalesce rapid purchases without allowing a queue of dormant timers to grow.
       while (timers.size >= BURST_LIMIT) {
