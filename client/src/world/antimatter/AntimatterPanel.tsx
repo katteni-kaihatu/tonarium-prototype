@@ -13,6 +13,7 @@ import { InfinityPanel } from './InfinityPanel.tsx';
 import { LayerTabs } from './LayerTabs.tsx';
 import { SaveErrorLog } from './SaveErrorLog.tsx';
 import { adPanelScale } from './panelScale.ts';
+import { AntimatterWall, antimatterDigits } from './AntimatterWall.tsx';
 import './antimatter-panel.css';
 import { emitAdFeedback } from '../../ad/feedback.ts';
 import { AdPurchaseParticles } from './AdPurchaseParticles.tsx';
@@ -84,10 +85,12 @@ export function AntimatterPanel({ ad }: AntimatterPanelProps) {
     <div ref={frame} className="adlab-scale-frame">
     <div ref={root} className="adlab-lab-panel" style={rootStyle} role="region" aria-label={t('mergeAdLab')} tabIndex={0}>
       <div className="adlab-header" style={s.header}>
+        <AntimatterWall antimatter={game.antimatter} />
         <div className="adlab-resource" data-ad-core role="group" aria-label={t('adLabText1')}>
           <Icon name="atom" size={24} stroke={1.8} />
           <span className="adlab-resource-value adlab-number" style={s.big}>{formatNumber(game.antimatter)}</span>
           <span className="adlab-number adlab-resource-rate">{t('adPerSecond', formatNumber(derived.antimatterPerSecond))}</span>
+          <span className="adlab-number adlab-digits" title={t('adUiDigitsTitle', antimatterDigits(game.antimatter), Math.floor(derived.preview.infinityThresholdLog10) + 1)}>{t('adUiDigits', antimatterDigits(game.antimatter))}</span>
         </div>
         <div className="adlab-chips">
           <span className="adlab-chip adlab-chip-ip adlab-number"><Icon name="infinity" size={13} />IP {formatNumber(game.infinityPoints)}</span>

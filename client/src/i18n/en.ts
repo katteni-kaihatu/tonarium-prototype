@@ -395,6 +395,8 @@ export default {
   adUiColNext: "Next ×2",
   adUiColBuy: "Buy",
   adUiFundProgress: "{0} of the cost saved",
+  adUiDigits: "{0} digits",
+  adUiDigitsTitle: "Antimatter written out is {0} digits. Big Crunch arrives at {1} digits (only the top ~15 digits are exact; the rest are decoration)",
   adUiTickBuyShort: "Buy",
   adUiCrunchShort: "Crunch",
   adUiLevel: "Lv{0}",

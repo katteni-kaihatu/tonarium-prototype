@@ -395,6 +395,8 @@ export default {
   adUiColNext: "次の ×2",
   adUiColBuy: "購入",
   adUiFundProgress: "費用の {0} まで貯まっています",
+  adUiDigits: "{0}桁",
+  adUiDigitsTitle: "反物質をすべて書くと {0} 桁。Big Crunch は {1} 桁で届く（正しく持っているのは上位約15桁で、下の桁は飾り）",
   adUiTickBuyShort: "買う",
   adUiCrunchShort: "Crunch",
   adUiLevel: "Lv{0}",
