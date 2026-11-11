@@ -48,6 +48,8 @@ export const EXPORT_BUNDLE_VERSION = 3;
 
 export const DEFAULT_PROFILE_NAME = 'Player 1';
 export const MAX_PROFILE_NAME_LENGTH = 64;
+/** 衝突時に戻すための記録。定期保存で増えるので、プロフィールごとに新しいこの件数だけ残す */
+export const RECOVERY_RECORD_LIMIT = 20;
 
 /** 対応する認証モード。将来モードを増やす場合はここへ追加する。 */
 export const AUTH_MODES = Object.freeze(['anonymous', 'token', 'header-injected']);
@@ -523,9 +525,63 @@ export function listRecoveryRecords(storage, profileId) {
   }
   return records.filter(record => record.key.startsWith(prefix) && storage.getItem(record.key));
 }
-export function retainSyncSources(storage, profileId, local, remote) {
+function recoveryPrefix(profileId) {
+  return 'ad:v3:recovery:' + profileId + ':';
+}
+function recoveryTime(prefix, record) {
+  const created = Date.parse(record.createdAt ?? '');
+  if (Number.isFinite(created)) return created;
+  // 索引の書込みだけが失敗した記録は createdAt を持たない。キーに含まれる作成時刻で新しい方を残す。
+  const id = record.key.startsWith(prefix) ? record.key.slice(prefix.length) : '';
+  const match = /^user-([0-9a-f]+)-/i.exec(id);
+  if (match) {
+    const parsed = Number.parseInt(match[1], 16);
+    if (Number.isSafeInteger(parsed)) return parsed;
+  }
+  // 通常のキーは UUID で時刻を持たない。索引へ載る前に失敗した最新の退避を、日付のある古い記録より先に消さない。
+  return Number.POSITIVE_INFINITY;
+}
+export function pruneRecoveryRecords(storage, profileId, keep = RECOVERY_RECORD_LIMIT) {
+  assertStorage(storage);
+  if (typeof profileId !== 'string' || !profileId || profileId.includes(':')) return [];
+  const limit = Number.isSafeInteger(keep) && keep >= 1 ? keep : RECOVERY_RECORD_LIMIT;
   const records = listRecoveryRecords(storage, profileId);
-  const key = 'ad:v3:recovery:' + profileId + ':' + generateUserId();
+  if (records.length <= limit) return records;
+  const prefix = recoveryPrefix(profileId);
+  const ranked = records.map((record, index) => ({ record, index, time: recoveryTime(prefix, record) }));
+  ranked.sort((a, b) => b.time - a.time || a.index - b.index);
+  const kept = ranked.slice(0, limit).map(item => item.record);
+  const keptKeys = new Set(kept.map(record => record.key));
+  // 上限超過で setItem が失敗する端末では、先に本体を消さないと短い索引も書けない。
+  for (const item of ranked) {
+    if (keptKeys.has(item.record.key) || !item.record.key.startsWith(prefix)) continue;
+    storage.removeItem(item.record.key);
+  }
+  storage.setItem('ad:v3:recoveryIndex:' + profileId, JSON.stringify(kept));
+  const lastKey = 'ad:v3:lastRecovery:' + profileId;
+  const last = storage.getItem(lastKey);
+  if (last && !keptKeys.has(last)) storage.setItem(lastKey, kept[0].key);
+  return kept;
+}
+export function pruneAllRecoveryRecords(storage, keep = RECOVERY_RECORD_LIMIT) {
+  assertStorage(storage);
+  const ids = new Set(listProfiles(storage).map(profile => profile.id));
+  if (typeof storage.key === 'function') {
+    const found = [];
+    for (let i = 0; i < (storage.length ?? 0); i++) found.push(storage.key(i));
+    for (const key of found) {
+      if (!key?.startsWith('ad:v3:recovery:')) continue;
+      const rest = key.slice('ad:v3:recovery:'.length);
+      const split = rest.lastIndexOf(':');
+      if (split > 0) ids.add(rest.slice(0, split));
+    }
+  }
+  for (const id of ids) pruneRecoveryRecords(storage, id, keep);
+}
+export function retainSyncSources(storage, profileId, local, remote) {
+  pruneRecoveryRecords(storage, profileId, RECOVERY_RECORD_LIMIT - 1);
+  const records = listRecoveryRecords(storage, profileId).slice(0, RECOVERY_RECORD_LIMIT - 1);
+  const key = recoveryPrefix(profileId) + generateUserId();
   storage.setItem(key, JSON.stringify({ local, remote, connection: readConnection(storage, profileId) }));
   storage.setItem('ad:v3:recoveryIndex:' + profileId, JSON.stringify([{ key, createdAt: new Date().toISOString() }, ...records]));
   storage.setItem('ad:v3:lastRecovery:' + profileId, key);
@@ -631,4 +687,7 @@ export default {
   writeConnection,
   retainSyncSources,
   listRecoveryRecords,
+  pruneRecoveryRecords,
+  pruneAllRecoveryRecords,
+  RECOVERY_RECORD_LIMIT,
 };

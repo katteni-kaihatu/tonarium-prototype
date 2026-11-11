@@ -27,7 +27,7 @@ import {
   type OfflineResult,
 } from './engine.mjs';
 import {
-  readConnection, writeConnection, retainSyncSources, listRecoveryRecords, parseImportBundle,
+  readConnection, writeConnection, retainSyncSources, listRecoveryRecords, pruneAllRecoveryRecords, parseImportBundle,
   prepareProgressSelection, selectProgress, listProgressSources, adoptConnection,
   type ProgressSource,
   type RecoveryRecord,
@@ -450,6 +450,8 @@ export function createAdSlice(set: AdSet, get: AdGet): AdSlice {
       if (started) return;
       started = true;
       storage = options.storage ?? safeStorage();
+      // 溜まった復元記録で容量が尽きていると、この後の現行セーブの上書きまで失敗する。整理に失敗しても保存済みの進行は読む。
+      try { pruneAllRecoveryRecords(storage); } catch { /* 現行セーブは残す */ }
 
       // 既定は同一オリジン（Tonarium サーバー内の /api/*）。空文字の AdApiClient は相対パス /api/... を叩く。
       // VITE_AD_API_BASE は任意の上書きで、Workers などの外部 API に向けたい場合にだけ指定する。
