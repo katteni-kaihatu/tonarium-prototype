@@ -15,7 +15,7 @@ import { ShareVideoHost } from '../ShareVideo.tsx';
 import { follow, selectNote } from '../actions.ts';
 import { Icon } from './Icon.tsx';
 import { ItemMark, Viewers, itemLabel } from './common.tsx';
-import { closeWindow, isAdWindow, moveWindow, raiseWindow, toggleMax } from './windows.ts';
+import { closeWindow, isAdWindow, moveWindow, raiseWindow, resizeWindow, toggleMax } from './windows.ts';
 import { AvatarView } from './Portraits.tsx';
 import { PortraitEmote } from './Emotes.tsx';
 import { MediaControls, mediaVolume } from '../mediaSync.tsx';
@@ -30,6 +30,8 @@ import { SystemItemPanel } from '../systems/SystemItem.tsx';
 import { useXR } from '../xr/runtime.ts';
 
 const BAR = 40;
+const MIN_W = 220;
+const MIN_H = BAR + 80;
 type Kind = 'video' | 'panel' | 'note' | 'media' | 'face' | 'dice' | 'survivor';
 /** noMax: 最大化しない（顔はアバターのキャンバスの下に隠れてしまうため） */
 interface Resolved { kind: Kind; dark: boolean; title: string; sub: React.ReactNode; item?: Item; body: React.ReactNode; aspect?: number; width: number; noMax?: boolean; noClose?: boolean }
@@ -171,6 +173,8 @@ function WindowFrame({ win, region, simple, z, compact = false }: {
   const maxWin = useStore((s) => s.maxWin);
   const phoneLayout = useStore((s) => s.phoneLayout);
   const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
+  const resize = useRef<{ sx: number; sy: number; ow: number; oh: number } | null>(null);
+  const frameRef = useRef<HTMLElement>(null);
   const gone = !r;
   useEffect(() => { if (gone) closeWindow(win.key); }, [gone, win.key]);
   if (!r) return null;
@@ -184,7 +188,8 @@ function WindowFrame({ win, region, simple, z, compact = false }: {
   else if (max) { width = window.innerWidth; height = window.innerHeight; }
   else if (simple) {
     ({ width, height } = simpleWindowSize({ region, bar: BAR, aspect: r.aspect, fill: shouldFillWindow({ phone: phoneLayout, compact, isAd: isAdWindow(win.key, r.item) }) }));
-  } else if (r.aspect && r.kind !== 'panel') height = width / r.aspect + BAR;
+  } else if (win.w && win.h) { width = win.w; height = win.h; }
+  else if (r.aspect && r.kind !== 'panel') height = width / r.aspect + BAR;
 
   // AD は長い操作パネルなので、フリー配置でも画面内に収めて本文をスクロールできるようにする。
   const boundedAD = !simple && !max && isAdWindow(win.key, r.item);
@@ -215,9 +220,30 @@ function WindowFrame({ win, region, simple, z, compact = false }: {
   };
   const onUp = () => { drag.current = null; };
 
+  const resizable = !simple && !max && !compact && !immersive;
+  const onResizeDown = (e: React.PointerEvent) => {
+    const el = frameRef.current;
+    if (!el) return;
+    e.stopPropagation();
+    raiseWindow(win.key);
+    const rect = el.getBoundingClientRect();
+    resize.current = { sx: e.clientX, sy: e.clientY, ow: rect.width, oh: rect.height };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* 合成イベントなど */ }
+  };
+  const onResizeMove = (e: React.PointerEvent) => {
+    const d = resize.current;
+    if (!d) return;
+    // 画面の外へはみ出す分は広げない（掴み直せなくなるため）
+    const maxW = Math.max(MIN_W, window.innerWidth - left);
+    const maxH = Math.max(MIN_H, window.innerHeight - top);
+    resizeWindow(win.key, Math.round(Math.max(MIN_W, Math.min(maxW, d.ow + e.clientX - d.sx))), Math.round(Math.max(MIN_H, Math.min(maxH, d.oh + e.clientY - d.sy))));
+  };
+  const onResizeUp = () => { resize.current = null; };
+
   // 最大化したウィンドウは前面のパネルより上に出す（ウィンドウ層の中だと重なり順で負ける）
   const frame = (
     <section
+      ref={frameRef}
       className={`win ${r.dark ? 'dark' : ''} k-${r.kind} ${compact ? 'compact' : ''}`} style={{ ...style, ...(immersive ? { '--xr-media-aspect': r.aspect } as React.CSSProperties : {}) }} aria-label={r.title}
       data-xr-surface={immersive ? win.key : undefined}
       data-xr-min-width={immersive ? (r.item && PANELS[r.item.kind] ? PANELS[r.item.kind]!.w + 44 : r.width) : undefined}
@@ -235,6 +261,12 @@ function WindowFrame({ win, region, simple, z, compact = false }: {
           : <WinButtons win={win} r={r} max={max} />}
       </div>
       <div className="winbody">{r.body}</div>
+      {resizable && (
+        <div
+          className="winresize" title={tr("winResize")} aria-hidden
+          onPointerDown={onResizeDown} onPointerMove={onResizeMove} onPointerUp={onResizeUp} onPointerCancel={onResizeUp}
+        />
+      )}
     </section>
   );
   return max && !compact ? createPortal(frame, document.body) : frame;
