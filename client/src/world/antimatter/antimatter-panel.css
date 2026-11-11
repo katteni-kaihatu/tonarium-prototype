@@ -132,6 +132,9 @@
 .adlab-lab-panel .adlab-action-run { flex: 1 1 auto; min-width: 0; padding: 4px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px !important; letter-spacing: -.01em; font-weight: 700; background: linear-gradient(90deg, rgba(139,127,214,.38) var(--ad-fill, 0%), transparent var(--ad-fill, 0%)) !important; }
 .adlab-lab-panel .adlab-action-run:disabled { opacity: 1; color: var(--ad-muted) !important; }
 .adlab-lab-panel .adlab-action.is-ready .adlab-action-run { border-color: var(--ad-accent) !important; background: color-mix(in srgb, var(--ad-accent) 18%, transparent) !important; }
+.adlab-lab-panel .adlab-action-run.has-eta { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 4px 7px !important; }
+.adlab-action-run.has-eta > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.adlab-action-run.has-eta > small { flex: none; font-size: 10px; font-weight: 600; }
 .adlab-lab-panel .adlab-auto-toggle-mini { flex: none; display: flex; align-items: center; justify-content: center; width: 26px; min-height: 30px; padding: 0; border: 1px solid #3a3266; border-radius: 7px; background: #241e42; color: var(--ad-muted); cursor: pointer; }
 .adlab-lab-panel .adlab-auto-toggle-mini.is-on { border-color: #5eead4; background: #1d3a3a; color: #a7f3e4; }
 .adlab-lab-panel .adlab-auto-toggle-mini.is-locked { opacity: .85; border-style: dashed; border-color: #4a3f7c; background: transparent; color: #9b94bb; }
@@ -156,7 +159,8 @@
 .adlab-tip-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .adlab-tip-chips > span { padding: 2px 6px; border-radius: 5px; background: #3b2433; color: #f4b4c4; font-size: 11px; }
 
-.adlab-dim-table { display: grid; grid-template-columns: 34px minmax(0, 1fr); border: 1px solid #2f2854; border-radius: 10px; background: var(--ad-box); overflow: hidden; }
+/* 次元ごとにカードで囲み、その次元の ×2 バーと購入ボタンがどの行のものか分かるようにする。 */
+.adlab-dim-table { display: grid; grid-template-columns: 34px minmax(0, 1fr); row-gap: 6px; padding: 6px 8px 6px 0; border: 1px solid #2f2854; border-radius: 10px; background: var(--ad-box); overflow: hidden; }
 /* 自動購入は第1〜4次元と第5〜8次元の 2 本なので、行の高さが違っても 4 行ぶんにそろうよう行番号で置く。 */
 .adlab-dim-table > .adlab-dim-row { grid-column: 2; }
 .adlab-dim-table > .adlab-dim-header { grid-row: 1; }
@@ -164,32 +168,36 @@
 .adlab-dim-row[data-tier="3"] { grid-row: 4; } .adlab-dim-row[data-tier="4"] { grid-row: 5; }
 .adlab-dim-row[data-tier="5"] { grid-row: 6; } .adlab-dim-row[data-tier="6"] { grid-row: 7; }
 .adlab-dim-row[data-tier="7"] { grid-row: 8; } .adlab-dim-row[data-tier="8"] { grid-row: 9; }
-.adlab-dim-autos { grid-column: 1; display: flex; justify-content: center; padding: 6px 0 6px 8px; min-height: 0; }
+.adlab-dim-autos { grid-column: 1; display: flex; justify-content: center; padding-left: 8px; min-height: 0; }
 .adlab-dim-autos.is-low { grid-row: 2 / 6; }
 .adlab-dim-autos.is-high { grid-row: 6 / 10; }
-.adlab-dim-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "name owned" "mult prod" "next next" "buy buy"; align-items: center; gap: 6px 10px; padding: 8px 10px; border-bottom: 1px solid #262046; }
-.adlab-dim-row:last-child { border-bottom: 0; }
+.adlab-dim-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "name owned" "mult prod" "buy buy"; align-items: center; gap: 6px 10px; padding: 8px 10px; border: 1px solid #2f2854; border-radius: 10px; background: #231d40; }
 .adlab-dim-header { display: none; }
+.adlab-dim-table > .adlab-dim-header { border-color: transparent; background: transparent; }
 .adlab-dim-name { grid-area: name; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .adlab-dim-icon { flex: none; width: 36px; height: 36px; }
 .adlab-dim-title { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-.adlab-dim-sub { color: var(--ad-muted); font-size: 11px; }
 .adlab-dim-cell { min-width: 0; text-align: right; }
 .adlab-dim-owned { grid-area: owned; font-size: 14px; font-weight: 700; }
 .adlab-dim-mult { grid-area: mult; color: var(--ad-violet); text-align: left; }
 .adlab-dim-mult > small { display: block; color: var(--ad-amber); font-size: 10px; }
 .adlab-dim-prod { grid-area: prod; color: var(--ad-teal); }
-.adlab-dim-next { grid-area: next; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.adlab-dim-next { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .adlab-dim-next > .adlab-bar { flex: 1 1 auto; }
-.adlab-dim-next > span { flex: none; width: 36px; color: var(--ad-muted); font-size: 11px; text-align: right; }
-.adlab-dim-buy { grid-area: buy; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.adlab-dim-next > span { flex: none; width: 32px; color: var(--ad-muted); font-size: 10px; text-align: right; }
+.adlab-dim-buy { grid-area: buy; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.adlab-dim-level { flex: none; width: 76px; display: flex; flex-direction: column; gap: 2px; line-height: 1.2; }
+.adlab-dim-level > b { font-size: 12px; color: #ece9f6; white-space: nowrap; }
+.adlab-dim-level > small { color: var(--ad-muted); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adlab-dim-buy-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.adlab-dim-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 /* 背景の塗りは「今の反物質 ÷ 費用」。押せないボタンも塗りが読めるよう、半透明にせず文字色だけ落とす。 */
-.adlab-lab-panel .adlab-dim-buy button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-height: 36px; padding: 2px 6px; border: 1px solid #3a3266; border-radius: 7px; background: linear-gradient(90deg, rgba(139,127,214,.38) var(--ad-fill, 0%), transparent var(--ad-fill, 0%)); color: #ece9f6; line-height: 1.15; cursor: pointer; }
+.adlab-lab-panel .adlab-dim-buy button { display: flex; align-items: center; justify-content: space-between; gap: 3px; min-height: 30px; padding: 2px 5px; border: 1px solid #3a3266; border-radius: 7px; background: linear-gradient(90deg, rgba(139,127,214,.38) var(--ad-fill, 0%), transparent var(--ad-fill, 0%)); color: #ece9f6; line-height: 1.15; cursor: pointer; }
 .adlab-lab-panel .adlab-dim-buy button:disabled { opacity: 1; color: var(--ad-muted); }
 .adlab-lab-panel .adlab-dim-buy button.is-partial:not(:disabled) { background: linear-gradient(90deg, rgba(94,234,212,.3) var(--ad-fill, 0%), transparent var(--ad-fill, 0%)); }
 .adlab-lab-panel .adlab-dim-row.is-affordable .adlab-dim-buy button:not(:disabled):not(.is-partial) { border-color: #5eead4; background: #1d3a3a; color: #c9f7ee; opacity: 1; }
 .adlab-lab-panel .adlab-dim-row.is-affordable .adlab-dim-buy button.is-double:not(:disabled) { border-color: #f0b866; background: #3a2e2a; color: #f6cf92; }
-.adlab-dim-eta { color: var(--ad-muted); white-space: nowrap; }
+.adlab-dim-eta { color: var(--ad-muted); white-space: nowrap; letter-spacing: -.02em; }
 .adlab-dim-row.is-affordable .adlab-dim-buy button:not(:disabled):not(.is-partial) .adlab-dim-eta { color: inherit; }
 .adlab-dim-prod { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
 .adlab-dim-prod > small { color: var(--ad-muted); font-size: 10px; white-space: nowrap; }
@@ -311,6 +319,10 @@
   .adlab-lab-panel .adlab-buy-all { padding: 0 10px; }
   .adlab-lab-panel .adlab-dim-buy button { min-height: 44px; }
   .adlab-lab-panel .adlab-dim-buy b { font-size: 14px; }
+  .adlab-dim-buy { flex-direction: column; align-items: stretch; gap: 6px; }
+  .adlab-dim-table { padding-right: 4px; }
+  .adlab-dim-row { padding: 8px; column-gap: 8px; }
+  .adlab-dim-level { width: auto; flex-direction: row; align-items: baseline; justify-content: space-between; gap: 8px; }
   .adlab-lab-panel input, .adlab-lab-panel select { min-height: 44px; font-size: 14px !important; }
   .adlab-lab-panel summary { min-height: 44px; }
   .adlab-lab-panel .adlab-action-run { white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
@@ -334,12 +346,11 @@
 @container (min-width: 760px) {
   .adlab-stat-columns { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; }
   .adlab-infinity-columns { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
-  .adlab-dim-row { grid-template-columns: 124px minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.15fr) minmax(56px, .7fr) 188px; grid-template-areas: "name owned mult prod next buy"; padding: 3px 10px; min-height: 46px; }
+  .adlab-dim-row { grid-template-columns: 124px minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.15fr) 276px; grid-template-areas: "name owned mult prod buy"; padding: 4px 10px; min-height: 48px; }
   .adlab-dim-header { display: grid; min-height: 28px; color: var(--ad-muted); font-size: 11px; }
   .adlab-dim-mult { text-align: right; }
-  .adlab-dim-buy { grid-template-columns: repeat(2, 90px); justify-content: end; }
-  .adlab-lab-panel .adlab-dim-buy button { min-height: 40px; }
-  .adlab-dim-row.is-locked { grid-template-areas: "name locked locked locked locked locked"; }
+  .adlab-lab-panel .adlab-dim-buy button { min-height: 26px; }
+  .adlab-dim-row.is-locked { grid-template-areas: "name locked locked locked locked"; }
 }
 @container (min-width: 820px) {
   .adlab-actions { grid-template-columns: repeat(5, minmax(0, 1fr)); }

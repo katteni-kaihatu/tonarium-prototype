@@ -6,7 +6,7 @@ import {
   getAntimatterPerSecond, getDimensionalBoostRequirement, getDimensionCost,
   getDimensionMultiplierBig, getDimensionProductionPerSecond, getEffectiveTickspeedBig, getSacrificeCandidate, getGalaxyRequirement,
   getInfinityGain, getMaxUnlockedTier, getTickspeedCost, getTickspeedPerPurchase,
-  INFINITY_THRESHOLD_LOG10, SACRIFICE_MIN_GAIN, bigMulNumber,
+  INFINITY_THRESHOLD_LOG10, SACRIFICE_MIN_GAIN, bigMulNumber, bigFromLog10,
   type GameState,
 } from '../../ad/engine.mjs';
 import { parseImportBundle, type StorageLike } from '../../ad/user.mjs';
@@ -54,6 +54,8 @@ function derivedFrom(game: GameState): DerivedSnapshot {
     tickspeedCost: getTickspeedCost(game),
     tickspeedAffordable: bigGte(game.antimatter, getTickspeedCost(game)),
     tickspeedPerPurchase: getTickspeedPerPurchase(game),
+    tickspeedEtaSeconds: predictEta(getTickspeedCost(game)),
+    infinityEtaSeconds: predictEta(bigFromLog10(INFINITY_THRESHOLD_LOG10)),
     maxUnlockedTier,
     dimensions: game.dimensions.map((dim, i) => {
       const tier = i + 1;
