@@ -916,3 +916,32 @@ test('Tickspeed と Big Crunch のカードは残り時間を出し、次元は 
     }
   } finally { setLanguage(previous); }
 });
+
+test('ヘッダーの帯には反物質の全桁を 2 行で敷き、上位は実際の桁、桁数の表示は三言語で出る', async () => {
+  const { AntimatterWall, antimatterDigits, WALL_MAX_DIGITS } = await import('./AntimatterWall.tsx');
+  assert.equal(antimatterDigits(bigFromNumber(0)), 1);
+  assert.equal(antimatterDigits(bigFromNumber(999)), 3);
+  assert.equal(antimatterDigits(bigFromNumber(1000)), 4);
+  assert.equal(antimatterDigits(bigFromLog10(68.742)), 69);
+  const wall = renderToStaticMarkup(<AntimatterWall antimatter={bigFromLog10(68.742)} />);
+  assert.equal([...wall.matchAll(/class="adlab-wall-row"/g)].length, 2);
+  const text = wall.replace(/<[^>]+>/g, '');
+  assert.equal(text.replace(/,/g, '').length, 69);
+  assert.ok(text.startsWith('552,'));
+  assert.ok(wall.includes('aria-hidden="true"'));
+  assert.equal(renderToStaticMarkup(<AntimatterWall antimatter={bigFromNumber(9.96)} />).replace(/<[^>]+>/g, ''), '9');
+  assert.ok(renderToStaticMarkup(<AntimatterWall antimatter={bigFromNumber(999999)} />).replace(/<[^>]+>/g, '').startsWith('999,999'));
+  const huge = renderToStaticMarkup(<AntimatterWall antimatter={bigFromLog10(100000)} />).replace(/<[^>]+>/g, '');
+  assert.equal(huge.replace(/,/g, '').length, WALL_MAX_DIGITS);
+  const previous = getLanguage();
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      const game = createNewGame(0);
+      game.antimatter = bigFromLog10(68.742);
+      const html = renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(harness(game))!} />);
+      assert.ok(html.includes(`>${t('adUiDigits', 69)}</span>`));
+      assert.ok(html.includes(t('adUiDigitsTitle', 69, 309)));
+    }
+  } finally { setLanguage(previous); }
+});
