@@ -61,6 +61,9 @@ export function adoptConnection(storage: StorageLike, name: string, connection: 
 export function retainSyncSources(storage: StorageLike, profileId: string, local: unknown, remote: unknown): string;
 export interface RecoveryRecord { key: string; createdAt: string | null }
 export function listRecoveryRecords(storage: StorageLike, profileId: string): RecoveryRecord[];
+export const RECOVERY_RECORD_LIMIT: number;
+export function pruneRecoveryRecords(storage: StorageLike, profileId: string, keep?: number): RecoveryRecord[];
+export function pruneAllRecoveryRecords(storage: StorageLike, keep?: number): void;
 export interface ProgressSelection { profileId: string; confirmed: boolean }
 export interface ProgressSource { key: string; profileId: string; name: string; save: Record<string, unknown>; createdAt?: string | null; source?: string }
 export function readProgressSelection(storage: StorageLike): ProgressSelection | null;
