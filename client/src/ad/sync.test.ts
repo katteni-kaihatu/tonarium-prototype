@@ -5,7 +5,7 @@ import { createNewGame, serialize, bigFromLog10, bigLog10, getGalaxyRequirement 
 import { compareProgress, sameSave } from './sync.mjs';
 import { createAdSlice, type AdSlice } from './slice.ts';
 import { pushSaveFailure, type AdSaveFailure } from './saveFailure.ts';
-import { buildExportBundle, createProfile, getActiveProfile, importBundleInto, listProfiles, listRecoveryRecords, retainSyncSources, parseImportBundle, readConnection, readSaveRaw, switchProfile, writeConnection, writeSave, prepareProgressSelection, readProgressSelection, selectProgress, type StorageLike } from './user.mjs';
+import { buildExportBundle, createProfile, getActiveProfile, importBundleInto, listProfiles, listRecoveryRecords, retainSyncSources, pruneAllRecoveryRecords, RECOVERY_RECORD_LIMIT, parseImportBundle, readConnection, readSaveRaw, switchProfile, writeConnection, writeSave, prepareProgressSelection, readProgressSelection, selectProgress, type StorageLike } from './user.mjs';
 import { linkTonariumProfile } from './link.ts';
 import { subscribeAdFeedback } from './feedback.ts';
 import { adaptAdSlice } from '../world/antimatter/adapter.tsx';
@@ -452,6 +452,61 @@ test('legacy recovery records are discovered and indexed without duplicating key
   assert.equal(records.length, 3);
   assert.equal(new Set(records.map(record => record.key)).size, 3);
   assert.ok(records.some(record => record.key.endsWith(':old')));
+});
+
+test('excess recovery records are deleted oldest first and the live save, connection and baseline stay byte for byte', () => {
+  const data = storage();
+  const profile = createProfile(data, 'Player');
+  const other = createProfile(data, 'Other');
+  const save = serialize(Object.assign(createNewGame(1000), { infinities: 4 }));
+  writeSave(data, profile.id, save);
+  writeConnection(data, profile.id, { id: 'remote', token: 'secret' });
+  const baselineKey = 'ad:v4:baseline:' + profile.id;
+  data.setItem(baselineKey, '{"id":"remote","revision":4}');
+  data.setItem('ad:v4:selection', JSON.stringify({ profileId: profile.id, confirmed: true }));
+  const prefix = 'ad:v3:recovery:' + profile.id + ':';
+  const keys = Array.from({ length: RECOVERY_RECORD_LIMIT + 5 }, (_, i) => prefix + 'user-' + (0x1000 + i).toString(16) + '-aa-bb');
+  for (const [index, key] of keys.entries()) data.setItem(key, JSON.stringify({ local: { infinities: index }, remote: null }));
+  const fresh = prefix + 'user-' + Date.now().toString(16) + '-cc-dd';
+  data.setItem(fresh, JSON.stringify({ local: { infinities: 99 }, remote: null }));
+  data.setItem('ad:v3:recoveryIndex:' + profile.id, JSON.stringify(keys.map(key => ({ key, createdAt: null }))));
+  data.setItem('ad:v3:lastRecovery:' + profile.id, keys[0]);
+  const otherKey = 'ad:v3:recovery:' + other.id + ':keep';
+  data.setItem(otherKey, JSON.stringify({ local: { infinities: 1 }, remote: null }));
+  const untouched = ['ad:v2:save:' + profile.id, 'ad:v3:connection:' + profile.id, baselineKey, 'ad:v4:selection', otherKey];
+  const before = Object.fromEntries(untouched.map(key => [key, data.getItem(key)]));
+  const order: string[] = [];
+  const removeItem = data.removeItem, setItem = data.setItem;
+  data.removeItem = (key: string) => { order.push('remove:' + key); removeItem(key); };
+  data.setItem = (key: string, value: string) => { order.push('set:' + key); setItem(key, value); };
+  const enumerable = Object.assign(data, { key: (index: number) => [...data.values.keys()][index] ?? null });
+  Object.defineProperty(enumerable, 'length', { get: () => data.values.size });
+  pruneAllRecoveryRecords(enumerable);
+  const indexWrite = order.indexOf('set:ad:v3:recoveryIndex:' + profile.id);
+  const firstRemoval = order.findIndex(entry => entry.startsWith('remove:' + prefix));
+  assert.ok(firstRemoval !== -1 && firstRemoval < indexWrite);
+  assert.equal(order.some(entry => untouched.some(key => entry.endsWith(key))), false);
+  for (const key of untouched) assert.equal(data.getItem(key), before[key]);
+  const left = listRecoveryRecords(enumerable, profile.id);
+  assert.equal(left.length, RECOVERY_RECORD_LIMIT);
+  assert.equal(left[0].key, fresh);
+  assert.equal(data.getItem(keys[0]), null);
+  assert.equal(data.getItem(keys.at(-1)!), JSON.stringify({ local: { infinities: keys.length - 1 }, remote: null }));
+  assert.equal(listRecoveryRecords(enumerable, other.id).length, 1);
+  const orphan = prefix + 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  data.setItem(orphan, JSON.stringify({ local: { infinities: 77 }, remote: null }));
+  const oldIndex = Array.from({ length: RECOVERY_RECORD_LIMIT }, (_, i) => {
+    const key = prefix + 'old-' + i;
+    data.setItem(key, JSON.stringify({ local: { infinities: i }, remote: null }));
+    return { key, createdAt: new Date(Date.UTC(2020, 0, i + 1)).toISOString() };
+  });
+  data.setItem('ad:v3:recoveryIndex:' + profile.id, JSON.stringify(oldIndex));
+  pruneAllRecoveryRecords(enumerable);
+  assert.equal(data.getItem(orphan), JSON.stringify({ local: { infinities: 77 }, remote: null }));
+  assert.equal(data.getItem('ad:v2:save:' + profile.id), save);
+  for (let i = 0; i < 10; i++) retainSyncSources(data, profile.id, { infinities: 1000 + i }, null);
+  assert.equal(listRecoveryRecords(enumerable, profile.id).length, RECOVERY_RECORD_LIMIT);
+  assert.equal(data.getItem('ad:v2:save:' + profile.id), save);
 });
 
 test('progress comparison prioritizes infinities, then the full precision total; equality stays equal', () => {
