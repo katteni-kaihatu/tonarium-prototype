@@ -846,3 +846,42 @@ test('ETA formatting retains second, minute, hour and day ceilings in all three 
     }
   } finally { setLanguage(previous); }
 });
+
+test('次元タブの自動化トグルは未解放で鍵、解放後は自動化パネルと同じ条件で切り替わり、カードのボタンは進み具合で塗る', () => {
+  const previous = getLanguage();
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      const game = createNewGame(0);
+      const slice = harness(game);
+      const html = () => renderToStaticMarkup(<DimensionList ad={adaptAdSlice(slice)!} />);
+      const button = (markup: string, label: string) => [...markup.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(m => m[0]).find(b => b.includes(`aria-label="${label}"`)) ?? '';
+      const lowLocked = button(html(), t('adUiAutoLockedPre', t('adAutoLow'), 1));
+      assert.ok(lowLocked.includes('is-locked') && /\bdisabled=/.test(lowLocked));
+      assert.ok(button(html(), t('adUiAutoLockedPre', 'Tickspeed', 1)).includes('is-locked'));
+      assert.ok(!html().includes(t('adUiAutoLockedPre', 'Sacrifice', 1)));
+      game.antimatter = bigMulNumber(adaptAdSlice(slice)!.derived.tickspeedCost, 0.25);
+      assert.match(html(), /class="adlab-action-run"[^>]*style="[^"]*--ad-fill:25%/);
+      game.infinities = 1;
+      game.infinityPoints = bigFromNumber(1);
+      assert.ok(button(html(), t('adUiAutoLocked', t('adAutoLow'), 1)).includes('is-locked'));
+      assert.equal(slice.adUnlockAutobuyer('lowDims'), true);
+      const on = button(html(), t('adUiAutoLabel', t('adAutoLow')));
+      assert.ok(on.includes('role="switch"') && on.includes('aria-checked="true"') && !/\bdisabled=/.test(on));
+      assert.ok(on.includes(t('adUiAutoRange', 1, 4)));
+      adaptAdSlice(slice)!.setAutobuyer('lowDims', false);
+      assert.ok(button(html(), t('adUiAutoLabel', t('adAutoLow'))).includes('aria-checked="false"'));
+    }
+  } finally { setLanguage(previous); }
+});
+
+test('狭い窓では PC 用の並びのまま縮め、縮めすぎになる幅ではスマホ用の並びに任せる', async () => {
+  const { adPanelScale, AD_PANEL_DESIGN_WIDTH, AD_PANEL_MIN_SCALE } = await import('./panelScale.ts');
+  assert.equal(adPanelScale(AD_PANEL_DESIGN_WIDTH), 1);
+  assert.equal(adPanelScale(1200), 1);
+  assert.equal(adPanelScale(AD_PANEL_DESIGN_WIDTH * 0.8), 0.8);
+  assert.equal(adPanelScale(AD_PANEL_DESIGN_WIDTH * AD_PANEL_MIN_SCALE), AD_PANEL_MIN_SCALE);
+  assert.equal(adPanelScale(AD_PANEL_DESIGN_WIDTH * AD_PANEL_MIN_SCALE - 1), 1);
+  assert.equal(adPanelScale(0), 1);
+  assert.ok(renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(harness(createNewGame(0)))!} />).startsWith('<div class="adlab-scale-frame"><div class="adlab-lab-panel"'));
+});
