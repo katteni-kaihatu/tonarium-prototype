@@ -38,6 +38,10 @@ export function moveWindow(key: string, x: number, y: number) {
   set((s) => ({ windows: s.windows.map((w): Win => (w.key === key ? { ...w, x, y } : w)) }));
 }
 
+export function resizeWindow(key: string, w: number, h: number) {
+  set((s) => ({ windows: s.windows.map((x): Win => (x.key === key ? { ...x, w, h } : x)) }));
+}
+
 export const toggleMax = (key: string) => set((s) => ({ maxWin: s.maxWin === key ? null : key }));
 
 export function setWinMode(winMode: WinMode) {
