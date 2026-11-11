@@ -200,7 +200,7 @@ async function run() {
   const savedProfile = JSON.stringify(slice.adProfile);
   const host = document.getElementById('panel')!;
   const click = async (label: string, scope: ParentNode = host) => {
-    const button = [...scope.querySelectorAll('button')].find(node => node.textContent === label);
+    const button = [...scope.querySelectorAll('button')].find(node => node.textContent === label || node.getAttribute('aria-label') === label);
     check(button && !button.disabled, `Available button: ${label}`);
     flushSync(() => button.click());
     await pause();
@@ -302,7 +302,7 @@ async function run() {
     for (const language of ['ja', 'en', 'ko', 'ja'] as const) {
       flushSync(() => setLanguage(language));
       await pause(50);
-      const button = [...host.querySelectorAll('button')].find(node => node.textContent === t('adLabText31'))!;
+      const button = [...host.querySelectorAll('button')].find(node => node.textContent === t('adLabText31') || node.getAttribute('aria-label') === t('adLabText31'))!;
       check(button && !button.disabled, 'Crunch card is in the Dimensions tab');
       flushSync(() => button.click());
       await pause();

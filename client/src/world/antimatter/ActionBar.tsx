@@ -7,6 +7,7 @@ import { formatNumber } from './format.ts';
 import { s } from './styles.ts';
 import { confirmAd } from './confirmAd.tsx';
 import { AutoToggle } from './AutoToggle.tsx';
+import { etaText } from './eta.ts';
 import { digitRatio, percent, ratio, remaining } from './progress.ts';
 
 interface Effect { label: string; now: string; next: string }
@@ -37,13 +38,15 @@ interface CardProps {
   onClick: () => void;
   tip: Tip;
   auto?: ReactNode;
+  shortLabel?: string;
+  eta?: string;
 }
 
 export function tickspeedText(value: BigNum): string {
   return value.exponent >= 4 ? formatNumber(value) : (value.mantissa * 10 ** value.exponent).toFixed(2);
 }
 
-function ActionCard({ kind, icon, title, fullTitle, count, value, valueLabel, reqLabel, reqText, progress, label, can, onClick, tip, auto }: CardProps) {
+function ActionCard({ kind, icon, title, fullTitle, count, value, valueLabel, reqLabel, reqText, progress, label, can, onClick, tip, auto, shortLabel, eta }: CardProps) {
   const tipId = useId();
   return (
     <div className={`adlab-action${can ? ' is-ready' : ''}`} data-kind={kind}>
@@ -51,7 +54,14 @@ function ActionCard({ kind, icon, title, fullTitle, count, value, valueLabel, re
       <div className="adlab-action-value adlab-number" title={`${value} ${valueLabel}`}>{value}<span>{valueLabel}</span></div>
       <div className="adlab-action-req-text" title={`${reqLabel} ${reqText}`}><span>{reqLabel}</span><span className="adlab-number">{reqText}</span></div>
       <div className="adlab-action-buttons">
-        <button type="button" className="adlab-action-run" style={{ ...s.btn, '--ad-fill': percent(progress) } as CSSProperties} disabled={!can} onClick={onClick} aria-describedby={tipId}>{label}</button>
+        {eta === undefined
+          ? <button type="button" className="adlab-action-run" style={{ ...s.btn, '--ad-fill': percent(progress) } as CSSProperties} disabled={!can} onClick={onClick} aria-describedby={tipId}>{label}</button>
+          : (
+            // 残り時間と並べると元の文言が入らないので、見える文言だけ短くし、読み上げは元の文言のままにする。
+            <button type="button" className="adlab-action-run has-eta" style={{ ...s.btn, '--ad-fill': percent(progress) } as CSSProperties} disabled={!can} onClick={onClick} aria-label={label} aria-describedby={tipId}>
+              <span>{shortLabel ?? label}</span><small>{eta}</small>
+            </button>
+          )}
         {auto}
       </div>
       <TipBody id={tipId} title={fullTitle ?? title} ready={can} tip={tip} progress={progress} />
@@ -126,7 +136,7 @@ export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (messag
   return (
     <div className="adlab-actions">
       <ActionCard
-        kind="tick" auto={<AutoToggle ad={ad} id="tickspeed" />} icon="gauge" title="Tickspeed" count={t('adUiTimes', derived.tickspeedBought)}
+        kind="tick" auto={<AutoToggle ad={ad} id="tickspeed" />} shortLabel={t('adUiTickBuyShort')} eta={etaText(derived.tickspeedAffordable, derived.tickspeedEtaSeconds)} icon="gauge" title="Tickspeed" count={t('adUiTimes', derived.tickspeedBought)}
         value={`×${tickspeedText(derived.tickspeedValue)}`} valueLabel={t('adUiAllDims')}
         reqLabel={resAntimatter} reqText={`${formatNumber(game.antimatter)} / ${formatNumber(derived.tickspeedCost)}`} progress={tickProgress}
         label={t('adBuyTickspeed')} can={derived.tickspeedAffordable} onClick={() => ad.buyTickspeed()}
@@ -186,7 +196,7 @@ export function ActionBar({ ad, notice }: { ad: AntimatterSlice; notice: (messag
         }}
       />
       <ActionCard
-        kind="crunch" auto={<AutoToggle ad={ad} id="crunch" />} icon="infinity" title="Big Crunch" count={t('adUiTimes', game.infinities)}
+        kind="crunch" auto={<AutoToggle ad={ad} id="crunch" />} shortLabel={t('adUiCrunchShort')} eta={etaText(infinity.can, derived.infinityEtaSeconds)} icon="infinity" title="Big Crunch" count={t('adUiTimes', game.infinities)}
         value={`+${infinity.gain} IP`} valueLabel={t('adUiNow')}
         reqLabel={resAntimatter} reqText={`e${infinityDigits} / e${infinityGoal}`} progress={crunchProgress}
         label={t('adLabText31')} can={infinity.can} onClick={onBigCrunch}

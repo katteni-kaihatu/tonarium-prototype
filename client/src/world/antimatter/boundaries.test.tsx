@@ -483,7 +483,8 @@ test('migration previews the active progress by default and offers only selectio
 });
 
 function disabled(html: string, label: string) {
-  const button = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)].find((match) => match[2] === label);
+  // 狭いカードでは見える文言を短くし、元の文言を読み上げ名に残すので、どちらでも探す。
+  const button = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)].find((match) => match[2] === label || match[1].includes(`aria-label="${label}"`));
   assert.ok(button, `ボタン ${label} がある`);
   return /\bdisabled=/.test(button[1]);
 }
@@ -861,7 +862,7 @@ test('次元タブの自動化トグルは未解放で鍵、解放後は自動�
       assert.ok(button(html(), t('adUiAutoLockedPre', 'Tickspeed', 1)).includes('is-locked'));
       assert.ok(!html().includes(t('adUiAutoLockedPre', 'Sacrifice', 1)));
       game.antimatter = bigMulNumber(adaptAdSlice(slice)!.derived.tickspeedCost, 0.25);
-      assert.match(html(), /class="adlab-action-run"[^>]*style="[^"]*--ad-fill:25%/);
+      assert.match(html(), /class="adlab-action-run[^"]*"[^>]*style="[^"]*--ad-fill:25%/);
       game.infinities = 1;
       game.infinityPoints = bigFromNumber(1);
       assert.ok(button(html(), t('adUiAutoLocked', t('adAutoLow'), 1)).includes('is-locked'));
@@ -884,4 +885,34 @@ test('狭い窓では PC 用の並びのまま縮め、縮めすぎになる幅�
   assert.equal(adPanelScale(AD_PANEL_DESIGN_WIDTH * AD_PANEL_MIN_SCALE - 1), 1);
   assert.equal(adPanelScale(0), 1);
   assert.ok(renderToStaticMarkup(<AntimatterPanel ad={adaptAdSlice(harness(createNewGame(0)))!} />).startsWith('<div class="adlab-scale-frame"><div class="adlab-lab-panel"'));
+});
+
+test('Tickspeed と Big Crunch のカードは残り時間を出し、次元は Lv と単価を左に、×2 バーと購入ボタンを右にまとめる', () => {
+  const previous = getLanguage();
+  try {
+    for (const language of ['ja', 'en', 'ko'] as const) {
+      setLanguage(language);
+      const game = createNewGame(0);
+      game.dimensions[0].bought = 23;
+      game.dimensions[0].amount = bigFromNumber(10);
+      const slice = harness(game);
+      const ad = adaptAdSlice(slice)!;
+      game.antimatter = bigMulNumber(ad.derived.tickspeedCost, 0.5);
+      const fresh = adaptAdSlice(slice)!;
+      const html = renderToStaticMarkup(<DimensionList ad={fresh} />);
+      const button = (label: string) => [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(m => m[0]).find(b => b.includes(`aria-label="${label}"`)) ?? '';
+      const tick = button(t('adBuyTickspeed'));
+      assert.ok(tick.includes(`<span>${t('adUiTickBuyShort')}</span>`));
+      assert.ok(Number.isFinite(fresh.derived.tickspeedEtaSeconds) && fresh.derived.tickspeedEtaSeconds > 0);
+      assert.ok(!tick.includes(t('adUiEtaNow')));
+      const crunch = button(t('adLabText31'));
+      assert.ok(crunch.includes(`<span>${t('adUiCrunchShort')}</span>`) && /\bdisabled=/.test(crunch));
+      assert.ok(html.includes(t('adUiLevel', 2)) && html.includes(t('adUiUnitPrice', formatNumber(fresh.derived.dimensions[0].cost))));
+      assert.ok(html.includes(t('adUiLevelTitle', 2, formatNumber(fresh.derived.preview.breakdown[0].buy10), 7, 23)));
+      game.antimatter = bigFromLog10(309);
+      const ready = renderToStaticMarkup(<DimensionList ad={adaptAdSlice(slice)!} />);
+      const readyCrunch = [...ready.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(m => m[0]).find(b => b.includes(`aria-label="${t('adLabText31')}"`)) ?? '';
+      assert.ok(readyCrunch.includes(t('adUiEtaNow')) && !/\bdisabled=/.test(readyCrunch));
+    }
+  } finally { setLanguage(previous); }
 });

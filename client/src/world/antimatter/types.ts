@@ -131,6 +131,10 @@ export interface DerivedSnapshot {
   tickspeedCost: BigNum;
   tickspeedAffordable: boolean;
   tickspeedPerPurchase: number;
+  /** 今の生産のまま次の Tickspeed を買えるまでの秒数（エンジンの到達時間の計算）。 */
+  tickspeedEtaSeconds: number;
+  /** 今の生産のまま Big Crunch できる反物質に届くまでの秒数。 */
+  infinityEtaSeconds: number;
   maxUnlockedTier: number;
   dimensions: DimensionDerived[];
   boost: RequirementDerived;
