@@ -349,6 +349,8 @@
 .win.dark { background: #2C2D35; color: #fff; }
 .winbar { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px 0 12px; background: var(--sand); font-size: 13px; flex: none; user-select: none; touch-action: none; }
 .winbar.draggable { cursor: grab; }
+.winresize { position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; z-index: 2; background: linear-gradient(135deg, transparent 55%, rgba(40, 30, 10, .28) 55%, rgba(40, 30, 10, .28) 62%, transparent 62%, transparent 74%, rgba(40, 30, 10, .28) 74%, rgba(40, 30, 10, .28) 81%, transparent 81%); }
+.win.dark .winresize { background: linear-gradient(135deg, transparent 55%, rgba(255, 255, 255, .35) 55%, rgba(255, 255, 255, .35) 62%, transparent 62%, transparent 74%, rgba(255, 255, 255, .35) 74%, rgba(255, 255, 255, .35) 81%, transparent 81%); }
 .win.dark .winbar { background: #36373F; }
 .livedot { width: 8px; height: 8px; border-radius: 50%; background: #F06A5A; flex: none; }
 .wtitle { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; white-space: nowrap; }
