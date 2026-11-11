@@ -1458,6 +1458,7 @@ export default {
   "ui841": "{0} — {1}'s live stream",
   "ui842": "Click to enlarge",
   "ui843": "Drag to move",
+  "winResize": "Drag to resize",
   "ui844": "Draw attention (temporarily highlights it in others' lists)",
   "ui845": "Draw attention",
   "ui846": "Put item away",
