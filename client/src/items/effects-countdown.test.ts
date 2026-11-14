@@ -32,10 +32,10 @@ test('countdown sound unlocks on a gesture, respects effect volume and releases 
   const originalVolume = get().audioVol;
   const voices: Oscillator[] = [], gains: Gain[] = [];
   let creations = 0, resumes = 0, state = 'suspended', rejectResume = false;
-  class Audio {
+  class Audio extends EventTarget {
     currentTime = 2;
     destination = {};
-    constructor() { creations++; }
+    constructor() { super(); creations++; }
     get state() { return state; }
     resume() {
       resumes++;
@@ -63,21 +63,30 @@ test('countdown sound unlocks on a gesture, respects effect volume and releases 
   playCountdownBeep();
   assert.equal(voices[0].type, 'sine');
   assert.deepEqual(voices[0].frequency.values, [[880, 2]]);
-  assert.deepEqual(gains[0].gain.values, [[0, 2], [0.025, 2.01], [0, 2.1]]);
+  assert.deepEqual(gains[0].gain.values, [[0, 2], [0.1, 2.01], [0, 2.1]]);
   assert.equal(voices[0].started, 2);
   assert.equal(voices[0].stopped, 2.11);
+  assert.deepEqual(gains[1].gain.values, [[0.25, 2]]);
+  set({audioMuted:true});
+  assert.deepEqual(gains[1].gain.values.at(-1), [0, 2]);
+  playCountdownBeep();
+  assert.equal(voices.length, 2);
+  set({audioVol:{...originalVolume,fx:0.4}});
+  assert.deepEqual(gains[1].gain.values.at(-1), [0, 2]);
+  set({audioMuted:false});
+  assert.deepEqual(gains[1].gain.values.at(-1), [0.4, 2]);
   voices[0].onended?.();
   assert.equal(voices[0].disconnected, true);
   assert.equal(gains[0].disconnected, true);
 
   set({ audioVol: { ...originalVolume, fx: 0 } });
   playCountdownBeep();
-  assert.equal(voices.length, 1);
+  assert.equal(voices.length, 2);
   state = 'suspended'; rejectResume = true;
   assert.doesNotThrow(prepareCountdownSound);
   await new Promise(resolve => setImmediate(resolve));
   assert.doesNotThrow(playCountdownBeep);
-  assert.equal(voices.length, 1);
+  assert.equal(voices.length, 2);
   state = 'closed';
   Object.defineProperty(globalThis, 'AudioContext', { configurable: true, value: class { constructor() { throw new Error('Audio unavailable'); } } });
   assert.doesNotThrow(prepareCountdownSound);

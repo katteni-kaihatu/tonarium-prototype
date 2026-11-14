@@ -4,6 +4,7 @@ import { clockTime, type Item } from '../../shared/items.ts';
 import { useStore, get, set, serverNow } from './store.ts';
 import { itemAction } from './items/actions.ts';
 import { volumeAt } from './spatial.ts';
+import { effectiveVolume } from './volume.ts';
 import { Icon } from './world/Icon.tsx';
 
 type ClockItem = Item & { kind: 'youtube' };
@@ -16,7 +17,7 @@ export const setUserVolume = (id: string, v: number) => set((s) => ({ volumes: {
 
 /** 自分で決めた音量と全体の音量に、ウィンドウで見ているなら等倍、3D では距離で小さく、2D でウィンドウを閉じていれば無音を掛ける */
 export function mediaVolume(item: Item) {
-  const base = userVolume(item.id) * get().audioVol.media;
+  const base = userVolume(item.id) * effectiveVolume('media');
   if (windowOpen(item.id)) return base;
   return get().mode === '3d' ? base * volumeAt(item.x, item.z) : 0;
 }

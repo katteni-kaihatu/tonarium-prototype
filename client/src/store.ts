@@ -137,6 +137,7 @@ interface State extends AdSlice {
   volumes: Record<string, number>;
   /** 全体の音量（0〜1、手元に保存）。voice は人の声、fx はサウンドボードや効果音、media は動画・YouTube・画面共有の音 */
   audioVol: { voice: number; fx: number; media: number };
+  audioMuted: boolean;
   /** 人ごとの声の音量（0〜2、アカウント ID ごとに手元に保存）。無ければ等倍 */
   peerVolume: Record<string, number>;
   /** 自分だけミュートしている人のアカウント ID（手元に保存） */
@@ -408,6 +409,7 @@ export const useStore = create<State>((set, get) => ({
     fx: savedAudioVol.fx ?? 0.05,
     media: savedAudioVol.media ?? 0.05,
   },
+  audioMuted: load<unknown>('tonarium.audioMuted', false) === true,
   peerVolume: load('tonarium.peerVolumeById', {}),
   peerMuted: load('tonarium.peerMutedIds', []),
   hubOpen: false,

@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { ANTIMATTER_CORE } from '../../../shared/antimatterLayout.ts';
 import { get, useStore, worldKindOf } from '../store.ts';
-import { fxVolume } from '../volume.ts';
 import { getAntimatterPerSecond } from './engine.mjs';
 import { subscribeAdFeedback } from './feedback.ts';
 import { AdSoundPlayer } from './audio.ts';
@@ -41,11 +40,12 @@ export function startAdAudio() {
   }
 
   function sync() {
-    player.setVolume(fxVolume());
+    player.setMuted(get().audioMuted);
+    player.setVolume(get().audioVol.fx);
     if (!sceneActive()) { player.stop(); return; }
     const gain = contextGain();
     const game = get().adGame;
-    if (!get().adBgmEnabled || !game || gain <= 0 || fxVolume() <= 0 || getAntimatterPerSecond(game).mantissa <= 0) {
+    if (!get().adBgmEnabled || !game || gain <= 0 || get().audioVol.fx <= 0 || getAntimatterPerSecond(game).mantissa <= 0) {
       player.stopProduction();
       return;
     }

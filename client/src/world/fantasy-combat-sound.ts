@@ -1,11 +1,11 @@
-import { fxVolume } from '../volume.ts';
+import { effectOutput, effectLevel } from '../effectOutput.ts';
 import { activeEffectAudioContext } from './sounds.ts';
 import { fantasyCombatSoundRecipe, type FantasyCombatSoundInput } from './fantasy-combat-audio.ts';
 
 export class FantasyCombatSoundPlayer {
  private playing=new Set<()=>void>();
  private noise=new WeakMap<AudioContext,AudioBuffer>();
- constructor(private context:()=>AudioContext|undefined,private volume:()=>number,private visible:()=>boolean){}
+ constructor(private context:()=>AudioContext|undefined,private volume:()=>number,private visible:()=>boolean, private output:(c:AudioContext)=>AudioNode = c=>c.destination){}
  play(beat:FantasyCombatSoundInput,delay=0){
   const empty=()=>{};
   if(!this.visible())return empty;
@@ -34,7 +34,7 @@ export class FantasyCombatSoundPlayer {
      oscillator.frequency.setValueAtTime(voice.hz,at);oscillator.frequency.exponentialRampToValueAtTime(voice.to,end);oscillator.connect(gain);
     }
     gain.gain.setValueAtTime(.0001,at);gain.gain.linearRampToValueAtTime(voice.gain*volume,at+.012);gain.gain.exponentialRampToValueAtTime(.0001,end);
-    gain.connect(context.destination);sources.add(source);
+    gain.connect(this.output(context));sources.add(source);
     source.onended=()=>{source.disconnect();filter?.disconnect();gain.disconnect();sources.delete(source);if(!sources.size)this.playing.delete(stop);};
     source.start(at);source.stop(end+.015);
    }
@@ -45,4 +45,4 @@ export class FantasyCombatSoundPlayer {
 }
 
 // 過去ログや非表示タブの音は、操作再開後にまとめて鳴らさない。
-export const fantasyCombatSounds=new FantasyCombatSoundPlayer(activeEffectAudioContext,fxVolume,()=>typeof document!=='undefined'&&document.visibilityState!=='hidden');
+export const fantasyCombatSounds=new FantasyCombatSoundPlayer(activeEffectAudioContext,()=>effectLevel() > 0 ? 1 : 0,()=>typeof document!=='undefined'&&document.visibilityState!=='hidden',effectOutput);

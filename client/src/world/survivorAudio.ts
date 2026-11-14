@@ -1,4 +1,4 @@
-import { fxVolume } from '../volume.ts';
+import { effectOutput, effectLevel } from '../effectOutput.ts';
 
 type SurvivorSound = 'start' | 'attack' | 'level' | 'choice' | 'hit' | 'equip' | 'boss' | 'pause' | 'resume' | 'end' | 'victory';
 
@@ -8,7 +8,7 @@ let lastAttackAt = 0;
 function context() {
   if (typeof window === 'undefined' || !window.AudioContext) return null;
   try {
-    audio ??= new AudioContext();
+    if (!audio || audio.state === 'closed') audio = new AudioContext();
     if (audio.state === 'suspended') void audio.resume().catch(() => {});
     return audio;
   } catch { return null; }
@@ -27,7 +27,7 @@ function tone(c: AudioContext, at: number, start: number, end: number, duration:
   oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, end), at + duration);
   gain.gain.setValueAtTime(Math.max(0.0001, volume), at);
   gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
-  oscillator.connect(gain).connect(c.destination);
+  oscillator.connect(gain).connect(effectOutput(c));
   oscillator.start(at);
   oscillator.stop(at + duration + 0.02);
 }
@@ -45,7 +45,7 @@ function hiss(c: AudioContext, at: number, duration: number, volume: number, cut
   gain.gain.setValueAtTime(volume, at);
   gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
   source.buffer = buffer;
-  source.connect(filter).connect(gain).connect(c.destination);
+  source.connect(filter).connect(gain).connect(effectOutput(c));
   source.start(at);
 }
 
@@ -54,8 +54,7 @@ function chord(c: AudioContext, at: number, notes: number[], duration: number, v
 }
 
 export function playSurvivorSound(kind: SurvivorSound, gear = '') {
-  const master = fxVolume();
-  if (master <= 0.001) return;
+  if (effectLevel() <= 0.001) return;
   if (kind === 'attack') {
     const now = performance.now();
     if (now - lastAttackAt < 90) return;
@@ -64,7 +63,7 @@ export function playSurvivorSound(kind: SurvivorSound, gear = '') {
   const c = context();
   if (!c) return;
   const at = c.currentTime + 0.012;
-  const v = master;
+  const v = 1;
 
   switch (kind) {
     case 'attack':
