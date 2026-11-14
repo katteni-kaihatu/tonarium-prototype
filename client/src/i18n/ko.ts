@@ -1,4 +1,8 @@
 export default {
+  audioMuteAll: "모든 소리 음소거",
+  audioUnmuteAll: "전체 음소거 해제",
+  audioMutedSettings: "음량 설정 (전체 음소거 중)",
+
   battleAddBot: "봇 추가",
   battleBlue: "파랑 팀",
   battleBot: "봇",

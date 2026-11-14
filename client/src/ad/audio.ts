@@ -28,6 +28,7 @@ export class AdSoundPlayer {
   private musicOffset = 0;
   private musicStartedAt = 0;
   private volume = 1;
+  private muted = false;
   private disposed = false;
   private resuming = false;
   private lastAction = new Map<string, number>();
@@ -41,10 +42,21 @@ export class AdSoundPlayer {
   unlock = () => {
     if (this.disposed) return;
     try {
+      if (this.context?.state === 'closed') {
+        this.stop();
+        this.musicAbort.abort();
+        this.musicAbort = new AbortController();
+        this.output?.disconnect();
+        this.context = null;
+        this.musicBuffer = null;
+        this.musicLoad = null;
+        this.musicFailed = false;
+        this.resuming = false;
+      }
       if (!this.context) {
         this.context = this.createContext();
         this.output = this.context.createGain();
-        this.output.gain.value = this.volume;
+        this.output.gain.value = this.muted ? 0 : this.volume;
         this.output.connect(this.context.destination);
       }
       if (this.context.state === 'suspended' && !this.resuming) {
@@ -59,8 +71,13 @@ export class AdSoundPlayer {
     const next = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
     if (next === this.volume) return;
     this.volume = next;
-    if (this.output && this.context) this.output.gain.setValueAtTime(this.volume, this.context.currentTime);
+    if (this.output && this.context) this.output.gain.setValueAtTime(this.muted ? 0 : this.volume, this.context.currentTime);
     if (this.volume === 0) this.stop();
+  }
+
+  setMuted(muted: boolean) {
+    this.muted = muted;
+    if (this.output && this.context) this.output.gain.setValueAtTime(muted ? 0 : this.volume, this.context.currentTime);
   }
 
   play(event: AdFeedbackEvent) {
@@ -130,6 +147,7 @@ export class AdSoundPlayer {
             this.musicBuffer = buffer;
             this.syncMusic();
           } catch {
+            if (this.disposed || c !== this.context) return;
             this.musicFailed = true;
             this.stopProduction();
           }

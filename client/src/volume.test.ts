@@ -1,5 +1,47 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { get, set } from './store.ts';
+import { effectiveVolume, setMasterVolume, toggleAudioMute } from './volume.ts';
+
+test('global mute persists separately, preserves other state and restores edited levels', async t => {
+  const before = get();
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const values = new Map<string, string>();
+  const writes: string[] = [];
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { writes.push(key); values.set(key, value); },
+  } });
+  t.after(() => {
+    set(before);
+    if (previous) Object.defineProperty(globalThis, 'localStorage', previous);
+    else Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+  const levels = { voice: 0.8, fx: 0.25, media: 0.6 };
+  values.set('tonarium.audioVol', JSON.stringify(levels));
+  const fresh = await import(new URL('./store.ts?mute-default', import.meta.url).href) as typeof import('./store.ts');
+  assert.equal(fresh.get().audioMuted, false);
+  set({ audioMuted: false, audioVol: levels });
+  const unchanged = get();
+  toggleAudioMute();
+  assert.deepEqual(writes, ['tonarium.audioMuted']);
+  assert.equal(values.get('tonarium.audioMuted'), 'true');
+  assert.equal(get().audioVol, levels);
+  for (const kind of ['voice', 'fx', 'media'] as const) assert.equal(effectiveVolume(kind), 0);
+  const reloaded = await import(new URL('./store.ts?mute-restored', import.meta.url).href) as typeof import('./store.ts');
+  assert.equal(reloaded.get().audioMuted, true);
+  assert.deepEqual(reloaded.get().audioVol, levels);
+  setMasterVolume('fx', 0.7);
+  assert.equal(effectiveVolume('fx'), 0);
+  assert.equal(get().audioVol.fx, 0.7);
+  toggleAudioMute();
+  assert.equal(effectiveVolume('fx'), 0.7);
+  assert.equal(effectiveVolume('voice'), 0.8);
+  assert.equal(effectiveVolume('media'), 0.6);
+  for (const key of Object.keys(unchanged) as (keyof typeof unchanged)[]) {
+    if (key !== 'audioMuted' && key !== 'audioVol') assert.equal(get()[key], unchanged[key], key);
+  }
+});
 
 test('chat notification sound defaults on and saved false survives reload', async (t) => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');

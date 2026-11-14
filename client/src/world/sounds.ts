@@ -1,11 +1,11 @@
-import { fxVolume } from '../volume.ts';
+import { effectOutput, effectLevel } from '../effectOutput.ts';
 import type { EmoteId } from '../../../shared/emotes.ts';
 
 let ctx: AudioContext | null = null;
 
 /** Call on the dock gesture so browsers can unlock audio before the server echo. */
 export function unlockEmoteAudio() {
-  try { ctx ??= new AudioContext(); if (ctx.state === 'suspended') void ctx.resume().catch(() => {}); } catch { /* optional audio */ }
+  try { if (!ctx || ctx.state === 'closed') ctx = new AudioContext(); if (ctx.state === 'suspended') void ctx.resume().catch(() => {}); } catch { /* optional audio */ }
 }
 
 export function activeEffectAudioContext(): AudioContext | undefined {
@@ -14,22 +14,22 @@ export function activeEffectAudioContext(): AudioContext | undefined {
 
 export function playChatNotification() {
   try {
-    const volume = fxVolume() * 0.22;
-    if (volume <= 0) return;
+    const volume = 0.22;
+    if (effectLevel() <= 0) return;
     if (!ctx || ctx.state !== 'running') return;
-    tone(ctx, ctx.destination, ctx.currentTime, 880, 880, 0.12, 'sine', volume);
-    tone(ctx, ctx.destination, ctx.currentTime + 0.1, 1174, 1174, 0.16, 'sine', volume * 0.7);
+    tone(ctx, effectOutput(ctx), ctx.currentTime, 880, 880, 0.12, 'sine', volume);
+    tone(ctx, effectOutput(ctx), ctx.currentTime + 0.1, 1174, 1174, 0.16, 'sine', volume * 0.7);
   } catch { /* 音声が使えなくても受信は続ける。 */ }
 }
 
 export function playEmoteSound(id: EmoteId, distanceVolume: number) {
-  const volume = distanceVolume * fxVolume() * 0.22;
-  if (volume <= 0.001) return;
+  const volume = distanceVolume * 0.22;
+  if (volume * effectLevel() <= 0.001) return;
   try {
-    ctx ??= new AudioContext();
+    if (!ctx || ctx.state === 'closed') ctx = new AudioContext();
     if (ctx.state !== 'running') return;
     const t = ctx.currentTime;
-    const out = ctx.destination;
+    const out = effectOutput(ctx);
     if (id === 'cheer' || id === 'bow') {
       (id === 'cheer' ? [523, 659, 784, 1046] : [784, 659]).forEach((hz, i) => tone(ctx!, out, t + i * .16, hz, hz, .25, 'sine', volume));
     } else if (id === 'wave') {
@@ -92,22 +92,22 @@ const SYNTH: Record<string, (c: AudioContext, out: AudioNode, t: number) => void
 /** つんつんされたときの音（自分だけに鳴る） */
 export function playPoke() {
   try {
-    ctx ??= new AudioContext();
+    if (!ctx || ctx.state === 'closed') ctx = new AudioContext();
     const t = ctx.currentTime;
-    const v = 0.3 * fxVolume();
-    tone(ctx, ctx.destination, t, 700, 1100, 0.09, 'sine', v);
-    tone(ctx, ctx.destination, t + 0.13, 800, 1300, 0.09, 'sine', v);
+    const v = 0.3;
+    tone(ctx, effectOutput(ctx), t, 700, 1100, 0.09, 'sine', v);
+    tone(ctx, effectOutput(ctx), t + 0.13, 800, 1300, 0.09, 'sine', v);
   } catch { /* 音が出せない環境では無視 */ }
 }
 
 /** ダイスが転がる音。演出だけの任意機能なので、鳴らせない環境では黙って諦める。 */
 export function playDiceRoll(durationMs=2500) {
-  const volume = fxVolume() * 0.42;
-  if (volume <= 0.001) return;
+  const volume = 0.42;
+  if (volume * effectLevel() <= 0.001) return;
   try {
-    ctx ??= new AudioContext();
+    if (!ctx || ctx.state === 'closed') ctx = new AudioContext();
     if (ctx.state !== 'running') { void ctx.resume().catch(() => {}); }
-    const t = ctx.currentTime, out = ctx.destination;
+    const t = ctx.currentTime, out = effectOutput(ctx);
     for (let i = 0; i < 7; i++) noise(ctx, out, t + i * 0.075 + Math.random() * 0.02, 0.05, volume);
     tone(ctx, out, t, 240, 90, 0.2, 'square', volume * 0.22);
     tone(ctx, out, t + 0.5, 520, 300, 0.12, 'triangle', volume * 0.3);
@@ -116,13 +116,13 @@ export function playDiceRoll(durationMs=2500) {
 
 export function playSynth(id: string, distanceVolume: number) {
   const f = SYNTH[id];
-  const volume = distanceVolume * fxVolume();
-  if (!f || volume <= 0.001) return;
+  const volume = distanceVolume;
+  if (!f || volume * effectLevel() <= 0.001) return;
   try {
-    ctx ??= new AudioContext();
+    if (!ctx || ctx.state === 'closed') ctx = new AudioContext();
     const g = ctx.createGain();
     g.gain.value = volume;
-    g.connect(ctx.destination);
+    g.connect(effectOutput(ctx));
     f(ctx, g, ctx.currentTime);
   } catch { /* 音が出せない環境では無視 */ }
 }

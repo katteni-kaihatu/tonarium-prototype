@@ -77,6 +77,31 @@ function fixture(fetchImpl?: typeof fetch) {
 }
 
 async function settle() { await new Promise<void>((resolve) => setImmediate(resolve)); }
+
+test('global mute silences running and new notes and music without stopping the clock', async () => {
+  const { player, context } = fixture();
+  player.setVolume(0.4);
+  player.unlock();
+  player.production(0.5);
+  await settle();
+  player.play({ kind: 'crunch' });
+  const source = context.sources[0];
+  const voices = context.voices.slice();
+  player.setMuted(true);
+  assert.equal(context.gains[0].gain.value, 0);
+  assert.equal(source.stopped, false);
+  for (const voice of voices) assert.equal(voice.disconnected, false);
+  context.currentTime = 2;
+  player.play({ kind: 'save' });
+  assert.ok(context.voices.length > voices.length);
+  player.setVolume(0.7);
+  assert.equal(context.gains[0].gain.value, 0);
+  player.setMuted(false);
+  assert.equal(context.gains[0].gain.value, 0.7);
+  assert.equal(context.sources.length, 1);
+  assert.equal(source.stopped, false);
+  player.dispose();
+});
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((r) => { resolve = r; });

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { clockTime, type Item } from '../../shared/items.ts';
-import { get, serverNow } from './store.ts';
+import { get, serverNow, useStore } from './store.ts';
 
 type YouTubeItem = Item & { kind: 'youtube' };
 
@@ -49,6 +49,16 @@ export function YouTubePlayer({ item, volume }: { item: YouTubeItem; volume: () 
     let ready = false;
     let alive = true;
     let timer = 0;
+    let appliedVolume: number | undefined;
+    const applyVolume = () => {
+      if (!ready || !player) return;
+      const v = Math.round(Math.max(0, Math.min(1, volRef.current())) * 100);
+      if (v === appliedVolume) return;
+      appliedVolume = v;
+      player.setVolume(v);
+      if (v <= 0) player.mute(); else player.unMute();
+    };
+    const unsubscribe = useStore.subscribe(applyVolume);
     const host = document.createElement('div');
     box.current!.appendChild(host);
     void loadApi().then((YT) => {
@@ -60,6 +70,7 @@ export function YouTubePlayer({ item, volume }: { item: YouTubeItem; volume: () 
         events: {
           onReady: () => {
             ready = true;
+            applyVolume();
             const set = players.get(item.id) ?? new Set();
             set.add(player!);
             players.set(item.id, set);
@@ -69,6 +80,7 @@ export function YouTubePlayer({ item, volume }: { item: YouTubeItem; volume: () 
       timer = window.setInterval(() => {
         const it = get().items[item.id];
         if (!player || !ready || it?.kind !== 'youtube') return;
+        applyVolume();
         const target = clockTime(it.clock, serverNow());
         const dur = player.getDuration() || Infinity;
         const state = player.getPlayerState();
@@ -76,12 +88,11 @@ export function YouTubePlayer({ item, volume }: { item: YouTubeItem; volume: () 
         if (Math.abs(player.getCurrentTime() - Math.min(target, dur)) > DRIFT) player.seekTo(Math.min(target, dur), true);
         if (it.clock.playing && target < dur && !playing) player.playVideo();
         if (!it.clock.playing && playing) player.pauseVideo();
-        const v = Math.round(Math.min(1, volRef.current()) * 100);
-        if (v <= 0) player.mute(); else { player.unMute(); player.setVolume(v); }
       }, 400);
     });
     return () => {
       alive = false;
+      unsubscribe();
       clearInterval(timer);
       if (player) {
         players.get(item.id)?.delete(player);

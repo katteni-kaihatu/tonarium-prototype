@@ -1,5 +1,5 @@
 import { get, set } from '../store.ts';
-import { fxVolume } from '../volume.ts';
+import { effectOutput, effectLevel } from '../effectOutput.ts';
 
 let audio: AudioContext | null = null;
 
@@ -12,16 +12,16 @@ export function prepareCountdownSound() {
 
 export function playCountdownBeep() {
   try {
-    if (!audio || audio.state !== 'running' || fxVolume() <= 0) return;
+    if (!audio || audio.state !== 'running' || effectLevel() <= 0) return;
     const t = audio.currentTime;
     const osc = audio.createOscillator();
     const gain = audio.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(880, t);
     gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.1 * fxVolume(), t + 0.01);
+    gain.gain.linearRampToValueAtTime(0.1, t + 0.01);
     gain.gain.linearRampToValueAtTime(0, t + 0.1);
-    osc.connect(gain).connect(audio.destination);
+    osc.connect(gain).connect(effectOutput(audio));
     osc.onended = () => { osc.disconnect(); gain.disconnect(); };
     osc.start(t);
     osc.stop(t + 0.11);
@@ -30,7 +30,7 @@ export function playCountdownBeep() {
 
 export function playPico() {
   try {
-    audio ??= new AudioContext();
+    if (!audio || audio.state === 'closed') audio = new AudioContext();
     const t = audio.currentTime;
     const osc = audio.createOscillator();
     const gain = audio.createGain();
@@ -38,9 +38,9 @@ export function playPico() {
     osc.frequency.setValueAtTime(1400, t);
     osc.frequency.exponentialRampToValueAtTime(2600, t + 0.05);
     osc.frequency.exponentialRampToValueAtTime(900, t + 0.12);
-    gain.gain.setValueAtTime(Math.max(0.0001, 0.12 * fxVolume()), t);
+    gain.gain.setValueAtTime(Math.max(0.0001, 0.12), t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-    osc.connect(gain).connect(audio.destination);
+    osc.connect(gain).connect(effectOutput(audio));
     osc.start(t);
     osc.stop(t + 0.17);
   } catch { /* 音が出せない環境では無視 */ }
@@ -48,7 +48,7 @@ export function playPico() {
 
 export function playShutter() {
   try {
-    audio ??= new AudioContext();
+    if (!audio || audio.state === 'closed') audio = new AudioContext();
     const t = audio.currentTime;
     const len = Math.floor(audio.sampleRate * 0.08);
     const buf = audio.createBuffer(1, len, audio.sampleRate);
@@ -56,9 +56,9 @@ export function playShutter() {
     for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 2;
     const src = audio.createBufferSource();
     const gain = audio.createGain();
-    gain.gain.value = 0.25 * fxVolume();
+    gain.gain.value = 0.25;
     src.buffer = buf;
-    src.connect(gain).connect(audio.destination);
+    src.connect(gain).connect(effectOutput(audio));
     src.start(t);
   } catch { /* 音が出せない環境では無視 */ }
 }
