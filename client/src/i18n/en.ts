@@ -1,4 +1,8 @@
 export default {
+  audioMuteAll: "Mute all audio",
+  audioUnmuteAll: "Unmute all audio",
+  audioMutedSettings: "Volume settings (all audio muted)",
+
   battleAddBot: "Add bot",
   battleBlue: "Blue team",
   battleBot: "Bot",

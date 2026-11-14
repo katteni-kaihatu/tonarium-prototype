@@ -1,4 +1,8 @@
 export default {
+  audioMuteAll: "すべての音をミュート",
+  audioUnmuteAll: "全体ミュートを解除",
+  audioMutedSettings: "音量設定（全体ミュート中）",
+
   battleAddBot: "ボットを追加",
   battleBlue: "青チーム",
   battleBot: "ボット",

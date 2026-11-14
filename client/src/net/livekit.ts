@@ -4,6 +4,7 @@ import {
   Room, RoomEvent, Track, LocalVideoTrack,
   type RemoteTrack, type RemoteTrackPublication, type Participant as LkParticipant,
 } from 'livekit-client';
+import { effectiveVolume } from '../volume.ts';
 import { get, set, useStore } from '../store.ts';
 import { addVoice, removeAllVoices, removeVoice } from '../spatial.ts';
 import { send } from './ws.ts';
@@ -109,7 +110,7 @@ function syncParticipants() {
 
 /** 画面共有の音は空間に置かないので、要素の音量に全体の「動画・画面共有」を掛けるだけ */
 const shareAudio = new Set<HTMLMediaElement>();
-useStore.subscribe((s) => { for (const el of shareAudio) el.volume = s.audioVol.media; });
+useStore.subscribe((s) => { for (const el of shareAudio) el.volume = effectiveVolume('media', s); });
 
 function attachRemote(track: RemoteTrack, pub: RemoteTrackPublication, identity: string) {
   const camId = camIdOf(pub.trackName);
@@ -125,7 +126,9 @@ function attachRemote(track: RemoteTrack, pub: RemoteTrackPublication, identity:
     return;
   }
   if (track.kind === Track.Kind.Audio) {
-    const el = track.attach();
+    const el = document.createElement('audio');
+    el.volume = track.source === Track.Source.Microphone ? 0 : effectiveVolume('media');
+    track.attach(el);
     if (track.source === Track.Source.Microphone) {
       // 空間オーディオで鳴らす。Chrome では要素にもつながないと音が流れないので、要素は無音にして残す。
       // LiveKit は startAudio や相手のミュート解除で muted を外すので、音量も 0 にしないと二重に鳴る
@@ -133,7 +136,7 @@ function attachRemote(track: RemoteTrack, pub: RemoteTrackPublication, identity:
       el.volume = 0;
       addVoice(identity, track.mediaStreamTrack);
     } else {
-      el.volume = get().audioVol.media;
+      el.volume = effectiveVolume('media');
       shareAudio.add(el);
     }
     audioHost.appendChild(el);
@@ -186,6 +189,7 @@ function resetVoiceState() {
   selectedShareTrack?.detach(shareVideoEl);
   selectedShareTrack = undefined;
   audioHost.replaceChildren();
+  shareAudio.clear();
   camHolder.replaceChildren();
   removeAllVoices();
   camVideos.clear();
