@@ -21,6 +21,22 @@ Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
 } });
 const { setLanguage, getLanguage, subscribeLanguage, t, msg, systemText, localized, formatDate, sourceText } = await import('./core.ts');
 
+test('global audio mute labels are translated in all three languages', () => {
+  const previous = getLanguage();
+  try {
+    for (const [language, mute, unmute, settings] of [
+      ['ja', 'すべての音をミュート', '全体ミュートを解除', '音量設定（全体ミュート中）'],
+      ['en', 'Mute all audio', 'Unmute all audio', 'Volume settings (all audio muted)'],
+      ['ko', '모든 소리 음소거', '전체 음소거 해제', '음량 설정 (전체 음소거 중)'],
+    ] as const) {
+      setLanguage(language);
+      assert.equal(t('audioMuteAll'), mute);
+      assert.equal(t('audioUnmuteAll'), unmute);
+      assert.equal(t('audioMutedSettings'), settings);
+    }
+  } finally { setLanguage(previous); }
+});
+
 test('reaction add and remove labels follow all three languages', () => {
   const previous = getLanguage();
   try {

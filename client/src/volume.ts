@@ -31,4 +31,13 @@ export function togglePeerMute(id: string) {
   });
 }
 
-export const fxVolume = () => get().audioVol.fx;
+export function toggleAudioMute() {
+  set((s) => {
+    const audioMuted = !s.audioMuted;
+    save('tonarium.audioMuted', audioMuted);
+    return { audioMuted };
+  });
+}
+
+export const effectiveVolume = (kind: VolumeKind, s = get()) => s.audioMuted ? 0 : s.audioVol[kind];
+export const fxVolume = () => effectiveVolume('fx');

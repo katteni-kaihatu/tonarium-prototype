@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { VOICE_RANGE, placeDistance, type Place } from '../../shared/places.ts';
 import { formatDistance, nearbyUsers, projectProximity, stepTrend, type ListedItem, type ListedPlayer, type TrendState } from './nearby.ts';
 import { useStore, get, isBroadcast } from './store.ts';
-import { peerGain } from './volume.ts';
+import { effectiveVolume, peerGain } from './volume.ts';
 import { placesFromInputs } from './placesMemo.ts';
 
 export { formatDistance };
@@ -222,14 +222,20 @@ function update() {
       const dx = p.x - me.x;
       const dz = p.z - me.z;
       const d = placeDistance(p, me);
-      g = (bc ? 1 : falloff(d)) * s.audioVol.voice * peerGain(id, s);
+      g = (bc ? 1 : falloff(d)) * effectiveVolume('voice', s) * peerGain(id, s);
       if (directional && d > 0.3) pan = ((dx * Math.cos(me.ry) - dz * Math.sin(me.ry)) / d) * 0.8;
     }
-    v.gain.gain.setTargetAtTime(g, ctx.currentTime, 0.08);
+    v.gain.gain.cancelScheduledValues(ctx.currentTime);
+    if (g === 0) v.gain.gain.setValueAtTime(0, ctx.currentTime);
+    else v.gain.gain.setTargetAtTime(g, ctx.currentTime, 0.08);
     v.pan.pan.setTargetAtTime(pan, ctx.currentTime, 0.08);
   }
 }
 
+useStore.subscribe((s, before) => {
+  if (s.audioMuted !== before.audioMuted || s.audioVol !== before.audioVol || s.peerVolume !== before.peerVolume
+    || s.peerMuted !== before.peerMuted || s.blocked !== before.blocked) update();
+});
 setInterval(update, 100);
 
 // 開発時のデバッグ用

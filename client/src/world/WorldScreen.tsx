@@ -154,8 +154,8 @@ function Soundboard({ anchor, onClose }: { anchor: DOMRect; onClose: () => void 
 }
 
 function Dock() {
-  const { voice, micEnabled, sharer, selfId, winMode } = useStore(useShallow((s) => ({
-    voice: s.voice, micEnabled: s.micEnabled, sharer: s.sharer, selfId: s.selfId, winMode: s.winMode,
+  const { voice, micEnabled, sharer, selfId, winMode, audioMuted } = useStore(useShallow((s) => ({
+    voice: s.voice, micEnabled: s.micEnabled, sharer: s.sharer, selfId: s.selfId, winMode: s.winMode, audioMuted: s.audioMuted,
   })));
   const [sb, setSb] = useState<DOMRect | null>(null);
   const [vol, setVol] = useState<DOMRect | null>(null);
@@ -177,8 +177,8 @@ function Dock() {
         <Icon name="music" size={22} />
       </button>
       <EmoteDockButton />
-      <button className="dk" aria-label={tr("ui824")} title={tr("ui824")} data-popanchor onClick={(e) => setVol(vol ? null : e.currentTarget.getBoundingClientRect())}>
-        <Icon name="volume" size={22} />
+      <button className="dk" aria-label={audioMuted ? tr("audioMutedSettings") : tr("ui824")} title={audioMuted ? tr("audioMutedSettings") : tr("ui824")} data-popanchor onClick={(e) => setVol(vol ? null : e.currentTarget.getBoundingClientRect())}>
+        <Icon name={audioMuted ? 'volumeOff' : 'volume'} size={22} />
       </button>
       <span className="dsep" />
       <div className="dseg" role="radiogroup" aria-label={tr("ui869")}>

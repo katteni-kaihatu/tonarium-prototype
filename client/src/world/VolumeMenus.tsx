@@ -1,7 +1,7 @@
 import { sourceText as uiSource } from '../i18n/core.ts';
 import { localized, t as tr } from '../i18n/index.ts';
 import { useStore } from '../store.ts';
-import { peerLevel, setMasterVolume, setPeerVolume, togglePeerMute, type VolumeKind } from '../volume.ts';
+import { toggleAudioMute, peerLevel, setMasterVolume, setPeerVolume, togglePeerMute, type VolumeKind } from '../volume.ts';
 import { Popover } from './common.tsx';
 import { Icon } from './Icon.tsx';
 
@@ -23,9 +23,13 @@ function Slider({ label, value, max, onChange }: { label: string; value: number;
 /** ドックから開く全体の音量 */
 export function MasterVolume({ anchor, onClose }: { anchor: DOMRect; onClose: () => void }) {
   const vol = useStore((s) => s.audioVol);
+  const muted = useStore((s) => s.audioMuted);
   return (
     <Popover anchor={anchor} side="up" onClose={onClose} className="volume">
       <span className="menutitle">{tr("ui37")}</span>
+      <button className={`ib menuitem ${muted ? 'on' : ''}`} aria-pressed={muted} onClick={toggleAudioMute}>
+        <Icon name={muted ? 'volumeOff' : 'volume'} />{muted ? tr('audioUnmuteAll') : tr('audioMuteAll')}
+      </button>
       {KINDS.map((k) => <Slider key={k.kind} label={k.label} value={vol[k.kind]} max={1} onChange={(v) => setMasterVolume(k.kind, v)} />)}
     </Popover>
   );
